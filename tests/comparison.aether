@@ -1,0 +1,29 @@
+(DEFINE_MODULE
+  (NAME comparison)
+  (INTENT "Comparison operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "max")
+      (INTENT "Return the maximum of two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN x y)
+          (THEN_EXECUTE (RETURN_VALUE x))
+          (ELSE_EXECUTE (RETURN_VALUE y))
+        )
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "is_equal")
+      (INTENT "Check if two integers are equal")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS BOOLEAN)
+      (BODY
+        (RETURN_VALUE (PREDICATE_EQUALS x y))
+      )
+    )
+  )
+)

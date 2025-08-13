@@ -1,0 +1,32 @@
+(DEFINE_MODULE
+  (NAME constants_test)
+  (INTENT "Test constant declarations and usage")
+  (CONTENT
+    (DECLARE_CONSTANT (NAME PI) (TYPE FLOAT) (VALUE 3.14159))
+    (DECLARE_CONSTANT (NAME MAX_SIZE) (TYPE INTEGER) (VALUE 100))
+    (DECLARE_CONSTANT (NAME GREETING) (TYPE STRING) (VALUE "Hello, World!"))
+    
+    (DEFINE_FUNCTION
+      (NAME circle_area)
+      (INTENT "Calculate area of a circle using PI constant")
+      (ACCEPTS_PARAMETER (NAME radius) (TYPE FLOAT))
+      (RETURNS FLOAT)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY PI (EXPRESSION_MULTIPLY radius radius)))))
+    
+    (DEFINE_FUNCTION
+      (NAME check_limit)
+      (INTENT "Check if value is within maximum size")
+      (ACCEPTS_PARAMETER (NAME value) (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO value MAX_SIZE)
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE (RETURN_VALUE 0)))))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test constant usage")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION check_limit 50))))))

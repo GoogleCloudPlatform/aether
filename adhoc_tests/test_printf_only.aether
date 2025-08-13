@@ -1,0 +1,10 @@
+(DEFINE_MODULE
+  (NAME printf_only)
+  (INTENT "Test printf only")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Hello from printf\\n")
+        (RETURN_VALUE 0)))))

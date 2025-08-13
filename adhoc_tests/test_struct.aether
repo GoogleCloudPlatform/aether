@@ -1,0 +1,74 @@
+(DEFINE_MODULE
+  (NAME test_struct)
+  (INTENT "Test struct type definitions and usage")
+  (CONTENT
+    ; Define a simple struct
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Point)
+      (INTENT "A 2D point")
+      (FIELD x INTEGER)
+      (FIELD y INTEGER))
+    
+    ; Define a struct with different types
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Person)
+      (INTENT "A person record")
+      (FIELD name STRING)
+      (FIELD age INTEGER)
+      (FIELD height FLOAT))
+    
+    ; External printf for testing
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    ; Main function to test structs
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create a Point
+        (DECLARE_VARIABLE (NAME p1) (TYPE Point))
+        (ASSIGN
+          (TARGET_VARIABLE p1)
+          (SOURCE_EXPRESSION 
+            (CONSTRUCT Point
+              (FIELD_VALUE x 10)
+              (FIELD_VALUE y 20))))
+        
+        ; Access fields
+        (DECLARE_VARIABLE (NAME x_val) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE x_val)
+          (SOURCE_EXPRESSION (GET_FIELD_VALUE p1 x)))
+        
+        (CALL_FUNCTION printf "Point x: %d\n" x_val)
+        
+        ; Create a Person
+        (DECLARE_VARIABLE (NAME person) (TYPE Person))
+        (ASSIGN
+          (TARGET_VARIABLE person)
+          (SOURCE_EXPRESSION
+            (CONSTRUCT Person
+              (FIELD_VALUE name "Alice")
+              (FIELD_VALUE age 30)
+              (FIELD_VALUE height 5.6))))
+        
+        ; Access person fields
+        (DECLARE_VARIABLE (NAME person_name) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE person_name)
+          (SOURCE_EXPRESSION (GET_FIELD_VALUE person name)))
+        
+        (DECLARE_VARIABLE (NAME person_age) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE person_age)
+          (SOURCE_EXPRESSION (GET_FIELD_VALUE person age)))
+        
+        (CALL_FUNCTION printf "Person: %s, age %d\n" person_name person_age)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

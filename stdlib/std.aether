@@ -1,0 +1,23 @@
+; AetherScript Standard Library
+; Main module that exports all standard library functionality
+
+(DEFINE_MODULE
+  (NAME "std")
+  (INTENT "AetherScript standard library providing core functionality with safety guarantees")
+  
+  ; Import all submodules
+  (IMPORT_MODULE "std.io")
+  (IMPORT_MODULE "std.collections")
+  (IMPORT_MODULE "std.math")
+  (IMPORT_MODULE "std.time")
+  (IMPORT_MODULE "std.net")
+  (IMPORT_MODULE "std.concurrency")
+  
+  ; Re-export all submodules for convenience
+  (EXPORT_MODULE "io")
+  (EXPORT_MODULE "collections")
+  (EXPORT_MODULE "math")
+  (EXPORT_MODULE "time")
+  (EXPORT_MODULE "net")
+  (EXPORT_MODULE "concurrency")
+)

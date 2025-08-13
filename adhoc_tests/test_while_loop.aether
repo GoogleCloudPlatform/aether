@@ -1,0 +1,19 @@
+(DEFINE_MODULE
+  (NAME while_test)
+  (INTENT "Test WHILE loop functionality")
+  (CONTENT    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test WHILE loop")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "counter") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE counter)
+          (SOURCE_EXPRESSION 0))
+        (LOOP_WHILE_CONDITION (PREDICATE_LESS_THAN counter 3)
+          (ITERATION_BODY
+            (ASSIGN
+              (TARGET_VARIABLE counter)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD counter 1)))))
+        (RETURN_VALUE counter)))))

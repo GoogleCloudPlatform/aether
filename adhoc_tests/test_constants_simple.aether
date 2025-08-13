@@ -1,0 +1,28 @@
+(DEFINE_MODULE
+  (NAME constants_test)
+  (INTENT "Test calculations with literal values")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "circle_area_approx")
+      (INTENT "Calculate approximate area of a circle")
+      (ACCEPTS_PARAMETER (NAME "radius") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY 3 (EXPRESSION_MULTIPLY radius radius)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "check_limit")
+      (INTENT "Check if value is within maximum size of 100")
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN value 101)
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE (RETURN_VALUE 0)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test calculations with literal values")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION check_limit 50))))))

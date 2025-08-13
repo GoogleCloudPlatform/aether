@@ -1,0 +1,29 @@
+(DEFINE_MODULE
+  (NAME test_constants)
+  (INTENT "Test multiple constant declarations")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME PI_APPROX)
+      (TYPE INTEGER)
+      (VALUE 3)
+      (INTENT "Simple PI approximation"))
+    
+    (DECLARE_CONSTANT
+      (NAME MAX_SIZE)
+      (TYPE INTEGER)
+      (VALUE 100)
+      (INTENT "Maximum size limit"))
+    
+    (DEFINE_FUNCTION
+      (NAME test_constants)
+      (INTENT "Test using multiple constants")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD PI_APPROX MAX_SIZE))))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Entry point")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION test_constants))))))

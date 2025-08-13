@@ -1,0 +1,233 @@
+; Test suite for FFI functionality
+
+(DEFINE_MODULE
+  (NAME "test_ffi")
+  (INTENT "Test foreign function interface features")
+  
+  (IMPORT_MODULE "std.testing")
+  
+  (CONTENT
+    ; External function from our test library
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "test_add")
+      (LIBRARY "./libffi_test.dylib")
+      (SYMBOL "add_numbers")
+      (RETURNS (TYPE INT))
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INT) (PASSING BY_VALUE))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INT) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    ; Test basic FFI call
+    (DEFINE_FUNCTION
+      (NAME "test_basic_ffi_call")
+      (INTENT "Test calling a simple external function")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (DECLARE_VARIABLE (NAME "result") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "test_add"
+            (ARGUMENTS 
+              (INTEGER_LITERAL 5)
+              (INTEGER_LITERAL 3)))))
+        
+        (CALL_FUNCTION "std.testing.assert_equals"
+          (ARGUMENTS
+            (VARIABLE_REFERENCE "result")
+            (INTEGER_LITERAL 8)
+            (STRING_LITERAL "FFI add function should return correct sum")))
+        
+        (RETURN_VOID)))
+    
+    ; Test pointer parameters
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "test_modify_int")
+      (LIBRARY "./libffi_test.dylib")
+      (SYMBOL "modify_int")
+      (RETURNS (TYPE VOID))
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE (POINTER INT)) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    (DEFINE_FUNCTION
+      (NAME "test_pointer_parameters")
+      (INTENT "Test passing pointers to external functions")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (DECLARE_VARIABLE (NAME "value") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 10)))
+        
+        (CALL_FUNCTION "test_modify_int"
+          (ARGUMENTS (ADDRESS_OF (VARIABLE_REFERENCE "value"))))
+        
+        ; Assume the function doubles the value
+        (CALL_FUNCTION "std.testing.assert_equals"
+          (ARGUMENTS
+            (VARIABLE_REFERENCE "value")
+            (INTEGER_LITERAL 20)
+            (STRING_LITERAL "External function should modify value through pointer")))
+        
+        (RETURN_VOID)))
+    
+    ; Test string passing
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "test_string_length")
+      (LIBRARY "./libffi_test.dylib")
+      (SYMBOL "get_string_length")
+      (RETURNS (TYPE SIZE_T))
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE (POINTER CHAR)) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    (DEFINE_FUNCTION
+      (NAME "test_string_ffi")
+      (INTENT "Test passing strings to external functions")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (DECLARE_VARIABLE (NAME "test_str") (TYPE STRING)
+          (INITIAL_VALUE (STRING_LITERAL "Hello")))
+        
+        (DECLARE_VARIABLE (NAME "c_str") (TYPE (POINTER CHAR))
+          (INITIAL_VALUE (STRING_TO_CSTR (VARIABLE_REFERENCE "test_str"))))
+        
+        (DECLARE_VARIABLE (NAME "length") (TYPE SIZE_T)
+          (INITIAL_VALUE (CALL_FUNCTION "test_string_length"
+            (ARGUMENTS (VARIABLE_REFERENCE "c_str")))))
+        
+        (CALL_FUNCTION "std.testing.assert_equals"
+          (ARGUMENTS
+            (VARIABLE_REFERENCE "length")
+            (INTEGER_LITERAL 5)
+            (STRING_LITERAL "External function should return correct string length")))
+        
+        (RETURN_VOID)))
+    
+    ; Test struct FFI
+    (DEFINE_TYPE
+      (NAME "TestPoint")
+      (STRUCTURED_TYPE
+        (FIELD (NAME "x") (TYPE INT))
+        (FIELD (NAME "y") (TYPE INT)))
+      (LAYOUT C_COMPATIBLE))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "test_point_sum")
+      (LIBRARY "./libffi_test.dylib")
+      (SYMBOL "sum_point_coords")
+      (RETURNS (TYPE INT))
+      (ACCEPTS_PARAMETER (NAME "point") (TYPE (POINTER "TestPoint")) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    (DEFINE_FUNCTION
+      (NAME "test_struct_ffi")
+      (INTENT "Test passing structs to external functions")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (DECLARE_VARIABLE (NAME "point") (TYPE "TestPoint")
+          (INITIAL_VALUE (CONSTRUCT "TestPoint"
+            (FIELD_VALUE (NAME "x") (VALUE (INTEGER_LITERAL 3)))
+            (FIELD_VALUE (NAME "y") (VALUE (INTEGER_LITERAL 4))))))
+        
+        (DECLARE_VARIABLE (NAME "sum") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "test_point_sum"
+            (ARGUMENTS (ADDRESS_OF (VARIABLE_REFERENCE "point"))))))
+        
+        (CALL_FUNCTION "std.testing.assert_equals"
+          (ARGUMENTS
+            (VARIABLE_REFERENCE "sum")
+            (INTEGER_LITERAL 7)
+            (STRING_LITERAL "External function should sum struct fields correctly")))
+        
+        (RETURN_VOID)))
+    
+    ; Test ownership semantics
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "test_allocate")
+      (LIBRARY "./libffi_test.dylib")
+      (SYMBOL "allocate_buffer")
+      (RETURNS (TYPE (POINTER BYTE))
+        (OWNERSHIP CALLER_OWNED)
+        (DEALLOCATOR "deallocate_buffer"))
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE SIZE_T) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "test_deallocate")
+      (LIBRARY "./libffi_test.dylib")
+      (SYMBOL "deallocate_buffer")
+      (RETURNS (TYPE VOID))
+      (ACCEPTS_PARAMETER (NAME "buffer") (TYPE (POINTER BYTE)) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    (DEFINE_FUNCTION
+      (NAME "test_ownership_semantics")
+      (INTENT "Test memory ownership across FFI boundary")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (RESOURCE_SCOPE
+          (SCOPE_ID "ffi_memory")
+          (ACQUIRES
+            (RESOURCE (TYPE "ffi_buffer") (ID "buffer") (CLEANUP "test_deallocate")))
+          (CLEANUP_GUARANTEED TRUE)
+          (BODY
+            (DECLARE_VARIABLE (NAME "buffer") (TYPE (POINTER BYTE))
+              (INITIAL_VALUE (CALL_FUNCTION "test_allocate"
+                (ARGUMENTS (INTEGER_LITERAL 100)))))
+            
+            (CALL_FUNCTION "std.testing.assert_not_null"
+              (ARGUMENTS
+                (VARIABLE_REFERENCE "buffer")
+                (STRING_LITERAL "External allocation should succeed")))
+            
+            ; Buffer will be automatically deallocated at scope exit
+            ))
+        
+        (RETURN_VOID)))
+    
+    ; Run all tests
+    (DEFINE_FUNCTION
+      (NAME "run_all_tests")
+      (INTENT "Execute all FFI tests")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (CALL_FUNCTION "std.testing.test_suite"
+          (ARGUMENTS (STRING_LITERAL "FFI Tests")))
+        
+        (CALL_FUNCTION "std.testing.run_test"
+          (ARGUMENTS
+            (STRING_LITERAL "Basic FFI Call")
+            (FUNCTION_REFERENCE "test_basic_ffi_call")))
+        
+        (CALL_FUNCTION "std.testing.run_test"
+          (ARGUMENTS
+            (STRING_LITERAL "Pointer Parameters")
+            (FUNCTION_REFERENCE "test_pointer_parameters")))
+        
+        (CALL_FUNCTION "std.testing.run_test"
+          (ARGUMENTS
+            (STRING_LITERAL "String FFI")
+            (FUNCTION_REFERENCE "test_string_ffi")))
+        
+        (CALL_FUNCTION "std.testing.run_test"
+          (ARGUMENTS
+            (STRING_LITERAL "Struct FFI")
+            (FUNCTION_REFERENCE "test_struct_ffi")))
+        
+        (CALL_FUNCTION "std.testing.run_test"
+          (ARGUMENTS
+            (STRING_LITERAL "Ownership Semantics")
+            (FUNCTION_REFERENCE "test_ownership_semantics")))
+        
+        (CALL_FUNCTION "std.testing.print_summary" (ARGUMENTS))
+        
+        (RETURN_VOID)))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (RETURNS (TYPE INT))
+      (BODY
+        (CALL_FUNCTION "run_all_tests" (ARGUMENTS))
+        (RETURN_VALUE (INTEGER_LITERAL 0))))
+  )
+)

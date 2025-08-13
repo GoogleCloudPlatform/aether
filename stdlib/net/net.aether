@@ -1,0 +1,382 @@
+; AetherScript Standard Library - Networking Primitives
+; Provides safe networking operations with timeouts and resource management
+
+(DEFINE_MODULE
+  (NAME "std.net")
+  (INTENT "Network operations with safety guarantees and resource management")
+  
+  ; Network type definitions
+  (DEFINE_TYPE
+    (NAME "ip_address")
+    (INTENT "IP address representation")
+    (FIELD (NAME "octets") (TYPE (ARRAY INT 4))) ; IPv4 for now
+    (FIELD (NAME "port") (TYPE INT)))
+  
+  (DEFINE_TYPE
+    (NAME "socket")
+    (INTENT "Network socket handle")
+    (FIELD (NAME "handle") (TYPE INT))
+    (FIELD (NAME "is_connected") (TYPE BOOL)))
+  
+  (DEFINE_TYPE
+    (NAME "http_request")
+    (INTENT "HTTP request structure")
+    (FIELD (NAME "method") (TYPE STRING))
+    (FIELD (NAME "url") (TYPE STRING))
+    (FIELD (NAME "headers") (TYPE (MAP STRING STRING)))
+    (FIELD (NAME "body") (TYPE STRING)))
+  
+  (DEFINE_TYPE
+    (NAME "http_response")
+    (INTENT "HTTP response structure")
+    (FIELD (NAME "status_code") (TYPE INT))
+    (FIELD (NAME "headers") (TYPE (MAP STRING STRING)))
+    (FIELD (NAME "body") (TYPE STRING)))
+  
+  ; TCP Operations
+  
+  (DEFINE_FUNCTION
+    (NAME "tcp_connect")
+    (INTENT "Connect to TCP server with timeout")
+    (ACCEPTS_PARAMETER (NAME "host") (TYPE STRING) (INTENT "Hostname or IP address"))
+    (ACCEPTS_PARAMETER (NAME "port") (TYPE INT) (INTENT "Port number"))
+    (ACCEPTS_PARAMETER (NAME "timeout_ms") (TYPE INT) (INTENT "Connection timeout in milliseconds"))
+    (RETURNS (TYPE "socket"))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "host") (NULL_LITERAL))
+        (PREDICATE_BETWEEN (VARIABLE_REFERENCE "port") (INTEGER_LITERAL 1) (INTEGER_LITERAL 65535))
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "timeout_ms") (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Valid host, port, and timeout"))
+    
+    (POSTCONDITION
+      (LOGICAL_IMPLICATION
+        (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "is_connected")
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "handle")
+          (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Connected socket has valid handle"))
+    
+    (RESOURCE_CONTRACT
+      (MAX_EXECUTION_TIME_MS (VARIABLE_REFERENCE "timeout_ms"))
+      (ENFORCEMENT RUNTIME))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "network") (WRITES "network"))
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "sock") (TYPE "socket"))
+      
+      (TRY_EXECUTE
+        (PROTECTED_BLOCK
+          (DECLARE_VARIABLE (NAME "handle") (TYPE INT)
+            (INITIAL_VALUE (CALL_FUNCTION "aether_tcp_connect"
+              (ARGUMENTS 
+                (VARIABLE_REFERENCE "host")
+                (VARIABLE_REFERENCE "port")
+                (VARIABLE_REFERENCE "timeout_ms")))))
+          
+          (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "handle") (INTEGER_LITERAL 0))
+            (THEN_EXECUTE
+              (THROW_EXCEPTION (TYPE "network_error")
+                (MESSAGE (STRING_CONCAT 
+                  (STRING_LITERAL "Failed to connect to ")
+                  (VARIABLE_REFERENCE "host"))))))
+          
+          (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "handle"))
+            (SOURCE (VARIABLE_REFERENCE "handle")))
+          (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "is_connected"))
+            (SOURCE (BOOL_LITERAL TRUE)))
+          
+          (RETURN_VALUE (VARIABLE_REFERENCE "sock")))
+        
+        (CATCH_EXCEPTION
+          (EXCEPTION_TYPE "timeout_error")
+          (BINDING_VARIABLE (NAME "e") (TYPE "timeout_error"))
+          (HANDLER_BLOCK
+            (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "is_connected"))
+              (SOURCE (BOOL_LITERAL FALSE)))
+            (RETURN_VALUE (VARIABLE_REFERENCE "sock")))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "tcp_send")
+    (INTENT "Send data over TCP socket")
+    (ACCEPTS_PARAMETER (NAME "sock") (TYPE "socket") (INTENT "Socket to send on"))
+    (ACCEPTS_PARAMETER (NAME "data") (TYPE STRING) (INTENT "Data to send"))
+    (RETURNS (TYPE INT))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "is_connected")
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "data") (NULL_LITERAL)))
+      (PROOF_HINT "Socket must be connected and data valid"))
+    
+    (POSTCONDITION
+      (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (INTEGER_LITERAL 0))
+      (PROOF_HINT "Returns bytes sent or 0 on error"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (WRITES "network"))
+      (EXCEPTION_SAFETY BASIC))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "bytes_sent") (TYPE INT)
+        (INITIAL_VALUE (CALL_FUNCTION "aether_tcp_send"
+          (ARGUMENTS 
+            (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "handle")
+            (VARIABLE_REFERENCE "data")
+            (CALL_FUNCTION "string_length" (ARGUMENTS (VARIABLE_REFERENCE "data")))))))
+      
+      (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "bytes_sent") (INTEGER_LITERAL 0))
+        (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 0)))
+        (ELSE_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "bytes_sent"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "tcp_receive")
+    (INTENT "Receive data from TCP socket")
+    (ACCEPTS_PARAMETER (NAME "sock") (TYPE "socket") (INTENT "Socket to receive from"))
+    (ACCEPTS_PARAMETER (NAME "max_size") (TYPE INT) (INTENT "Maximum bytes to receive"))
+    (ACCEPTS_PARAMETER (NAME "timeout_ms") (TYPE INT) (INTENT "Receive timeout"))
+    (RETURNS (TYPE STRING))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "is_connected")
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "max_size") (INTEGER_LITERAL 0))
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "timeout_ms") (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Socket connected with valid parameters"))
+    
+    (RESOURCE_CONTRACT
+      (MAX_MEMORY_MB (EXPRESSION_DIVIDE (VARIABLE_REFERENCE "max_size") (INTEGER_LITERAL 1048576)))
+      (MAX_EXECUTION_TIME_MS (VARIABLE_REFERENCE "timeout_ms"))
+      (ENFORCEMENT RUNTIME))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "network"))
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "buffer") (TYPE STRING)
+        (INITIAL_VALUE (CALL_FUNCTION "aether_allocate_string"
+          (ARGUMENTS (VARIABLE_REFERENCE "max_size")))))
+      
+      (DECLARE_VARIABLE (NAME "bytes_received") (TYPE INT)
+        (INITIAL_VALUE (CALL_FUNCTION "aether_tcp_receive"
+          (ARGUMENTS 
+            (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "handle")
+            (VARIABLE_REFERENCE "buffer")
+            (VARIABLE_REFERENCE "max_size")
+            (VARIABLE_REFERENCE "timeout_ms")))))
+      
+      (IF_CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "bytes_received") (INTEGER_LITERAL 0))
+        (THEN_EXECUTE (RETURN_VALUE (STRING_LITERAL "")))
+        (ELSE_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "buffer"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "tcp_close")
+    (INTENT "Close TCP socket safely")
+    (ACCEPTS_PARAMETER (NAME "sock") (TYPE "socket") (INTENT "Socket to close"))
+    (RETURNS (TYPE VOID))
+    
+    (POSTCONDITION
+      (PREDICATE_NOT (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "is_connected"))
+      (PROOF_HINT "Socket is disconnected after close"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (MODIFIES "sock"))
+      (EXCEPTION_SAFETY NO_THROW))
+    
+    (BODY
+      (IF_CONDITION (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "is_connected")
+        (THEN_EXECUTE
+          (CALL_FUNCTION "aether_tcp_close"
+            (ARGUMENTS (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "handle")))
+          (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "sock") "is_connected"))
+            (SOURCE (BOOL_LITERAL FALSE)))))
+      (RETURN_VOID)))
+  
+  ; HTTP Operations
+  
+  (DEFINE_FUNCTION
+    (NAME "http_get")
+    (INTENT "Perform HTTP GET request with safety guarantees")
+    (ACCEPTS_PARAMETER (NAME "url") (TYPE STRING) (INTENT "URL to request"))
+    (ACCEPTS_PARAMETER (NAME "options") (TYPE (MAP STRING STRING)) (INTENT "Request options"))
+    (RETURNS (TYPE "http_response"))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "url") (NULL_LITERAL))
+        (PREDICATE_STARTS_WITH (VARIABLE_REFERENCE "url") (STRING_LITERAL "http")))
+      (PROOF_HINT "Valid HTTP(S) URL"))
+    
+    (POSTCONDITION
+      (PREDICATE_BETWEEN 
+        (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "status_code")
+        (INTEGER_LITERAL 100) (INTEGER_LITERAL 599))
+      (PROOF_HINT "Valid HTTP status code"))
+    
+    (RESOURCE_CONTRACT
+      (MAX_MEMORY_MB 
+        (IF_EXPRESSION
+          (CONDITION (HAS_MAP_KEY (VARIABLE_REFERENCE "options") (STRING_LITERAL "max_response_size")))
+          (THEN_VALUE (EXPRESSION_DIVIDE 
+            (TO_INTEGER (GET_MAP_VALUE (VARIABLE_REFERENCE "options") (STRING_LITERAL "max_response_size")))
+            (INTEGER_LITERAL 1048576)))
+          (ELSE_VALUE (INTEGER_LITERAL 10))))
+      (MAX_EXECUTION_TIME_MS 
+        (IF_EXPRESSION
+          (CONDITION (HAS_MAP_KEY (VARIABLE_REFERENCE "options") (STRING_LITERAL "timeout_ms")))
+          (THEN_VALUE (TO_INTEGER (GET_MAP_VALUE (VARIABLE_REFERENCE "options") (STRING_LITERAL "timeout_ms"))))
+          (ELSE_VALUE (INTEGER_LITERAL 30000))))
+      (ENFORCEMENT RUNTIME))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "network"))
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "request") (TYPE "http_request"))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "method"))
+        (SOURCE (STRING_LITERAL "GET")))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "url"))
+        (SOURCE (VARIABLE_REFERENCE "url")))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "headers"))
+        (SOURCE (MAP_LITERAL (KEY_TYPE STRING) (VALUE_TYPE STRING))))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "body"))
+        (SOURCE (STRING_LITERAL "")))
+      
+      (RETURN_VALUE (CALL_FUNCTION "http_request_internal"
+        (ARGUMENTS 
+          (VARIABLE_REFERENCE "request")
+          (VARIABLE_REFERENCE "options"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "http_post")
+    (INTENT "Perform HTTP POST request")
+    (ACCEPTS_PARAMETER (NAME "url") (TYPE STRING) (INTENT "URL to request"))
+    (ACCEPTS_PARAMETER (NAME "body") (TYPE STRING) (INTENT "Request body"))
+    (ACCEPTS_PARAMETER (NAME "content_type") (TYPE STRING) (INTENT "Content type"))
+    (ACCEPTS_PARAMETER (NAME "options") (TYPE (MAP STRING STRING)) (INTENT "Request options"))
+    (RETURNS (TYPE "http_response"))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "url") (NULL_LITERAL))
+        (PREDICATE_STARTS_WITH (VARIABLE_REFERENCE "url") (STRING_LITERAL "http"))
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "content_type") (NULL_LITERAL)))
+      (PROOF_HINT "Valid URL and content type"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "network") (WRITES "network"))
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "request") (TYPE "http_request"))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "method"))
+        (SOURCE (STRING_LITERAL "POST")))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "url"))
+        (SOURCE (VARIABLE_REFERENCE "url")))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "headers"))
+        (SOURCE (MAP_LITERAL (KEY_TYPE STRING) (VALUE_TYPE STRING)
+          (ENTRY (KEY "Content-Type") (VALUE (VARIABLE_REFERENCE "content_type"))))))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "request") "body"))
+        (SOURCE (VARIABLE_REFERENCE "body")))
+      
+      (RETURN_VALUE (CALL_FUNCTION "http_request_internal"
+        (ARGUMENTS 
+          (VARIABLE_REFERENCE "request")
+          (VARIABLE_REFERENCE "options"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "http_request_internal")
+    (INTENT "Internal HTTP request implementation")
+    (ACCEPTS_PARAMETER (NAME "request") (TYPE "http_request"))
+    (ACCEPTS_PARAMETER (NAME "options") (TYPE (MAP STRING STRING)))
+    (RETURNS (TYPE "http_response"))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "response") (TYPE "http_response"))
+      
+      (RESOURCE_SCOPE
+        (SCOPE_ID "http_request")
+        (ACQUIRES
+          (RESOURCE (TYPE "network_connection") (ID "conn") (CLEANUP "aether_close_connection")))
+        (CLEANUP_GUARANTEED TRUE)
+        (BODY
+          (TRY_EXECUTE
+            (PROTECTED_BLOCK
+              ; Call runtime HTTP implementation
+              (CALL_FUNCTION "aether_http_request"
+                (ARGUMENTS 
+                  (ADDRESS_OF (VARIABLE_REFERENCE "request"))
+                  (VARIABLE_REFERENCE "options")
+                  (ADDRESS_OF (VARIABLE_REFERENCE "response"))))
+              
+              (RETURN_VALUE (VARIABLE_REFERENCE "response")))
+            
+            (CATCH_EXCEPTION
+              (EXCEPTION_TYPE "network_error")
+              (BINDING_VARIABLE (NAME "e") (TYPE "network_error"))
+              (HANDLER_BLOCK
+                ; Return error response
+                (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "response") "status_code"))
+                  (SOURCE (INTEGER_LITERAL 0)))
+                (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "response") "body"))
+                  (SOURCE (FIELD_ACCESS (VARIABLE_REFERENCE "e") "message")))
+                (RETURN_VALUE (VARIABLE_REFERENCE "response")))))))))
+  
+  ; DNS Operations
+  
+  (DEFINE_FUNCTION
+    (NAME "resolve_hostname")
+    (INTENT "Resolve hostname to IP address")
+    (ACCEPTS_PARAMETER (NAME "hostname") (TYPE STRING) (INTENT "Hostname to resolve"))
+    (RETURNS (TYPE "ip_address"))
+    
+    (PRECONDITION
+      (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "hostname") (NULL_LITERAL))
+      (PROOF_HINT "Hostname must be valid"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "network"))
+      (DETERMINISTIC FALSE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "addr") (TYPE "ip_address"))
+      
+      (IF_CONDITION (PREDICATE_NOT 
+          (CALL_FUNCTION "aether_resolve_hostname"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "hostname")
+              (ADDRESS_OF (VARIABLE_REFERENCE "addr")))))
+        (THEN_EXECUTE
+          (THROW_EXCEPTION (TYPE "network_error")
+            (MESSAGE (STRING_CONCAT 
+              (STRING_LITERAL "Failed to resolve hostname: ")
+              (VARIABLE_REFERENCE "hostname"))))))
+      
+      (RETURN_VALUE (VARIABLE_REFERENCE "addr"))))
+  
+  ; Export all types and functions
+  (EXPORT_TYPE "ip_address")
+  (EXPORT_TYPE "socket")
+  (EXPORT_TYPE "http_request")
+  (EXPORT_TYPE "http_response")
+  (EXPORT_FUNCTION "tcp_connect")
+  (EXPORT_FUNCTION "tcp_send")
+  (EXPORT_FUNCTION "tcp_receive")
+  (EXPORT_FUNCTION "tcp_close")
+  (EXPORT_FUNCTION "http_get")
+  (EXPORT_FUNCTION "http_post")
+  (EXPORT_FUNCTION "resolve_hostname")
+)

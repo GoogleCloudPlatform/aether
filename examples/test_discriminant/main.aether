@@ -1,0 +1,41 @@
+(DEFINE_MODULE
+  (NAME test_discriminant)
+  (CONTENT
+    ; Define a simple Result type
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Result)
+      (VARIANTS
+        (VARIANT Ok (HOLDS INTEGER))
+        (VARIANT Error (HOLDS STRING))))
+    
+    ; External function declaration
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (VARIADIC)
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create Ok variant
+        (DECLARE_VARIABLE (NAME ok_result) (TYPE Result))
+        (ASSIGN
+          (TARGET_VARIABLE ok_result)
+          (SOURCE_EXPRESSION (Ok 42)))
+        
+        ; Create Error variant
+        (DECLARE_VARIABLE (NAME err_result) (TYPE Result))
+        (ASSIGN
+          (TARGET_VARIABLE err_result)
+          (SOURCE_EXPRESSION (Error "test error")))
+        
+        ; Just test discriminants without pattern matching
+        (CALL_FUNCTION printf "Ok discriminant: %d\n")
+        (CALL_FUNCTION printf "Error discriminant: %d\n")
+        
+        (RETURN_VALUE 0)))
+  )
+)

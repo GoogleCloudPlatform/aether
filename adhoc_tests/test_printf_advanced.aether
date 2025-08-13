@@ -1,0 +1,37 @@
+(DEFINE_MODULE
+  (NAME printf_advanced)
+  (INTENT "Advanced printf usage")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME factorial)
+      (INTENT "Calculate factorial")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO n 1)
+          (THEN_EXECUTE
+            (RETURN_VALUE 1))
+          (ELSE_EXECUTE
+            (RETURN_VALUE (EXPRESSION_MULTIPLY n (CALL_FUNCTION factorial (EXPRESSION_SUBTRACT n 1))))))))
+            
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test printf with calculations")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "num") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "fact") (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE num)
+          (SOURCE_EXPRESSION 5))
+          
+        (CALL_FUNCTION printf "Calculating factorial of %d\n" num)
+        
+        (ASSIGN
+          (TARGET_VARIABLE fact)
+          (SOURCE_EXPRESSION (CALL_FUNCTION factorial num)))
+          
+        (CALL_FUNCTION printf "The factorial of %d is %d\n" num fact)
+        
+        (RETURN_VALUE 0)))))

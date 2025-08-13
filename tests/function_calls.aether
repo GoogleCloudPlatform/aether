@@ -1,0 +1,39 @@
+(DEFINE_MODULE
+  (NAME function_calls)
+  (INTENT "Test function calls between AetherScript functions")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "square")
+      (INTENT "Square a number")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY x x))
+      )
+    )
+    
+    (DEFINE_FUNCTION
+      (NAME "sum_of_squares")
+      (INTENT "Return sum of squares of two numbers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD (CALL_FUNCTION square a) (CALL_FUNCTION square b)))
+      )
+    )
+    
+    (DEFINE_FUNCTION
+      (NAME "factorial")
+      (INTENT "Calculate factorial recursively")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_EQUALS n 1)
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE (RETURN_VALUE (EXPRESSION_MULTIPLY n (CALL_FUNCTION factorial (EXPRESSION_SUBTRACT n 1)))))
+        )
+      )
+    )
+  )
+)

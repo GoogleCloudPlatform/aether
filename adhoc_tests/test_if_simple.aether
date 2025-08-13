@@ -1,0 +1,14 @@
+(DEFINE_MODULE
+  (NAME if_simple_test)
+  (INTENT "Simple IF test")
+  (CONTENT    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test IF statement with simple values")
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN 5 10)
+          (THEN_EXECUTE
+            (RETURN_VALUE 1))
+          (ELSE_EXECUTE
+            (RETURN_VALUE 2)))))))

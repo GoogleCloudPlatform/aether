@@ -1,0 +1,142 @@
+(DEFINE_MODULE
+  (NAME test_memory)
+  (INTENT "Test memory management features")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_malloc)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)  ; Using STRING as pointer type
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_free)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_memory_used)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_allocation_count)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_gc_collect)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_gc_add_root)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_gc_remove_root)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "=== Memory Management Test ===\n")
+        
+        ; Check initial memory stats
+        (DECLARE_VARIABLE (NAME initial_memory) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE initial_memory)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (DECLARE_VARIABLE (NAME initial_count) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE initial_count)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_allocation_count)))
+        
+        (CALL_FUNCTION printf "Initial memory used: %d bytes\n" initial_memory)
+        (CALL_FUNCTION printf "Initial allocation count: %d\n" initial_count)
+        
+        ; Allocate some memory
+        (CALL_FUNCTION printf "\nAllocating 1000 bytes...\n")
+        (DECLARE_VARIABLE (NAME ptr1) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE ptr1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 1000)))
+        
+        ; Check memory stats after allocation
+        (DECLARE_VARIABLE (NAME after_alloc_memory) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE after_alloc_memory)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (DECLARE_VARIABLE (NAME after_alloc_count) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE after_alloc_count)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_allocation_count)))
+        
+        (CALL_FUNCTION printf "Memory after allocation: %d bytes\n" after_alloc_memory)
+        (CALL_FUNCTION printf "Allocation count: %d\n" after_alloc_count)
+        
+        ; Test GC with root
+        (CALL_FUNCTION printf "\nAdding pointer as GC root...\n")
+        (CALL_FUNCTION aether_gc_add_root ptr1)
+        
+        ; Allocate some garbage
+        (CALL_FUNCTION printf "Allocating garbage (2000 bytes)...\n")
+        (DECLARE_VARIABLE (NAME garbage) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE garbage)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 2000)))
+        
+        ; Force GC
+        (CALL_FUNCTION printf "\nForcing garbage collection...\n")
+        (CALL_FUNCTION aether_gc_collect)
+        
+        ; Check memory after GC
+        (DECLARE_VARIABLE (NAME after_gc_memory) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE after_gc_memory)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (DECLARE_VARIABLE (NAME after_gc_count) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE after_gc_count)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_allocation_count)))
+        
+        (CALL_FUNCTION printf "Memory after GC: %d bytes\n" after_gc_memory)
+        (CALL_FUNCTION printf "Allocation count after GC: %d\n" after_gc_count)
+        
+        ; Clean up
+        (CALL_FUNCTION printf "\nCleaning up...\n")
+        (CALL_FUNCTION aether_gc_remove_root ptr1)
+        (CALL_FUNCTION aether_free ptr1)
+        
+        ; Final stats
+        (DECLARE_VARIABLE (NAME final_memory) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE final_memory)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (DECLARE_VARIABLE (NAME final_count) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE final_count)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_allocation_count)))
+        
+        (CALL_FUNCTION printf "\nFinal memory used: %d bytes\n" final_memory)
+        (CALL_FUNCTION printf "Final allocation count: %d\n" final_count)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

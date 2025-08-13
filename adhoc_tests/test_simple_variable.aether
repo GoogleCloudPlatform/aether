@@ -1,0 +1,13 @@
+(DEFINE_MODULE
+  (NAME simple_variable_test)
+  (INTENT "Simple test for variable declaration and assignment")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "x") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE x)
+          (SOURCE_EXPRESSION 42))
+        (RETURN_VALUE x)))))

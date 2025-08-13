@@ -1,0 +1,33 @@
+(DEFINE_MODULE
+  (NAME test_float)
+  (INTENT "Test float type support")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add_floats")
+      (INTENT "Add two floating point numbers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE FLOAT))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE FLOAT))
+      (RETURNS FLOAT)
+      (BODY
+        (RETURN_VALUE
+          (EXPRESSION_ADD a b))))
+    
+    (DEFINE_FUNCTION
+      (NAME "multiply_floats")
+      (INTENT "Multiply two floating point numbers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE FLOAT))
+      (RETURNS FLOAT)
+      (BODY
+        (RETURN_VALUE
+          (EXPRESSION_MULTIPLY x y))))
+    
+    (DEFINE_FUNCTION
+      (NAME "float_comparison")
+      (INTENT "Compare two floats")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE FLOAT))
+      (RETURNS BOOLEAN)
+      (BODY
+        (RETURN_VALUE
+          (PREDICATE_GREATER_THAN x y))))))

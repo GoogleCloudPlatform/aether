@@ -1,0 +1,46 @@
+;; Simple HTTP Blog Server
+;; Uses http_create_server from runtime
+
+(DEFINE_MODULE
+  (NAME 'blog_http_simple')
+  (INTENT "Simple HTTP blog server")
+  (CONTENT
+    ;; External HTTP server function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'http_create_server')
+      (LIBRARY "aether_runtime")
+      (SYMBOL "http_create_server")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "handler") (TYPE INTEGER))  ; simplified - would be function pointer
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'http_run_server')
+      (LIBRARY "aether_runtime")
+      (SYMBOL "http_run_server")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "server") (TYPE INTEGER))
+    )
+    
+    (DEFINE_FUNCTION
+      (NAME 'main')
+      (RETURNS INTEGER)
+      (INTENT "Start HTTP blog server")
+      (BODY
+        (DECLARE_VARIABLE
+          (NAME 'server')
+          (TYPE INTEGER)
+          (INITIAL_VALUE (CALL_FUNCTION 'http_create_server' (ARGUMENTS 8080 0)))
+        )
+        
+        ;; This would run the server event loop
+        (EXPRESSION_STATEMENT
+          (CALL_FUNCTION 'http_run_server' (ARGUMENTS (VARIABLE_REFERENCE 'server')))
+        )
+        
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

@@ -1,0 +1,24 @@
+
+(DEFINE_MODULE
+  (NAME "main")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "divide")
+      (ACCEPTS_PARAMETER (NAME "numerator") (TYPE INT))
+      (ACCEPTS_PARAMETER (NAME "denominator") (TYPE INT))
+      (RETURNS (TYPE INT))
+      (PRECONDITION
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "denominator") (INTEGER_LITERAL 0))
+        (FAILURE_ACTION THROW_EXCEPTION)
+        (PROOF_HINT "Denominator cannot be zero"))
+      (BODY
+        (RETURN_VALUE (EXPRESSION_DIVIDE (VARIABLE_REFERENCE "numerator") (VARIABLE_REFERENCE "denominator")))))
+
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (RETURNS (TYPE INT))
+      (BODY
+        (CALL_FUNCTION "divide" (ARGUMENTS (INTEGER_LITERAL 10) (INTEGER_LITERAL 0)))
+        (RETURN_VALUE (INTEGER_LITERAL 0))))
+  )
+)

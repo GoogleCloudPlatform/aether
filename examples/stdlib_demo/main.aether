@@ -1,0 +1,144 @@
+; AetherScript Standard Library Demo
+; Demonstrates use of standard library modules
+
+(DEFINE_MODULE
+  (NAME "stdlib_demo")
+  (INTENT "Demonstrate standard library usage")
+  
+  ; Import standard library modules
+  (IMPORT_MODULE "std.io")
+  (IMPORT_MODULE "std.math")
+  (IMPORT_MODULE "std.collections")
+  
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Main entry point demonstrating stdlib features")
+      (RETURNS (TYPE INT))
+      
+      (BODY
+        ; I/O Operations
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "=== AetherScript Standard Library Demo ===")))
+        
+        ; Math operations
+        (DECLARE_VARIABLE (NAME "x") (TYPE FLOAT) (INITIAL_VALUE (FLOAT_LITERAL 16.0)))
+        (DECLARE_VARIABLE (NAME "sqrt_x") (TYPE FLOAT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.math.sqrt"
+            (ARGUMENTS (VARIABLE_REFERENCE "x")))))
+        
+        (CALL_FUNCTION "std.io.print"
+          (ARGUMENTS (STRING_LITERAL "Square root of 16 is: ")))
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (TO_STRING (VARIABLE_REFERENCE "sqrt_x"))))
+        
+        ; Min/Max operations
+        (DECLARE_VARIABLE (NAME "a") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 42)))
+        (DECLARE_VARIABLE (NAME "b") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 17)))
+        (DECLARE_VARIABLE (NAME "max_val") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.math.max"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "a")
+              (VARIABLE_REFERENCE "b")))))
+        
+        (CALL_FUNCTION "std.io.print"
+          (ARGUMENTS (STRING_LITERAL "Max of 42 and 17 is: ")))
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (TO_STRING (VARIABLE_REFERENCE "max_val"))))
+        
+        ; Array sorting
+        (DECLARE_VARIABLE (NAME "numbers") (TYPE (ARRAY INT 5))
+          (INITIAL_VALUE (ARRAY_LITERAL 
+            (TYPE (ARRAY INT 5))
+            (INTEGER_LITERAL 5)
+            (INTEGER_LITERAL 2)
+            (INTEGER_LITERAL 8)
+            (INTEGER_LITERAL 1)
+            (INTEGER_LITERAL 9))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\nUnsorted array: [5, 2, 8, 1, 9]")))
+        
+        ; Sort the array
+        (CALL_FUNCTION "std.collections.sort_verified"
+          (ARGUMENTS 
+            (VARIABLE_REFERENCE "numbers")
+            (INTEGER_LITERAL 5)))
+        
+        (CALL_FUNCTION "std.io.print"
+          (ARGUMENTS (STRING_LITERAL "Sorted array: [")))
+        
+        ; Print sorted array
+        (FOR_LOOP
+          (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+          (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 5)))
+          (UPDATE (ASSIGN (TARGET "i") 
+            (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+          (BODY
+            (IF_CONDITION (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 0))
+              (THEN_EXECUTE
+                (CALL_FUNCTION "std.io.print"
+                  (ARGUMENTS (STRING_LITERAL ", ")))))
+            (CALL_FUNCTION "std.io.print"
+              (ARGUMENTS (TO_STRING 
+                (ARRAY_ACCESS (VARIABLE_REFERENCE "numbers") (VARIABLE_REFERENCE "i")))))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "]")))
+        
+        ; Binary search
+        (DECLARE_VARIABLE (NAME "search_result") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.collections.binary_search"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "numbers")
+              (INTEGER_LITERAL 5)
+              (INTEGER_LITERAL 8)))))
+        
+        (CALL_FUNCTION "std.io.print"
+          (ARGUMENTS (STRING_LITERAL "\nSearching for 8 in sorted array: ")))
+        (IF_CONDITION (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "search_result") (INTEGER_LITERAL -1))
+          (THEN_EXECUTE
+            (CALL_FUNCTION "std.io.print"
+              (ARGUMENTS (STRING_LITERAL "Found at index ")))
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (TO_STRING (VARIABLE_REFERENCE "search_result")))))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "Not found")))))
+        
+        ; File I/O demo
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n=== File I/O Demo ===")))
+        
+        (DECLARE_VARIABLE (NAME "write_success") (TYPE BOOL)
+          (INITIAL_VALUE (CALL_FUNCTION "std.io.write_file_safe"
+            (ARGUMENTS 
+              (STRING_LITERAL "demo_output.txt")
+              (STRING_LITERAL "Hello from AetherScript Standard Library!")
+              (BOOL_LITERAL FALSE)))))
+        
+        (IF_CONDITION (VARIABLE_REFERENCE "write_success")
+          (THEN_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "Successfully wrote to demo_output.txt")))
+            
+            ; Read it back
+            (DECLARE_VARIABLE (NAME "file_content") (TYPE STRING)
+              (INITIAL_VALUE (CALL_FUNCTION "std.io.read_file_safe"
+                (ARGUMENTS 
+                  (STRING_LITERAL "demo_output.txt")
+                  (INTEGER_LITERAL 1024)))))
+            
+            (CALL_FUNCTION "std.io.print"
+              (ARGUMENTS (STRING_LITERAL "File content: ")))
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (VARIABLE_REFERENCE "file_content"))))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "Failed to write file")))))
+        
+        (RETURN_VALUE (INTEGER_LITERAL 0))
+      )
+    )
+  )
+)

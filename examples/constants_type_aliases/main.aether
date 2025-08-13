@@ -1,0 +1,145 @@
+(DEFINE_MODULE
+  (NAME constants_type_aliases)
+  (INTENT "Demonstrate constants and type aliases")
+  (CONTENT
+    ; Constants
+    (DECLARE_CONSTANT
+      (NAME PI)
+      (TYPE FLOAT)
+      (VALUE 3.14159265359))
+    
+    (DECLARE_CONSTANT
+      (NAME MAX_SIZE)
+      (TYPE INTEGER)
+      (VALUE 100))
+    
+    (DECLARE_CONSTANT
+      (NAME GREETING)
+      (TYPE STRING)
+      (VALUE "Hello, World!"))
+    
+    (DECLARE_CONSTANT
+      (NAME DEBUG_MODE)
+      (TYPE BOOLEAN)
+      (VALUE TRUE))
+    
+    ; Type aliases
+    (DEFINE_TYPE_ALIAS
+      (NAME UserId)
+      (TYPE INTEGER))
+    
+    (DEFINE_TYPE_ALIAS
+      (NAME Temperature)
+      (TYPE FLOAT))
+    
+    (DEFINE_TYPE_ALIAS
+      (NAME Message)
+      (TYPE STRING))
+    
+    (DEFINE_TYPE_ALIAS
+      (NAME IntArray)
+      (TYPE (ARRAY_OF_TYPE INTEGER)))
+    
+    ; External function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_constants)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME area) (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME radius) (TYPE FLOAT))
+        
+        (ASSIGN
+          (TARGET_VARIABLE radius)
+          (SOURCE_EXPRESSION 5.0))
+        
+        ; Use PI constant
+        (ASSIGN
+          (TARGET_VARIABLE area)
+          (SOURCE_EXPRESSION 
+            (EXPRESSION_MULTIPLY
+              PI
+              (EXPRESSION_MULTIPLY radius radius))))
+        
+        (CALL_FUNCTION printf "Circle area with radius %.1f: %.2f\n" radius area)
+        (CALL_FUNCTION printf "Maximum size allowed: %d\n" MAX_SIZE)
+        (CALL_FUNCTION printf "Greeting message: %s\n" GREETING)
+        
+        (IF_CONDITION
+          DEBUG_MODE
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Debug mode is enabled\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "Debug mode is disabled\n")))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_type_aliases)
+      (ACCEPTS_PARAMETER (NAME user_id) (TYPE UserId))
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME temp) (TYPE Temperature))
+        (DECLARE_VARIABLE (NAME msg) (TYPE Message))
+        (DECLARE_VARIABLE (NAME numbers) (TYPE IntArray))
+        
+        ; Use type aliases
+        (ASSIGN
+          (TARGET_VARIABLE temp)
+          (SOURCE_EXPRESSION 98.6))
+        
+        (ASSIGN
+          (TARGET_VARIABLE msg)
+          (SOURCE_EXPRESSION "System initialized"))
+        
+        (ASSIGN
+          (TARGET_VARIABLE numbers)
+          (SOURCE_EXPRESSION (ARRAY_LITERAL 1 2 3 4 5)))
+        
+        (CALL_FUNCTION printf "User ID: %d\n" user_id)
+        (CALL_FUNCTION printf "Temperature: %.1f°F\n" temp)
+        (CALL_FUNCTION printf "Message: %s\n" msg)
+        (CALL_FUNCTION printf "First number: %d\n" (GET_ARRAY_ELEMENT numbers 0))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME calculate_with_constants)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME items) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME result) (TYPE BOOLEAN))
+        
+        (ASSIGN
+          (TARGET_VARIABLE items)
+          (SOURCE_EXPRESSION 150))
+        
+        ; Compare with constant
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (PREDICATE_GREATER_THAN items MAX_SIZE)))
+        
+        (IF_CONDITION
+          result
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "%d exceeds MAX_SIZE (%d)\n" items MAX_SIZE))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "%d is within MAX_SIZE (%d)\n" items MAX_SIZE)))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_constants)
+        (CALL_FUNCTION test_type_aliases 12345)
+        (CALL_FUNCTION calculate_with_constants)
+        (RETURN_VALUE 0)))
+  )
+)

@@ -1,0 +1,18 @@
+(DEFINE_MODULE
+  (NAME 'test_string_debug')
+  (INTENT "Test string constant")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME 'main')
+      (RETURNS (TYPE 'INTEGER'))
+      (BODY
+        (DECLARE_CONSTANT
+          (NAME 'GREETING')
+          (TYPE 'STRING')
+          (VALUE "Hello, World!")
+        )
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

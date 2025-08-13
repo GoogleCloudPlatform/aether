@@ -1,0 +1,147 @@
+;; Blog Server that Listens
+;; HTTP server that actually handles connections on port 8080
+
+(DEFINE_MODULE
+  (NAME 'blog_listen')
+  (INTENT "Blog server that listens on port 8080")
+  (CONTENT
+    ;; External function declarations
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'printf')
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_listen')
+      (LIBRARY "aether_runtime")
+      (SYMBOL "tcp_listen")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_accept')
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "listener_id") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_read')
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "buffer") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "buffer_size") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_write')
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "data") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "data_size") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_close')
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'aether_malloc')
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'aether_free')
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING))
+    )
+    
+    ;; Server loop that handles connections
+    (DEFINE_FUNCTION
+      (NAME 'server_loop')
+      (RETURNS INTEGER)
+      (INTENT "Handle incoming connections in a loop")
+      (ACCEPTS_PARAMETER (NAME "server_fd") (TYPE INTEGER))
+      (BODY
+        ;; Accept a connection
+        (DECLARE_VARIABLE (NAME "client_fd") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE client_fd)
+          (SOURCE_EXPRESSION (CALL_FUNCTION tcp_accept server_fd)))
+        
+        ;; Check if connection was accepted
+        (IF_CONDITION
+          (PREDICATE_LESS_THAN client_fd 0)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Failed to accept connection\n")
+            (RETURN_VALUE (CALL_FUNCTION server_loop server_fd))))
+        
+        (CALL_FUNCTION printf "Blog client connected!\n")
+        
+        ;; Read request
+        (DECLARE_VARIABLE (NAME "buffer") (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE buffer)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 1024)))
+        
+        (DECLARE_VARIABLE (NAME "bytes_read") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE bytes_read)
+          (SOURCE_EXPRESSION (CALL_FUNCTION tcp_read client_fd buffer 1024)))
+        
+        ;; Send LLM blog response
+        (DECLARE_VARIABLE (NAME "response") (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE response)
+          (SOURCE_EXPRESSION "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: 1200\n\n<!DOCTYPE html><html><head><title>AetherScript LLM Blog</title><style>body{font-family:sans-serif;max-width:800px;margin:20px auto;line-height:1.6;}h1,h2{color:#333;}article{border-bottom:1px solid #eee;padding:20px 0;}.meta{color:#666;font-size:0.9em;}</style></head><body><h1>AetherScript LLM Blog</h1><h2>Welcome to LLM-First Programming</h2><p>This blog demonstrates AetherScript's LLM-first design principles with explicit, readable code.</p><h3>Recent Posts:</h3><article><h4>Understanding LLM-First Programming</h4><div class=\"meta\">Published: 2025-07-31 | Author: AetherScript Team</div><p>AetherScript prioritizes code readability for LLMs while maintaining human comprehension. Its explicit S-expression syntax ensures every operation is immediately apparent.</p></article><article><h4>Explicit Intent in Code Design</h4><div class=\"meta\">Published: 2025-07-30 | Author: AetherScript Team</div><p>Every function carries an INTENT annotation explaining its purpose, bridging the gap between human intention and machine execution.</p></article><article><h4>Resource Management Made Simple</h4><div class=\"meta\">Published: 2025-07-29 | Author: AetherScript Team</div><p>RESOURCE_SCOPE provides deterministic resource management without manual memory management complexity.</p></article></body></html>\n"))
+        
+        (CALL_FUNCTION tcp_write client_fd response 1300)
+        
+        ;; Clean up connection
+        (CALL_FUNCTION tcp_close client_fd)
+        (CALL_FUNCTION aether_free buffer)
+        
+        (CALL_FUNCTION printf "Blog response sent\n")
+        
+        ;; Continue server loop
+        (RETURN_VALUE (CALL_FUNCTION server_loop server_fd))
+      )
+    )
+    
+    (DEFINE_FUNCTION
+      (NAME 'main')
+      (RETURNS INTEGER)
+      (INTENT "Start blog server on port 8080")
+      (BODY
+        ;; Create server socket
+        (DECLARE_VARIABLE (NAME server_fd) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE server_fd)
+          (SOURCE_EXPRESSION (CALL_FUNCTION tcp_listen 8080)))
+        
+        ;; Check if socket was created successfully
+        (IF_CONDITION
+          (PREDICATE_LESS_THAN server_fd 0)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Failed to create server socket\n")
+            (RETURN_VALUE 1)))
+        
+        (CALL_FUNCTION printf "Blog server listening on port 8080...\n")
+        
+        ;; Start server loop
+        (RETURN_VALUE (CALL_FUNCTION server_loop server_fd))
+      )
+    )
+  )
+)

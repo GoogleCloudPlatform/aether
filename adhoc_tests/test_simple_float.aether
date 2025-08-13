@@ -1,0 +1,22 @@
+(DEFINE_MODULE
+  (NAME simple_float_test)
+  (INTENT "Simple float test")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "x") (TYPE FLOAT))
+        (ASSIGN (TARGET_VARIABLE x) (SOURCE_EXPRESSION 10.5))
+        
+        ; Test direct print
+        (CALL_FUNCTION printf "Float value: %.2f\n" x)
+        
+        ; Test integer to verify printf works
+        (DECLARE_VARIABLE (NAME "i") (TYPE INTEGER))
+        (ASSIGN (TARGET_VARIABLE i) (SOURCE_EXPRESSION 42))
+        (CALL_FUNCTION printf "Integer value: %d\n" i)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

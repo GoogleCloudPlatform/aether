@@ -1,0 +1,7 @@
+Program {
+  Module 'simple_module' {
+    intent: "A simple test module"
+    const VERSION: String = "1.0.0"
+    const MAX_ITEMS: Integer = 100
+  }
+}

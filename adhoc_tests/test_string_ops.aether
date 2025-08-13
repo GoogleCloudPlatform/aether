@@ -1,0 +1,128 @@
+(DEFINE_MODULE
+  (NAME test_string_ops)
+  (INTENT "Test string operations")
+  (CONTENT
+    ; Declare external functions from runtime
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_concat)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "str1") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "str2") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_length)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_equals)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "str1") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "str2") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_contains)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "haystack") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "needle") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_to_upper)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_to_lower)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME int_to_string)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE INTEGER)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Test string concatenation
+        (DECLARE_VARIABLE (NAME str1) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE str1)
+          (SOURCE_EXPRESSION "Hello, "))
+        
+        (DECLARE_VARIABLE (NAME str2) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE str2)
+          (SOURCE_EXPRESSION "World!"))
+        
+        (DECLARE_VARIABLE (NAME result) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_concat str1 str2)))
+        
+        (CALL_FUNCTION printf "Concatenated: %s\n" result)
+        
+        ; Test string length
+        (DECLARE_VARIABLE (NAME len) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE len)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_length result)))
+        
+        (CALL_FUNCTION printf "Length: %d\n" len)
+        
+        ; Test string equality
+        (DECLARE_VARIABLE (NAME eq_test) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE eq_test)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_equals str1 str1)))
+        
+        (CALL_FUNCTION printf "str1 equals str1: %d\n" eq_test)
+        
+        ; Test string contains
+        (DECLARE_VARIABLE (NAME contains_test) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE contains_test)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_contains result "World")))
+        
+        (CALL_FUNCTION printf "Result contains 'World': %d\n" contains_test)
+        
+        ; Test string case conversion
+        (DECLARE_VARIABLE (NAME upper) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE upper)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_to_upper result)))
+        
+        (CALL_FUNCTION printf "Uppercase: %s\n" upper)
+        
+        (DECLARE_VARIABLE (NAME lower) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE lower)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_to_lower upper)))
+        
+        (CALL_FUNCTION printf "Lowercase: %s\n" lower)
+        
+        ; Test int to string conversion
+        (DECLARE_VARIABLE (NAME num_str) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE num_str)
+          (SOURCE_EXPRESSION (CALL_FUNCTION int_to_string 42)))
+        
+        (CALL_FUNCTION printf "Number as string: %s\n" num_str)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

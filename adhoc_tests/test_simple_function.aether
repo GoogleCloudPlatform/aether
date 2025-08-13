@@ -1,0 +1,9 @@
+(DEFINE_MODULE
+  (NAME simple_function_test)
+  (INTENT "Simple test function")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 0)))))

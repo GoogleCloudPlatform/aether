@@ -1,0 +1,348 @@
+; AetherScript Standard Library - Mathematical Functions
+; Provides mathematical operations with contracts and verified correctness
+
+(DEFINE_MODULE
+  (NAME "std.math")
+  (INTENT "Mathematical functions with formal verification and safety guarantees")
+  
+  ; Constants
+  (DECLARE_CONSTANT (NAME "PI") (TYPE FLOAT) (VALUE (FLOAT_LITERAL 3.14159265358979323846)))
+  (DECLARE_CONSTANT (NAME "E") (TYPE FLOAT) (VALUE (FLOAT_LITERAL 2.71828182845904523536)))
+  (DECLARE_CONSTANT (NAME "SQRT2") (TYPE FLOAT) (VALUE (FLOAT_LITERAL 1.41421356237309504880)))
+  (DECLARE_CONSTANT (NAME "LN2") (TYPE FLOAT) (VALUE (FLOAT_LITERAL 0.69314718055994530942)))
+  
+  ; Basic arithmetic with overflow protection
+  
+  (DEFINE_FUNCTION
+    (NAME "safe_add")
+    (INTENT "Add two integers with overflow protection")
+    (ACCEPTS_PARAMETER (NAME "a") (TYPE INT) (INTENT "First operand"))
+    (ACCEPTS_PARAMETER (NAME "b") (TYPE INT) (INTENT "Second operand"))
+    (RETURNS (TYPE INT))
+    
+    (PRECONDITION
+      (LOGICAL_OR
+        (LOGICAL_AND
+          (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "b") (INTEGER_LITERAL 0))
+          (PREDICATE_LESS_THAN_OR_EQUAL_TO 
+            (VARIABLE_REFERENCE "a")
+            (EXPRESSION_SUBTRACT (INTEGER_LITERAL 2147483647) (VARIABLE_REFERENCE "b"))))
+        (LOGICAL_AND
+          (PREDICATE_LESS_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "b") (INTEGER_LITERAL 0))
+          (PREDICATE_GREATER_THAN_OR_EQUAL_TO 
+            (VARIABLE_REFERENCE "a")
+            (EXPRESSION_SUBTRACT (INTEGER_LITERAL -2147483648) (VARIABLE_REFERENCE "b")))))
+      (PROOF_HINT "Addition must not overflow")
+      (VERIFICATION_METHOD SMT_SOLVER))
+    
+    (POSTCONDITION
+      (PREDICATE_EQUALS 
+        (VARIABLE_REFERENCE "RETURNED_VALUE")
+        (EXPRESSION_ADD (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b")))
+      (PROOF_HINT "Result is correct sum"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE)
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (RETURN_VALUE (EXPRESSION_ADD (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b")))))
+  
+  (DEFINE_FUNCTION
+    (NAME "safe_multiply")
+    (INTENT "Multiply two integers with overflow protection")
+    (ACCEPTS_PARAMETER (NAME "a") (TYPE INT) (INTENT "First operand"))
+    (ACCEPTS_PARAMETER (NAME "b") (TYPE INT) (INTENT "Second operand"))
+    (RETURNS (TYPE INT))
+    
+    (PRECONDITION
+      (LOGICAL_OR
+        (PREDICATE_EQUALS (VARIABLE_REFERENCE "a") (INTEGER_LITERAL 0))
+        (PREDICATE_EQUALS (VARIABLE_REFERENCE "b") (INTEGER_LITERAL 0))
+        (LOGICAL_AND
+          (PREDICATE_LESS_THAN_OR_EQUAL_TO 
+            (EXPRESSION_DIVIDE (INTEGER_LITERAL 2147483647) (VARIABLE_REFERENCE "a"))
+            (VARIABLE_REFERENCE "b"))
+          (PREDICATE_GREATER_THAN_OR_EQUAL_TO 
+            (EXPRESSION_DIVIDE (INTEGER_LITERAL -2147483648) (VARIABLE_REFERENCE "a"))
+            (VARIABLE_REFERENCE "b"))))
+      (PROOF_HINT "Multiplication must not overflow")
+      (VERIFICATION_METHOD SMT_SOLVER))
+    
+    (POSTCONDITION
+      (PREDICATE_EQUALS 
+        (VARIABLE_REFERENCE "RETURNED_VALUE")
+        (EXPRESSION_MULTIPLY (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b")))
+      (PROOF_HINT "Result is correct product"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE)
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (RETURN_VALUE (EXPRESSION_MULTIPLY (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b")))))
+  
+  ; Power and root functions
+  
+  (DEFINE_FUNCTION
+    (NAME "pow")
+    (INTENT "Raise base to power with contract verification")
+    (ACCEPTS_PARAMETER (NAME "base") (TYPE FLOAT) (INTENT "Base value"))
+    (ACCEPTS_PARAMETER (NAME "exponent") (TYPE FLOAT) (INTENT "Exponent value"))
+    (RETURNS (TYPE FLOAT))
+    
+    (PRECONDITION
+      (LOGICAL_OR
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "base") (FLOAT_LITERAL 0.0))
+        (LOGICAL_AND
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "base") (FLOAT_LITERAL 0.0))
+          (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "exponent") (FLOAT_LITERAL 0.0))))
+      (PROOF_HINT "Base must be positive or zero with positive exponent"))
+    
+    (POSTCONDITION
+      (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (FLOAT_LITERAL 0.0))
+      (PROOF_HINT "Result is non-negative for valid inputs"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (RETURN_VALUE (CALL_FUNCTION "aether_pow"
+        (ARGUMENTS 
+          (VARIABLE_REFERENCE "base")
+          (VARIABLE_REFERENCE "exponent"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "sqrt")
+    (INTENT "Square root with domain checking")
+    (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT) (INTENT "Value to compute square root of"))
+    (RETURNS (TYPE FLOAT))
+    
+    (PRECONDITION
+      (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "x") (FLOAT_LITERAL 0.0))
+      (PROOF_HINT "Cannot take square root of negative number"))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (FLOAT_LITERAL 0.0))
+        (PREDICATE_LESS_THAN 
+          (EXPRESSION_SUBTRACT
+            (EXPRESSION_MULTIPLY (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "RETURNED_VALUE"))
+            (VARIABLE_REFERENCE "x"))
+          (FLOAT_LITERAL 0.000001)))
+      (PROOF_HINT "Result squared equals input within tolerance"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (RETURN_VALUE (CALL_FUNCTION "aether_sqrt"
+        (ARGUMENTS (VARIABLE_REFERENCE "x"))))))
+  
+  ; Trigonometric functions
+  
+  (DEFINE_FUNCTION
+    (NAME "sin")
+    (INTENT "Sine function with range guarantee")
+    (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT) (INTENT "Angle in radians"))
+    (RETURNS (TYPE FLOAT))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (FLOAT_LITERAL -1.0))
+        (PREDICATE_LESS_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (FLOAT_LITERAL 1.0)))
+      (PROOF_HINT "Sine is always between -1 and 1"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (RETURN_VALUE (CALL_FUNCTION "aether_sin"
+        (ARGUMENTS (VARIABLE_REFERENCE "x"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "cos")
+    (INTENT "Cosine function with range guarantee")
+    (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT) (INTENT "Angle in radians"))
+    (RETURNS (TYPE FLOAT))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (FLOAT_LITERAL -1.0))
+        (PREDICATE_LESS_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (FLOAT_LITERAL 1.0)))
+      (PROOF_HINT "Cosine is always between -1 and 1"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (RETURN_VALUE (CALL_FUNCTION "aether_cos"
+        (ARGUMENTS (VARIABLE_REFERENCE "x"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "tan")
+    (INTENT "Tangent function")
+    (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT) (INTENT "Angle in radians"))
+    (RETURNS (TYPE FLOAT))
+    
+    (PRECONDITION
+      (PREDICATE_NOT_EQUALS 
+        (EXPRESSION_MODULO 
+          (EXPRESSION_ADD (VARIABLE_REFERENCE "x") (EXPRESSION_DIVIDE (VARIABLE_REFERENCE "PI") (FLOAT_LITERAL 2.0)))
+          (VARIABLE_REFERENCE "PI"))
+        (FLOAT_LITERAL 0.0))
+      (PROOF_HINT "x must not be odd multiple of pi/2"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (RETURN_VALUE (CALL_FUNCTION "aether_tan"
+        (ARGUMENTS (VARIABLE_REFERENCE "x"))))))
+  
+  ; Logarithmic functions
+  
+  (DEFINE_FUNCTION
+    (NAME "log")
+    (INTENT "Natural logarithm with domain checking")
+    (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT) (INTENT "Value to compute logarithm of"))
+    (RETURNS (TYPE FLOAT))
+    
+    (PRECONDITION
+      (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "x") (FLOAT_LITERAL 0.0))
+      (PROOF_HINT "Logarithm only defined for positive numbers"))
+    
+    (POSTCONDITION
+      (PREDICATE_LESS_THAN 
+        (EXPRESSION_SUBTRACT
+          (CALL_FUNCTION "exp" (ARGUMENTS (VARIABLE_REFERENCE "RETURNED_VALUE")))
+          (VARIABLE_REFERENCE "x"))
+        (FLOAT_LITERAL 0.000001))
+      (PROOF_HINT "e^(log(x)) equals x within tolerance"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (RETURN_VALUE (CALL_FUNCTION "aether_log"
+        (ARGUMENTS (VARIABLE_REFERENCE "x"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "exp")
+    (INTENT "Exponential function")
+    (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT) (INTENT "Exponent"))
+    (RETURNS (TYPE FLOAT))
+    
+    (POSTCONDITION
+      (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "RETURNED_VALUE") (FLOAT_LITERAL 0.0))
+      (PROOF_HINT "Exponential is always positive"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (RETURN_VALUE (CALL_FUNCTION "aether_exp"
+        (ARGUMENTS (VARIABLE_REFERENCE "x"))))))
+  
+  ; Min/Max functions
+  
+  (DEFINE_FUNCTION
+    (NAME "min")
+    (INTENT "Return minimum of two values")
+    (ACCEPTS_PARAMETER (NAME "a") (TYPE INT) (INTENT "First value"))
+    (ACCEPTS_PARAMETER (NAME "b") (TYPE INT) (INTENT "Second value"))
+    (RETURNS (TYPE INT))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (PREDICATE_LESS_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "a"))
+        (PREDICATE_LESS_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "b"))
+        (LOGICAL_OR
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "a"))
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "b"))))
+      (PROOF_HINT "Returns the smaller value"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b"))
+        (THEN_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "a")))
+        (ELSE_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "b"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "max")
+    (INTENT "Return maximum of two values")
+    (ACCEPTS_PARAMETER (NAME "a") (TYPE INT) (INTENT "First value"))
+    (ACCEPTS_PARAMETER (NAME "b") (TYPE INT) (INTENT "Second value"))
+    (RETURNS (TYPE INT))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "a"))
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "b"))
+        (LOGICAL_OR
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "a"))
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "b"))))
+      (PROOF_HINT "Returns the larger value"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (IF_CONDITION (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b"))
+        (THEN_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "a")))
+        (ELSE_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "b"))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "abs")
+    (INTENT "Absolute value")
+    (ACCEPTS_PARAMETER (NAME "x") (TYPE INT) (INTENT "Input value"))
+    (RETURNS (TYPE INT))
+    
+    (PRECONDITION
+      (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "x") (INTEGER_LITERAL -2147483648))
+      (PROOF_HINT "Cannot take absolute value of INT_MIN"))
+    
+    (POSTCONDITION
+      (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (INTEGER_LITERAL 0))
+      (PROOF_HINT "Absolute value is non-negative"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "x") (INTEGER_LITERAL 0))
+        (THEN_EXECUTE (RETURN_VALUE (EXPRESSION_NEGATE (VARIABLE_REFERENCE "x"))))
+        (ELSE_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "x"))))))
+  
+  ; Export all functions and constants
+  (EXPORT_CONSTANT "PI")
+  (EXPORT_CONSTANT "E")
+  (EXPORT_CONSTANT "SQRT2")
+  (EXPORT_CONSTANT "LN2")
+  (EXPORT_FUNCTION "safe_add")
+  (EXPORT_FUNCTION "safe_multiply")
+  (EXPORT_FUNCTION "pow")
+  (EXPORT_FUNCTION "sqrt")
+  (EXPORT_FUNCTION "sin")
+  (EXPORT_FUNCTION "cos")
+  (EXPORT_FUNCTION "tan")
+  (EXPORT_FUNCTION "log")
+  (EXPORT_FUNCTION "exp")
+  (EXPORT_FUNCTION "min")
+  (EXPORT_FUNCTION "max")
+  (EXPORT_FUNCTION "abs")
+)

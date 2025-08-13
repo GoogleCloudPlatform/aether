@@ -1,0 +1,321 @@
+; Data Analysis with Standard Library
+; Demonstrates collections, math operations, and statistical analysis
+
+(DEFINE_MODULE
+  (NAME "data_analysis")
+  (INTENT "Statistical analysis of numerical data using stdlib")
+  
+  (IMPORT_MODULE "std.io")
+  (IMPORT_MODULE "std.collections")
+  (IMPORT_MODULE "std.math")
+  
+  (CONTENT
+    ; Helper function for sum
+    (DEFINE_FUNCTION
+      (NAME "sum_reducer")
+      (ACCEPTS_PARAMETER (NAME "acc") (TYPE INT))
+      (ACCEPTS_PARAMETER (NAME "val") (TYPE INT))
+      (RETURNS (TYPE INT))
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD 
+          (VARIABLE_REFERENCE "acc")
+          (VARIABLE_REFERENCE "val")))))
+    
+    ; Helper function for filtering positive numbers
+    (DEFINE_FUNCTION
+      (NAME "is_positive")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INT))
+      (RETURNS (TYPE BOOL))
+      (BODY
+        (RETURN_VALUE (PREDICATE_GREATER_THAN 
+          (VARIABLE_REFERENCE "x")
+          (INTEGER_LITERAL 0)))))
+    
+    ; Transform function to square numbers
+    (DEFINE_FUNCTION
+      (NAME "square")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INT))
+      (RETURNS (TYPE INT))
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY 
+          (VARIABLE_REFERENCE "x")
+          (VARIABLE_REFERENCE "x")))))
+    
+    (DEFINE_FUNCTION
+      (NAME "calculate_mean")
+      (INTENT "Calculate arithmetic mean of array")
+      (ACCEPTS_PARAMETER (NAME "data") (TYPE (ARRAY INT 100)))
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INT))
+      (RETURNS (TYPE FLOAT))
+      
+      (PRECONDITION
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 0))
+        (PROOF_HINT "Size must be positive"))
+      
+      (BODY
+        (DECLARE_VARIABLE (NAME "sum") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.collections.reduce"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "data")
+              (VARIABLE_REFERENCE "size")
+              (INTEGER_LITERAL 0)
+              (FUNCTION_REFERENCE "sum_reducer")))))
+        
+        (RETURN_VALUE (EXPRESSION_DIVIDE
+          (TO_FLOAT (VARIABLE_REFERENCE "sum"))
+          (TO_FLOAT (VARIABLE_REFERENCE "size"))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "calculate_variance")
+      (INTENT "Calculate population variance")
+      (ACCEPTS_PARAMETER (NAME "data") (TYPE (ARRAY INT 100)))
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INT))
+      (ACCEPTS_PARAMETER (NAME "mean") (TYPE FLOAT))
+      (RETURNS (TYPE FLOAT))
+      
+      (BODY
+        (DECLARE_VARIABLE (NAME "sum_squared_diff") (TYPE FLOAT) 
+          (INITIAL_VALUE (FLOAT_LITERAL 0.0)))
+        
+        (FOR_LOOP
+          (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+          (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "size")))
+          (UPDATE (ASSIGN (TARGET "i") 
+            (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+          (BODY
+            (DECLARE_VARIABLE (NAME "diff") (TYPE FLOAT)
+              (INITIAL_VALUE (EXPRESSION_SUBTRACT
+                (TO_FLOAT (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (VARIABLE_REFERENCE "i")))
+                (VARIABLE_REFERENCE "mean"))))
+            
+            (ASSIGN (TARGET "sum_squared_diff")
+              (SOURCE (EXPRESSION_ADD
+                (VARIABLE_REFERENCE "sum_squared_diff")
+                (EXPRESSION_MULTIPLY (VARIABLE_REFERENCE "diff") (VARIABLE_REFERENCE "diff")))))))
+        
+        (RETURN_VALUE (EXPRESSION_DIVIDE
+          (VARIABLE_REFERENCE "sum_squared_diff")
+          (TO_FLOAT (VARIABLE_REFERENCE "size"))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "find_median")
+      (INTENT "Find median value of sorted array")
+      (ACCEPTS_PARAMETER (NAME "data") (TYPE (ARRAY INT 100)))
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INT))
+      (RETURNS (TYPE FLOAT))
+      
+      (PRECONDITION
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 0))
+        (PROOF_HINT "Size must be positive"))
+      
+      (BODY
+        ; First sort the data
+        (CALL_FUNCTION "std.collections.sort_verified"
+          (ARGUMENTS 
+            (VARIABLE_REFERENCE "data")
+            (VARIABLE_REFERENCE "size")))
+        
+        ; Calculate median
+        (DECLARE_VARIABLE (NAME "mid") (TYPE INT)
+          (INITIAL_VALUE (EXPRESSION_DIVIDE (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 2))))
+        
+        (IF_CONDITION (PREDICATE_EQUALS 
+            (EXPRESSION_MODULO (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 2))
+            (INTEGER_LITERAL 0))
+          (THEN_EXECUTE
+            ; Even number of elements - average of two middle values
+            (RETURN_VALUE (EXPRESSION_DIVIDE
+              (EXPRESSION_ADD
+                (TO_FLOAT (ARRAY_ACCESS (VARIABLE_REFERENCE "data") 
+                  (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "mid") (INTEGER_LITERAL 1))))
+                (TO_FLOAT (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (VARIABLE_REFERENCE "mid"))))
+              (FLOAT_LITERAL 2.0))))
+          (ELSE_EXECUTE
+            ; Odd number of elements
+            (RETURN_VALUE (TO_FLOAT 
+              (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (VARIABLE_REFERENCE "mid"))))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "analyze_dataset")
+      (INTENT "Perform comprehensive statistical analysis")
+      (ACCEPTS_PARAMETER (NAME "data") (TYPE (ARRAY INT 100)))
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INT))
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "=== Statistical Analysis Report ===")))
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Dataset size: ")
+            (TO_STRING (VARIABLE_REFERENCE "size")))))
+        
+        ; Find min and max
+        (DECLARE_VARIABLE (NAME "min_val") (TYPE INT) 
+          (INITIAL_VALUE (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (INTEGER_LITERAL 0))))
+        (DECLARE_VARIABLE (NAME "max_val") (TYPE INT) 
+          (INITIAL_VALUE (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (INTEGER_LITERAL 0))))
+        
+        (FOR_LOOP
+          (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 1))))
+          (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "size")))
+          (UPDATE (ASSIGN (TARGET "i") 
+            (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+          (BODY
+            (DECLARE_VARIABLE (NAME "val") (TYPE INT)
+              (INITIAL_VALUE (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (VARIABLE_REFERENCE "i"))))
+            
+            (ASSIGN (TARGET "min_val")
+              (SOURCE (CALL_FUNCTION "std.math.min"
+                (ARGUMENTS (VARIABLE_REFERENCE "min_val") (VARIABLE_REFERENCE "val")))))
+            
+            (ASSIGN (TARGET "max_val")
+              (SOURCE (CALL_FUNCTION "std.math.max"
+                (ARGUMENTS (VARIABLE_REFERENCE "max_val") (VARIABLE_REFERENCE "val")))))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Minimum: ")
+            (TO_STRING (VARIABLE_REFERENCE "min_val")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Maximum: ")
+            (TO_STRING (VARIABLE_REFERENCE "max_val")))))
+        
+        ; Calculate mean
+        (DECLARE_VARIABLE (NAME "mean") (TYPE FLOAT)
+          (INITIAL_VALUE (CALL_FUNCTION "calculate_mean"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "data")
+              (VARIABLE_REFERENCE "size")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Mean: ")
+            (TO_STRING (VARIABLE_REFERENCE "mean")))))
+        
+        ; Calculate median
+        (DECLARE_VARIABLE (NAME "data_copy") (TYPE (ARRAY INT 100)))
+        ; Copy data for median calculation (which sorts)
+        (FOR_LOOP
+          (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+          (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "size")))
+          (UPDATE (ASSIGN (TARGET "i") 
+            (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+          (BODY
+            (ASSIGN (TARGET (ARRAY_ACCESS (VARIABLE_REFERENCE "data_copy") (VARIABLE_REFERENCE "i")))
+              (SOURCE (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (VARIABLE_REFERENCE "i"))))))
+        
+        (DECLARE_VARIABLE (NAME "median") (TYPE FLOAT)
+          (INITIAL_VALUE (CALL_FUNCTION "find_median"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "data_copy")
+              (VARIABLE_REFERENCE "size")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Median: ")
+            (TO_STRING (VARIABLE_REFERENCE "median")))))
+        
+        ; Calculate variance and standard deviation
+        (DECLARE_VARIABLE (NAME "variance") (TYPE FLOAT)
+          (INITIAL_VALUE (CALL_FUNCTION "calculate_variance"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "data")
+              (VARIABLE_REFERENCE "size")
+              (VARIABLE_REFERENCE "mean")))))
+        
+        (DECLARE_VARIABLE (NAME "std_dev") (TYPE FLOAT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.math.sqrt"
+            (ARGUMENTS (VARIABLE_REFERENCE "variance")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Variance: ")
+            (TO_STRING (VARIABLE_REFERENCE "variance")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Standard Deviation: ")
+            (TO_STRING (VARIABLE_REFERENCE "std_dev")))))
+        
+        ; Filter positive numbers
+        (DECLARE_VARIABLE (NAME "positive_nums") (TYPE (ARRAY INT 100)))
+        (DECLARE_VARIABLE (NAME "positive_count") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.collections.filter"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "data")
+              (VARIABLE_REFERENCE "size")
+              (FUNCTION_REFERENCE "is_positive")
+              (VARIABLE_REFERENCE "positive_nums")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "\nPositive numbers count: ")
+            (TO_STRING (VARIABLE_REFERENCE "positive_count")))))
+        
+        ; Calculate sum of squares
+        (DECLARE_VARIABLE (NAME "squares") (TYPE (ARRAY INT 100)))
+        (CALL_FUNCTION "std.collections.map"
+          (ARGUMENTS 
+            (VARIABLE_REFERENCE "data")
+            (VARIABLE_REFERENCE "size")
+            (FUNCTION_REFERENCE "square")
+            (VARIABLE_REFERENCE "squares")))
+        
+        (DECLARE_VARIABLE (NAME "sum_of_squares") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.collections.reduce"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "squares")
+              (VARIABLE_REFERENCE "size")
+              (INTEGER_LITERAL 0)
+              (FUNCTION_REFERENCE "sum_reducer")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Sum of squares: ")
+            (TO_STRING (VARIABLE_REFERENCE "sum_of_squares")))))
+        
+        (RETURN_VOID)))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (RETURNS (TYPE INT))
+      (BODY
+        ; Create sample dataset
+        (DECLARE_VARIABLE (NAME "dataset") (TYPE (ARRAY INT 100))
+          (INITIAL_VALUE (ARRAY_LITERAL 
+            (TYPE (ARRAY INT 100))
+            (INTEGER_LITERAL 15)
+            (INTEGER_LITERAL -5)
+            (INTEGER_LITERAL 22)
+            (INTEGER_LITERAL 8)
+            (INTEGER_LITERAL 13)
+            (INTEGER_LITERAL -2)
+            (INTEGER_LITERAL 30)
+            (INTEGER_LITERAL 17)
+            (INTEGER_LITERAL 9)
+            (INTEGER_LITERAL 25)
+            (INTEGER_LITERAL -8)
+            (INTEGER_LITERAL 19)
+            (INTEGER_LITERAL 11)
+            (INTEGER_LITERAL 6)
+            (INTEGER_LITERAL 28))))
+        
+        (DECLARE_VARIABLE (NAME "dataset_size") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 15)))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "Analyzing dataset...")))
+        
+        (CALL_FUNCTION "analyze_dataset"
+          (ARGUMENTS 
+            (VARIABLE_REFERENCE "dataset")
+            (VARIABLE_REFERENCE "dataset_size")))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\nAnalysis complete!")))
+        
+        (RETURN_VALUE (INTEGER_LITERAL 0))))
+  )
+)

@@ -1,0 +1,20 @@
+[package]
+name = "aether-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+lazy_static = "1.4"
+libc = "0.2"
+chrono = "0.4"
+backtrace = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["libloaderapi", "minwindef"] }
+
+[profile.release]
+opt-level = 3
+lto = true

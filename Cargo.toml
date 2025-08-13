@@ -1,0 +1,74 @@
+[package]
+name = "aether"
+version = "0.1.0"
+edition = "2021"
+authors = ["AetherScript Compiler Team"]
+description = "Compiler for the AetherScript programming language"
+license = "MIT"
+repository = "https://github.com/aetherscript/aether"
+
+[dependencies]
+# CLI argument parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Serialization (for AST, config files)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime (for potential parallel compilation)
+tokio = { version = "1.0", features = ["full"], optional = true }
+
+# String utilities
+unicode-segmentation = "1.10"
+
+# LLVM code generation
+inkwell = { version = "0.4", features = ["llvm17-0"] }
+
+# System information for profiling
+libc = "0.2"
+
+# Parallel processing
+rayon = "1.10"
+
+# Formal verification
+# z3 = { version = "0.12" }
+
+# Cryptography for checksums
+sha2 = "0.10"
+
+# Date and time
+chrono = { version = "0.4", features = ["serde"] }
+broadcast = "0.1"
+reqwest = { version = "0.11", features = ["json"] }
+
+# Number of CPUs
+num_cpus = "1.16"
+
+# Archive creation
+zip = "0.6"
+
+[dev-dependencies]
+# Testing utilities
+proptest = "1.4"
+criterion = "0.5"
+tempfile = "3.0"
+
+[features]
+default = []
+async = ["tokio"]
+
+[[bin]]
+name = "aether-compiler"
+path = "src/main.rs"
+
+[lib]
+name = "aether"
+path = "src/lib.rs"
+
+[[bench]]
+name = "compile_bench"
+harness = false

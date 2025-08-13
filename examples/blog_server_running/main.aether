@@ -1,0 +1,97 @@
+;; AetherScript Blog Server - Running Demo
+;; A blog server that stays running
+
+(DEFINE_MODULE
+  (NAME 'blog_server_running')
+  (INTENT "Blog server that runs continuously")
+  (CONTENT
+    ;; External functions we need
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_listen')
+      (LIBRARY "aether_runtime")
+      (SYMBOL "tcp_listen")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_accept')
+      (LIBRARY "aether_runtime")
+      (SYMBOL "tcp_accept")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "socket") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'tcp_close')
+      (LIBRARY "aether_runtime")
+      (SYMBOL "tcp_close")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "socket") (TYPE INTEGER))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'puts')
+      (LIBRARY "c")
+      (SYMBOL "puts")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING))
+    )
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME 'sleep')
+      (LIBRARY "c")
+      (SYMBOL "sleep")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "seconds") (TYPE INTEGER))
+    )
+    
+    (DEFINE_FUNCTION
+      (NAME 'main')
+      (RETURNS INTEGER)
+      (INTENT "Blog server main loop")
+      (BODY
+        (DECLARE_VARIABLE
+          (NAME 'server_socket')
+          (TYPE INTEGER)
+          (INITIAL_VALUE (CALL_FUNCTION 'tcp_listen' (ARGUMENTS 8080)))
+        )
+        
+        (EXPRESSION_STATEMENT
+          (CALL_FUNCTION 'puts' (ARGUMENTS (STRING_LITERAL "Blog server listening on port 8080...")))
+        )
+        
+        ;; Simple infinite loop
+        (LOOP_WHILE_CONDITION
+          (CONDITION (BOOLEAN_LITERAL true))
+          (BODY
+            (DECLARE_VARIABLE
+              (NAME 'client')
+              (TYPE INTEGER)
+              (INITIAL_VALUE (CALL_FUNCTION 'tcp_accept' (ARGUMENTS (VARIABLE_REFERENCE 'server_socket'))))
+            )
+            
+            (IF_CONDITION
+              (CONDITION (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE 'client') 0))
+              (THEN_EXECUTE
+                (EXPRESSION_STATEMENT
+                  (CALL_FUNCTION 'puts' (ARGUMENTS (STRING_LITERAL "Client connected!")))
+                )
+                (EXPRESSION_STATEMENT
+                  (CALL_FUNCTION 'tcp_close' (ARGUMENTS (VARIABLE_REFERENCE 'client')))
+                )
+              )
+            )
+            
+            ;; Small delay
+            (EXPRESSION_STATEMENT
+              (CALL_FUNCTION 'sleep' (ARGUMENTS 1))
+            )
+          )
+        )
+        
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

@@ -1,0 +1,35 @@
+(DEFINE_MODULE
+  (NAME test_float_main)
+  (INTENT "Test float type support with main function")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add_floats")
+      (INTENT "Add two floating point numbers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE FLOAT))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE FLOAT))
+      (RETURNS FLOAT)
+      (BODY
+        (RETURN_VALUE
+          (EXPRESSION_ADD a b))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Main entry point")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE
+          (NAME "x")
+          (TYPE FLOAT)
+          (VALUE 3.14))
+        (DECLARE_VARIABLE
+          (NAME "y")
+          (TYPE FLOAT)
+          (VALUE 2.71))
+        (DECLARE_VARIABLE
+          (NAME "result")
+          (TYPE FLOAT)
+          (VALUE (CALL_FUNCTION
+            (NAME "add_floats")
+            (ARGUMENT x)
+            (ARGUMENT y))))
+        (RETURN_VALUE 0)))))

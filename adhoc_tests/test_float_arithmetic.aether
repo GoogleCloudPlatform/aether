@@ -1,0 +1,46 @@
+(DEFINE_MODULE
+  (NAME float_test)
+  (INTENT "Test float arithmetic operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "x") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "y") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "result") (TYPE FLOAT))
+        
+        (ASSIGN (TARGET_VARIABLE x) (SOURCE_EXPRESSION 10.5))
+        (ASSIGN (TARGET_VARIABLE y) (SOURCE_EXPRESSION 3.5))
+        
+        ; Test addition
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (EXPRESSION_ADD x y)))
+        
+        (CALL_FUNCTION printf "%.2f + %.2f = %.2f\n" x y result)
+        
+        ; Test subtraction
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (EXPRESSION_SUBTRACT x y)))
+        
+        (CALL_FUNCTION printf "%.2f - %.2f = %.2f\n" x y result)
+        
+        ; Test multiplication
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (EXPRESSION_MULTIPLY x y)))
+        
+        (CALL_FUNCTION printf "%.2f * %.2f = %.2f\n" x y result)
+        
+        ; Test division
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (EXPRESSION_DIVIDE x y)))
+        
+        (CALL_FUNCTION printf "%.2f / %.2f = %.2f\n" x y result)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

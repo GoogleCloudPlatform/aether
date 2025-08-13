@@ -1,0 +1,74 @@
+(DEFINE_MODULE
+  (NAME error_handling)
+  (INTENT "Test error handling features")
+  (CONTENT
+    ; Define a custom error type
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Error)
+      (VARIANTS
+        (VARIANT DivisionByZero)
+        (VARIANT InvalidInput (HOLDS STRING))
+        (VARIANT FileNotFound (HOLDS STRING))))
+    
+    ; External function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME divide)
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION
+          (PREDICATE_EQUALS b 0)
+          (THEN_EXECUTE
+            (THROW_EXCEPTION DivisionByZero))
+          (ELSE_EXECUTE
+            (RETURN_VALUE (EXPRESSION_INTEGER_DIVIDE a b))))))
+    
+    (DEFINE_FUNCTION
+      (NAME test_error_handling)
+      (RETURNS INTEGER)
+      (BODY
+        (TRY_EXECUTE
+          (PROTECTED_BLOCK
+            (DECLARE_VARIABLE (NAME result) (TYPE INTEGER))
+            (ASSIGN
+              (TARGET_VARIABLE result)
+              (SOURCE_EXPRESSION (CALL_FUNCTION divide 10 2)))
+            (CALL_FUNCTION printf "Result: %d\n" result)
+            
+            ; This will throw
+            (ASSIGN
+              (TARGET_VARIABLE result)
+              (SOURCE_EXPRESSION (CALL_FUNCTION divide 10 0)))
+            (CALL_FUNCTION printf "This should not print\n"))
+          
+          (CATCH_EXCEPTION Error e
+            (HANDLER_BLOCK
+              (MATCH_EXPRESSION e
+                (CASE DivisionByZero
+                  (CALL_FUNCTION printf "Caught division by zero error\n"))
+                (CASE (InvalidInput msg)
+                  (CALL_FUNCTION printf "Caught invalid input: %s\n" msg))
+                (CASE (FileNotFound path)
+                  (CALL_FUNCTION printf "File not found: %s\n" path)))))
+          
+          (FINALLY_EXECUTE
+            (CLEANUP_BLOCK
+              (CALL_FUNCTION printf "Cleanup executed\n"))))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_error_handling)
+        (RETURN_VALUE 0)))
+  )
+)

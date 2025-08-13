@@ -1,0 +1,55 @@
+(DEFINE_MODULE
+  (NAME test_control_flow)
+  (INTENT "Test control flow statements")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "test_if")
+      (INTENT "Test if statement")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN x 10)
+          (THEN_EXECUTE
+            (RETURN_VALUE 100))
+          (ELSE_EXECUTE
+            (RETURN_VALUE 50)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "test_nested_if")
+      (INTENT "Test nested if statements")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN x 0)
+          (THEN_EXECUTE
+            (IF_CONDITION (PREDICATE_LESS_THAN x 10)
+              (THEN_EXECUTE
+                (RETURN_VALUE 1))
+              (ELSE_EXECUTE
+                (RETURN_VALUE 2))))
+          (ELSE_EXECUTE
+            (RETURN_VALUE 0)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "test_while")
+      (INTENT "Test while loop")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE
+          (NAME "sum")
+          (TYPE INTEGER)
+          (VALUE 0))
+        (DECLARE_VARIABLE
+          (NAME "i")
+          (TYPE INTEGER)
+          (VALUE 0))
+        (LOOP_WHILE_CONDITION (PREDICATE_LESS_THAN i n)
+          (ITERATION_BODY
+            (ASSIGN
+              (TARGET_VARIABLE sum)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD sum i)))
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD i 1)))))
+        (RETURN_VALUE sum)))))

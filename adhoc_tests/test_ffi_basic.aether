@@ -1,0 +1,43 @@
+(DEFINE_MODULE
+  (NAME ffi_test)
+  (INTENT "Test FFI with external C functions")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME strlen)
+      (LIBRARY "libc")
+      (SYMBOL "strlen")
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING))
+      (RETURNS INTEGER)
+      (CALLING_CONVENTION "C")
+      (THREAD_SAFE true)
+      (MAY_BLOCK false))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME malloc)
+      (LIBRARY "libc")
+      (SYMBOL "malloc")
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INTEGER))
+      (RETURNS (POINTER_TO VOID))
+      (CALLING_CONVENTION "C")
+      (THREAD_SAFE false)
+      (MAY_BLOCK false))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "test_str") (TYPE STRING))
+        (DECLARE_VARIABLE (NAME "length") (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE test_str)
+          (SOURCE_EXPRESSION "Hello, FFI!"))
+        
+        (ASSIGN
+          (TARGET_VARIABLE length)
+          (SOURCE_EXPRESSION (CALL_FUNCTION strlen test_str)))
+        
+        (CALL_FUNCTION printf "String: %s\n" test_str)
+        (CALL_FUNCTION printf "Length via FFI: %d\n" length)
+        
+        (RETURN_VALUE length)))))

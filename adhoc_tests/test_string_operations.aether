@@ -1,0 +1,33 @@
+(DEFINE_MODULE
+  (NAME string_test)
+  (INTENT "Test string operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "str1") (TYPE STRING))
+        (DECLARE_VARIABLE (NAME "str2") (TYPE STRING))
+        (DECLARE_VARIABLE (NAME "result") (TYPE STRING))
+        (DECLARE_VARIABLE (NAME "length") (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE str1)
+          (SOURCE_EXPRESSION "Hello"))
+        
+        (ASSIGN
+          (TARGET_VARIABLE str2)
+          (SOURCE_EXPRESSION " World"))
+        
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (STRING_CONCAT str1 str2)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE length)
+          (SOURCE_EXPRESSION (STRING_LENGTH result)))
+        
+        (CALL_FUNCTION printf "Concatenated: %s\n" result)
+        (CALL_FUNCTION printf "Length: %d\n" length)
+        
+        (RETURN_VALUE length)))))

@@ -1,0 +1,15 @@
+(DEFINE_MODULE
+  (NAME simple_for)
+  (INTENT "Simple FOR loop test")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER i)
+          (FROM 1)
+          (TO 5)
+          (DO
+            (CALL_FUNCTION printf "%d\\n" i)))
+        (RETURN_VALUE 0)))))

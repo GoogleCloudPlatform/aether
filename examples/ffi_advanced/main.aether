@@ -1,0 +1,308 @@
+; Advanced FFI Demo - Structs, Callbacks, and Complex Interop
+; Shows advanced FFI features including struct passing and callbacks
+
+(DEFINE_MODULE
+  (NAME "ffi_advanced")
+  (INTENT "Demonstrate advanced FFI features with structs and callbacks")
+  
+  (CONTENT
+    ; Define a struct that matches C layout
+    (DEFINE_TYPE
+      (NAME "Point2D")
+      (STRUCTURED_TYPE
+        (FIELD (NAME "x") (TYPE FLOAT64))
+        (FIELD (NAME "y") (TYPE FLOAT64)))
+      (LAYOUT C_COMPATIBLE)
+      (INTENT "2D point structure compatible with C"))
+    
+    (DEFINE_TYPE
+      (NAME "Rectangle")
+      (STRUCTURED_TYPE
+        (FIELD (NAME "top_left") (TYPE "Point2D"))
+        (FIELD (NAME "width") (TYPE FLOAT64))
+        (FIELD (NAME "height") (TYPE FLOAT64)))
+      (LAYOUT C_COMPATIBLE)
+      (INTENT "Rectangle structure compatible with C"))
+    
+    ; Callback function type
+    (DEFINE_TYPE
+      (NAME "ProgressCallback")
+      (FUNCTION_POINTER
+        (ACCEPTS_PARAMETER (NAME "current") (TYPE INT))
+        (ACCEPTS_PARAMETER (NAME "total") (TYPE INT))
+        (RETURNS (TYPE VOID)))
+      (CALLING_CONVENTION C)
+      (INTENT "Progress callback function pointer"))
+    
+    ; External C functions that work with structs
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "c_distance")
+      (LIBRARY "geometry")
+      (SYMBOL "calculate_distance")
+      (RETURNS (TYPE FLOAT64))
+      (ACCEPTS_PARAMETER (NAME "p1") (TYPE (POINTER "Point2D")) (PASSING BY_VALUE))
+      (ACCEPTS_PARAMETER (NAME "p2") (TYPE (POINTER "Point2D")) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "c_rectangle_area")
+      (LIBRARY "geometry")
+      (SYMBOL "calculate_area")
+      (RETURNS (TYPE FLOAT64))
+      (ACCEPTS_PARAMETER (NAME "rect") (TYPE (POINTER "Rectangle")) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    ; External function that takes a callback
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "c_process_with_callback")
+      (LIBRARY "processing")
+      (SYMBOL "process_data")
+      (RETURNS (TYPE INT))
+      (ACCEPTS_PARAMETER (NAME "data") (TYPE (POINTER VOID)) (PASSING BY_VALUE))
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE SIZE_T) (PASSING BY_VALUE))
+      (ACCEPTS_PARAMETER (NAME "callback") (TYPE "ProgressCallback") (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    ; System calls
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "c_time")
+      (LIBRARY "libc")
+      (SYMBOL "time")
+      (RETURNS (TYPE TIME_T))
+      (ACCEPTS_PARAMETER (NAME "tloc") (TYPE (POINTER TIME_T)) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "c_getenv")
+      (LIBRARY "libc")
+      (SYMBOL "getenv")
+      (RETURNS (TYPE (POINTER CHAR)))
+      (ACCEPTS_PARAMETER (NAME "name") (TYPE (POINTER CHAR)) (PASSING BY_VALUE))
+      (CALLING_CONVENTION C)
+      (THREAD_SAFE FALSE))
+    
+    ; Test struct passing
+    (DEFINE_FUNCTION
+      (NAME "test_struct_ffi")
+      (INTENT "Test passing structs to C functions")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        ; Create points
+        (DECLARE_VARIABLE (NAME "p1") (TYPE "Point2D")
+          (INITIAL_VALUE (CONSTRUCT "Point2D"
+            (FIELD_VALUE (NAME "x") (VALUE (FLOAT_LITERAL 0.0)))
+            (FIELD_VALUE (NAME "y") (VALUE (FLOAT_LITERAL 0.0))))))
+        
+        (DECLARE_VARIABLE (NAME "p2") (TYPE "Point2D")
+          (INITIAL_VALUE (CONSTRUCT "Point2D"
+            (FIELD_VALUE (NAME "x") (VALUE (FLOAT_LITERAL 3.0)))
+            (FIELD_VALUE (NAME "y") (VALUE (FLOAT_LITERAL 4.0))))))
+        
+        ; Call C function with struct pointers
+        (DECLARE_VARIABLE (NAME "distance") (TYPE FLOAT64)
+          (INITIAL_VALUE (CALL_FUNCTION "c_distance"
+            (ARGUMENTS 
+              (ADDRESS_OF (VARIABLE_REFERENCE "p1"))
+              (ADDRESS_OF (VARIABLE_REFERENCE "p2"))))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Distance between points: ")
+            (TO_STRING (VARIABLE_REFERENCE "distance")))))
+        
+        ; Test rectangle
+        (DECLARE_VARIABLE (NAME "rect") (TYPE "Rectangle")
+          (INITIAL_VALUE (CONSTRUCT "Rectangle"
+            (FIELD_VALUE (NAME "top_left") (VALUE (VARIABLE_REFERENCE "p1")))
+            (FIELD_VALUE (NAME "width") (VALUE (FLOAT_LITERAL 10.0)))
+            (FIELD_VALUE (NAME "height") (VALUE (FLOAT_LITERAL 5.0))))))
+        
+        (DECLARE_VARIABLE (NAME "area") (TYPE FLOAT64)
+          (INITIAL_VALUE (CALL_FUNCTION "c_rectangle_area"
+            (ARGUMENTS (ADDRESS_OF (VARIABLE_REFERENCE "rect"))))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Rectangle area: ")
+            (TO_STRING (VARIABLE_REFERENCE "area")))))
+        
+        (RETURN_VOID)))
+    
+    ; Progress callback implementation
+    (DEFINE_FUNCTION
+      (NAME "progress_handler")
+      (INTENT "Handle progress updates from C code")
+      (EXPORT_AS C_FUNCTION (SYMBOL "aether_progress_handler"))
+      (ACCEPTS_PARAMETER (NAME "current") (TYPE INT))
+      (ACCEPTS_PARAMETER (NAME "total") (TYPE INT))
+      (RETURNS (TYPE VOID))
+      (CALLING_CONVENTION C)
+      
+      (BODY
+        (DECLARE_VARIABLE (NAME "percent") (TYPE INT)
+          (INITIAL_VALUE (EXPRESSION_DIVIDE
+            (EXPRESSION_MULTIPLY (VARIABLE_REFERENCE "current") (INTEGER_LITERAL 100))
+            (VARIABLE_REFERENCE "total"))))
+        
+        (CALL_FUNCTION "std.io.print"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "\rProgress: ")
+            (STRING_CONCAT
+              (TO_STRING (VARIABLE_REFERENCE "percent"))
+              (STRING_LITERAL "%")))))
+        
+        (IF_CONDITION (PREDICATE_EQUALS 
+            (VARIABLE_REFERENCE "current") 
+            (VARIABLE_REFERENCE "total"))
+          (THEN_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL " - Complete!")))))
+        
+        (RETURN_VOID)))
+    
+    ; Test callbacks
+    (DEFINE_FUNCTION
+      (NAME "test_callbacks")
+      (INTENT "Test passing AetherScript functions as callbacks to C")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        ; Create some test data
+        (DECLARE_VARIABLE (NAME "data") (TYPE (ARRAY BYTE 1000)))
+        (DECLARE_VARIABLE (NAME "size") (TYPE SIZE_T) 
+          (INITIAL_VALUE (INTEGER_LITERAL 1000)))
+        
+        ; Get function pointer for our callback
+        (DECLARE_VARIABLE (NAME "callback_ptr") (TYPE "ProgressCallback")
+          (INITIAL_VALUE (FUNCTION_POINTER "progress_handler")))
+        
+        ; Call C function with callback
+        (DECLARE_VARIABLE (NAME "result") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "c_process_with_callback"
+            (ARGUMENTS
+              (CAST_TO_TYPE 
+                (ADDRESS_OF (ARRAY_ACCESS (VARIABLE_REFERENCE "data") (INTEGER_LITERAL 0)))
+                (TYPE (POINTER VOID)))
+              (VARIABLE_REFERENCE "size")
+              (VARIABLE_REFERENCE "callback_ptr")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Processing completed with result: ")
+            (TO_STRING (VARIABLE_REFERENCE "result")))))
+        
+        (RETURN_VOID)))
+    
+    ; Test system calls
+    (DEFINE_FUNCTION
+      (NAME "test_system_calls")
+      (INTENT "Test calling system functions via FFI")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        ; Get current time
+        (DECLARE_VARIABLE (NAME "current_time") (TYPE TIME_T)
+          (INITIAL_VALUE (CALL_FUNCTION "c_time"
+            (ARGUMENTS (NULL_LITERAL)))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "Current Unix timestamp: ")
+            (TO_STRING (VARIABLE_REFERENCE "current_time")))))
+        
+        ; Get environment variable
+        (DECLARE_VARIABLE (NAME "path_cstr") (TYPE (POINTER CHAR))
+          (INITIAL_VALUE (CALL_FUNCTION "c_getenv"
+            (ARGUMENTS (STRING_TO_CSTR (STRING_LITERAL "PATH"))))))
+        
+        (IF_CONDITION (PREDICATE_NOT_EQUALS 
+            (VARIABLE_REFERENCE "path_cstr")
+            (NULL_LITERAL))
+          (THEN_EXECUTE
+            (DECLARE_VARIABLE (NAME "path") (TYPE STRING)
+              (INITIAL_VALUE (CSTR_TO_STRING (VARIABLE_REFERENCE "path_cstr"))))
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_CONCAT
+                (STRING_LITERAL "PATH environment variable (first 80 chars):\n")
+                (SUBSTRING 
+                  (VARIABLE_REFERENCE "path")
+                  (INTEGER_LITERAL 0)
+                  (INTEGER_LITERAL 80))))))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "PATH environment variable not found")))))
+        
+        (RETURN_VOID)))
+    
+    ; Error handling with FFI
+    (DEFINE_FUNCTION
+      (NAME "test_ffi_error_handling")
+      (INTENT "Demonstrate error handling in FFI calls")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (TRY_EXECUTE
+          (PROTECTED_BLOCK
+            ; Try to allocate a huge amount of memory
+            (DECLARE_VARIABLE (NAME "huge_size") (TYPE SIZE_T)
+              (INITIAL_VALUE (INTEGER_LITERAL 18446744073709551615))) ; MAX_SIZE_T
+            
+            (DECLARE_VARIABLE (NAME "ptr") (TYPE (POINTER VOID))
+              (INITIAL_VALUE (CALL_FUNCTION "c_malloc"
+                (ARGUMENTS (VARIABLE_REFERENCE "huge_size")))))
+            
+            (IF_CONDITION (PREDICATE_EQUALS 
+                (VARIABLE_REFERENCE "ptr")
+                (NULL_LITERAL))
+              (THEN_EXECUTE
+                (THROW_EXCEPTION 
+                  (TYPE "allocation_error")
+                  (MESSAGE "Failed to allocate memory"))))
+            
+            ; This shouldn't be reached
+            (CALL_FUNCTION "c_free"
+              (ARGUMENTS (VARIABLE_REFERENCE "ptr"))))
+          
+          (CATCH_EXCEPTION
+            (EXCEPTION_TYPE "allocation_error")
+            (BINDING_VARIABLE (NAME "e") (TYPE "allocation_error"))
+            (HANDLER_BLOCK
+              (CALL_FUNCTION "std.io.println"
+                (ARGUMENTS (STRING_CONCAT
+                  (STRING_LITERAL "Expected error caught: ")
+                  (FIELD_ACCESS (VARIABLE_REFERENCE "e") "message")))))))
+        
+        (RETURN_VOID)))
+    
+    ; Main function
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (RETURNS (TYPE INT))
+      
+      (BODY
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "=== Advanced FFI Demo ===\n")))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "1. Testing struct FFI:")))
+        (CALL_FUNCTION "test_struct_ffi" (ARGUMENTS))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n2. Testing callbacks:")))
+        (CALL_FUNCTION "test_callbacks" (ARGUMENTS))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n3. Testing system calls:")))
+        (CALL_FUNCTION "test_system_calls" (ARGUMENTS))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n4. Testing FFI error handling:")))
+        (CALL_FUNCTION "test_ffi_error_handling" (ARGUMENTS))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n=== Advanced FFI Demo Complete ===\n")))
+        
+        (RETURN_VALUE (INTEGER_LITERAL 0))))
+  )
+)

@@ -1,0 +1,46 @@
+(DEFINE_MODULE
+  (NAME math_ops)
+  (INTENT "Mathematical operations library")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add")
+      (INTENT "Add two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD x y))
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "subtract")
+      (INTENT "Subtract two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_SUBTRACT x y))
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "multiply")
+      (INTENT "Multiply two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY x y))
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "divide")
+      (INTENT "Divide two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_DIVIDE x y))
+      )
+    )
+  )
+)

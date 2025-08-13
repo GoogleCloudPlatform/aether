@@ -1,0 +1,16 @@
+(DEFINE_MODULE
+  (NAME debug_test)
+  (INTENT "Debug constant resolution")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME 'MY_CONST')
+      (TYPE INTEGER) 
+      (VALUE 42)
+      (INTENT "Simple test constant"))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test constant reference")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE MY_CONST)))))

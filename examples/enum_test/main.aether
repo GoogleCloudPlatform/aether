@@ -1,0 +1,13 @@
+(DEFINE_MODULE
+  (NAME enum_test)
+  (INTENT "Test basic enum parsing")
+  (CONTENT
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Color)
+      (INTENT "Basic color enum")
+      (VARIANTS
+        (VARIANT Red)
+        (VARIANT Green)
+        (VARIANT Blue)))
+  )
+)

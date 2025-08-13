@@ -1,0 +1,27 @@
+(DEFINE_MODULE
+  (NAME test_error_recovery2)
+  (INTENT "Test error recovery in parser")
+  (CONTENT
+    ; Good function first
+    (DEFINE_FUNCTION
+      (NAME "good_function1")
+      (INTENT "First good function")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 100)))
+    
+    ; This function has wrong keyword
+    (DEFINE_FUNCTION
+      (NAME "broken_function")
+      (WRONG_KEYWORD "This should cause an error")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 200)))
+    
+    ; Another good function
+    (DEFINE_FUNCTION
+      (NAME "good_function2")
+      (INTENT "Second good function")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 300)))))

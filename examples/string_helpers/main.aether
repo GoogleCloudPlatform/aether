@@ -1,0 +1,69 @@
+(DEFINE_MODULE
+  (NAME string_helpers)
+  (INTENT "String formatting and manipulation helpers")
+  (CONTENT
+    ; Format a number with commas
+    (DEFINE_FUNCTION
+      (NAME format_number)
+      (ACCEPTS_PARAMETER (NAME num) (TYPE INTEGER))
+      (RETURNS STRING)
+      (BODY
+        ; Placeholder - would implement number formatting
+        (RETURN_VALUE (TO_STRING num))))
+    
+    ; Convert string to uppercase
+    (DEFINE_FUNCTION
+      (NAME to_upper)
+      (ACCEPTS_PARAMETER (NAME str) (TYPE STRING))
+      (RETURNS STRING)
+      (BODY
+        ; Placeholder implementation
+        (RETURN_VALUE str)))
+    
+    ; Convert string to lowercase
+    (DEFINE_FUNCTION
+      (NAME to_lower)
+      (ACCEPTS_PARAMETER (NAME str) (TYPE STRING))
+      (RETURNS STRING)
+      (BODY
+        ; Placeholder implementation
+        (RETURN_VALUE str)))
+    
+    ; Trim whitespace from string
+    (DEFINE_FUNCTION
+      (NAME trim)
+      (ACCEPTS_PARAMETER (NAME str) (TYPE STRING))
+      (RETURNS STRING)
+      (BODY
+        ; Placeholder implementation
+        (RETURN_VALUE str)))
+    
+    ; Join array of strings with delimiter
+    (DEFINE_FUNCTION
+      (NAME join)
+      (ACCEPTS_PARAMETER (NAME strings) (TYPE (ARRAY_OF_TYPE STRING)))
+      (ACCEPTS_PARAMETER (NAME delimiter) (TYPE STRING))
+      (RETURNS STRING)
+      (BODY
+        ; Placeholder implementation
+        (RETURN_VALUE delimiter)))
+    
+    ; Split string by delimiter
+    (DEFINE_FUNCTION
+      (NAME split)
+      (ACCEPTS_PARAMETER (NAME str) (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME delimiter) (TYPE STRING))
+      (RETURNS (ARRAY_OF_TYPE STRING))
+      (BODY
+        ; Placeholder implementation
+        (RETURN_VALUE (ARRAY_LITERAL str))))
+    
+    ; Export all functions
+    (EXPORTS_FUNCTION format_number)
+    (EXPORTS_FUNCTION to_upper)
+    (EXPORTS_FUNCTION to_lower)
+    (EXPORTS_FUNCTION trim)
+    (EXPORTS_FUNCTION join)
+    (EXPORTS_FUNCTION split)
+  )
+)

@@ -1,0 +1,11 @@
+(DEFINE_MODULE
+  (NAME printf_simple)
+  (INTENT "Simple printf test")
+  (CONTENT      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test printf call")
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Hello from AetherScript!\n")
+        (RETURN_VALUE 0)))))

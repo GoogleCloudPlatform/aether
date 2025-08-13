@@ -1,0 +1,29 @@
+(DEFINE_MODULE
+  (NAME if_test)
+  (INTENT "Test IF statement functionality")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME MAX_VALUE)
+      (TYPE INTEGER)
+      (VALUE 100)
+      (INTENT "Test constant"))
+      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test IF statement")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION 50))
+        (IF_CONDITION (PREDICATE_LESS_THAN result MAX_VALUE)
+          (THEN_EXECUTE
+            (ASSIGN
+              (TARGET_VARIABLE result)
+              (SOURCE_EXPRESSION 200)))
+          (ELSE_EXECUTE
+            (ASSIGN
+              (TARGET_VARIABLE result)
+              (SOURCE_EXPRESSION 300))))
+        (RETURN_VALUE result)))))

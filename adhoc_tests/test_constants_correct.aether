@@ -1,0 +1,40 @@
+(DEFINE_MODULE
+  (NAME constants_test)
+  (INTENT "Test constant declarations and usage")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME "PI_APPROX")
+      (TYPE INTEGER) 
+      (VALUE 3)
+      (INTENT "Approximate value of PI as integer"))
+    
+    (DECLARE_CONSTANT
+      (NAME "MAX_SIZE")
+      (TYPE INTEGER) 
+      (VALUE 100)
+      (INTENT "Maximum allowed size"))
+    
+    (DEFINE_FUNCTION
+      (NAME "circle_area_approx")
+      (INTENT "Calculate approximate area of a circle using PI constant")
+      (ACCEPTS_PARAMETER (NAME "radius") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY PI_APPROX (EXPRESSION_MULTIPLY radius radius)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "check_limit")
+      (INTENT "Check if value is within maximum size")
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN value MAX_SIZE)
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE (RETURN_VALUE 0)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test constant usage")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION check_limit 50))))))

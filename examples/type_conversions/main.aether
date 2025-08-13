@@ -1,0 +1,172 @@
+(DEFINE_MODULE
+  (NAME type_conversions)
+  (INTENT "Demonstrate type conversion operations")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_to_string)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME f) (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME b) (TYPE BOOLEAN))
+        (DECLARE_VARIABLE (NAME str) (TYPE STRING))
+        
+        ; Integer to string
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 42))
+        
+        (ASSIGN
+          (TARGET_VARIABLE str)
+          (SOURCE_EXPRESSION (TO_STRING i)))
+        
+        (CALL_FUNCTION printf "Integer %d to string: '%s'\n" i str)
+        
+        ; Float to string
+        (ASSIGN
+          (TARGET_VARIABLE f)
+          (SOURCE_EXPRESSION 3.14159))
+        
+        (ASSIGN
+          (TARGET_VARIABLE str)
+          (SOURCE_EXPRESSION (TO_STRING f)))
+        
+        (CALL_FUNCTION printf "Float %.5f to string: '%s'\n" f str)
+        
+        ; Boolean to string
+        (ASSIGN
+          (TARGET_VARIABLE b)
+          (SOURCE_EXPRESSION TRUE))
+        
+        (ASSIGN
+          (TARGET_VARIABLE str)
+          (SOURCE_EXPRESSION (TO_STRING b)))
+        
+        (CALL_FUNCTION printf "Boolean TRUE to string: '%s'\n" str)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_to_integer)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME str) (TYPE STRING))
+        (DECLARE_VARIABLE (NAME f) (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        
+        ; String to integer
+        (ASSIGN
+          (TARGET_VARIABLE str)
+          (SOURCE_EXPRESSION "123"))
+        
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION (TO_INTEGER str)))
+        
+        (CALL_FUNCTION printf "String '%s' to integer: %d\n" str i)
+        
+        ; Float to integer
+        (ASSIGN
+          (TARGET_VARIABLE f)
+          (SOURCE_EXPRESSION 3.7))
+        
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION (TO_INTEGER f)))
+        
+        (CALL_FUNCTION printf "Float %.1f to integer: %d\n" f i)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_to_float)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME str) (TYPE STRING))
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME f) (TYPE FLOAT))
+        
+        ; String to float
+        (ASSIGN
+          (TARGET_VARIABLE str)
+          (SOURCE_EXPRESSION "3.14159"))
+        
+        (ASSIGN
+          (TARGET_VARIABLE f)
+          (SOURCE_EXPRESSION (TO_FLOAT str)))
+        
+        (CALL_FUNCTION printf "String '%s' to float: %.5f\n" str f)
+        
+        ; Integer to float
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 42))
+        
+        (ASSIGN
+          (TARGET_VARIABLE f)
+          (SOURCE_EXPRESSION (TO_FLOAT i)))
+        
+        (CALL_FUNCTION printf "Integer %d to float: %.1f\n" i f)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_cast_to_type)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME f) (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME c) (TYPE CHAR))
+        
+        ; Cast float to integer (truncate)
+        (ASSIGN
+          (TARGET_VARIABLE f)
+          (SOURCE_EXPRESSION 3.99))
+        
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION (CAST_TO_TYPE f INTEGER TRUNCATE)))
+        
+        (CALL_FUNCTION printf "Cast float %.2f to integer (truncate): %d\n" f i)
+        
+        ; Cast integer to char
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 65))
+        
+        (ASSIGN
+          (TARGET_VARIABLE c)
+          (SOURCE_EXPRESSION (CAST_TO_TYPE i CHAR TRUNCATE)))
+        
+        (CALL_FUNCTION printf "Cast integer %d to char: '%c'\n" i c)
+        
+        ; Cast char to integer
+        (ASSIGN
+          (TARGET_VARIABLE c)
+          (SOURCE_EXPRESSION 'A'))
+        
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION (CAST_TO_TYPE c INTEGER ZERO_EXTEND)))
+        
+        (CALL_FUNCTION printf "Cast char '%c' to integer: %d\n" c i)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_to_string)
+        (CALL_FUNCTION test_to_integer)
+        (CALL_FUNCTION test_to_float)
+        (CALL_FUNCTION test_cast_to_type)
+        (RETURN_VALUE 0)))
+  )
+)

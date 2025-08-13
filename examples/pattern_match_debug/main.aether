@@ -1,0 +1,71 @@
+(DEFINE_MODULE
+  (NAME pattern_match_debug)
+  (INTENT "Test pattern matching with debug output")
+  (CONTENT
+    ; Define a simple Result type
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Result)
+      (INTENT "Represents success or failure")
+      (VARIANTS
+        (VARIANT Ok (HOLDS INTEGER))
+        (VARIANT Error (HOLDS STRING))))
+    
+    ; External function declaration for puts
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME puts)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Test with Ok variant
+        (CALL_FUNCTION puts "Creating Ok result...")
+        
+        (DECLARE_VARIABLE (NAME ok_result) (TYPE Result))
+        (ASSIGN
+          (TARGET_VARIABLE ok_result)
+          (SOURCE_EXPRESSION (Ok 42)))
+        
+        (CALL_FUNCTION puts "Matching on result...")
+        
+        ; Match on the result
+        (DECLARE_VARIABLE (NAME msg) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE msg)
+          (SOURCE_EXPRESSION 
+            (MATCH_EXPRESSION ok_result
+              (CASE (Ok value)
+                (STRING_CONCAT "Success: " (TO_STRING value)))
+              (CASE (Error err_msg)
+                (STRING_CONCAT "Error: " err_msg)))))
+        
+        (CALL_FUNCTION puts "Result of match:")
+        (CALL_FUNCTION puts msg)
+        
+        ; Test with Error variant
+        (CALL_FUNCTION puts "Creating Error result...")
+        
+        (DECLARE_VARIABLE (NAME err_result) (TYPE Result))
+        (ASSIGN
+          (TARGET_VARIABLE err_result)
+          (SOURCE_EXPRESSION (Error "Something went wrong")))
+        
+        (DECLARE_VARIABLE (NAME msg2) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE msg2)
+          (SOURCE_EXPRESSION 
+            (MATCH_EXPRESSION err_result
+              (CASE (Ok value)
+                (STRING_CONCAT "Success: " (TO_STRING value)))
+              (CASE (Error err_msg)
+                (STRING_CONCAT "Error: " err_msg)))))
+        
+        (CALL_FUNCTION puts "Result of second match:")
+        (CALL_FUNCTION puts msg2)
+        
+        (RETURN_VALUE 0)))
+  )
+)

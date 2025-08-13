@@ -1,0 +1,14 @@
+(DEFINE_MODULE
+  (NAME main)
+  (INTENT "Simple test module")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Main function")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 42)
+      )
+    )
+  )
+)

@@ -1,0 +1,62 @@
+(DEFINE_MODULE
+  (NAME struct_simple_nested)
+  (INTENT "Test simple nested struct access")
+  (CONTENT
+    ; Define a Point struct
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Point)
+      (INTENT "A 2D point")
+      (FIELD x INTEGER)
+      (FIELD y INTEGER))
+    
+    ; Define a Line struct  
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Line)
+      (INTENT "A line with start and end points")
+      (FIELD start Point)
+      (FIELD endp Point))
+    
+    ; External function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create points
+        (DECLARE_VARIABLE (NAME p1) (TYPE Point))
+        (ASSIGN
+          (TARGET_VARIABLE p1)
+          (SOURCE_EXPRESSION 
+            (CONSTRUCT Point
+              (FIELD_VALUE x 10)
+              (FIELD_VALUE y 20))))
+        
+        ; Print p1.x directly
+        (CALL_FUNCTION printf "p1.x = %d\n" (GET_FIELD_VALUE p1 x))
+        
+        ; Create line with points
+        (DECLARE_VARIABLE (NAME line) (TYPE Line))
+        (ASSIGN
+          (TARGET_VARIABLE line)
+          (SOURCE_EXPRESSION
+            (CONSTRUCT Line
+              (FIELD_VALUE start p1)
+              (FIELD_VALUE endp p1))))
+        
+        ; Access line.start
+        (DECLARE_VARIABLE (NAME start_point) (TYPE Point))
+        (ASSIGN 
+          (TARGET_VARIABLE start_point)
+          (SOURCE_EXPRESSION (GET_FIELD_VALUE line start)))
+        
+        ; Access start_point.x
+        (CALL_FUNCTION printf "line.start.x = %d\n" (GET_FIELD_VALUE start_point x))
+        
+        (RETURN_VALUE 0)))
+  )
+)

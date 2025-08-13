@@ -1,0 +1,18 @@
+(DEFINE_MODULE
+  (NAME 'math_examples')
+  (INTENT "Module demonstrating expression parsing")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME 'sum_result')
+      (TYPE INTEGER)
+      (VALUE (EXPRESSION_ADD 10 20))
+      (INTENT "Result of adding 10 and 20")
+    )
+    (DECLARE_CONSTANT
+      (NAME 'multiply_result')
+      (TYPE INTEGER)
+      (VALUE (EXPRESSION_MULTIPLY 7 6))
+      (INTENT "Result of multiplying 7 and 6")
+    )
+  )
+)

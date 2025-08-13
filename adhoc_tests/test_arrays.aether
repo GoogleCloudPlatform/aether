@@ -1,0 +1,47 @@
+(DEFINE_MODULE
+  (NAME test_arrays)
+  (INTENT "Test array operations")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+
+    (DEFINE_FUNCTION
+      (NAME test_arrays)
+      (INTENT "Function to test array operations")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "my_array") (TYPE (ARRAY_OF_TYPE INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE my_array)
+          (SOURCE_EXPRESSION (ARRAY_LITERAL 1 2 3 4 5)))
+        
+        (DECLARE_VARIABLE (NAME "array_len") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE array_len)
+          (SOURCE_EXPRESSION (ARRAY_LENGTH my_array)))
+        
+        (DECLARE_VARIABLE (NAME "first_element") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE first_element)
+          (SOURCE_EXPRESSION (GET_ARRAY_ELEMENT my_array 0)))
+        
+        (DECLARE_VARIABLE (NAME "third_element") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE third_element)
+          (SOURCE_EXPRESSION (GET_ARRAY_ELEMENT my_array 2)))
+        
+        (CALL_FUNCTION printf "Array length: %d\n" array_len)
+        (CALL_FUNCTION printf "First element: %d\n" first_element)
+        (CALL_FUNCTION printf "Third element: %d\n" third_element)
+        
+        (RETURN_VALUE 0)))
+
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Main function")
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_arrays)
+        (RETURN_VALUE 0)))))

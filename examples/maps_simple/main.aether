@@ -1,0 +1,46 @@
+(DEFINE_MODULE
+  (NAME maps_simple)
+  (INTENT "Simple map operations test")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_map_literal)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create a map
+        (DECLARE_VARIABLE (NAME scores) (TYPE (MAP_FROM_TYPE_TO_TYPE STRING INTEGER)))
+        
+        ; Initialize with a map literal
+        (ASSIGN
+          (TARGET_VARIABLE scores)
+          (SOURCE_EXPRESSION 
+            (MAP_LITERAL
+              (ENTRY (KEY "Alice") (VALUE 95))
+              (ENTRY (KEY "Bob") (VALUE 87)))))
+        
+        ; Get value from map
+        (DECLARE_VARIABLE (NAME alice_score) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE alice_score)
+          (SOURCE_EXPRESSION (GET_MAP_VALUE scores "Alice")))
+        
+        (CALL_FUNCTION printf "Alice's score: %d\n" alice_score)
+        
+        ; Set value in map
+        (SET_MAP_VALUE scores "Charlie" 92)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_map_literal)
+        (RETURN_VALUE 0)))
+  )
+)

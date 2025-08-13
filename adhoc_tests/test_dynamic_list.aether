@@ -1,0 +1,132 @@
+(DEFINE_MODULE
+  (NAME test_dynamic_list)
+  (INTENT "Test dynamic linked list with memory management")
+  (CONTENT
+    ; Define a node structure
+    (DECLARE_STRUCT
+      (NAME ListNode)
+      (FIELDS
+        (FIELD_DECLARATION (NAME value) (TYPE INTEGER))
+        (FIELD_DECLARATION (NAME next) (TYPE STRING))))  ; STRING as pointer
+    
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_malloc)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_free)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_memory_used)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME create_node)
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME value) (TYPE INTEGER))
+      (BODY
+        ; Allocate memory for a ListNode (16 bytes: 8 for value, 8 for next)
+        (DECLARE_VARIABLE (NAME ptr) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE ptr)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 16)))
+        
+        ; Create a node at the allocated memory
+        (DECLARE_VARIABLE (NAME node) (TYPE ListNode))
+        (ASSIGN
+          (TARGET_STRUCT_FIELD node value)
+          (SOURCE_EXPRESSION value))
+        (ASSIGN
+          (TARGET_STRUCT_FIELD node next)
+          (SOURCE_EXPRESSION ""))  ; null pointer as empty string
+        
+        ; This is a simplification - in reality we'd need to copy node to ptr
+        ; For now, return the allocated pointer
+        (RETURN_VALUE ptr)
+      ))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "=== Dynamic Linked List Test ===\n")
+        
+        ; Check initial memory
+        (DECLARE_VARIABLE (NAME initial_memory) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE initial_memory)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (CALL_FUNCTION printf "Initial memory: %d bytes\n" initial_memory)
+        
+        ; Create some nodes
+        (CALL_FUNCTION printf "\nCreating 5 nodes...\n")
+        
+        (DECLARE_VARIABLE (NAME node1) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE node1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION create_node 10)))
+        
+        (DECLARE_VARIABLE (NAME node2) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE node2)
+          (SOURCE_EXPRESSION (CALL_FUNCTION create_node 20)))
+        
+        (DECLARE_VARIABLE (NAME node3) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE node3)
+          (SOURCE_EXPRESSION (CALL_FUNCTION create_node 30)))
+        
+        (DECLARE_VARIABLE (NAME node4) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE node4)
+          (SOURCE_EXPRESSION (CALL_FUNCTION create_node 40)))
+        
+        (DECLARE_VARIABLE (NAME node5) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE node5)
+          (SOURCE_EXPRESSION (CALL_FUNCTION create_node 50)))
+        
+        ; Check memory after allocations
+        (DECLARE_VARIABLE (NAME after_alloc) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE after_alloc)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (CALL_FUNCTION printf "Memory after allocations: %d bytes\n" after_alloc)
+        (CALL_FUNCTION printf "Memory per node: %d bytes\n" (ARITHMETIC_DIVIDE
+          (ARITHMETIC_SUBTRACT after_alloc initial_memory)
+          5))
+        
+        ; Free the nodes
+        (CALL_FUNCTION printf "\nFreeing all nodes...\n")
+        (CALL_FUNCTION aether_free node1)
+        (CALL_FUNCTION aether_free node2)
+        (CALL_FUNCTION aether_free node3)
+        (CALL_FUNCTION aether_free node4)
+        (CALL_FUNCTION aether_free node5)
+        
+        ; Final memory check
+        (DECLARE_VARIABLE (NAME final_memory) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE final_memory)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (CALL_FUNCTION printf "Final memory: %d bytes\n" final_memory)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

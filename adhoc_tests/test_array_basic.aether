@@ -1,0 +1,24 @@
+(DEFINE_MODULE
+  (NAME array_test)
+  (INTENT "Test basic array operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "numbers") (TYPE (ARRAY_OF_TYPE INTEGER)))
+        (DECLARE_VARIABLE (NAME "length") (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE numbers)
+          (SOURCE_EXPRESSION (ARRAY_LITERAL 1 2 3 4 5)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE length)
+          (SOURCE_EXPRESSION (ARRAY_LENGTH numbers)))
+        
+        (CALL_FUNCTION printf "Array length: %d\n" length)
+        (CALL_FUNCTION printf "First element: %d\n" (GET_ARRAY_ELEMENT numbers 0))
+        (CALL_FUNCTION printf "Last element: %d\n" (GET_ARRAY_ELEMENT numbers 4))
+        
+        (RETURN_VALUE length)))))

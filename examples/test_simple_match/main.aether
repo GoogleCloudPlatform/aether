@@ -1,0 +1,42 @@
+(DEFINE_MODULE
+  (NAME test_simple_match)
+  (CONTENT
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Result)
+      (VARIANTS
+        (VARIANT Ok (HOLDS INTEGER))
+        (VARIANT Error (HOLDS STRING))))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE INTEGER))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_result)
+      (ACCEPTS_PARAMETER (NAME "r") (TYPE Result))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE
+          (MATCH_EXPRESSION r
+            (CASE (Ok x)
+              (CALL_FUNCTION printf "Ok: %d\n" x))
+            (CASE (Error msg)
+              0)))))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME r) (TYPE Result))
+        (ASSIGN
+          (TARGET_VARIABLE r)
+          (SOURCE_EXPRESSION (Ok 42)))
+        
+        (CALL_FUNCTION test_result r)
+        
+        (RETURN_VALUE 0)))
+  )
+)

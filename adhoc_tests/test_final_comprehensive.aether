@@ -1,0 +1,43 @@
+(DEFINE_MODULE
+  (NAME final_test)
+  (INTENT "Comprehensive test of all implemented features")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME MAX_ITERATIONS)
+      (TYPE INTEGER)
+      (VALUE 5)
+      (INTENT "Maximum loop iterations"))
+      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "counter") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "sum") (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE counter)
+          (SOURCE_EXPRESSION 0))
+        
+        (ASSIGN
+          (TARGET_VARIABLE sum)
+          (SOURCE_EXPRESSION 0))
+          
+        (CALL_FUNCTION printf "Starting comprehensive test...\n")
+        
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER i)
+          (FROM 1)
+          (TO MAX_ITERATIONS)
+          (DO
+            (CALL_FUNCTION printf "Iteration %d\n" i)
+            (ASSIGN
+              (TARGET_VARIABLE sum)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD sum i)))
+            (IF_CONDITION (PREDICATE_EQUALS i 3)
+              (THEN_EXECUTE
+                (CALL_FUNCTION printf "Breaking at iteration 3\n")
+                (BREAK_LOOP)))))
+        
+        (CALL_FUNCTION printf "Final sum: %d\n" sum)
+        (RETURN_VALUE sum)))))

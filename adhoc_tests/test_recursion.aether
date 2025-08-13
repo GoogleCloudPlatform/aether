@@ -1,0 +1,32 @@
+(DEFINE_MODULE
+  (NAME recursion_test)
+  (INTENT "Test recursive function calls")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "factorial")
+      (INTENT "Calculate factorial recursively")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO n 1)
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE (RETURN_VALUE (EXPRESSION_MULTIPLY n (CALL_FUNCTION factorial (EXPRESSION_SUBTRACT n 1))))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "fibonacci")
+      (INTENT "Calculate Fibonacci number recursively")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO n 1)
+          (THEN_EXECUTE (RETURN_VALUE n))
+          (ELSE_EXECUTE (RETURN_VALUE (EXPRESSION_ADD 
+            (CALL_FUNCTION fibonacci (EXPRESSION_SUBTRACT n 1))
+            (CALL_FUNCTION fibonacci (EXPRESSION_SUBTRACT n 2))))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test recursive functions")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION factorial 5))))))

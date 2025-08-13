@@ -1,0 +1,46 @@
+(DEFINE_MODULE
+  (NAME float_comprehensive_test)
+  (INTENT "Comprehensive test for float operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "a") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "b") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "sum") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "diff") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "product") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "quotient") (TYPE FLOAT))
+        
+        (ASSIGN
+          (TARGET_VARIABLE a)
+          (SOURCE_EXPRESSION 10.5))
+        
+        (ASSIGN
+          (TARGET_VARIABLE b)
+          (SOURCE_EXPRESSION 3.2))
+        
+        (ASSIGN
+          (TARGET_VARIABLE sum)
+          (SOURCE_EXPRESSION (EXPRESSION_ADD a b)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE diff)
+          (SOURCE_EXPRESSION (EXPRESSION_SUBTRACT a b)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE product)
+          (SOURCE_EXPRESSION (EXPRESSION_MULTIPLY a b)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE quotient)
+          (SOURCE_EXPRESSION (EXPRESSION_DIVIDE a b)))
+        
+        (CALL_FUNCTION printf "a = %f, b = %f\n" a b)
+        (CALL_FUNCTION printf "a + b = %f\n" sum)
+        (CALL_FUNCTION printf "a - b = %f\n" diff)
+        (CALL_FUNCTION printf "a * b = %f\n" product)
+        (CALL_FUNCTION printf "a / b = %f\n" quotient)
+        
+        (RETURN_VALUE 0)))))

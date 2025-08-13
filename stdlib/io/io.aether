@@ -1,0 +1,266 @@
+; AetherScript Standard Library - I/O Operations
+; Provides safe I/O operations with resource management
+
+(DEFINE_MODULE
+  (NAME "std.io")
+  (INTENT "Safe I/O operations with automatic resource management and error handling")
+  
+  ; File operations
+  
+  (DEFINE_FUNCTION
+    (NAME "read_file_safe")
+    (INTENT "Read entire file contents with size limit and automatic resource cleanup")
+    (ACCEPTS_PARAMETER (NAME "path") (TYPE STRING) (INTENT "Path to file to read"))
+    (ACCEPTS_PARAMETER (NAME "max_size") (TYPE INT) (INTENT "Maximum file size in bytes"))
+    (RETURNS (TYPE STRING))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "path") (NULL_LITERAL))
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "max_size") (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Path must be valid and max_size must be positive"))
+    
+    (POSTCONDITION
+      (PREDICATE_LESS_THAN_OR_EQUAL_TO 
+        (CALL_FUNCTION "string_length" (ARGUMENTS (VARIABLE_REFERENCE "RETURNED_VALUE")))
+        (VARIABLE_REFERENCE "max_size"))
+      (PROOF_HINT "Returned content size is within limit"))
+    
+    (RESOURCE_CONTRACT
+      (MAX_MEMORY_MB (EXPRESSION_DIVIDE (VARIABLE_REFERENCE "max_size") (INTEGER_LITERAL 1048576)))
+      (ENFORCEMENT RUNTIME))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "filesystem"))
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (RESOURCE_SCOPE
+        (SCOPE_ID "file_read")
+        (ACQUIRES
+          (RESOURCE (TYPE "file_handle") (ID "file") (CLEANUP "aether_close_file")))
+        (CLEANUP_GUARANTEED TRUE)
+        (BODY
+          (TRY_EXECUTE
+            (PROTECTED_BLOCK
+              ; Open file for reading
+              (ASSIGN (TARGET "file")
+                (SOURCE (CALL_FUNCTION "aether_open_file"
+                  (ARGUMENTS 
+                    (VARIABLE_REFERENCE "path")
+                    (STRING_LITERAL "r")))))
+              
+              (IF_CONDITION (PREDICATE_EQUALS (VARIABLE_REFERENCE "file") (NULL_LITERAL))
+                (THEN_EXECUTE 
+                  (THROW_EXCEPTION (TYPE "io_error")
+                    (MESSAGE (STRING_CONCAT 
+                      (STRING_LITERAL "Failed to open file: ")
+                      (VARIABLE_REFERENCE "path"))))))
+              
+              ; Get file size
+              (DECLARE_VARIABLE (NAME "file_size") (TYPE INT)
+                (INITIAL_VALUE (CALL_FUNCTION "aether_file_size"
+                  (ARGUMENTS (VARIABLE_REFERENCE "file")))))
+              
+              ; Check size limit
+              (IF_CONDITION (PREDICATE_GREATER_THAN 
+                  (VARIABLE_REFERENCE "file_size") 
+                  (VARIABLE_REFERENCE "max_size"))
+                (THEN_EXECUTE
+                  (THROW_EXCEPTION (TYPE "io_error")
+                    (MESSAGE (STRING_LITERAL "File exceeds maximum size limit")))))
+              
+              ; Allocate buffer and read
+              (DECLARE_VARIABLE (NAME "buffer") (TYPE STRING)
+                (INITIAL_VALUE (CALL_FUNCTION "aether_allocate_string"
+                  (ARGUMENTS (VARIABLE_REFERENCE "file_size")))))
+              
+              (CALL_FUNCTION "aether_read_file"
+                (ARGUMENTS 
+                  (VARIABLE_REFERENCE "file")
+                  (VARIABLE_REFERENCE "buffer")
+                  (VARIABLE_REFERENCE "file_size")))
+              
+              (RETURN_VALUE (VARIABLE_REFERENCE "buffer")))
+            
+            (CATCH_EXCEPTION
+              (EXCEPTION_TYPE "io_error")
+              (BINDING_VARIABLE (NAME "e") (TYPE "io_error"))
+              (HANDLER_BLOCK
+                (THROW_EXCEPTION (TYPE "io_error")
+                  (MESSAGE (FIELD_ACCESS (VARIABLE_REFERENCE "e") "message"))))))))))
+  
+  (DEFINE_FUNCTION
+    (NAME "write_file_safe")
+    (INTENT "Write content to file with automatic resource cleanup and atomic write")
+    (ACCEPTS_PARAMETER (NAME "path") (TYPE STRING) (INTENT "Path to file to write"))
+    (ACCEPTS_PARAMETER (NAME "content") (TYPE STRING) (INTENT "Content to write"))
+    (ACCEPTS_PARAMETER (NAME "append") (TYPE BOOL) (INTENT "Whether to append or overwrite"))
+    (RETURNS (TYPE BOOL))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "path") (NULL_LITERAL))
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "content") (NULL_LITERAL)))
+      (PROOF_HINT "Path and content must be valid"))
+    
+    (POSTCONDITION
+      (LOGICAL_IMPLICATION
+        (VARIABLE_REFERENCE "RETURNED_VALUE")
+        (PREDICATE_FILE_EXISTS (VARIABLE_REFERENCE "path")))
+      (PROOF_HINT "If successful, file must exist"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (WRITES "filesystem"))
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (RESOURCE_SCOPE
+        (SCOPE_ID "file_write")
+        (ACQUIRES
+          (RESOURCE (TYPE "file_handle") (ID "file") (CLEANUP "aether_close_file")))
+        (CLEANUP_GUARANTEED TRUE)
+        (BODY
+          (TRY_EXECUTE
+            (PROTECTED_BLOCK
+              ; Determine write mode
+              (DECLARE_VARIABLE (NAME "mode") (TYPE STRING)
+                (INITIAL_VALUE (IF_EXPRESSION 
+                  (CONDITION (VARIABLE_REFERENCE "append"))
+                  (THEN_VALUE (STRING_LITERAL "a"))
+                  (ELSE_VALUE (STRING_LITERAL "w")))))
+              
+              ; Open file for writing
+              (ASSIGN (TARGET "file")
+                (SOURCE (CALL_FUNCTION "aether_open_file"
+                  (ARGUMENTS 
+                    (VARIABLE_REFERENCE "path")
+                    (VARIABLE_REFERENCE "mode")))))
+              
+              (IF_CONDITION (PREDICATE_EQUALS (VARIABLE_REFERENCE "file") (NULL_LITERAL))
+                (THEN_EXECUTE (RETURN_VALUE (BOOL_LITERAL FALSE))))
+              
+              ; Write content
+              (DECLARE_VARIABLE (NAME "bytes_written") (TYPE INT)
+                (INITIAL_VALUE (CALL_FUNCTION "aether_write_file"
+                  (ARGUMENTS 
+                    (VARIABLE_REFERENCE "file")
+                    (VARIABLE_REFERENCE "content")
+                    (CALL_FUNCTION "string_length" 
+                      (ARGUMENTS (VARIABLE_REFERENCE "content")))))))
+              
+              (RETURN_VALUE (PREDICATE_GREATER_THAN 
+                (VARIABLE_REFERENCE "bytes_written") 
+                (INTEGER_LITERAL 0))))
+            
+            (CATCH_EXCEPTION
+              (EXCEPTION_TYPE "io_error")
+              (BINDING_VARIABLE (NAME "e") (TYPE "io_error"))
+              (HANDLER_BLOCK
+                (RETURN_VALUE (BOOL_LITERAL FALSE)))))))))
+  
+  ; Console I/O
+  
+  (DEFINE_FUNCTION
+    (NAME "print")
+    (INTENT "Print text to standard output")
+    (ACCEPTS_PARAMETER (NAME "text") (TYPE STRING) (INTENT "Text to print"))
+    (RETURNS (TYPE VOID))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (WRITES "stdout"))
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (CALL_FUNCTION "aether_print"
+        (ARGUMENTS (VARIABLE_REFERENCE "text")))
+      (RETURN_VOID)))
+  
+  (DEFINE_FUNCTION
+    (NAME "println")
+    (INTENT "Print text to standard output with newline")
+    (ACCEPTS_PARAMETER (NAME "text") (TYPE STRING) (INTENT "Text to print"))
+    (RETURNS (TYPE VOID))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (WRITES "stdout"))
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (CALL_FUNCTION "aether_print"
+        (ARGUMENTS (STRING_CONCAT 
+          (VARIABLE_REFERENCE "text")
+          (STRING_LITERAL "\n"))))
+      (RETURN_VOID)))
+  
+  (DEFINE_FUNCTION
+    (NAME "read_line")
+    (INTENT "Read a line from standard input")
+    (RETURNS (TYPE STRING))
+    
+    (POSTCONDITION
+      (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (NULL_LITERAL))
+      (PROOF_HINT "Always returns a valid string, possibly empty"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "stdin"))
+      (DETERMINISTIC FALSE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "buffer") (TYPE STRING)
+        (INITIAL_VALUE (CALL_FUNCTION "aether_allocate_string"
+          (ARGUMENTS (INTEGER_LITERAL 1024)))))
+      
+      (CALL_FUNCTION "aether_read_line"
+        (ARGUMENTS (VARIABLE_REFERENCE "buffer")))
+      
+      (RETURN_VALUE (VARIABLE_REFERENCE "buffer"))))
+  
+  ; Directory operations
+  
+  (DEFINE_FUNCTION
+    (NAME "list_directory")
+    (INTENT "List contents of a directory")
+    (ACCEPTS_PARAMETER (NAME "path") (TYPE STRING) (INTENT "Directory path"))
+    (RETURNS (TYPE (ARRAY STRING 1000)))
+    
+    (PRECONDITION
+      (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "path") (NULL_LITERAL))
+      (PROOF_HINT "Path must be valid"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "filesystem"))
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "entries") (TYPE (ARRAY STRING 1000))
+        (INITIAL_VALUE (ARRAY_LITERAL (TYPE (ARRAY STRING 1000)))))
+      
+      (TRY_EXECUTE
+        (PROTECTED_BLOCK
+          (CALL_FUNCTION "aether_list_directory"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "path")
+              (VARIABLE_REFERENCE "entries")))
+          (RETURN_VALUE (VARIABLE_REFERENCE "entries")))
+        
+        (CATCH_EXCEPTION
+          (EXCEPTION_TYPE "io_error")
+          (BINDING_VARIABLE (NAME "e") (TYPE "io_error"))
+          (HANDLER_BLOCK
+            (RETURN_VALUE (VARIABLE_REFERENCE "entries")))))))
+  
+  ; Export all functions
+  (EXPORT_FUNCTION "read_file_safe")
+  (EXPORT_FUNCTION "write_file_safe")
+  (EXPORT_FUNCTION "print")
+  (EXPORT_FUNCTION "println")
+  (EXPORT_FUNCTION "read_line")
+  (EXPORT_FUNCTION "list_directory")
+)

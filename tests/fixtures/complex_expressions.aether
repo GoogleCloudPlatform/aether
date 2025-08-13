@@ -1,0 +1,24 @@
+(DEFINE_MODULE
+  (NAME 'complex_expressions')
+  (INTENT "Module with various data types for testing parser and type checker")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME 'INTEGER_VALUE')
+      (TYPE INTEGER)
+      (VALUE 42)
+      (INTENT "Simple integer constant")
+    )
+    (DECLARE_CONSTANT
+      (NAME 'PI_APPROX')
+      (TYPE FLOAT)
+      (VALUE 3.14159)
+      (INTENT "Approximation of PI")
+    )
+    (DECLARE_CONSTANT
+      (NAME 'STRING_VALUE')
+      (TYPE STRING)
+      (VALUE "hello world")
+      (INTENT "String constant")
+    )
+  )
+)

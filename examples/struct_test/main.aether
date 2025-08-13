@@ -1,0 +1,65 @@
+(DEFINE_MODULE
+  (NAME struct_test)
+  (INTENT "Test structured types")
+  (CONTENT
+    ; Define a Point struct
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Point)
+      (INTENT "A 2D point")
+      (FIELD x INTEGER)
+      (FIELD y INTEGER))
+    
+    ; Define a Person struct
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Person)
+      (INTENT "Person information")
+      (FIELD name STRING)
+      (FIELD age INTEGER))
+    
+    ; External function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_structs)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create a Point
+        (DECLARE_VARIABLE (NAME p) (TYPE Point))
+        (ASSIGN
+          (TARGET_VARIABLE p)
+          (SOURCE_EXPRESSION 
+            (CONSTRUCT Point
+              (FIELD_VALUE x 10)
+              (FIELD_VALUE y 20))))
+        
+        ; Access fields
+        (DECLARE_VARIABLE (NAME x_val) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE x_val)
+          (SOURCE_EXPRESSION (GET_FIELD_VALUE p x)))
+        
+        (CALL_FUNCTION printf "Point x: %d\n" x_val)
+        
+        ; Create a Person
+        (DECLARE_VARIABLE (NAME person) (TYPE Person))
+        (ASSIGN
+          (TARGET_VARIABLE person)
+          (SOURCE_EXPRESSION
+            (CONSTRUCT Person
+              (FIELD_VALUE name "Alice")
+              (FIELD_VALUE age 30))))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_structs)
+        (RETURN_VALUE 0)))
+  )
+)

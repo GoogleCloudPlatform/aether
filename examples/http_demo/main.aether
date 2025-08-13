@@ -1,0 +1,25 @@
+(DEFINE_MODULE
+  (NAME 'http_demo')
+  (INTENT "HTTP blog server demonstration")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME 'SERVER_PORT')
+      (TYPE INTEGER)
+      (VALUE 8080)
+      (INTENT "HTTP server port")
+    )
+    (DECLARE_CONSTANT
+      (NAME 'BLOG_TITLE')
+      (TYPE STRING)
+      (VALUE "AetherScript Blog Server")
+      (INTENT "Blog website title")
+    )
+    (DEFINE_FUNCTION
+      (NAME 'main')
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

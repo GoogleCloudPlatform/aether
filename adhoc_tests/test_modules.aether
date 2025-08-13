@@ -1,0 +1,55 @@
+(DEFINE_MODULE
+  (NAME test_modules)
+  (INTENT "Test module imports and exports")
+  (CONTENT
+    ; Import standard library modules
+    (IMPORT_MODULE (NAME std_core))
+    (IMPORT_MODULE (NAME std_io))
+    (IMPORT_MODULE (NAME std_math) (VALUE m))
+    
+    ; Main function to test imports
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Test calling imported functions
+        (CALL_FUNCTION println "Testing module system...")
+        
+        ; Test aliased import
+        ; For now, we'll use unqualified names since the lexer doesn't support dots
+        (DECLARE_VARIABLE (NAME pi_value) (TYPE FLOAT))
+        (ASSIGN
+          (TARGET_VARIABLE pi_value)
+          (SOURCE_EXPRESSION PI))
+        
+        (CALL_FUNCTION println "PI value from math module:")
+        (CALL_FUNCTION println pi_value)
+        
+        ; Test core module function
+        (DECLARE_VARIABLE (NAME x) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE x)
+          (SOURCE_EXPRESSION 42))
+        
+        (DECLARE_VARIABLE (NAME y) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE y)
+          (SOURCE_EXPRESSION 
+            (CALL_FUNCTION identity x)))
+        
+        (CALL_FUNCTION println "Identity function result:")
+        (CALL_FUNCTION println y)
+        
+        ; Test math functions
+        (DECLARE_VARIABLE (NAME abs_result) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE abs_result)
+          (SOURCE_EXPRESSION
+            (CALL_FUNCTION abs -15)))
+        
+        (CALL_FUNCTION println "Absolute value of -15:")
+        (CALL_FUNCTION println abs_result)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

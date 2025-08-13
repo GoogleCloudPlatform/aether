@@ -1,0 +1,103 @@
+(DEFINE_MODULE
+  (NAME module_system)
+  (INTENT "Demonstrate module imports and exports")
+  (CONTENT
+    ; Import other modules
+    (IMPORT_MODULE "math_utils")
+    (IMPORT_MODULE "string_helpers")
+    
+    ; External function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    ; Define a function that will be exported
+    (DEFINE_FUNCTION
+      (NAME calculate_area)
+      (ACCEPTS_PARAMETER (NAME radius) (TYPE FLOAT))
+      (RETURNS FLOAT)
+      (BODY
+        ; Assume PI is imported from math_utils
+        (DECLARE_VARIABLE (NAME area) (TYPE FLOAT))
+        (ASSIGN
+          (TARGET_VARIABLE area)
+          (SOURCE_EXPRESSION 
+            (EXPRESSION_MULTIPLY
+              PI  ; From math_utils module
+              (EXPRESSION_MULTIPLY radius radius))))
+        (RETURN_VALUE area)))
+    
+    ; Define a type that will be exported
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Point2D)
+      (FIELD (NAME x) (TYPE FLOAT))
+      (FIELD (NAME y) (TYPE FLOAT)))
+    
+    ; Define a constant that will be exported
+    (DECLARE_CONSTANT
+      (NAME VERSION)
+      (TYPE STRING)
+      (VALUE "1.0.0"))
+    
+    ; Private function (not exported)
+    (DEFINE_FUNCTION
+      (NAME internal_helper)
+      (ACCEPTS_PARAMETER (NAME value) (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY value 2))))
+    
+    ; Main function using imported functions
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Use imported function from math_utils
+        (DECLARE_VARIABLE (NAME result) (TYPE FLOAT))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION sqrt 16.0)))  ; From math_utils
+        
+        (CALL_FUNCTION printf "Square root of 16: %.1f\n" result)
+        
+        ; Use imported function from string_helpers
+        (DECLARE_VARIABLE (NAME formatted) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE formatted)
+          (SOURCE_EXPRESSION (CALL_FUNCTION format_number 12345)))  ; From string_helpers
+        
+        (CALL_FUNCTION printf "Formatted number: %s\n" formatted)
+        
+        ; Use local exported function
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION calculate_area 5.0)))
+        
+        (CALL_FUNCTION printf "Area of circle with radius 5: %.2f\n" result)
+        
+        ; Use local constant
+        (CALL_FUNCTION printf "Module version: %s\n" VERSION)
+        
+        ; Create and use exported type
+        (DECLARE_VARIABLE (NAME point) (TYPE Point2D))
+        (ASSIGN
+          (TARGET_VARIABLE point)
+          (SOURCE_EXPRESSION 
+            (CONSTRUCT Point2D
+              (FIELD_VALUE x 3.5)
+              (FIELD_VALUE y 7.2))))
+        
+        (CALL_FUNCTION printf "Point: (%.1f, %.1f)\n" 
+          (GET_FIELD_VALUE point x)
+          (GET_FIELD_VALUE point y))
+        
+        (RETURN_VALUE 0)))
+    
+    ; Export declarations
+    (EXPORTS_FUNCTION calculate_area)
+    (EXPORTS_TYPE Point2D)
+    (EXPORTS_CONSTANT VERSION)
+  )
+)

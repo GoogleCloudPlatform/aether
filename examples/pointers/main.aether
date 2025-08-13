@@ -1,0 +1,182 @@
+(DEFINE_MODULE
+  (NAME pointers)
+  (INTENT "Demonstrate pointer operations")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_basic_pointers)
+      (RETURNS INTEGER)
+      (BODY
+        ; Declare a variable and a pointer to it
+        (DECLARE_VARIABLE (NAME value) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME ptr) (TYPE (POINTER_TO INTEGER)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE value)
+          (SOURCE_EXPRESSION 42))
+        
+        ; Take address of value
+        (ASSIGN
+          (TARGET_VARIABLE ptr)
+          (SOURCE_EXPRESSION (ADDRESS_OF value)))
+        
+        ; Dereference pointer
+        (DECLARE_VARIABLE (NAME deref_value) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE deref_value)
+          (SOURCE_EXPRESSION (DEREFERENCE ptr)))
+        
+        (CALL_FUNCTION printf "Original value: %d\n" value)
+        (CALL_FUNCTION printf "Dereferenced value: %d\n" deref_value)
+        
+        ; Modify through pointer
+        ; TODO: Assignment to dereferenced pointer not yet supported
+        ; Would be: (ASSIGN (TARGET_VARIABLE (DEREFERENCE ptr)) (SOURCE_EXPRESSION 100))
+        
+        (CALL_FUNCTION printf "Modified value: %d\n" value)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME swap_by_pointer)
+      (ACCEPTS_PARAMETER (NAME a) (TYPE (POINTER_TO INTEGER)))
+      (ACCEPTS_PARAMETER (NAME b) (TYPE (POINTER_TO INTEGER)))
+      (RETURNS VOID)
+      (BODY
+        (DECLARE_VARIABLE (NAME temp) (TYPE INTEGER))
+        
+        ; temp = *a
+        (ASSIGN
+          (TARGET_VARIABLE temp)
+          (SOURCE_EXPRESSION (DEREFERENCE a)))
+        
+        ; *a = *b
+        (ASSIGN
+          (TARGET_VARIABLE (DEREFERENCE a))
+          (SOURCE_EXPRESSION (DEREFERENCE b)))
+        
+        ; *b = temp
+        (ASSIGN
+          (TARGET_VARIABLE (DEREFERENCE b))
+          (SOURCE_EXPRESSION temp))
+        
+        (RETURN_VOID)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_pointer_swap)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME x) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME y) (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE x)
+          (SOURCE_EXPRESSION 10))
+        
+        (ASSIGN
+          (TARGET_VARIABLE y)
+          (SOURCE_EXPRESSION 20))
+        
+        (CALL_FUNCTION printf "Before swap: x=%d, y=%d\n" x y)
+        
+        (CALL_FUNCTION swap_by_pointer (ADDRESS_OF x) (ADDRESS_OF y))
+        
+        (CALL_FUNCTION printf "After swap: x=%d, y=%d\n" x y)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_pointer_arithmetic)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create an array
+        (DECLARE_VARIABLE (NAME arr) (TYPE (ARRAY_OF_TYPE INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE arr)
+          (SOURCE_EXPRESSION (ARRAY_LITERAL 10 20 30 40 50)))
+        
+        ; Get pointer to first element
+        (DECLARE_VARIABLE (NAME ptr) (TYPE (POINTER_TO INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE ptr)
+          (SOURCE_EXPRESSION (ADDRESS_OF (GET_ARRAY_ELEMENT arr 0))))
+        
+        ; Access elements through pointer arithmetic
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_WHILE_CONDITION
+          (CONDITION (PREDICATE_LESS_THAN i 5))
+          (DO
+            (CALL_FUNCTION printf "arr[%d] via pointer: %d\n" 
+              i 
+              (DEREFERENCE (POINTER_ADD ptr i)))
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD i 1)))))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_struct_pointers)
+      (RETURNS INTEGER)
+      (BODY
+        ; Define a simple struct
+        (DEFINE_STRUCTURED_TYPE
+          (NAME Point)
+          (FIELD (NAME x) (TYPE INTEGER))
+          (FIELD (NAME y) (TYPE INTEGER)))
+        
+        ; Create a struct and pointer to it
+        (DECLARE_VARIABLE (NAME point) (TYPE Point))
+        (DECLARE_VARIABLE (NAME ptr) (TYPE (POINTER_TO Point)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE point)
+          (SOURCE_EXPRESSION
+            (CONSTRUCT Point
+              (FIELD_VALUE x 10)
+              (FIELD_VALUE y 20))))
+        
+        (ASSIGN
+          (TARGET_VARIABLE ptr)
+          (SOURCE_EXPRESSION (ADDRESS_OF point)))
+        
+        ; Access fields through pointer
+        (CALL_FUNCTION printf "Point via pointer: (%d, %d)\n"
+          (GET_FIELD_VALUE (DEREFERENCE ptr) x)
+          (GET_FIELD_VALUE (DEREFERENCE ptr) y))
+        
+        ; Modify fields through pointer
+        (ASSIGN
+          (TARGET_VARIABLE (GET_FIELD_VALUE (DEREFERENCE ptr) x))
+          (SOURCE_EXPRESSION 30))
+        
+        (ASSIGN
+          (TARGET_VARIABLE (GET_FIELD_VALUE (DEREFERENCE ptr) y))
+          (SOURCE_EXPRESSION 40))
+        
+        (CALL_FUNCTION printf "Modified point: (%d, %d)\n"
+          (GET_FIELD_VALUE point x)
+          (GET_FIELD_VALUE point y))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_basic_pointers)
+        (CALL_FUNCTION test_pointer_swap)
+        (CALL_FUNCTION test_pointer_arithmetic)
+        (CALL_FUNCTION test_struct_pointers)
+        (RETURN_VALUE 0)))
+  )
+)

@@ -1,0 +1,37 @@
+(DEFINE_MODULE
+  (NAME for_loop_test)
+  (INTENT "Test FOR loop implementation")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test different FOR loop variations")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "sum") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE sum)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER i)
+          (FROM 1)
+          (TO 5)
+          (DO
+            (ASSIGN
+              (TARGET_VARIABLE sum)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD sum i)))
+            (CALL_FUNCTION printf "i = %d, sum = %d\n" i sum)))
+        
+        (CALL_FUNCTION printf "Final sum: %d\n" sum)
+        
+        (CALL_FUNCTION printf "\nCounting by 2s:\n")
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER j)
+          (FROM 0)
+          (TO 10)
+          (STEP 2)
+          (DO
+            (CALL_FUNCTION printf "%d " j)))
+        
+        (CALL_FUNCTION printf "\n")
+        (RETURN_VALUE 0)))))

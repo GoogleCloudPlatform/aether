@@ -1,0 +1,29 @@
+(DEFINE_MODULE
+  (NAME arithmetic_test)
+  (INTENT "Test arithmetic operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add_numbers")
+      (INTENT "Add two integers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD a b))))
+    
+    (DEFINE_FUNCTION
+      (NAME "multiply_and_add")
+      (INTENT "Multiply two numbers and add a third")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "z") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD (EXPRESSION_MULTIPLY x y) z))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test arithmetic functions")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION add_numbers 10 5))))))

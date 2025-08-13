@@ -1,0 +1,305 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta, nightly]
+        exclude:
+          # Reduce CI time by only testing stable on all platforms
+          - os: windows-latest
+            rust: beta
+          - os: windows-latest
+            rust: nightly
+          - os: macos-latest
+            rust: beta
+          - os: macos-latest
+            rust: nightly
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.rust }}-cargo-
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run unit tests
+      run: cargo test --verbose --lib
+
+    - name: Run integration tests
+      run: cargo test --verbose --test integration_tests
+
+    - name: Run end-to-end tests
+      run: cargo test --verbose --test end_to_end_tests
+
+    - name: Run CLI integration tests
+      run: cargo test --verbose --test cli_integration_tests
+
+    - name: Run property-based tests
+      run: cargo test --verbose --test property_based_tests
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-stable-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Run security audit
+      run: cargo audit
+
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-stable-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run benchmarks
+      run: cargo bench --bench compiler_benchmarks
+
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      if: github.event_name == 'push'
+      with:
+        tool: 'cargo'
+        output-file-path: target/criterion/reports/index.html
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        comment-on-alert: true
+        alert-threshold: '200%'
+        fail-on-alert: true
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-tarpaulin
+      run: cargo install cargo-tarpaulin
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-stable-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Generate code coverage
+      run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: cobertura.xml
+        fail_ci_if_error: true
+
+  cli_smoke_test:
+    name: CLI Smoke Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-stable-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build CLI
+      run: cargo build --release
+
+    - name: Test CLI help
+      run: cargo run -- --help
+
+    - name: Test CLI version
+      run: cargo run -- --version
+
+    - name: Test CLI check command
+      run: cargo run -- check tests/fixtures/simple_module.aether
+
+    - name: Test CLI ast command
+      run: cargo run -- ast tests/fixtures/simple_module.aether
+
+    - name: Test CLI tokens command
+      run: cargo run -- tokens tests/fixtures/simple_module.aether
+
+    - name: Test CLI with verbose flag
+      run: cargo run -- check tests/fixtures/simple_module.aether --verbose
+
+    - name: Test CLI with debug flag
+      run: cargo run -- check tests/fixtures/simple_module.aether --debug
+
+    - name: Test CLI error handling
+      run: |
+        # This should fail and return exit code 1
+        if cargo run -- check nonexistent.aether; then
+          echo "Expected failure for nonexistent file"
+          exit 1
+        fi
+        echo "Correctly failed for nonexistent file"
+
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-stable-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Generate documentation
+      run: cargo doc --no-deps --all-features
+
+    - name: Check for broken doc links
+      run: cargo doc --no-deps --all-features 2>&1 | grep -i "broken\|error" && exit 1 || true
+
+  release_check:
+    name: Release Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-stable-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Check release build
+      run: cargo build --release
+
+    - name: Verify binary size
+      run: |
+        BINARY_SIZE=$(stat -c%s target/release/aether)
+        echo "Binary size: $BINARY_SIZE bytes"
+        
+        # Fail if binary is larger than 50MB (arbitrary reasonable limit)
+        if [ $BINARY_SIZE -gt 52428800 ]; then
+          echo "Binary too large: $BINARY_SIZE bytes"
+          exit 1
+        fi
+
+    - name: Test release binary
+      run: |
+        ./target/release/aether --version
+        ./target/release/aether check tests/fixtures/simple_module.aether

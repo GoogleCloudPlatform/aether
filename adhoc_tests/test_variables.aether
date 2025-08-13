@@ -1,0 +1,38 @@
+(DEFINE_MODULE
+  (NAME variables_test)
+  (INTENT "Test variable declarations and assignments")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "calculate_sum")
+      (INTENT "Calculate sum using local variables")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "temp1") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "temp2") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN temp1 (EXPRESSION_MULTIPLY a 2))
+        (ASSIGN temp2 (EXPRESSION_MULTIPLY b 3))
+        (ASSIGN result (EXPRESSION_ADD temp1 temp2))
+        (RETURN_VALUE result)))
+    
+    (DEFINE_FUNCTION
+      (NAME "swap_and_add")
+      (INTENT "Swap values and return their sum")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "temp") (TYPE INTEGER))
+        (ASSIGN temp x)
+        (ASSIGN x y)
+        (ASSIGN y temp)
+        (RETURN_VALUE (EXPRESSION_ADD x y))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test variable operations")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION calculate_sum 3 4))))))

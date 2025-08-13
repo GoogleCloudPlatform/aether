@@ -1,0 +1,36 @@
+(DEFINE_MODULE
+  (NAME string_features)
+  (INTENT "Test string operations and formatting")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+
+    (DEFINE_FUNCTION
+      (NAME test_strings)
+      (INTENT "Function to test string operations")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "greeting") (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE greeting)
+          (SOURCE_EXPRESSION "Hello, World!"))
+        
+        (DECLARE_VARIABLE (NAME "name") (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE name)
+          (SOURCE_EXPRESSION "AetherScript"))
+        
+        (CALL_FUNCTION printf "Greeting: %s\n" greeting)
+        (CALL_FUNCTION printf "Language: %s\n" name)
+        
+        (RETURN_VALUE 0)))
+
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Main function")
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_strings)
+        (RETURN_VALUE 0)))))

@@ -1,0 +1,133 @@
+(DEFINE_MODULE
+  (NAME text_analyzer)
+  (INTENT "Text File Analyzer demonstrating AetherScript LLM-first features")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Program entry point that demonstrates text analysis")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME sample_text) (TYPE STRING))
+        (DECLARE_VARIABLE (NAME line_count) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME word_count) (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE sample_text)
+          (SOURCE_EXPRESSION "Hello World!\nThis is a test.\nAnother line."))
+        (ASSIGN
+          (TARGET_VARIABLE line_count)
+          (SOURCE_EXPRESSION (CALL_FUNCTION count_lines sample_text)))
+        (ASSIGN
+          (TARGET_VARIABLE word_count)
+          (SOURCE_EXPRESSION (CALL_FUNCTION count_words sample_text)))
+        
+        (CALL_FUNCTION printf 
+          "Text Analysis Results:\nSample: %s\nLines: %d\nWords: %d\n"
+          sample_text line_count word_count)
+        
+        (RETURN_VALUE 0)
+      )
+    )
+    
+    (DEFINE_FUNCTION
+      (NAME count_lines)
+      (INTENT "Count the number of lines in text content")
+      (ACCEPTS_PARAMETER (NAME "text") (TYPE STRING))
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME line_count) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME text_length) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE line_count)
+          (SOURCE_EXPRESSION 1))
+        (ASSIGN
+          (TARGET_VARIABLE text_length)
+          (SOURCE_EXPRESSION (STRING_LENGTH text)))
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_WHILE_CONDITION (PREDICATE_LESS_THAN i text_length)
+          (ITERATION_BODY
+            (IF_CONDITION
+              (PREDICATE_EQUALS (STRING_CHAR_AT text i) '\n')
+              (THEN_EXECUTE
+                (ASSIGN
+                  (TARGET_VARIABLE line_count)
+                  (SOURCE_EXPRESSION (EXPRESSION_ADD line_count 1)))))
+            
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD i 1)))
+          )
+        )
+        
+        (RETURN_VALUE line_count)
+      )
+    )
+    
+    (DEFINE_FUNCTION
+      (NAME count_words)
+      (INTENT "Count words in text using whitespace as delimiters")
+      (ACCEPTS_PARAMETER (NAME "text") (TYPE STRING))
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME word_count) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME in_word) (TYPE BOOLEAN))
+        (DECLARE_VARIABLE (NAME text_length) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME current_char) (TYPE CHAR))
+        (DECLARE_VARIABLE (NAME is_space) (TYPE BOOLEAN))
+        
+        (ASSIGN
+          (TARGET_VARIABLE word_count)
+          (SOURCE_EXPRESSION 0))
+        (ASSIGN
+          (TARGET_VARIABLE in_word)
+          (SOURCE_EXPRESSION FALSE))
+        (ASSIGN
+          (TARGET_VARIABLE text_length)
+          (SOURCE_EXPRESSION (STRING_LENGTH text)))
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_WHILE_CONDITION (PREDICATE_LESS_THAN i text_length)
+          (ITERATION_BODY
+            (ASSIGN
+              (TARGET_VARIABLE current_char)
+              (SOURCE_EXPRESSION (STRING_CHAR_AT text i)))
+            (ASSIGN
+              (TARGET_VARIABLE is_space)
+              (SOURCE_EXPRESSION (PREDICATE_EQUALS current_char ' ')))
+            
+            (IF_CONDITION
+              (PREDICATE_NOT_EQUALS is_space TRUE)
+              (THEN_EXECUTE
+                (IF_CONDITION
+                  (PREDICATE_EQUALS in_word FALSE)
+                  (THEN_EXECUTE
+                    (ASSIGN
+                      (TARGET_VARIABLE word_count)
+                      (SOURCE_EXPRESSION (EXPRESSION_ADD word_count 1)))
+                    (ASSIGN
+                      (TARGET_VARIABLE in_word)
+                      (SOURCE_EXPRESSION TRUE)))))
+              (ELSE_EXECUTE
+                (ASSIGN
+                  (TARGET_VARIABLE in_word)
+                  (SOURCE_EXPRESSION FALSE))))
+            
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION (EXPRESSION_ADD i 1)))
+          )
+        )
+        
+        (RETURN_VALUE word_count)
+      )
+    )
+  )
+)

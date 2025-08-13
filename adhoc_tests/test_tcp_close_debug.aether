@@ -1,0 +1,58 @@
+(DEFINE_MODULE
+  (NAME test_tcp_close_debug)
+  (INTENT "Debug tcp_close parsing issue")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_listen)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_close)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Direct call to tcp_close
+        (DECLARE_VARIABLE (NAME sock) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE sock)
+          (SOURCE_EXPRESSION 5))
+        
+        (CALL_FUNCTION printf "Calling tcp_close directly\n")
+        (CALL_FUNCTION tcp_close sock)
+        
+        (CALL_FUNCTION printf "Direct call successful\n")
+        
+        ; Call within THEN_EXECUTE
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN sock 0)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Calling tcp_close in THEN_EXECUTE\n")
+          )
+        )
+        
+        ; Call tcp_close within THEN_EXECUTE
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN sock 0)
+          (THEN_EXECUTE
+            (CALL_FUNCTION tcp_close sock)
+          )
+        )
+        
+        (CALL_FUNCTION printf "All calls successful\n")
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

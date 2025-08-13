@@ -1,0 +1,45 @@
+;; Test program for map operations
+
+(module test_maps
+    ;; External function declarations
+    (extern print_int (integer) void)
+    (extern print_string (string) void)
+    
+    ;; Map runtime functions (simplified versions)
+    (extern map_new () pointer)
+    (extern map_insert (pointer integer integer) void)
+    (extern map_get (pointer integer) integer)
+    
+    ;; Test map literal creation
+    (function test_map_literal () void
+        (let ((m (MAP_LITERAL integer integer
+                    (1 10)
+                    (2 20)
+                    (3 30))))
+            (print_string "Map created with literals\n")
+            (print_string "Value for key 1: ")
+            (print_int (GET_MAP_VALUE m 1))
+            (print_string "\nValue for key 2: ")
+            (print_int (GET_MAP_VALUE m 2))
+            (print_string "\nValue for key 3: ")
+            (print_int (GET_MAP_VALUE m 3))
+            (print_string "\n")))
+    
+    ;; Test map assignment
+    (function test_map_assignment () void
+        (let ((m (MAP_LITERAL integer integer)))
+            (SET_MAP_VALUE m 5 50)
+            (SET_MAP_VALUE m 10 100)
+            (print_string "\nMap after assignments:\n")
+            (print_string "Value for key 5: ")
+            (print_int (GET_MAP_VALUE m 5))
+            (print_string "\nValue for key 10: ")
+            (print_int (GET_MAP_VALUE m 10))
+            (print_string "\n")))
+    
+    ;; Main function
+    (function main () integer
+        (print_string "Testing map operations:\n\n")
+        (test_map_literal)
+        (test_map_assignment)
+        0))

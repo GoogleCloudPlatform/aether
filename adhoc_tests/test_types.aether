@@ -1,0 +1,27 @@
+(DEFINE_MODULE
+  (NAME types_test)
+  (INTENT "Test FLOAT and STRING types")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "test_float")
+      (INTENT "Test floating point arithmetic")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE FLOAT))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE FLOAT))
+      (RETURNS FLOAT)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD x y))))
+    
+    (DEFINE_FUNCTION
+      (NAME "test_string")
+      (INTENT "Test string operations")
+      (ACCEPTS_PARAMETER (NAME "message") (TYPE STRING))
+      (RETURNS STRING)
+      (BODY
+        (RETURN_VALUE message)))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test different types")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 42)))))

@@ -1,0 +1,27 @@
+(DEFINE_MODULE
+  (NAME factorial_fixed)
+  (INTENT "Fixed factorial test")
+  (CONTENT      
+    (DEFINE_FUNCTION
+      (NAME factorial)
+      (INTENT "Calculate factorial")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO n 1)
+          (THEN_EXECUTE
+            (RETURN_VALUE 1))
+          (ELSE_EXECUTE
+            (RETURN_VALUE (EXPRESSION_MULTIPLY n (CALL_FUNCTION factorial (EXPRESSION_SUBTRACT n 1))))))))
+            
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test factorial")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION factorial 5)))
+        (CALL_FUNCTION printf "Factorial of 5 is %d\n" result)
+        (RETURN_VALUE 0)))))

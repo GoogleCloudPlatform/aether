@@ -1,0 +1,15 @@
+(DEFINE_MODULE
+  (NAME 'main')
+  (INTENT "A simple hello world program")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME 'main')
+      (INTENT "Program entry point")
+      (RETURNS (TYPE 'INT'))
+      (BODY
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)
+EOF < /dev/null

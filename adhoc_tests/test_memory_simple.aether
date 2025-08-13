@@ -1,0 +1,96 @@
+(DEFINE_MODULE
+  (NAME test_memory_simple)
+  (INTENT "Simple memory test without realloc")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_malloc)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_free)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_memory_used)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_concat)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "str1") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "str2") (TYPE STRING)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "=== Memory + String Operations Test ===\n")
+        
+        ; Test malloc with strings
+        (CALL_FUNCTION printf "\nAllocating memory and creating strings:\n")
+        
+        (DECLARE_VARIABLE (NAME str1) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE str1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_concat "Hello, " "World!")))
+        
+        (DECLARE_VARIABLE (NAME str2) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE str2)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_concat "AetherScript " "rocks!")))
+        
+        (DECLARE_VARIABLE (NAME mem_after_strings) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE mem_after_strings)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (CALL_FUNCTION printf "Memory after string creation: %d bytes\n" mem_after_strings)
+        (CALL_FUNCTION printf "String 1: %s\n" str1)
+        (CALL_FUNCTION printf "String 2: %s\n" str2)
+        
+        ; Allocate some raw memory
+        (DECLARE_VARIABLE (NAME buffer1) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE buffer1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 1024)))
+        
+        (DECLARE_VARIABLE (NAME buffer2) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE buffer2)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 2048)))
+        
+        (DECLARE_VARIABLE (NAME mem_peak) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE mem_peak)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (CALL_FUNCTION printf "\nPeak memory usage: %d bytes\n" mem_peak)
+        
+        ; Free the buffers
+        (CALL_FUNCTION printf "\nFreeing buffers...\n")
+        (CALL_FUNCTION aether_free buffer1)
+        (CALL_FUNCTION aether_free buffer2)
+        
+        (DECLARE_VARIABLE (NAME mem_after_free) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE mem_after_free)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        
+        (CALL_FUNCTION printf "Memory after freeing buffers: %d bytes\n" mem_after_free)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

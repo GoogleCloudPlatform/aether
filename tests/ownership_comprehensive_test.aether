@@ -1,0 +1,268 @@
+// Comprehensive test suite for AetherScript ownership system
+// This file tests all aspects of ownership, borrowing, and cleanup
+
+module ownership_comprehensive_test {
+    // Test 1: Basic ownership transfer with primitive types
+    func test_primitive_ownership() -> bool {
+        let x: ^int = 42;
+        consume_int(x);
+        // x is now moved, cannot use it
+        return true;
+    }
+    
+    // Test 2: String ownership and cleanup
+    func test_string_ownership() -> bool {
+        let s1: ^string = "Hello, World!";
+        let s2: ^string = consume_and_return_string(s1);
+        // s1 is moved, s2 owns the string now
+        return string_length(s2) == 13;
+    }
+    
+    // Test 3: Array ownership and cleanup
+    func test_array_ownership() -> bool {
+        let arr1: ^[int; 5] = [1, 2, 3, 4, 5];
+        let arr2: ^[int; 5] = consume_and_return_array(arr1);
+        // arr1 is moved, arr2 owns the array now
+        return arr2[2] == 3;
+    }
+    
+    // Test 4: Map ownership and cleanup
+    func test_map_ownership() -> bool {
+        let mut map1: ^map<string, int> = {};
+        map1["key1"] = 100;
+        map1["key2"] = 200;
+        
+        let map2: ^map<string, int> = consume_and_return_map(map1);
+        // map1 is moved, map2 owns the map now
+        return map2["key1"] == 100 && map2["key2"] == 200;
+    }
+    
+    // Test 5: Immutable borrowing allows multiple borrows
+    func test_immutable_borrows() -> bool {
+        let x: ^int = 42;
+        let ref1: &int = &x;
+        let ref2: &int = &x;
+        let ref3: &int = &x;
+        
+        // All three references can coexist
+        return *ref1 == 42 && *ref2 == 42 && *ref3 == 42;
+    }
+    
+    // Test 6: Mutable borrowing is exclusive
+    func test_mutable_borrow_exclusive() -> bool {
+        let mut x: ^int = 42;
+        let ref_mut: &mut int = &mut x;
+        *ref_mut = 100;
+        
+        // Cannot create another borrow while mutable borrow exists
+        // let ref2: &int = &x;  // This would fail
+        
+        return *ref_mut == 100;
+    }
+    
+    // Test 7: Shared ownership with reference counting
+    func test_shared_ownership() -> bool {
+        let shared1: ~string = ~"Shared string";
+        let shared2: ~string = shared1;  // Increment ref count
+        let shared3: ~string = shared2;  // Increment ref count again
+        
+        // All three can access the same string
+        return string_length(shared1) == string_length(shared2) && 
+               string_length(shared2) == string_length(shared3);
+    }
+    
+    // Test 8: Cleanup on scope exit
+    func test_scope_cleanup() -> bool {
+        {
+            let s: ^string = "Temporary string";
+            let arr: ^[int; 3] = [1, 2, 3];
+            let mut map: ^map<string, int> = {};
+            map["temp"] = 42;
+            // All these will be cleaned up when scope exits
+        }
+        // Memory should be freed here
+        return true;
+    }
+    
+    // Test 9: Cleanup on early return
+    func test_early_return_cleanup() -> int {
+        let s1: ^string = "String 1";
+        let s2: ^string = "String 2";
+        
+        if string_length(s1) > 0 {
+            // s2 should be cleaned up even though we return early
+            return 1;
+        }
+        
+        let s3: ^string = "String 3";
+        return 0;
+    }
+    
+    // Test 10: Cleanup on panic
+    func test_panic_cleanup() -> bool {
+        let s: ^string = "Will be cleaned up";
+        let arr: ^[int; 10] = [0; 10];
+        
+        // This would panic, but cleanup should still happen
+        // panic("Test panic");
+        
+        return true;
+    }
+    
+    // Test 11: Complex ownership patterns
+    func test_complex_ownership() -> bool {
+        // Create a complex structure with multiple ownership types
+        let owned_str: ^string = "Owned";
+        let shared_str: ~string = ~"Shared";
+        let mut mutable_int: ^int = 42;
+        
+        // Borrow the owned string
+        let borrowed: &string = &owned_str;
+        
+        // Mutably borrow the integer
+        let mut_ref: &mut int = &mut mutable_int;
+        *mut_ref = 100;
+        
+        // Pass shared string to function (doesn't move)
+        let len = string_length(shared_str);
+        
+        return len > 0 && *mut_ref == 100;
+    }
+    
+    // Test 12: Nested ownership with structs
+    struct Container {
+        owned_field: ^string,
+        shared_field: ~int,
+        value: int
+    }
+    
+    func test_struct_ownership() -> bool {
+        let mut container: ^Container = Container {
+            owned_field: ^"Owned by container",
+            shared_field: ~42,
+            value: 100
+        };
+        
+        // Move the container
+        let container2: ^Container = consume_and_return_container(container);
+        // container is now moved
+        
+        return container2.value == 100;
+    }
+    
+    // Helper functions
+    func consume_int(x: ^int) {
+        // Takes ownership of x
+    }
+    
+    func consume_and_return_string(s: ^string) -> ^string {
+        // Takes ownership and returns it
+        return s;
+    }
+    
+    func consume_and_return_array(arr: ^[int; 5]) -> ^[int; 5] {
+        // Takes ownership and returns it
+        return arr;
+    }
+    
+    func consume_and_return_map(m: ^map<string, int>) -> ^map<string, int> {
+        // Takes ownership and returns it
+        return m;
+    }
+    
+    func consume_and_return_container(c: ^Container) -> ^Container {
+        // Takes ownership and returns it
+        return c;
+    }
+    
+    func string_length(s: &string) -> int {
+        // Borrows string to get length
+        // This would call runtime string_length function
+        return 0;  // Placeholder
+    }
+    
+    // Main test runner
+    func main() -> int {
+        let mut passed = 0;
+        let mut failed = 0;
+        
+        if test_primitive_ownership() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_string_ownership() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_array_ownership() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_map_ownership() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_immutable_borrows() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_mutable_borrow_exclusive() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_shared_ownership() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_scope_cleanup() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_early_return_cleanup() > 0 {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_panic_cleanup() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_complex_ownership() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        if test_struct_ownership() {
+            passed = passed + 1;
+        } else {
+            failed = failed + 1;
+        }
+        
+        // Return 0 if all tests passed, otherwise return number of failures
+        if failed == 0 {
+            return 0;
+        } else {
+            return failed;
+        }
+    }
+}

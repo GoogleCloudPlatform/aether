@@ -1,0 +1,16 @@
+(DEFINE_MODULE
+  (NAME 'main')
+  (INTENT "Simple test module with a function")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME 'add')
+      (INTENT "Adds two numbers")
+      (ACCEPTS_PARAMETER (NAME 'a') (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME 'b') (TYPE INTEGER))
+      (RETURNS (TYPE INTEGER))
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD 'a' 'b'))
+      )
+    )
+  )
+)

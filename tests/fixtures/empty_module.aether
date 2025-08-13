@@ -1,0 +1,5 @@
+(DEFINE_MODULE
+  (NAME 'empty_module')
+  (INTENT "Minimal empty module")
+  (CONTENT)
+)

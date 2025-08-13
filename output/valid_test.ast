@@ -1,0 +1,7 @@
+Program {
+  Module 'valid_test' {
+    intent: "Test valid AetherScript file"
+    const PI: Float = 3.14159
+    const VERSION: String = "1.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+(DEFINE_MODULE
+  (NAME test_constants)
+  (INTENT "Test multiple constants")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME PI_APPROX)
+      (TYPE INTEGER)
+      (VALUE 3)
+      (INTENT "Simple PI"))
+    
+    (DECLARE_CONSTANT
+      (NAME MAX_SIZE) 
+      (TYPE INTEGER)
+      (VALUE 100)
+      (INTENT "Max size"))))

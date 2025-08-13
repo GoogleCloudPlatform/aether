@@ -1,0 +1,27 @@
+(DEFINE_MODULE
+  (NAME memory_test)
+  (INTENT "Test memory allocation")
+  (CONTENT
+    (DEFINE_EXTERNAL
+      (NAME aether_malloc)
+      (ACCEPTS_PARAMETER (NAME size) (TYPE INTEGER))
+      (RETURNS POINTER))
+    
+    (DEFINE_EXTERNAL
+      (NAME aether_free)
+      (ACCEPTS_PARAMETER (NAME ptr) (TYPE POINTER))
+      (RETURNS VOID))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test memory allocation and deallocation")
+      (RETURNS INTEGER)
+      (BODY
+        (DEFINE_LOCAL (NAME ptr) (TYPE POINTER))
+        (ASSIGN ptr (FUNCTION_CALL aether_malloc 100))
+        (FUNCTION_CALL aether_free ptr)
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

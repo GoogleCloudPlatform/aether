@@ -1,0 +1,12 @@
+(DEFINE_MODULE
+  (NAME simple_conditional)
+  (INTENT "Test simple conditional")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test simple if-then-else")
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN 42 10)
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE (RETURN_VALUE 0)))))))

@@ -1,0 +1,21 @@
+(DEFINE_MODULE
+  (NAME string_test)
+  (INTENT "Test STRING type support")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "get_message")
+      (INTENT "Return a string message")
+      (RETURNS STRING)
+      (BODY
+        (RETURN_VALUE "Hello, AetherScript!")))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test string operations and return as integer")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "message") (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE message)
+          (SOURCE_EXPRESSION (CALL_FUNCTION get_message)))
+        (RETURN_VALUE 42)))))
