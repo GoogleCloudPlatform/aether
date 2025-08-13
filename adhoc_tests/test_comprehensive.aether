@@ -1,0 +1,32 @@
+(DEFINE_MODULE
+  (NAME comprehensive_test)
+  (INTENT "Test constants and variables together")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME PI)
+      (TYPE FLOAT)
+      (VALUE 3.14159)
+      (INTENT "Mathematical constant"))
+      
+    (DECLARE_CONSTANT
+      (NAME GREETING)
+      (TYPE STRING)
+      (VALUE "Hello")
+      (INTENT "String constant"))
+      
+    (DECLARE_CONSTANT
+      (NAME MAX_COUNT)
+      (TYPE INTEGER)
+      (VALUE 100)
+      (INTENT "Integer constant"))
+      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test all features")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION MAX_COUNT))
+        (RETURN_VALUE result)))))

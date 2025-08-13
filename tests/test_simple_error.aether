@@ -1,0 +1,8 @@
+(DEFINE_MODULE
+  (NAME test_simple_error)
+  (INTENT "Simple error test")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "broken")
+      (RETURNS INTEGER)
+      ; Missing closing paren here

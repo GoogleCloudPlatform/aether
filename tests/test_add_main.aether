@@ -1,0 +1,23 @@
+(DEFINE_MODULE
+  (NAME test_add_main)
+  (INTENT "Test module with add function and main")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add")
+      (INTENT "Add two integers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE
+          (EXPRESSION_ADD a b))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Main entry point")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE
+          (CALL_FUNCTION "add"
+            (ARGUMENT 30)
+            (ARGUMENT 12)))))))

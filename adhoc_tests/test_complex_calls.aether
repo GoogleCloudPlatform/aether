@@ -1,0 +1,48 @@
+(DEFINE_MODULE
+  (NAME complex_calls_test)
+  (INTENT "Test complex function call scenarios")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME multiply)
+      (INTENT "Multiply two numbers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY x y))))
+        
+    (DEFINE_FUNCTION
+      (NAME add)
+      (INTENT "Add two numbers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD a b))))
+        
+    (DEFINE_FUNCTION
+      (NAME compute)
+      (INTENT "Complex computation with nested calls")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "doubled") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE doubled)
+          (SOURCE_EXPRESSION (CALL_FUNCTION multiply n 2)))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION add doubled 10)))
+        (RETURN_VALUE result)))
+        
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test nested function calls")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "final_result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE final_result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION compute 3)))
+        (RETURN_VALUE final_result)))))

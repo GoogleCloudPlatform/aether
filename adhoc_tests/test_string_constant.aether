@@ -1,0 +1,9 @@
+(DEFINE_MODULE
+  (NAME test_string)
+  (INTENT "Test string constant")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME GREETING)
+      (TYPE STRING)
+      (VALUE "Hello, World\!")
+      (INTENT "Test string constant"))))

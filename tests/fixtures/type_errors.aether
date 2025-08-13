@@ -1,0 +1,18 @@
+(DEFINE_MODULE
+  (NAME 'type_errors')
+  (INTENT "Module with intentional type errors for testing")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME 'BAD_NUMBER')
+      (TYPE INTEGER)
+      (VALUE "this should be an integer")
+      (INTENT "Type error: string assigned to integer")
+    )
+    (DECLARE_CONSTANT
+      (NAME 'BAD_STRING')
+      (TYPE STRING)
+      (VALUE 42)
+      (INTENT "Type error: integer assigned to string")
+    )
+  )
+)

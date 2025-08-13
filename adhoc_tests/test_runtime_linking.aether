@@ -1,0 +1,60 @@
+(DEFINE_MODULE
+  (NAME test_runtime_linking)
+  (INTENT "Test runtime library linking with array operations")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    ; Main function to test runtime
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create an array
+        (DECLARE_VARIABLE (NAME arr) (TYPE (ARRAY_OF_TYPE INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE arr)
+          (SOURCE_EXPRESSION
+            (ARRAY_LITERAL 10 20 30 40 50)))
+        
+        ; Get array length using built-in ARRAY_LENGTH
+        (DECLARE_VARIABLE (NAME len) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE len)
+          (SOURCE_EXPRESSION (ARRAY_LENGTH arr)))
+        
+        ; Print length
+        (CALL_FUNCTION printf "Array length: %d\n" len)
+        
+        ; Get an element using GET_ARRAY_ELEMENT
+        (DECLARE_VARIABLE (NAME elem) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE elem)
+          (SOURCE_EXPRESSION (GET_ARRAY_ELEMENT arr 2)))
+        
+        ; Print element
+        (CALL_FUNCTION printf "Element at index 2: %d\n" elem)
+        
+        ; Get another element
+        (ASSIGN
+          (TARGET_VARIABLE elem)
+          (SOURCE_EXPRESSION (GET_ARRAY_ELEMENT arr 3)))
+        
+        ; Print element
+        (CALL_FUNCTION printf "Element at index 3: %d\n" elem)
+        
+        ; Print all elements
+        (CALL_FUNCTION printf "All elements: %d %d %d %d %d\n" 
+          (GET_ARRAY_ELEMENT arr 0)
+          (GET_ARRAY_ELEMENT arr 1)
+          (GET_ARRAY_ELEMENT arr 2)
+          (GET_ARRAY_ELEMENT arr 3)
+          (GET_ARRAY_ELEMENT arr 4))
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

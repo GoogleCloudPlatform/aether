@@ -1,0 +1,42 @@
+(DEFINE_MODULE
+  (NAME float_debug)
+  (INTENT "Debug float operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "x") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "y") (TYPE FLOAT))
+        
+        ; Direct assignment
+        (ASSIGN (TARGET_VARIABLE x) (SOURCE_EXPRESSION 10.5))
+        (CALL_FUNCTION printf "After assignment, x = %.2f\n" x)
+        
+        (ASSIGN (TARGET_VARIABLE y) (SOURCE_EXPRESSION 3.5))
+        (CALL_FUNCTION printf "After assignment, y = %.2f\n" y)
+        
+        ; Store addition result directly
+        (DECLARE_VARIABLE (NAME "sum") (TYPE FLOAT))
+        (ASSIGN
+          (TARGET_VARIABLE sum)
+          (SOURCE_EXPRESSION (EXPRESSION_ADD x y)))
+        
+        (CALL_FUNCTION printf "After addition, sum = %.2f\n" sum)
+        
+        ; Also test with integer for comparison
+        (DECLARE_VARIABLE (NAME "ix") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "iy") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "isum") (TYPE INTEGER))
+        
+        (ASSIGN (TARGET_VARIABLE ix) (SOURCE_EXPRESSION 10))
+        (ASSIGN (TARGET_VARIABLE iy) (SOURCE_EXPRESSION 3))
+        (ASSIGN
+          (TARGET_VARIABLE isum)
+          (SOURCE_EXPRESSION (EXPRESSION_ADD ix iy)))
+        
+        (CALL_FUNCTION printf "Integer: %d + %d = %d\n" ix iy isum)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

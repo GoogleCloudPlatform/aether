@@ -1,0 +1,33 @@
+(DEFINE_MODULE
+  (NAME io)
+  (INTENT "Input/Output operations for AetherScript")
+  (CONTENT
+    ; Export I/O functions
+    (EXPORTS_FUNCTION (NAME print))
+    (EXPORTS_FUNCTION (NAME println))
+    
+    ; External function declarations for FFI
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER)
+      (CALLING_CONVENTION "C"))
+    
+    ; Print a value without newline
+    (DEFINE_FUNCTION
+      (NAME print)
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE STRING))
+      (RETURNS VOID)
+      (BODY
+        (CALL_FUNCTION printf "%s" value)
+      ))
+    
+    ; Print a value with newline
+    (DEFINE_FUNCTION
+      (NAME println)
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE STRING))
+      (RETURNS VOID)
+      (BODY
+        (CALL_FUNCTION printf "%s\n" value)
+      ))
+  ))

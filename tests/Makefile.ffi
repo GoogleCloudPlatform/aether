@@ -1,0 +1,29 @@
+# Makefile for FFI test library
+
+CC = cc
+CFLAGS = -Wall -fPIC -shared
+LDFLAGS = 
+
+# Platform-specific settings
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    LIBRARY_EXT = .dylib
+    CFLAGS += -dynamiclib
+else
+    LIBRARY_EXT = .so
+endif
+
+# Targets
+LIBRARY = libffi_test$(LIBRARY_EXT)
+SOURCES = ffi_test_lib.c
+OBJECTS = $(SOURCES:.c=.o)
+
+all: $(LIBRARY)
+
+$(LIBRARY): $(SOURCES)
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+clean:
+	rm -f $(LIBRARY) $(OBJECTS)
+
+.PHONY: all clean

@@ -1,0 +1,17 @@
+(DEFINE_MODULE
+  (NAME debug_loop_test)
+  (INTENT "Debug test with loop")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Before loop\n")
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER i)
+          (FROM 1)
+          (TO 3)
+          (DO
+            (CALL_FUNCTION printf "i = %d\n" i)))
+        (CALL_FUNCTION printf "After loop\n")
+        (RETURN_VALUE 0)))))

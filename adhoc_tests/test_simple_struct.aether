@@ -1,0 +1,50 @@
+(DEFINE_MODULE
+  (NAME test_simple_struct)
+  (INTENT "Test simple struct access")
+  (CONTENT
+    (DEFINE_STRUCTURED_TYPE
+      (NAME Point)
+      (INTENT "A 2D point")
+      (FIELD x INTEGER)
+      (FIELD y INTEGER))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create a Point
+        (DECLARE_VARIABLE (NAME p1) (TYPE Point))
+        (ASSIGN
+          (TARGET_VARIABLE p1)
+          (SOURCE_EXPRESSION 
+            (CONSTRUCT Point
+              (FIELD_VALUE x 10)
+              (FIELD_VALUE y 20))))
+        
+        ; Print initialization message
+        (CALL_FUNCTION printf "Point created: x=%d, y=%d\n" 10 20)
+        
+        ; Access x field
+        (DECLARE_VARIABLE (NAME x_val) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE x_val)
+          (SOURCE_EXPRESSION (GET_FIELD_VALUE p1 x)))
+        
+        ; Access y field
+        (DECLARE_VARIABLE (NAME y_val) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE y_val)
+          (SOURCE_EXPRESSION (GET_FIELD_VALUE p1 y)))
+        
+        ; Print the values
+        (CALL_FUNCTION printf "Point fields: x=%d, y=%d\n" x_val y_val)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

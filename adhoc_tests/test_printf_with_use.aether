@@ -1,0 +1,14 @@
+(DEFINE_MODULE
+  (NAME printf_test)
+  (INTENT "Printf test using result")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE 
+          (NAME result) 
+          (TYPE INTEGER) 
+          (MUTABILITY MUTABLE) 
+          (VALUE (CALL_FUNCTION printf "Hello World\n")))
+        (RETURN_VALUE result)))))

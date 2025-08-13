@@ -1,0 +1,97 @@
+(DEFINE_MODULE
+  (NAME test_tcp_client)
+  (INTENT "Simple TCP client for testing")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_connect)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "host") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_write)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "data") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "data_size") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_read)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "buffer") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "buffer_size") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_close)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Connecting to localhost:9999...\n")
+        
+        ; Connect to server
+        (DECLARE_VARIABLE (NAME client) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE client)
+          (SOURCE_EXPRESSION (CALL_FUNCTION tcp_connect "127.0.0.1" 9999)))
+        
+        (IF_CONDITION
+          (PREDICATE_LESS_THAN client 0)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Failed to connect to server\n")
+          )
+        )
+        
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN client -1)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Connected successfully (socket id: %d)\n" client)
+          )
+        )
+        
+        ; Send message
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN client -1)
+          (THEN_EXECUTE
+            (DECLARE_VARIABLE (NAME message) (TYPE STRING))
+            (ASSIGN
+              (TARGET_VARIABLE message)
+              (SOURCE_EXPRESSION "Hello, server!"))
+            
+            (DECLARE_VARIABLE (NAME bytes_sent) (TYPE INTEGER))
+            (ASSIGN
+              (TARGET_VARIABLE bytes_sent)
+              (SOURCE_EXPRESSION (CALL_FUNCTION tcp_write client message 14)))
+            
+            (CALL_FUNCTION printf "Sent %d bytes\n" bytes_sent)
+          )
+        )
+        
+        ; Close connection
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN client -1)
+          (THEN_EXECUTE
+            (CALL_FUNCTION tcp_close client)
+          )
+        )
+        
+        (CALL_FUNCTION printf "Client shutdown\n")
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

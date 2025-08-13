@@ -1,0 +1,277 @@
+;; Resource Management Demonstration for AetherScript
+;; Shows deterministic resource management with RESOURCE_SCOPE
+
+(DEFINE_MODULE
+  (NAME resource_demo)
+  (INTENT "Demonstrate deterministic resource management"))
+
+;; Example 1: Basic file handling with resource scope
+(DEFINE_FUNCTION
+  (NAME file_copy)
+  (INTENT "Copy file contents with guaranteed cleanup")
+  (ACCEPTS_PARAMETER (NAME "src_path") (TYPE STRING))
+  (ACCEPTS_PARAMETER (NAME "dst_path") (TYPE STRING))
+  (RETURNS (TYPE BOOLEAN))
+  (BODY
+    ;; Acquire two file handles with guaranteed cleanup
+    (RESOURCE_SCOPE
+      (NAME "file_copy_scope")
+      (ACQUIRE_RESOURCE
+        (RESOURCE_TYPE "file_handle")
+        (RESOURCE_BINDING "src_file")
+        (VALUE (CALL_FUNCTION
+          (NAME "file_open")
+          (ARGUMENT (PARAMETER_NAME "path") (VALUE src_path))
+          (ARGUMENT (PARAMETER_NAME "mode") (VALUE (STRING_LITERAL "r")))))
+        (CLEANUP "file_close"))
+      (ACQUIRE_RESOURCE
+        (RESOURCE_TYPE "file_handle")
+        (RESOURCE_BINDING "dst_file")
+        (VALUE (CALL_FUNCTION
+          (NAME "file_open")
+          (ARGUMENT (PARAMETER_NAME "path") (VALUE dst_path))
+          (ARGUMENT (PARAMETER_NAME "mode") (VALUE (STRING_LITERAL "w")))))
+        (CLEANUP "file_close"))
+      (CLEANUP_ORDER "REVERSE_ACQUISITION")
+      (BODY
+        ;; Read and write with guaranteed cleanup
+        (DECLARE_VARIABLE
+          (NAME "buffer")
+          (TYPE (ARRAY_OF_TYPE INTEGER))
+          (INITIAL_VALUE (CALL_FUNCTION (NAME "file_read_all") (ARGUMENT src_file))))
+        
+        (CALL_FUNCTION
+          (NAME "file_write")
+          (ARGUMENT (PARAMETER_NAME "handle") (VALUE dst_file))
+          (ARGUMENT (PARAMETER_NAME "data") (VALUE buffer)))
+        
+        (RETURN_VALUE (BOOLEAN_LITERAL TRUE))))))
+
+;; Example 2: Network connection with resource pooling
+(DEFINE_FUNCTION
+  (NAME fetch_data)
+  (INTENT "Fetch data from network with connection pooling")
+  (ACCEPTS_PARAMETER (NAME "url") (TYPE STRING))
+  (RETURNS (TYPE STRING))
+  (BODY
+    (RESOURCE_SCOPE
+      (NAME "network_fetch")
+      (ACQUIRE_RESOURCE
+        (RESOURCE_TYPE "tcp_socket")
+        (RESOURCE_BINDING "socket")
+        (VALUE (CALL_FUNCTION
+          (NAME "connect_tcp")
+          (ARGUMENT (PARAMETER_NAME "host") (VALUE (CALL_FUNCTION (NAME "parse_host") (ARGUMENT url))))
+          (ARGUMENT (PARAMETER_NAME "port") (VALUE (INTEGER_LITERAL 80)))))
+        (CLEANUP "socket_close"))
+      (BODY
+        ;; Send HTTP request
+        (CALL_FUNCTION
+          (NAME "socket_send")
+          (ARGUMENT socket)
+          (ARGUMENT (STRING_CONCAT
+            (STRING_LITERAL "GET ")
+            (CALL_FUNCTION (NAME "parse_path") (ARGUMENT url))
+            (STRING_LITERAL " HTTP/1.1\r\n\r\n"))))
+        
+        ;; Receive response
+        (DECLARE_VARIABLE
+          (NAME "response")
+          (TYPE STRING)
+          (INITIAL_VALUE (CALL_FUNCTION (NAME "socket_recv") (ARGUMENT socket))))
+        
+        (RETURN_VALUE response)))))
+
+;; Example 3: Memory management with explicit scopes
+(DEFINE_FUNCTION
+  (NAME process_large_data)
+  (INTENT "Process large data with explicit memory management")
+  (ACCEPTS_PARAMETER (NAME "size") (TYPE INTEGER))
+  (RETURNS (TYPE INTEGER))
+  (BODY
+    (RESOURCE_SCOPE
+      (NAME "memory_processing")
+      (ACQUIRE_RESOURCE
+        (RESOURCE_TYPE "memory_buffer")
+        (RESOURCE_BINDING "buffer")
+        (VALUE (CALL_FUNCTION
+          (NAME "aether_alloc")
+          (ARGUMENT (EXPRESSION_MULTIPLY size (INTEGER_LITERAL 1024)))))
+        (CLEANUP "aether_free"))
+      (BODY
+        ;; Process data in buffer
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER "i")
+          (FROM (INTEGER_LITERAL 0))
+          (TO size)
+          (DO
+            (CALL_FUNCTION
+              (NAME "buffer_write")
+              (ARGUMENT buffer)
+              (ARGUMENT i)
+              (ARGUMENT (EXPRESSION_MULTIPLY i (INTEGER_LITERAL 2))))))
+        
+        ;; Calculate sum
+        (DECLARE_VARIABLE
+          (NAME "sum")
+          (TYPE INTEGER)
+          (INITIAL_VALUE (INTEGER_LITERAL 0))
+          (MUTABLE TRUE))
+        
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER "j")
+          (FROM (INTEGER_LITERAL 0))
+          (TO size)
+          (DO
+            (ASSIGN
+              (TARGET_VARIABLE "sum")
+              (SOURCE_EXPRESSION (EXPRESSION_ADD
+                sum
+                (CALL_FUNCTION
+                  (NAME "buffer_read")
+                  (ARGUMENT buffer)
+                  (ARGUMENT j)))))))
+        
+        (RETURN_VALUE sum)))))
+
+;; Example 4: Nested resource scopes
+(DEFINE_FUNCTION
+  (NAME database_transaction)
+  (INTENT "Perform database transaction with nested resources")
+  (ACCEPTS_PARAMETER (NAME "db_name") (TYPE STRING))
+  (RETURNS (TYPE BOOLEAN))
+  (BODY
+    (RESOURCE_SCOPE
+      (NAME "db_connection")
+      (ACQUIRE_RESOURCE
+        (RESOURCE_TYPE "database_connection")
+        (RESOURCE_BINDING "db")
+        (VALUE (CALL_FUNCTION (NAME "db_connect") (ARGUMENT db_name)))
+        (CLEANUP "db_disconnect"))
+      (BODY
+        ;; Begin transaction
+        (CALL_FUNCTION (NAME "db_begin_transaction") (ARGUMENT db))
+        
+        ;; Nested scope for prepared statement
+        (RESOURCE_SCOPE
+          (NAME "prepared_statement")
+          (ACQUIRE_RESOURCE
+            (RESOURCE_TYPE "database_statement")
+            (RESOURCE_BINDING "stmt")
+            (VALUE (CALL_FUNCTION
+              (NAME "db_prepare")
+              (ARGUMENT db)
+              (ARGUMENT (STRING_LITERAL "INSERT INTO logs (message) VALUES (?)"))))
+            (CLEANUP "stmt_close"))
+          (BODY
+            ;; Execute multiple inserts
+            (LOOP_FIXED_ITERATIONS
+              (COUNTER "i")
+              (FROM (INTEGER_LITERAL 0))
+              (TO (INTEGER_LITERAL 10))
+              (DO
+                (CALL_FUNCTION
+                  (NAME "stmt_bind_and_execute")
+                  (ARGUMENT stmt)
+                  (ARGUMENT (STRING_CONCAT
+                    (STRING_LITERAL "Log entry ")
+                    (CALL_FUNCTION (NAME "int_to_string") (ARGUMENT i)))))))))
+        
+        ;; Commit transaction
+        (CALL_FUNCTION (NAME "db_commit") (ARGUMENT db))
+        
+        (RETURN_VALUE (BOOLEAN_LITERAL TRUE))))))
+
+;; Example 5: Error handling with resource cleanup
+(DEFINE_FUNCTION
+  (NAME safe_file_process)
+  (INTENT "Process file with error handling and guaranteed cleanup")
+  (ACCEPTS_PARAMETER (NAME "filename") (TYPE STRING))
+  (RETURNS (TYPE BOOLEAN))
+  (BEHAVIORAL_SPEC
+    (SAFE_ERRORS TRUE))
+  (BODY
+    (TRY_EXECUTE
+      (PROTECTED_BLOCK
+        (RESOURCE_SCOPE
+          (NAME "file_processing")
+          (ACQUIRE_RESOURCE
+            (RESOURCE_TYPE "file_handle")
+            (RESOURCE_BINDING "file")
+            (VALUE (CALL_FUNCTION
+              (NAME "file_open")
+              (ARGUMENT filename)
+              (ARGUMENT (STRING_LITERAL "r+"))))
+            (CLEANUP "file_close"))
+          (BODY
+            ;; Process file - may throw exception
+            (IF_CONDITION
+              (PREDICATE_EQUALS
+                (CALL_FUNCTION (NAME "file_size") (ARGUMENT file))
+                (INTEGER_LITERAL 0))
+              (THEN_EXECUTE
+                (THROW_EXCEPTION
+                  (CALL_FUNCTION
+                    (NAME "create_error")
+                    (ARGUMENT (STRING_LITERAL "Empty file"))))))
+            
+            ;; Normal processing
+            (CALL_FUNCTION
+              (NAME "file_write")
+              (ARGUMENT file)
+              (ARGUMENT (STRING_LITERAL "Processed\n")))
+            
+            (RETURN_VALUE (BOOLEAN_LITERAL TRUE)))))
+      (CATCH_EXCEPTION
+        (EXCEPTION_TYPE "FileError")
+        (BINDING_VARIABLE "e")
+        (HANDLER_BLOCK
+          ;; Log error - resources already cleaned up
+          (CALL_FUNCTION
+            (NAME "log_error")
+            (ARGUMENT (STRING_CONCAT
+              (STRING_LITERAL "File processing failed: ")
+              (CALL_FUNCTION (NAME "error_message") (ARGUMENT e)))))
+          
+          (RETURN_VALUE (BOOLEAN_LITERAL FALSE)))))))
+
+;; Example with resource contracts
+(DEFINE_FUNCTION
+  (NAME limited_connections)
+  (INTENT "Manage limited connection pool")
+  (RETURNS (TYPE VOID))
+  (RESOURCE_CONTRACT
+    (MAX_FILE_HANDLES 10)
+    (MAX_MEMORY_MB 100))
+  (BODY
+    ;; This would fail if more than 10 files opened
+    (LOOP_FIXED_ITERATIONS
+      (COUNTER "i")
+      (FROM (INTEGER_LITERAL 0))
+      (TO (INTEGER_LITERAL 5))
+      (DO
+        (RESOURCE_SCOPE
+          (NAME "connection_scope")
+          (ACQUIRE_RESOURCE
+            (RESOURCE_TYPE "file_handle")
+            (RESOURCE_BINDING "conn")
+            (VALUE (CALL_FUNCTION
+              (NAME "file_open")
+              (ARGUMENT (STRING_CONCAT
+                (STRING_LITERAL "/tmp/conn_")
+                (CALL_FUNCTION (NAME "int_to_string") (ARGUMENT i))))
+              (ARGUMENT (STRING_LITERAL "w"))))
+            (CLEANUP "file_close"))
+          (BODY
+            (CALL_FUNCTION
+              (NAME "file_write")
+              (ARGUMENT conn)
+              (ARGUMENT (STRING_LITERAL "Connection data\n")))))))))
+
+;; Exports
+(EXPORTS_FUNCTION (NAME "file_copy"))
+(EXPORTS_FUNCTION (NAME "fetch_data"))
+(EXPORTS_FUNCTION (NAME "process_large_data"))
+(EXPORTS_FUNCTION (NAME "database_transaction"))
+(EXPORTS_FUNCTION (NAME "safe_file_process"))
+(EXPORTS_FUNCTION (NAME "limited_connections"))

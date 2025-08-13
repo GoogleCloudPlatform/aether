@@ -1,0 +1,14 @@
+(DEFINE_MODULE
+  (NAME assignment_test)
+  (INTENT "Test variable assignment")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE 
+          (NAME x) 
+          (TYPE INTEGER) 
+          (MUTABILITY MUTABLE) 
+          (VALUE 42))
+        (RETURN_VALUE 0)))))

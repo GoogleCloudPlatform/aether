@@ -1,0 +1,9 @@
+[
+  {
+    "sessionId": "c02ab52a-69d4-4ecb-9436-a7ce4f04a12f",
+    "messageId": 0,
+    "type": "user",
+    "message": "read @user-guide.md and then create me a very detailed technical design doc on how we will build a compiler for this language. Keep in mind that we want a) very high levels of reliability and b) high levels of performance, and c) easy ways to interop with c/c++/rust/go sdks (and update the user-guide.md if it doesn't cover this interop)",
+    "timestamp": "2025-06-15T11:33:03.646Z"
+  }
+]

@@ -1,0 +1,29 @@
+(DEFINE_MODULE
+  (NAME test_simple_string)
+  (INTENT "Test simple string operations")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Test simple string printing
+        (CALL_FUNCTION printf "Hello from AetherScript!\n")
+        
+        ; Test string variable
+        (DECLARE_VARIABLE (NAME msg) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE msg)
+          (SOURCE_EXPRESSION "String variable test\n"))
+        
+        (CALL_FUNCTION printf msg)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

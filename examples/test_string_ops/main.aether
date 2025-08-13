@@ -1,0 +1,33 @@
+(DEFINE_MODULE
+  (NAME test_string_ops)
+  (CONTENT
+    ; External function declaration for puts
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME puts)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Test string concat
+        (DECLARE_VARIABLE (NAME msg) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE msg)
+          (SOURCE_EXPRESSION (STRING_CONCAT "Hello, " "World!")))
+        
+        (CALL_FUNCTION puts msg)
+        
+        ; Test int to string
+        (DECLARE_VARIABLE (NAME num_str) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE num_str)
+          (SOURCE_EXPRESSION (TO_STRING 42)))
+        
+        (CALL_FUNCTION puts num_str)
+        
+        (RETURN_VALUE 0)))
+  )
+)

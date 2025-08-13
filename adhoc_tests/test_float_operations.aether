@@ -1,0 +1,28 @@
+(DEFINE_MODULE
+  (NAME float_test)
+  (INTENT "Test float operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "x") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "y") (TYPE FLOAT))
+        (DECLARE_VARIABLE (NAME "result") (TYPE FLOAT))
+        
+        (ASSIGN
+          (TARGET_VARIABLE x)
+          (SOURCE_EXPRESSION 3.14))
+        
+        (ASSIGN
+          (TARGET_VARIABLE y)
+          (SOURCE_EXPRESSION 2.5))
+        
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (EXPRESSION_ADD x y)))
+        
+        (CALL_FUNCTION printf "x = %f, y = %f\n" x y)
+        (CALL_FUNCTION printf "x + y = %f\n" result)
+        
+        (RETURN_VALUE 0)))))

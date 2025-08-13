@@ -1,0 +1,6 @@
+Program {
+  Module 'type_error_test' {
+    intent: "Test type error detection"
+    const wrong_type: Integer = "this is a string not an integer"
+  }
+}

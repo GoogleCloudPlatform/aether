@@ -1,0 +1,16 @@
+(DEFINE_MODULE
+  (NAME test_string_use)
+  (INTENT "Test using string constant")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME GREETING)
+      (TYPE STRING)
+      (VALUE "Hello")
+      (INTENT "Test string"))
+      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Use string constant")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE GREETING)))))

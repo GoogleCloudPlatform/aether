@@ -1,0 +1,11 @@
+mod basic_tests;
+mod multi_file_tests;
+mod verification_tests;
+mod error_system_tests;
+mod resource_tests;
+mod pattern_tests;
+mod llm_workflow_tests;
+mod test_string_runtime;
+mod test_variadic_functions;
+mod test_ffi_structs;
+mod test_memory_alloc;

@@ -1,0 +1,46 @@
+(DEFINE_MODULE
+  (NAME complex_test)
+  (INTENT "Test complex expressions and nested function calls")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "square")
+      (INTENT "Square a number")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY x x))))
+    
+    (DEFINE_FUNCTION
+      (NAME "cube")
+      (INTENT "Cube a number")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY x (CALL_FUNCTION square x)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "sum_of_cubes")
+      (INTENT "Calculate sum of cubes of two numbers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD (CALL_FUNCTION cube a) (CALL_FUNCTION cube b)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "complex_calculation")
+      (INTENT "Perform a complex nested calculation")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_MULTIPLY 
+          (CALL_FUNCTION sum_of_cubes x y)
+          (EXPRESSION_ADD (CALL_FUNCTION square x) (CALL_FUNCTION square y))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test complex nested calculations")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION complex_calculation 2 3))))))

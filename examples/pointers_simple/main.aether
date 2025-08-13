@@ -1,0 +1,79 @@
+(DEFINE_MODULE
+  (NAME pointers_simple)
+  (INTENT "Demonstrate basic pointer operations that currently work")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_address_of_and_dereference)
+      (RETURNS INTEGER)
+      (BODY
+        ; Declare a variable
+        (DECLARE_VARIABLE (NAME value) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME ptr) (TYPE (POINTER_TO INTEGER)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE value)
+          (SOURCE_EXPRESSION 42))
+        
+        ; Take address of value
+        (ASSIGN
+          (TARGET_VARIABLE ptr)
+          (SOURCE_EXPRESSION (ADDRESS_OF value)))
+        
+        ; Dereference pointer into another variable
+        (DECLARE_VARIABLE (NAME deref_value) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE deref_value)
+          (SOURCE_EXPRESSION (DEREFERENCE ptr)))
+        
+        (CALL_FUNCTION printf "Original value: %d\n" value)
+        (CALL_FUNCTION printf "Dereferenced value: %d\n" deref_value)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_pointer_arithmetic)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME arr) (TYPE (ARRAY_OF_TYPE INTEGER)))
+        (DECLARE_VARIABLE (NAME ptr) (TYPE (POINTER_TO INTEGER)))
+        (DECLARE_VARIABLE (NAME ptr2) (TYPE (POINTER_TO INTEGER)))
+        
+        (ASSIGN
+          (TARGET_VARIABLE arr)
+          (SOURCE_EXPRESSION (ARRAY_LITERAL 10 20 30 40 50)))
+        
+        ; Get pointer to first element
+        (ASSIGN
+          (TARGET_VARIABLE ptr)
+          (SOURCE_EXPRESSION (ADDRESS_OF (GET_ARRAY_ELEMENT arr 0))))
+        
+        ; Add offset to pointer
+        (ASSIGN
+          (TARGET_VARIABLE ptr2)
+          (SOURCE_EXPRESSION (POINTER_ADD ptr 2)))
+        
+        ; Dereference the offset pointer
+        (DECLARE_VARIABLE (NAME value_at_offset) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE value_at_offset)
+          (SOURCE_EXPRESSION (DEREFERENCE ptr2)))
+        
+        (CALL_FUNCTION printf "Value at offset 2: %d\n" value_at_offset)
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_address_of_and_dereference)
+        (CALL_FUNCTION test_pointer_arithmetic)
+        (RETURN_VALUE 0)))
+  )
+)

@@ -1,0 +1,53 @@
+(DEFINE_MODULE
+  (NAME pattern_match_nested_debug)
+  (INTENT "Debug nested pattern matching")
+  (CONTENT
+    ; Simple nested enum for debugging
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Inner)
+      (VARIANTS
+        (VARIANT Val (HOLDS INTEGER))))
+    
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Outer)
+      (VARIANTS
+        (VARIANT Wrap (HOLDS Inner))))
+    
+    ; External function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_simple_nested)
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE Outer))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE
+          (MATCH_EXPRESSION value
+            (CASE (Wrap inner)
+              ; First just try to match without nested pattern
+              (CALL_FUNCTION printf "Got Wrap"))))))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create Outer(Inner(123))
+        (DECLARE_VARIABLE (NAME inner) (TYPE Inner))
+        (ASSIGN
+          (TARGET_VARIABLE inner)
+          (SOURCE_EXPRESSION (Val 123)))
+        
+        (DECLARE_VARIABLE (NAME outer) (TYPE Outer))
+        (ASSIGN
+          (TARGET_VARIABLE outer)
+          (SOURCE_EXPRESSION (Wrap inner)))
+        
+        (CALL_FUNCTION test_simple_nested outer)
+        
+        (RETURN_VALUE 0)))
+  )
+)

@@ -1,0 +1,569 @@
+;; AetherScript Blog Server - Based on LLM Example
+;; Demonstrates LLM-first design with extreme explicitness and intent-driven syntax
+
+(DEFINE_MODULE
+  (NAME 'blog_server')
+  (INTENT "An HTTP server for serving a simple blog application, demonstrating AetherScript's capabilities for web applications through FFI and structured design. It manages blog post data, handles HTTP requests, and generates HTML responses.")
+  (CONTENT
+
+    ;; Blog post structured type definition
+    (DEFINE_STRUCT
+      (NAME 'blog_post')
+      (INTENT "Represents a single blog post with its metadata and content, including a unique identifier, title, author, publication date, and the main body of text.")
+      (FIELDS
+        (FIELD 'id' STRING)
+        (FIELD 'title' STRING)
+        (FIELD 'author' STRING)
+        (FIELD 'content' STRING)
+        (FIELD 'date' STRING)
+      )
+    )
+
+    ;; Predefined blog posts data - hardcoded for demonstration
+    ;; In a production environment, this data would be loaded dynamically from a persistent store
+    (DECLARE_CONSTANT
+      (NAME "blog_posts_data")
+      (TYPE (MAP STRING "blog_post"))
+      (VALUE
+        (MAP_LITERAL
+          (KEY_TYPE STRING)
+          (VALUE_TYPE "blog_post")
+          (ENTRY
+            (KEY "post-1")
+            (VALUE
+              (CONSTRUCT_STRUCT "blog_post"
+                (FIELD_VALUE "id" "post-1")
+                (FIELD_VALUE "title" "AetherScript: The LLM-First Language")
+                (FIELD_VALUE "author" "AI Developer")
+                (FIELD_VALUE "date" "2025-07-29")
+                (FIELD_VALUE "content" "AetherScript revolutionizes code generation by prioritizing LLM comprehension. Its explicit S-expression syntax, built-in verification, and intent-driven design make it ideal for AI-powered development. This post explores its core philosophy and benefits for reliable, safe, and performant code generation.")
+              )
+            )
+          )
+          (ENTRY
+            (KEY "post-2")
+            (VALUE
+              (CONSTRUCT_STRUCT "blog_post"
+                (FIELD_VALUE "id" "post-2")
+                (FIELD_VALUE "title" "Resource Management with AetherScript")
+                (FIELD_VALUE "author" "AI Developer")
+                (FIELD_VALUE "date" "2025-08-10")
+                (FIELD_VALUE "content" "One of AetherScript's standout features is its deterministic resource management. Using RESOURCE_SCOPE, developers (or LLMs) can ensure proper acquisition and release of resources like file handles and memory, preventing leaks and improving system stability. This is crucial for long-running server applications.")
+              )
+            )
+          )
+          (ENTRY
+            (KEY "post-3")
+            (VALUE
+              (CONSTRUCT_STRUCT "blog_post"
+                (FIELD_VALUE "id" "post-3")
+                (FIELD_VALUE "title" "Formal Verification in Practice")
+                (FIELD_VALUE "author" "AI Developer")
+                (FIELD_VALUE "date" "2025-08-25")
+                (FIELD_VALUE "content" "AetherScript integrates formal verification using SMT solvers, enabling developers to define PRECONDITIONs, POSTCONDITIONs, and INVARIANTs. This guarantees code correctness beyond typical testing, making AetherScript suitable for mission-critical applications where bugs are unacceptable.")
+              )
+            )
+          )
+        )
+      )
+      (INTENT "Contains the hardcoded blog post data, serving as the in-memory database for this demonstration. Keys are post IDs, values are blog_post structures.")
+    )
+
+    ;; FFI declarations for HTTP server functionality
+    ;; These declarations define the interface to an external HTTP server library
+    ;; that AetherScript can interact with, abstracting away low-level networking details
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "http_create_server")
+      (LIBRARY "aether_http_lib")
+      (SYMBOL "aether_http_create_server")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "request_handler_ptr") (TYPE (POINTER VOID)))
+      (INTENT "Initializes and starts an HTTP server on the specified port. It registers the provided AetherScript function pointer as the callback for handling incoming requests. Returns a handle to the server instance.")
+    )
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "http_get_request_path")
+      (LIBRARY "aether_http_lib")
+      (SYMBOL "aether_http_get_request_path")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "request_ctx_ptr") (TYPE (POINTER VOID)))
+      (INTENT "Retrieves the URI path component from an incoming HTTP request context. The returned string must be freed by the caller.")
+    )
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "http_get_request_method")
+      (LIBRARY "aether_http_lib")
+      (SYMBOL "aether_http_get_request_method")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "request_ctx_ptr") (TYPE (POINTER VOID)))
+      (INTENT "Retrieves the HTTP method (e.g., 'GET', 'POST', 'PUT') from an incoming HTTP request context. The returned string must be freed by the caller.")
+    )
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "http_send_response")
+      (LIBRARY "aether_http_lib")
+      (SYMBOL "aether_http_send_response")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "request_ctx_ptr") (TYPE (POINTER VOID)))
+      (ACCEPTS_PARAMETER (NAME "status_code") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "content_type") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "body") (TYPE STRING))
+      (INTENT "Sends an HTTP response back to the client, specifying the status code, content type, and the response body.")
+    )
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "http_stop_server")
+      (LIBRARY "aether_http_lib")
+      (SYMBOL "aether_http_stop_server")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "server_handle") (TYPE INTEGER))
+      (INTENT "Stops a running HTTP server gracefully, releasing all associated resources. This is intended to be used as a cleanup function for resource scopes.")
+    )
+
+    ;; Standard library functions for common utilities
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "log_info")
+      (LIBRARY "std.log")
+      (SYMBOL "std_log_info")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "message") (TYPE STRING))
+      (INTENT "Logs an informational message to the standard output or logging system.")
+    )
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "log_error")
+      (LIBRARY "std.log")
+      (SYMBOL "std_log_error")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "message") (TYPE STRING))
+      (INTENT "Logs an error message to the standard error or logging system.")
+    )
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "string_starts_with")
+      (LIBRARY "std.string")
+      (SYMBOL "std_string_starts_with")
+      (RETURNS BOOLEAN)
+      (ACCEPTS_PARAMETER (NAME "text") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "prefix") (TYPE STRING))
+      (INTENT "Checks if a given string starts with a specified prefix.")
+    )
+
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME "map_keys")
+      (LIBRARY "std.collections")
+      (SYMBOL "std_collections_map_keys")
+      (RETURNS (ARRAY STRING))
+      (ACCEPTS_PARAMETER (NAME "map_obj") (TYPE (MAP STRING "blog_post")))
+      (INTENT "Returns an array containing all keys present in the given map.")
+    )
+
+    ;; HTML generation helper functions
+
+    (DEFINE_FUNCTION
+      (NAME "generate_html_header")
+      (INTENT "Generates the common HTML header for blog pages, including basic styling and navigation. This promotes consistency across all rendered pages.")
+      (ACCEPTS_PARAMETER (NAME "title") (TYPE STRING) (INTENT "The title to be displayed in the browser tab and page header."))
+      (RETURNS STRING)
+      (SIDE_EFFECTS NONE) ; Pure function, only produces a string based on inputs
+      (BODY
+        (RETURN_VALUE
+          (STRING_CONCAT
+            "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            (STRING_CONCAT
+              "<title>"
+              (STRING_CONCAT
+                (VARIABLE_REFERENCE "title")
+                "</title>"
+              )
+            )
+            "<style>body { font-family: sans-serif; max-width: 800px; margin: 20px auto; line-height: 1.6; } article { border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 20px; } h1, h2, h3 { color: #333; } a { color: #007bff; text-decoration: none; } a:hover { text-decoration: underline; }</style>"
+            "</head><body><header><h1>AetherScript Blog</h1><nav><a href=\"/\">Home</a></nav></header><main>"
+          )
+        )
+      )
+    )
+
+    (DEFINE_FUNCTION
+      (NAME "generate_html_footer")
+      (INTENT "Generates the common HTML footer for blog pages, including copyright information. This ensures proper closing of HTML tags and provides consistent branding.")
+      (RETURNS STRING)
+      (SIDE_EFFECTS NONE) ; Pure function, produces a static string
+      (BODY
+        (RETURN_VALUE
+          "<footer><p>&copy; 2025 AetherScript Blog</p></footer></main></body></html>"
+        )
+      )
+    )
+
+    (DEFINE_FUNCTION
+      (NAME "render_blog_list_page")
+      (INTENT "Renders the main blog index page, listing all available blog posts with summaries and links to full articles. It dynamically generates content based on the 'blog_posts_data' constant.")
+      (RETURNS STRING)
+      (SIDE_EFFECTS NONE) ; Pure function, only reads global constant and generates string
+      (BODY
+        (DECLARE_VARIABLE
+          (NAME "html_content")
+          (TYPE STRING)
+          (INITIAL_VALUE (CALL_FUNCTION "generate_html_header" (ARGUMENTS "Our Blog Posts")))
+          (INTENT "Accumulates the HTML content for the entire blog list page, starting with the common header.")
+        )
+
+        (ASSIGN_VARIABLE
+          "html_content"
+          (STRING_CONCAT (VARIABLE_REFERENCE "html_content") "<h2>Recent Posts</h2>")
+        )
+
+        ; Iterate over the keys (post IDs) of the blog_posts_data map
+        (FOR_EACH_LOOP
+          (COLLECTION (CALL_FUNCTION "map_keys" (ARGUMENTS (VARIABLE_REFERENCE "blog_posts_data"))))
+          (ELEMENT_NAME "post_id")
+          (BODY
+            (DECLARE_VARIABLE
+              (NAME "post")
+              (TYPE "blog_post")
+              (INITIAL_VALUE (MAP_ACCESS (VARIABLE_REFERENCE "blog_posts_data") (VARIABLE_REFERENCE "post_id")))
+              (INTENT "The current blog_post object retrieved from the map for the iteration.")
+            )
+            (ASSIGN_VARIABLE
+              "html_content"
+              (STRING_CONCAT
+                (VARIABLE_REFERENCE "html_content")
+                (STRING_CONCAT
+                  "<article><h3><a href=\"/posts/"
+                  (STRING_CONCAT
+                    (FIELD_ACCESS (VARIABLE_REFERENCE "post") "id")
+                    (STRING_CONCAT
+                      "\">"
+                      (STRING_CONCAT
+                        (FIELD_ACCESS (VARIABLE_REFERENCE "post") "title")
+                        (STRING_CONCAT
+                          "</a></h3><p><em>By "
+                          (STRING_CONCAT
+                            (FIELD_ACCESS (VARIABLE_REFERENCE "post") "author")
+                            (STRING_CONCAT
+                              " on "
+                              (STRING_CONCAT
+                                (FIELD_ACCESS (VARIABLE_REFERENCE "post") "date")
+                                (STRING_CONCAT
+                                  "</em></p><p>"
+                                  (STRING_CONCAT
+                                    (SUBSTRING
+                                      (FIELD_ACCESS (VARIABLE_REFERENCE "post") "content")
+                                      0
+                                      150
+                                    ) ; Show first 150 characters
+                                    (STRING_CONCAT
+                                      "... <a href=\"/posts/"
+                                      (STRING_CONCAT
+                                        (FIELD_ACCESS (VARIABLE_REFERENCE "post") "id")
+                                        "\">Read More</a></p></article>"
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+
+        (ASSIGN_VARIABLE
+          "html_content"
+          (STRING_CONCAT (VARIABLE_REFERENCE "html_content") (CALL_FUNCTION "generate_html_footer" (ARGUMENTS)))
+        )
+        (RETURN_VALUE (VARIABLE_REFERENCE "html_content"))
+      )
+    )
+
+    (DEFINE_FUNCTION
+      (NAME "render_single_post_page")
+      (INTENT "Renders a detailed page for a single blog post based on its ID. If the post is not found, it returns an empty string, signaling a 404 condition to the caller.")
+      (ACCEPTS_PARAMETER (NAME "post_id") (TYPE STRING) (INTENT "The unique identifier of the blog post to be rendered."))
+      (RETURNS STRING)
+      (SIDE_EFFECTS NONE) ; Pure function, only reads global constant and generates string
+      (BODY
+        (DECLARE_VARIABLE
+          (NAME "post")
+          (TYPE "blog_post")
+          (INITIAL_VALUE (MAP_ACCESS (VARIABLE_REFERENCE "blog_posts_data") (VARIABLE_REFERENCE "post_id")))
+          (INTENT "The blog_post object retrieved using the provided post_id. Will be NULL if not found.")
+        )
+
+        (IF_STATEMENT
+          (CONDITION (EXPRESSION_EQUALS (VARIABLE_REFERENCE "post") NULL_VALUE))
+          (THEN_EXECUTE
+            (RETURN_VALUE "") ; Return empty string to indicate that the post was not found
+          )
+          (ELSE_EXECUTE
+            (DECLARE_VARIABLE
+              (NAME "html_content")
+              (TYPE STRING)
+              (INITIAL_VALUE (CALL_FUNCTION "generate_html_header" (ARGUMENTS (FIELD_ACCESS (VARIABLE_REFERENCE "post") "title"))))
+              (INTENT "Accumulates the HTML content for the single post page, starting with the common header tailored to the post title.")
+            )
+
+            (ASSIGN_VARIABLE
+              "html_content"
+              (STRING_CONCAT
+                (VARIABLE_REFERENCE "html_content")
+                (STRING_CONCAT
+                  "<h2>"
+                  (STRING_CONCAT
+                    (FIELD_ACCESS (VARIABLE_REFERENCE "post") "title")
+                    (STRING_CONCAT
+                      "</h2>"
+                      (STRING_CONCAT
+                        "<p><em>By "
+                        (STRING_CONCAT
+                          (FIELD_ACCESS (VARIABLE_REFERENCE "post") "author")
+                          (STRING_CONCAT
+                            " on "
+                            (STRING_CONCAT
+                              (FIELD_ACCESS (VARIABLE_REFERENCE "post") "date")
+                              (STRING_CONCAT
+                                "</em></p>"
+                                (STRING_CONCAT
+                                  "<article><p>"
+                                  (STRING_CONCAT
+                                    (FIELD_ACCESS (VARIABLE_REFERENCE "post") "content")
+                                    "</p></article>"
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+            (ASSIGN_VARIABLE
+              "html_content"
+              (STRING_CONCAT (VARIABLE_REFERENCE "html_content") (CALL_FUNCTION "generate_html_footer" (ARGUMENTS)))
+            )
+            (RETURN_VALUE (VARIABLE_REFERENCE "html_content"))
+          )
+        )
+      )
+    )
+
+    ;; Main HTTP request handler function
+    (DEFINE_FUNCTION
+      (NAME "http_request_handler")
+      (INTENT "Handles incoming HTTP requests by parsing the request path and method, then dispatching the request to the appropriate content generation function (e.g., list page, single post page) or returning a 404 error. It interacts with the FFI layer to send the response.")
+      (ACCEPTS_PARAMETER (NAME "request_context") (TYPE (POINTER VOID))
+        (INTENT "An opaque pointer to the HTTP request context, provided by the external HTTP library via FFI. This context is used to extract request details and send responses."))
+      (RETURNS VOID) ; Handlers typically return void as they complete the request by calling send_response
+      (SIDE_EFFECTS (WRITES "network")) ; Interacts with the network to send the HTTP response
+
+      (BODY
+        (DECLARE_VARIABLE
+          (NAME "path")
+          (TYPE STRING)
+          (INITIAL_VALUE (CALL_FUNCTION "http_get_request_path" (ARGUMENTS (VARIABLE_REFERENCE "request_context"))))
+          (INTENT "The URL path requested by the client (e.g., '/', '/posts/post-1').")
+        )
+        (DECLARE_VARIABLE
+          (NAME "method")
+          (TYPE STRING)
+          (INITIAL_VALUE (CALL_FUNCTION "http_get_request_method" (ARGUMENTS (VARIABLE_REFERENCE "request_context"))))
+          (INTENT "The HTTP method used by the client for the request (e.g., 'GET', 'POST').")
+        )
+
+        (IF_STATEMENT
+          (CONDITION
+            (LOGICAL_AND
+              (EXPRESSION_EQUALS (VARIABLE_REFERENCE "method") "GET")
+              (EXPRESSION_EQUALS (VARIABLE_REFERENCE "path") "/")
+            )
+          )
+          (THEN_EXECUTE
+            ; Handle root path (blog list)
+            (DECLARE_VARIABLE
+              (NAME "response_body")
+              (TYPE STRING)
+              (INITIAL_VALUE (CALL_FUNCTION "render_blog_list_page" (ARGUMENTS)))
+              (INTENT "The generated HTML content for the main blog listing page.")
+            )
+            (CALL_FUNCTION "http_send_response"
+              (ARGUMENTS
+                (VARIABLE_REFERENCE "request_context")
+                200 ; HTTP 200 OK
+                "text/html"
+                (VARIABLE_REFERENCE "response_body")
+              )
+            )
+          )
+          (ELSE_EXECUTE
+            ; Check for /posts/{id} pattern
+            (IF_STATEMENT
+              (CONDITION
+                (LOGICAL_AND
+                  (EXPRESSION_EQUALS (VARIABLE_REFERENCE "method") "GET")
+                  (CALL_FUNCTION "string_starts_with" (ARGUMENTS (VARIABLE_REFERENCE "path") "/posts/"))
+                )
+              )
+              (THEN_EXECUTE
+                (DECLARE_VARIABLE
+                  (NAME "post_id")
+                  (TYPE STRING)
+                  (INITIAL_VALUE (SUBSTRING (VARIABLE_REFERENCE "path") 7 (STRING_LENGTH (VARIABLE_REFERENCE "path")))) ; Extract ID after "/posts/"
+                  (INTENT "The extracted unique ID of the blog post from the URL path.")
+                )
+                (DECLARE_VARIABLE
+                  (NAME "response_body")
+                  (TYPE STRING)
+                  (INITIAL_VALUE (CALL_FUNCTION "render_single_post_page" (ARGUMENTS (VARIABLE_REFERENCE "post_id"))))
+                  (INTENT "The generated HTML content for a single blog post page. This will be empty if the post is not found.")
+                )
+
+                (IF_STATEMENT
+                  (CONDITION (EXPRESSION_EQUALS (VARIABLE_REFERENCE "response_body") ""))
+                  (THEN_EXECUTE
+                    ; Respond with 404 Not Found if post was not found by render_single_post_page
+                    (CALL_FUNCTION "http_send_response"
+                      (ARGUMENTS
+                        (VARIABLE_REFERENCE "request_context")
+                        404 ; HTTP 404 Not Found
+                        "text/html"
+                        (STRING_CONCAT
+                          (CALL_FUNCTION "generate_html_header" (ARGUMENTS "404 Not Found"))
+                          (STRING_CONCAT
+                            "<h2>404 Not Found</h2><p>The blog post you requested could not be found.</p>"
+                            (CALL_FUNCTION "generate_html_footer" (ARGUMENTS))
+                          )
+                        )
+                      )
+                    )
+                  )
+                  (ELSE_EXECUTE
+                    ; Respond with 200 OK for a valid post
+                    (CALL_FUNCTION "http_send_response"
+                      (ARGUMENTS
+                        (VARIABLE_REFERENCE "request_context")
+                        200 ; HTTP 200 OK
+                        "text/html"
+                        (VARIABLE_REFERENCE "response_body")
+                      )
+                    )
+                  )
+                )
+              )
+              (ELSE_EXECUTE
+                ; Handle all other paths as 404 Not Found
+                (CALL_FUNCTION "http_send_response"
+                  (ARGUMENTS
+                    (VARIABLE_REFERENCE "request_context")
+                    404 ; HTTP 404 Not Found
+                    "text/html"
+                    (STRING_CONCAT
+                      (CALL_FUNCTION "generate_html_header" (ARGUMENTS "404 Not Found"))
+                      (STRING_CONCAT
+                        "<h2>404 Not Found</h2><p>The page you requested could not be found on this server.</p>"
+                        (CALL_FUNCTION "generate_html_footer" (ARGUMENTS))
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+
+    ;; Main function to start the server
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Entry point for the blog server application. It initializes the HTTP server, registers the request handler, and manages the server's lifecycle with guaranteed resource cleanup.")
+      (RETURNS INTEGER) ; Returns 0 on success, 1 on failure
+      (RESOURCE_CONTRACT
+        (MAX_MEMORY_MB 50) ; Example memory limit for the application
+        (MAX_EXECUTION_TIME_MS 0) ; Server runs indefinitely until terminated externally
+        (ENFORCEMENT RUNTIME) ; Enforce resource limits at runtime
+      )
+      (SIDE_EFFECTS (READS "network") (WRITES "network") (READS "file_system")) ; Interacts with network, potentially reads config files
+
+      (BODY
+        (DECLARE_CONSTANT
+          (NAME "SERVER_PORT")
+          (TYPE INTEGER)
+          (VALUE 8080)
+          (INTENT "The TCP port on which the HTTP server will listen for incoming connections.")
+        )
+
+        ; Use RESOURCE_SCOPE to ensure the HTTP server is stopped when the main function exits,
+        ; regardless of success or failure. This demonstrates exception-safe resource management.
+        (RESOURCE_SCOPE
+          (SCOPE_ID "http_server_lifetime")
+          (ACQUIRES
+            ; Acquire the server handle from http_create_server.
+            ; The CLEANUP function ensures http_stop_server is called on scope exit.
+            (RESOURCE (TYPE INTEGER) (ID "server_handle") (CLEANUP "http_stop_server"))
+          )
+          (CLEANUP_GUARANTEED TRUE) ; Ensure cleanup happens always
+          (CLEANUP_ORDER REVERSE_ACQUISITION) ; Order not critical here as only one resource
+          (BODY
+            (TRY_EXECUTE
+              (PROTECTED_BLOCK
+                (DECLARE_VARIABLE
+                  (NAME "server_handle")
+                  (TYPE INTEGER)
+                  (INITIAL_VALUE (CALL_FUNCTION "http_create_server"
+                    (ARGUMENTS
+                      (VARIABLE_REFERENCE "SERVER_PORT")
+                      (ADDRESS_OF "http_request_handler") ; Pass a pointer to our AetherScript handler function
+                    )))
+                  (INTENT "The integer handle returned by the FFI function for the HTTP server instance. Used for stopping the server.")
+                )
+
+                (IF_STATEMENT
+                  (CONDITION (EXPRESSION_LESS_EQUAL (VARIABLE_REFERENCE "server_handle") 0))
+                  (THEN_EXECUTE
+                    (CALL_FUNCTION "log_error" (ARGUMENTS "Failed to start HTTP server. Server handle is invalid."))
+                    (RETURN_VALUE 1) ; Indicate application error
+                  )
+                  (ELSE_EXECUTE
+                    (CALL_FUNCTION "log_info" (ARGUMENTS
+                      (STRING_CONCAT "HTTP Server listening on port " (INTEGER_TO_STRING (VARIABLE_REFERENCE "SERVER_PORT")))))
+                    ; In a typical server, this would block indefinitely, waiting for requests.
+                    ; For this AetherScript example, assume `http_create_server` itself blocks or
+                    ; the AetherScript runtime keeps the program alive until explicit termination.
+                    (RETURN_VALUE 0) ; Indicate successful initialization
+                  )
+                )
+              )
+              (CATCH_EXCEPTION
+                (EXCEPTION_TYPE "network_error") ; Catch a specific network-related exception
+                (BINDING_VARIABLE (NAME "error") (TYPE "network_error"))
+                (HANDLER_BLOCK
+                  (CALL_FUNCTION "log_error"
+                    (ARGUMENTS
+                      (STRING_CONCAT "Caught network error during server startup: " (FIELD_ACCESS (VARIABLE_REFERENCE "error") "message"))))
+                  (RETURN_VALUE 1))) ; Indicate application error
+              (FINALLY_EXECUTE
+                (CLEANUP_BLOCK
+                  (CALL_FUNCTION "log_info" (ARGUMENTS "HTTP Server shutdown sequence initiated.")))
+              )
+            )
+          )
+        )
+      )
+    )
+
+    (EXPORT_FUNCTION "main") ; Make the main entry point visible
+    (EXPORT_FUNCTION "http_request_handler") ; Export if the FFI layer needs to explicitly lookup exported functions
+  )
+)

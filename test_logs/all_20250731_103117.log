@@ -1,0 +1,2957 @@
+warning: unused import: `ExampleType`
+ --> src/docs/tutorial.rs:9:18
+  |
+9 |     CodeExample, ExampleType
+  |                  ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `Expression`, `Statement`, and `TypeSpecifier`
+ --> src/error/structured.rs:7:18
+  |
+7 | use crate::ast::{Expression, Statement, TypeSpecifier};
+  |                  ^^^^^^^^^^  ^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `std::path::Path`
+  --> src/error/enhancement.rs:10:5
+   |
+10 | use std::path::Path;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `BehavioralSpec`
+ --> src/error/intent_analysis.rs:7:45
+  |
+7 | use crate::semantic::metadata::{IntentSpec, BehavioralSpec};
+  |                                             ^^^^^^^^^^^^^^
+
+warning: unused import: `HashSet`
+  --> src/llvm_backend/mod.rs:20:33
+   |
+20 | use std::collections::{HashMap, HashSet};
+   |                                 ^^^^^^^
+
+warning: unused imports: `BasicBlockId`, `LocalId`, `Place`, and `SourceInfo`
+ --> src/optimizations/inlining.rs:7:77
+  |
+7 | use crate::mir::{Function, Program, Statement, Terminator, Rvalue, Operand, Place, LocalId,
+  |                                                                             ^^^^^  ^^^^^^^
+8 |                  BasicBlockId, SourceInfo};
+  |                  ^^^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/optimizations/inlining.rs:10:5
+   |
+10 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Constant`
+ --> src/optimizations/interprocedural.rs:6:96
+  |
+6 | use crate::mir::{Function, Program, BasicBlock, Statement, Rvalue, Operand, Place, Terminator, Constant};
+  |                                                                                                ^^^^^^^^
+
+warning: unused import: `BuildConfiguration`
+ --> src/package/builder.rs:7:49
+  |
+7 | use crate::package::manifest::{PackageManifest, BuildConfiguration};
+  |                                                 ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `CacheStats`
+ --> src/package/builder.rs:8:35
+  |
+8 | use crate::package::{BuildConfig, CacheStats};
+  |                                   ^^^^^^^^^^
+
+warning: unused imports: `BinaryOp` and `Expression as ContractExpr`
+ --> src/patterns/catalog.rs:6:38
+  |
+6 | use crate::verification::contracts::{Expression as ContractExpr, BinaryOp};
+  |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^
+
+warning: unused imports: `Block`, `Expression`, `Function`, and `Statement`
+ --> src/patterns/composition.rs:6:18
+  |
+6 | use crate::ast::{Statement, Expression, Block, Function};
+  |                  ^^^^^^^^^  ^^^^^^^^^^  ^^^^^  ^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+ --> src/patterns/composition.rs:7:5
+  |
+7 | use crate::error::SourceLocation;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Function`
+ --> src/patterns/mod.rs:9:18
+  |
+9 | use crate::ast::{Function, Statement, Expression, Block};
+  |                  ^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+  --> src/patterns/mod.rs:11:5
+   |
+11 | use crate::error::SourceLocation;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `FailoverConfig`, `FailoverThreshold`, `RecoveryConfig`, and `self`
+ --> src/release/distribution.rs:8:22
+  |
+8 | use crate::release::{self, DistributionConfig, FailoverConfig, FailoverThreshold, RecoveryConfig};
+  |                      ^^^^                      ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `crate::error::SemanticError`
+  --> src/release/mod.rs:12:5
+   |
+12 | use crate::error::SemanticError;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+  --> src/verification/contracts.rs:17:13
+   |
+17 | use serde::{Serialize, Deserialize};
+   |             ^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused imports: `AggregateOp` and `TemporalOp`
+ --> src/verification/contract_to_smt.rs:6:100
+  |
+6 | use crate::verification::contracts::{Expression, BinaryOp, UnaryOp, ConstantValue, QuantifierKind, TemporalOp, AggregateOp};
+  |                                                                                                    ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `crate::types::Type`
+ --> src/verification/contract_to_smt.rs:8:5
+  |
+8 | use crate::types::Type;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::types::Type`
+ --> src/verification/vcgen.rs:7:5
+  |
+7 | use crate::types::Type;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::ast::PrimitiveType`
+ --> src/verification/vcgen.rs:8:5
+  |
+8 | use crate::ast::PrimitiveType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `worker_id`
+   --> src/concurrency/async_runtime.rs:332:13
+    |
+332 |         for worker_id in 0..self.config.worker_threads {
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_worker_id`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `start_time`
+   --> src/concurrency/sync_primitives.rs:540:13
+    |
+540 |         let start_time = Instant::now();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `metrics`
+   --> src/concurrency/sync_primitives.rs:683:23
+    |
+683 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_metrics`
+
+warning: variable does not need to be mutable
+   --> src/concurrency/sync_primitives.rs:683:19
+    |
+683 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {
+    |                   ----^^^^^^^
+    |                   |
+    |                   help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `metrics`
+   --> src/concurrency/sync_primitives.rs:691:23
+    |
+691 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_metrics`
+
+warning: variable does not need to be mutable
+   --> src/concurrency/sync_primitives.rs:691:19
+    |
+691 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {
+    |                   ----^^^^^^^
+    |                   |
+    |                   help: remove this `mut`
+
+warning: unused variable: `strategy`
+   --> src/concurrency/actors.rs:584:12
+    |
+584 |     fn new(strategy: SupervisionStrategy) -> Self {
+    |            ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_strategy`
+
+warning: unused variable: `response_receiver`
+   --> src/debug/debugger.rs:362:31
+    |
+362 |         let (response_sender, response_receiver) = channel();
+    |                               ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_response_receiver`
+
+warning: unused variable: `debugger_process`
+   --> src/debug/debugger.rs:365:13
+    |
+365 |         let debugger_process = self.start_debugger_process(&program_path)?;
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_debugger_process`
+
+warning: unused variable: `target_info`
+   --> src/debug/debugger.rs:377:13
+    |
+377 |         let target_info = TargetInfo {
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_target_info`
+
+warning: unused variable: `diagnostic`
+   --> src/debug/lsp.rs:562:21
+    |
+562 |                 let diagnostic = Diagnostic {
+    |                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_diagnostic`
+
+warning: unused variable: `name`
+   --> src/debug/lsp.rs:599:18
+    |
+599 |             for (name, symbol) in &semantic_info.symbols {
+    |                  ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `uri`
+   --> src/debug/lsp.rs:739:35
+    |
+739 |     pub fn get_diagnostics(&self, uri: &str) -> Vec<Diagnostic> {
+    |                                   ^^^ help: if this is intentional, prefix it with an underscore: `_uri`
+
+warning: unused variable: `scope`
+   --> src/debug/source_map.rs:415:45
+    |
+415 |     pub fn add_variable_location(&mut self, scope: String, location: VariableLocation) {
+    |                                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_scope`
+
+warning: unused variable: `location`
+   --> src/debug/source_map.rs:415:60
+    |
+415 |     pub fn add_variable_location(&mut self, scope: String, location: VariableLocation) {
+    |                                                            ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_location`
+
+warning: unused variable: `scope`
+   --> src/debug/source_map.rs:421:44
+    |
+421 |     pub fn find_variable_at_address(&self, scope: &str, name: &str, address: u64) -> Option<&VariableLocation> {
+    |                                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_scope`
+
+warning: unused variable: `name`
+   --> src/debug/source_map.rs:421:57
+    |
+421 |     pub fn find_variable_at_address(&self, scope: &str, name: &str, address: u64) -> Option<&VariableLocation> {
+    |                                                         ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `address`
+   --> src/debug/source_map.rs:421:69
+    |
+421 |     pub fn find_variable_at_address(&self, scope: &str, name: &str, address: u64) -> Option<&VariableLocation> {
+    |                                                                     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_address`
+
+warning: unused variable: `scope`
+   --> src/debug/source_map.rs:427:38
+    |
+427 |     pub fn variables_in_scope(&self, scope: &str) -> Option<&[VariableLocation]> {
+    |                                      ^^^^^ help: if this is intentional, prefix it with an underscore: `_scope`
+
+warning: unused variable: `output_dir`
+ --> src/docs/generator.rs:8:16
+  |
+8 |     pub fn new(output_dir: String) -> Self {
+  |                ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_output_dir`
+
+warning: unused variable: `comment_parser`
+   --> src/docs/parser.rs:120:13
+    |
+120 |         let comment_parser = CommentParser::new();
+    |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_comment_parser`
+
+warning: unused variable: `signature_parser`
+   --> src/docs/parser.rs:121:13
+    |
+121 |         let signature_parser = SignatureParser::new();
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_signature_parser`
+
+warning: unused variable: `config`
+   --> src/docs/parser.rs:119:16
+    |
+119 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `themes`
+   --> src/docs/renderer.rs:356:13
+    |
+356 |         let themes = ThemeManager::new()?;
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_themes`
+
+warning: unused variable: `search_paths`
+   --> src/docs/renderer.rs:500:13
+    |
+500 |         let search_paths = vec![
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_search_paths`
+
+warning: unused variable: `helpers`
+   --> src/docs/renderer.rs:513:13
+    |
+513 |         let helpers = Self::create_default_helpers();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_helpers`
+
+warning: unused variable: `processors`
+   --> src/docs/renderer.rs:798:13
+    |
+798 |         let processors: Vec<&dyn Fn(&str) -> String> = vec![];
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_processors`
+
+warning: unused variable: `options`
+    --> src/docs/renderer.rs:1057:13
+     |
+1057 |         let options = MarkdownOptions {
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `toc_generator`
+    --> src/docs/renderer.rs:1064:13
+     |
+1064 |         let toc_generator = TocGenerator {};
+     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_toc_generator`
+
+warning: unused variable: `options`
+    --> src/docs/renderer.rs:1199:13
+     |
+1199 |         let options = PdfOptions {
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `layout`
+    --> src/docs/renderer.rs:1206:13
+     |
+1206 |         let layout = PageLayout {
+     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_layout`
+
+warning: unused variable: `categories`
+   --> src/docs/examples.rs:118:13
+    |
+118 |         let categories = Self::create_example_categories();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_categories`
+
+warning: unused variable: `templates`
+   --> src/docs/examples.rs:119:13
+    |
+119 |         let templates = Self::create_example_templates();
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_templates`
+
+warning: unused variable: `config`
+   --> src/docs/examples.rs:117:16
+    |
+117 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `templates`
+  --> src/docs/tutorial.rs:85:13
+   |
+85 |         let templates = Self::create_tutorial_templates();
+   |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_templates`
+
+warning: unused variable: `config`
+  --> src/docs/tutorial.rs:84:16
+   |
+84 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+   |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `error`
+   --> src/error/structured.rs:414:26
+    |
+414 |     fn fix_type_mismatch(error: &CompilerError) -> Vec<FixSuggestion> {
+    |                          ^^^^^ help: if this is intentional, prefix it with an underscore: `_error`
+
+warning: unused variable: `error`
+   --> src/error/structured.rs:439:29
+    |
+439 |     fn fix_undefined_symbol(error: &CompilerError) -> Vec<FixSuggestion> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_error`
+
+warning: unused variable: `function`
+   --> src/error/intent_analysis.rs:125:9
+    |
+125 |         function: &Function,
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `function`
+   --> src/llvm_backend/codegen.rs:126:13
+    |
+126 |         let function = self.module.add_function(name, fn_type, None);
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `i`
+   --> src/llvm_backend/mod.rs:529:18
+    |
+529 |             for (i, stmt) in mir_block.statements.iter().enumerate() {
+    |                  ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `int_val`
+    --> src/llvm_backend/mod.rs:1005:58
+     |
+1005 | ...                   BasicValueEnum::IntValue(int_val) => {
+     |                                                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_int_val`
+
+warning: unused variable: `field_names`
+    --> src/llvm_backend/mod.rs:1194:61
+     |
+1194 |                     mir::AggregateKind::Struct(struct_name, field_names) => {
+     |                                                             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_field_names`
+
+warning: value assigned to `struct_size` is never read
+    --> src/llvm_backend/mod.rs:1213:33
+     |
+1213 |                         let mut struct_size = 0u64;
+     |                                 ^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+     = note: `#[warn(unused_assignments)]` on by default
+
+warning: variable does not need to be mutable
+    --> src/llvm_backend/mod.rs:1395:29
+     |
+1395 |                         let mut current_type = self.get_basic_type_from_local(place.local, function)?;
+     |                             ----^^^^^^^^^^^^
+     |                             |
+     |                             help: remove this `mut`
+
+warning: unused variable: `void_type`
+    --> src/llvm_backend/mod.rs:2109:13
+     |
+2109 |         let void_type = self.context.void_type();
+     |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_void_type`
+
+warning: unused variable: `parent`
+  --> src/memory/mod.rs:96:37
+   |
+96 |     pub fn create_region(&mut self, parent: Option<RegionId>) -> RegionId {
+   |                                     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parent`
+
+warning: unused variable: `region_id`
+   --> src/memory/mod.rs:362:38
+    |
+362 |     fn get_region_allocations(&self, region_id: &RegionId) -> Vec<AllocationInfo> {
+    |                                      ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_region_id`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:352:51
+    |
+352 |             ast::Statement::Break { target_label, source_location } => {
+    |                                                   ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:360:54
+    |
+360 |             ast::Statement::Continue { target_label, source_location } => {
+    |                                                      ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `map`
+    --> src/mir/lowering.rs:1101:47
+     |
+1101 |             ast::AssignmentTarget::MapValue { map, key } => {
+     |                                               ^^^ help: try ignoring the field: `map: _`
+
+warning: unused variable: `key`
+    --> src/mir/lowering.rs:1101:52
+     |
+1101 |             ast::AssignmentTarget::MapValue { map, key } => {
+     |                                                    ^^^ help: try ignoring the field: `key: _`
+
+warning: unused variable: `st`
+    --> src/mir/lowering.rs:2200:49
+     |
+2200 |                     let data_type = if let Some(st) = &self.symbol_table {
+     |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_st`
+
+warning: unused variable: `inner_variant`
+    --> src/mir/lowering.rs:2225:67
+     |
+2225 |                         ast::Pattern::EnumVariant { variant_name: inner_variant, binding: inner_binding, .. } => {
+     |                                                                   ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inner_variant`
+
+warning: unused variable: `target_type`
+    --> src/mir/lowering.rs:2894:13
+     |
+2894 |         let target_type = match pointer_type {
+     |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_target_type`
+
+warning: unused variable: `cycle`
+   --> src/module_loader.rs:235:17
+    |
+235 |             let cycle: Vec<String> = stack[cycle_start..].to_vec();
+    |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_cycle`
+
+warning: unused variable: `depth`
+  --> src/optimizations/inlining.rs:36:44
+   |
+36 |     pub fn set_max_inline_depth(&mut self, depth: usize) {
+   |                                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_depth`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:616:14
+    |
+616 |         for (function_name, summary) in summaries {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:708:14
+    |
+708 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function`
+   --> src/optimizations/interprocedural.rs:708:29
+    |
+708 |         for (function_name, function) in &program.functions {
+    |                             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:721:14
+    |
+721 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:739:14
+    |
+739 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `constant`
+   --> src/optimizations/interprocedural.rs:774:21
+    |
+774 |         for (place, constant) in assignments {
+    |                     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_constant`
+
+warning: unused variable: `var_name`
+   --> src/optimizations/interprocedural.rs:775:17
+    |
+775 |             let var_name = format!("{}::{}", function.name, place.local);
+    |                 ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_var_name`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:1272:37
+     |
+1272 | ...                   let mut constraints = Vec::new();
+     |                           ----^^^^^^^^^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:1424:37
+     |
+1424 | ...                   let mut constraints = Vec::new();
+     |                           ----^^^^^^^^^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:4122:13
+     |
+4122 |         let mut invariants = Vec::new();
+     |             ----^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:118:21
+    |
+118 |                 let mut contract = create_pattern_contract("safe_array_access");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:369:21
+    |
+369 |                 let mut contract = create_pattern_contract("binary_search");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:508:21
+    |
+508 |                 let mut contract = create_pattern_contract("map_filter_reduce");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:757:21
+    |
+757 |                 let mut contract = create_pattern_contract("raii_wrapper");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:882:21
+    |
+882 |                 let mut contract = create_pattern_contract("result_type");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:987:21
+    |
+987 |                 let mut contract = create_pattern_contract("input_validation");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: unused variable: `data_flow`
+   --> src/patterns/composition.rs:504:9
+    |
+504 |         data_flow: &DataFlowSpec,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_data_flow`
+
+warning: unused variable: `config`
+   --> src/release/distribution.rs:953:16
+    |
+953 |     pub fn new(config: DistributionConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `cache_config`
+    --> src/release/distribution.rs:1124:13
+     |
+1124 |         let cache_config = CacheConfig {
+     |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cache_config`
+
+warning: unused variable: `c_string`
+   --> src/runtime/mod.rs:145:9
+    |
+145 |     let c_string = result.as_ptr() as *mut c_char;
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_c_string`
+
+warning: unused variable: `constraint`
+   --> src/semantic/metadata.rs:442:25
+    |
+442 |             if let Some(constraint) = &sem_type.constraint {
+    |                         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_constraint`
+
+warning: unused variable: `enum_name`
+    --> src/semantic/mod.rs:1141:39
+     |
+1141 |             Expression::EnumVariant { enum_name, variant_name, value, source_location } => {
+     |                                       ^^^^^^^^^ help: try ignoring the field: `enum_name: _`
+
+warning: unused variable: `source_location`
+    --> src/semantic/mod.rs:1278:46
+     |
+1278 |             Expression::AddressOf { operand, source_location } => {
+     |                                              ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+    --> src/semantic/mod.rs:1330:69
+     |
+1330 |             Expression::MapLiteral { key_type, value_type, entries, source_location } => {
+     |                                                                     ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `size_type`
+  --> src/stdlib/network.rs:27:9
+   |
+27 |     let size_type = TypeSpecifier::Primitive {
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_size_type`
+
+warning: unused variable: `contract`
+   --> src/verification/contracts.rs:754:13
+    |
+754 |     let mut contract = FunctionContract::new(function.name.name.clone());
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_contract`
+
+warning: variable does not need to be mutable
+   --> src/verification/contracts.rs:754:9
+    |
+754 |     let mut contract = FunctionContract::new(function.name.name.clone());
+    |         ----^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: field `associated_mutex` is never read
+  --> src/concurrency/sync_primitives.rs:75:5
+   |
+70 | pub struct AetherCondVar {
+   |            ------------- field in this struct
+...
+75 |     associated_mutex: Option<String>,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `AetherCondVar` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+warning: struct `BarrierState` is never constructed
+   --> src/concurrency/sync_primitives.rs:124:8
+    |
+124 | struct BarrierState {
+    |        ^^^^^^^^^^^^
+
+warning: field `barrier_cycles` is never read
+   --> src/concurrency/sync_primitives.rs:187:5
+    |
+185 | struct BarrierMetrics {
+    |        -------------- field in this struct
+186 |     wait_count: u64,
+187 |     barrier_cycles: u64,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `BarrierMetrics` has derived impls for the traits `Default` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `acquired_at` is never read
+   --> src/concurrency/sync_primitives.rs:223:5
+    |
+221 | pub struct ReadGuard<'a> {
+    |            --------- field in this struct
+222 |     rw_lock: &'a AetherRwLock,
+223 |     acquired_at: Instant,
+    |     ^^^^^^^^^^^
+
+warning: field `acquired_at` is never read
+   --> src/concurrency/sync_primitives.rs:229:5
+    |
+227 | pub struct WriteGuard<'a> {
+    |            ---------- field in this struct
+228 |     rw_lock: &'a AetherRwLock,
+229 |     acquired_at: Instant,
+    |     ^^^^^^^^^^^
+
+warning: fields `target_pid` and `breakpoints` are never read
+  --> src/debug/debugger.rs:37:5
+   |
+35 | pub struct DebugSession {
+   |            ------------ fields in this struct
+36 |     /// Target process ID
+37 |     target_pid: Option<u32>,
+   |     ^^^^^^^^^^
+...
+43 |     breakpoints: Arc<Mutex<HashMap<String, Vec<Breakpoint>>>>,
+   |     ^^^^^^^^^^^
+   |
+   = note: `DebugSession` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `diagnostics_provider` and `shutdown` are never read
+  --> src/debug/lsp.rs:31:5
+   |
+20 | pub struct LanguageServer {
+   |            -------------- fields in this struct
+...
+31 |     diagnostics_provider: DiagnosticsProvider,
+   |     ^^^^^^^^^^^^^^^^^^^^
+...
+37 |     shutdown: Arc<AtomicBool>,
+   |     ^^^^^^^^
+   |
+   = note: `LanguageServer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `diagnostics` is never read
+   --> src/debug/lsp.rs:316:5
+    |
+314 | pub struct DiagnosticEngine {
+    |            ---------------- field in this struct
+315 |     /// Active diagnostics by document
+316 |     diagnostics: HashMap<String, Vec<Diagnostic>>,
+    |     ^^^^^^^^^^^
+    |
+    = note: `DiagnosticEngine` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `snippets` is never read
+   --> src/debug/lsp.rs:326:5
+    |
+321 | pub struct CompletionProvider {
+    |            ------------------ field in this struct
+...
+326 |     snippets: HashMap<String, String>,
+    |     ^^^^^^^^
+    |
+    = note: `CompletionProvider` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `variables` is never read
+   --> src/debug/source_map.rs:120:5
+    |
+118 | pub struct VariableMap {
+    |            ----------- field in this struct
+119 |     /// Mapping from variable name to its type and location
+120 |     variables: HashMap<String, VariableInfo>,
+    |     ^^^^^^^^^
+    |
+    = note: `VariableMap` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `source_parser` and `markdown_parser` are never read
+  --> src/docs/parser.rs:26:5
+   |
+24 | pub struct DocParser {
+   |            --------- fields in this struct
+25 |     /// Source code parser
+26 |     source_parser: SourceParser,
+   |     ^^^^^^^^^^^^^
+...
+29 |     markdown_parser: MarkdownParser,
+   |     ^^^^^^^^^^^^^^^
+   |
+   = note: `DocParser` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `patterns` is never read
+  --> src/docs/parser.rs:61:5
+   |
+59 | pub struct CommentParser {
+   |            ------------- field in this struct
+60 |     /// Comment prefix patterns
+61 |     patterns: CommentPatterns,
+   |     ^^^^^^^^
+   |
+   = note: `CommentParser` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `location` is never read
+   --> src/docs/parser.rs:676:5
+    |
+665 | struct ParsedItem {
+    |        ---------- field in this struct
+...
+676 |     location: SourceLocation,
+    |     ^^^^^^^^
+    |
+    = note: `ParsedItem` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: variants `Module`, `Enum`, `Trait`, `TypeAlias`, `Import`, and `Macro` are never constructed
+   --> src/docs/parser.rs:682:5
+    |
+681 | enum ItemType {
+    |      -------- variants in this enum
+682 |     Module,
+    |     ^^^^^^
+...
+685 |     Enum,
+    |     ^^^^
+686 |     Trait,
+    |     ^^^^^
+687 |     TypeAlias,
+    |     ^^^^^^^^^
+688 |     Constant,
+689 |     Import,
+    |     ^^^^^^
+690 |     Macro,
+    |     ^^^^^
+    |
+    = note: `ItemType` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: methods `parse_documentation`, `clean_comment_line`, `extract_tag`, `tag_to_section`, and `finalize_section` are never used
+   --> src/docs/parser.rs:725:8
+    |
+712 | impl CommentParser {
+    | ------------------ methods in this implementation
+...
+725 |     fn parse_documentation(&self, raw_docs: &str) -> Result<ParsedDoc, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+774 |     fn clean_comment_line(&self, line: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+787 |     fn extract_tag(&self, line: &str) -> Option<String> {
+    |        ^^^^^^^^^^^
+...
+799 |     fn tag_to_section(&self, tag: &str) -> DocSection {
+    |        ^^^^^^^^^^^^^^
+...
+809 |     fn finalize_section(&self, section: &mut DocSection, content: &[String],
+    |        ^^^^^^^^^^^^^^^^
+
+warning: variant `Tag` is never constructed
+   --> src/docs/parser.rs:867:5
+    |
+861 | enum DocSection {
+    |      ---------- variant in this enum
+...
+867 |     Tag(String),
+    |     ^^^
+    |
+    = note: `DocSection` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: methods `parse_function_signature`, `parse_type_definition`, `extract_function_name`, and `extract_type_name` are never used
+   --> src/docs/parser.rs:875:8
+    |
+870 | impl SignatureParser {
+    | -------------------- methods in this implementation
+...
+875 |     fn parse_function_signature(&self, source: &str) -> Result<FunctionSignature, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+891 |     fn parse_type_definition(&self, source: &str) -> Result<TypeInfo, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+904 |     fn extract_function_name(&self, source: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+915 |     fn extract_type_name(&self, source: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: fields `template_engine` and `output_format` are never read
+  --> src/docs/renderer.rs:19:5
+   |
+17 | pub struct DocRenderer {
+   |            ----------- fields in this struct
+18 |     /// Template engine for rendering
+19 |     template_engine: TemplateEngine,
+   |     ^^^^^^^^^^^^^^^
+...
+25 |     output_format: OutputFormat,
+   |     ^^^^^^^^^^^^^
+   |
+   = note: `DocRenderer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `templates` is never read
+  --> src/docs/renderer.rs:32:5
+   |
+30 | pub struct TemplateEngine {
+   |            -------------- field in this struct
+31 |     /// Loaded templates
+32 |     templates: HashMap<String, String>,
+   |     ^^^^^^^^^
+   |
+   = note: `TemplateEngine` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `doc` is never read
+   --> src/docs/renderer.rs:216:5
+    |
+214 | pub struct HtmlRenderer<'a> {
+    |            ------------ field in this struct
+215 |     /// Documentation to render
+216 |     doc: &'a Documentation,
+    |     ^^^
+    |
+    = note: `HtmlRenderer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `render_template` is never used
+   --> src/docs/renderer.rs:774:8
+    |
+497 | impl TemplateEngine {
+    | ------------------- method in this implementation
+...
+774 |     fn render_template(&self, template_name: &str, context: &HashMap<String, String>) -> Result<String, SemanticError> {
+    |        ^^^^^^^^^^^^^^^
+
+warning: field `patterns` is never read
+   --> src/error/structured.rs:383:5
+    |
+382 | pub struct ErrorPatterns {
+    |            ------------- field in this struct
+383 |     patterns: HashMap<String, ErrorPattern>,
+    |     ^^^^^^^^
+
+warning: fields `code_prefix`, `matcher`, and `fixer` are never read
+   --> src/error/structured.rs:388:5
+    |
+387 | struct ErrorPattern {
+    |        ------------ fields in this struct
+388 |     code_prefix: String,
+    |     ^^^^^^^^^^^
+389 |     matcher: fn(&CompilerError) -> bool,
+    |     ^^^^^^^
+390 |     fixer: fn(&CompilerError) -> Vec<FixSuggestion>,
+    |     ^^^^^
+    |
+    = note: `ErrorPattern` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `include_snippets` is never read
+   --> src/error/structured.rs:497:5
+    |
+496 | pub struct LLMErrorFormatter {
+    |            ----------------- field in this struct
+497 |     include_snippets: bool,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: field `intent_keywords` is never read
+   --> src/error/intent_analysis.rs:204:5
+    |
+203 | struct IntentPattern {
+    |        ------------- field in this struct
+204 |     intent_keywords: Vec<String>,
+    |     ^^^^^^^^^^^^^^^
+
+warning: method `read_quoted_identifier` is never used
+   --> src/lexer/mod.rs:380:8
+    |
+72  | impl Lexer {
+    | ---------- method in this implementation
+...
+380 |     fn read_quoted_identifier(&mut self) -> Result<Token, LexerError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `get_type_id` is never used
+  --> src/llvm_backend/mod.rs:70:8
+   |
+47 | impl CleanupInfo {
+   | ---------------- method in this implementation
+...
+70 |     fn get_type_id(&self, local_id: &mir::LocalId) -> TypeId {
+   |        ^^^^^^^^^^^
+
+warning: fields `start`, `size`, `permissions`, and `status` are never read
+  --> src/memory/mod.rs:47:5
+   |
+45 | struct MemoryRegion {
+   |        ------------ fields in this struct
+46 |     /// Start address
+47 |     start: usize,
+   |     ^^^^^
+...
+50 |     size: usize,
+   |     ^^^^
+...
+53 |     permissions: MemoryPermissions,
+   |     ^^^^^^^^^^^
+...
+56 |     status: AllocationStatus,
+   |     ^^^^^^
+   |
+   = note: `MemoryRegion` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `parent` is never read
+   --> src/mir/mod.rs:426:5
+    |
+425 | struct Scope {
+    |        ----- field in this struct
+426 |     parent: Option<ScopeId>,
+    |     ^^^^^^
+
+warning: field `inlined_functions` is never read
+  --> src/optimizations/inlining.rs:19:5
+   |
+14 | pub struct InliningPass {
+   |            ------------ field in this struct
+...
+19 |     inlined_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `InliningPass` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `induction_variable` is never read
+   --> src/optimizations/vectorization.rs:580:5
+    |
+577 | struct LoopInfo {
+    |        -------- field in this struct
+...
+580 |     induction_variable: Option<Place>,
+    |     ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `LoopInfo` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `summaries` and `global_constants` are never read
+  --> src/optimizations/interprocedural.rs:18:5
+   |
+13 | pub struct InterproceduralAnalysisPass {
+   |            --------------------------- fields in this struct
+...
+18 |     summaries: HashMap<String, FunctionSummary>,
+   |     ^^^^^^^^^
+...
+21 |     global_constants: GlobalConstantAnalysis,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `InterproceduralAnalysisPass` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `pure_functions`, `readonly_functions`, `modifying_functions`, `throwing_functions`, and `nonterminating_functions` are never read
+  --> src/optimizations/interprocedural.rs:47:5
+   |
+45 | pub struct SideEffectAnalysis {
+   |            ------------------ fields in this struct
+46 |     /// Functions that are pure (no side effects)
+47 |     pure_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^
+...
+50 |     readonly_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^
+...
+53 |     modifying_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^^
+...
+56 |     throwing_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^
+...
+59 |     nonterminating_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `SideEffectAnalysis` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `client` is never read
+  --> src/package/registry.rs:95:5
+   |
+93 | pub struct HttpClient {
+   |            ---------- field in this struct
+94 |     /// HTTP client
+95 |     client: reqwest::Client,
+   |     ^^^^^^
+   |
+   = note: `HttpClient` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `artifacts` is never read
+  --> src/package/builder.rs:21:5
+   |
+16 | pub struct PackageBuilder {
+   |            -------------- field in this struct
+...
+21 |     artifacts: Vec<BuildArtifact>,
+   |     ^^^^^^^^^
+   |
+   = note: `PackageBuilder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `artifacts`, `source_timestamps`, `dependency_timestamps`, `config_hash`, and `stats` are never read
+  --> src/package/builder.rs:37:5
+   |
+35 | pub struct BuildCache {
+   |            ---------- fields in this struct
+36 |     /// Cached build artifacts
+37 |     artifacts: HashMap<String, CachedArtifact>,
+   |     ^^^^^^^^^
+...
+40 |     source_timestamps: HashMap<PathBuf, std::time::SystemTime>,
+   |     ^^^^^^^^^^^^^^^^^
+...
+43 |     dependency_timestamps: HashMap<String, std::time::SystemTime>,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+...
+46 |     config_hash: Option<String>,
+   |     ^^^^^^^^^^^
+...
+49 |     stats: BuildCacheStats,
+   |     ^^^^^
+   |
+   = note: `BuildCache` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `sandbox_config` is never read
+   --> src/package/builder.rs:270:5
+    |
+268 | pub struct BuildScriptRunner {
+    |            ----------------- field in this struct
+269 |     /// Sandbox configuration
+270 |     sandbox_config: SandboxConfig,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `BuildScriptRunner` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `clear` is never used
+   --> src/package/builder.rs:822:8
+    |
+821 | impl BuildCache {
+    | --------------- method in this implementation
+822 |     fn clear(&mut self) {
+    |        ^^^^^
+
+warning: methods `execute_shell_script`, `execute_python_script`, `execute_node_script`, `execute_custom_script`, and `execute_external_script` are never used
+   --> src/package/builder.rs:876:8
+    |
+831 | impl BuildScriptRunner {
+    | ---------------------- methods in this implementation
+...
+876 |     fn execute_shell_script(&self, script_path: &PathBuf, context: &BuildScriptContext, shell: &str) -> Result<(), SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+882 |     fn execute_python_script(&self, script_path: &PathBuf, context: &BuildScriptContext, python: &str) -> Result<(), SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+888 |     fn execute_node_script(&self, script_path: &PathBuf, context: &BuildScriptContext, node: &str) -> Result<(), SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+894 |     fn execute_custom_script(&self, script_path: &PathBuf, context: &BuildScriptContext, command: &str, args: &[String]) -> Result<(), Se...
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+900 |     fn execute_external_script(&self, mut cmd: Command, context: &BuildScriptContext) -> Result<(), SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `cache` and `resolver` are never read
+  --> src/patterns/composition.rs:17:5
+   |
+12 | pub struct CompositionEngine {
+   |            ----------------- fields in this struct
+...
+17 |     cache: HashMap<String, ComposedPattern>,
+   |     ^^^^^
+...
+20 |     resolver: ConflictResolver,
+   |     ^^^^^^^^
+
+warning: field `strategies` is never read
+   --> src/patterns/composition.rs:137:5
+    |
+135 | pub struct ConflictResolver {
+    |            ---------------- field in this struct
+136 |     /// Resolution strategies
+137 |     strategies: HashMap<ConflictType, ResolutionStrategy>,
+    |     ^^^^^^^^^^
+
+warning: variant `Sequential` is never constructed
+   --> src/patterns/composition.rs:959:5
+    |
+957 | enum PatternRelationship {
+    |      ------------------- variant in this enum
+958 |     Independent,
+959 |     Sequential,
+    |     ^^^^^^^^^^
+    |
+    = note: `PatternRelationship` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `stdlib` is never read
+   --> src/pipeline/mod.rs:103:5
+    |
+101 | pub struct CompilationPipeline {
+    |            ------------------- field in this struct
+102 |     options: CompileOptions,
+103 |     stdlib: StandardLibrary,
+    |     ^^^^^^
+
+warning: fields `project_info`, `history`, `automation`, `artifacts`, `distribution`, and `packaging` are never read
+  --> src/release/mod.rs:24:5
+   |
+22 | pub struct ReleaseManager {
+   |            -------------- fields in this struct
+23 |     /// Project information
+24 |     project_info: ProjectInfo,
+   |     ^^^^^^^^^^^^
+...
+27 |     history: ReleaseHistory,
+   |     ^^^^^^^
+...
+30 |     automation: automation::AutomationPipeline,
+   |     ^^^^^^^^^^
+...
+33 |     artifacts: artifacts::ArtifactManager,
+   |     ^^^^^^^^^
+...
+36 |     distribution: distribution::DistributionManager,
+   |     ^^^^^^^^^^^^
+...
+39 |     packaging: packaging::PackageBuilder,
+   |     ^^^^^^^^^
+   |
+   = note: `ReleaseManager` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `formats` and `compression` are never read
+  --> src/release/packaging.rs:24:5
+   |
+13 | pub struct PackageBuilder {
+   |            -------------- fields in this struct
+...
+24 |     formats: Vec<PackageFormat>,
+   |     ^^^^^^^
+...
+27 |     compression: CompressionSettings,
+   |     ^^^^^^^^^^^
+   |
+   = note: `PackageBuilder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `get_content_type` is never used
+    --> src/release/distribution.rs:1071:8
+     |
+951  | impl DistributionManager {
+     | ------------------------ method in this implementation
+...
+1071 |     fn get_content_type(&self, format: &PackageFormat) -> String {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: field `settings` is never read
+   --> src/release/updates.rs:645:5
+    |
+634 | pub struct UpdateCache<T> {
+    |            ----------- field in this struct
+...
+645 |     settings: CacheSettings,
+    |     ^^^^^^^^
+    |
+    = note: `UpdateCache` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `trusted_certs`, `signature_verification`, and `cert_validation` are never read
+   --> src/release/updates.rs:880:5
+    |
+875 | pub struct UpdateSecurity {
+    |            -------------- fields in this struct
+...
+880 |     trusted_certs: Vec<Certificate>,
+    |     ^^^^^^^^^^^^^
+...
+883 |     signature_verification: SignatureVerificationConfig,
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+...
+886 |     cert_validation: CertificateValidation,
+    |     ^^^^^^^^^^^^^^^
+    |
+    = note: `UpdateSecurity` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `pools` is never read
+  --> src/resource/analysis.rs:23:5
+   |
+12 | pub struct ResourceAnalyzer {
+   |            ---------------- field in this struct
+...
+23 |     pools: HashMap<String, ResourcePool>,
+   |     ^^^^^
+
+warning: fields `depth` and `location` are never read
+  --> src/resource/analysis.rs:34:5
+   |
+31 | struct ScopeInfo {
+   |        --------- fields in this struct
+...
+34 |     depth: usize,
+   |     ^^^^^
+35 |     location: SourceLocation,
+   |     ^^^^^^^^
+   |
+   = note: `ScopeInfo` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `assertions` and `variables` are never read
+  --> src/verification/solver.rs:12:5
+   |
+10 | pub struct SmtSolver {
+   |            --------- fields in this struct
+11 |     /// SMT-LIB assertions
+12 |     assertions: Vec<String>,
+   |     ^^^^^^^^^^
+...
+15 |     variables: HashMap<String, String>,
+   |     ^^^^^^^^^
+   |
+   = note: `SmtSolver` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: unused `Result` that must be used
+   --> src/llvm_backend/mod.rs:344:29
+    |
+344 | ...                   builder.build_return(Some(&return_value));
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+344 |                             let _ = builder.build_return(Some(&return_value));
+    |                             +++++++
+
+warning: unused `Result` that must be used
+   --> src/llvm_backend/mod.rs:348:29
+    |
+348 | ...                   builder.build_return(Some(&i32_type.const_int(0, false)));
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+348 |                             let _ = builder.build_return(Some(&i32_type.const_int(0, false)));
+    |                             +++++++
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:503:61
+    |
+503 |                 Ok(compatible_versions.iter().max().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+    |
+    = note: `#[warn(suspicious_double_ref_op)]` on by default
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:506:61
+    |
+506 |                 Ok(compatible_versions.iter().min().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:510:61
+    |
+510 |                 Ok(compatible_versions.iter().min().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:514:61
+    |
+514 |                 Ok(compatible_versions.iter().max().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: unused `Result` that must be used
+    --> src/semantic/mod.rs:1999:9
+     |
+1999 |         self.symbol_table.exit_scope();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+     |
+1999 |         let _ = self.symbol_table.exit_scope();
+     |         +++++++
+
+warning: `aether` (lib) generated 164 warnings (run `cargo fix --lib -p aether` to apply 35 suggestions)
+warning: unused imports: `Builder` and `Program`
+   --> src/debug/dwarf.rs:505:22
+    |
+505 |     use crate::mir::{Builder, Program};
+    |                      ^^^^^^^  ^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::collections::HashMap`
+   --> src/debug/dwarf.rs:508:9
+    |
+508 |     use std::collections::HashMap;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Builder`
+   --> src/debug/source_map.rs:438:22
+    |
+438 |     use crate::mir::{Builder, Program};
+    |                      ^^^^^^^
+
+warning: unused import: `ExampleType`
+ --> src/docs/tutorial.rs:9:18
+  |
+9 |     CodeExample, ExampleType
+  |                  ^^^^^^^^^^^
+
+warning: unused imports: `FunctionCall` and `FunctionReference`
+   --> src/error/intent_analysis.rs:508:71
+    |
+508 |     use crate::ast::{Identifier, Block, PrimitiveType, TypeSpecifier, FunctionCall, FunctionReference};
+    |                                                                       ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Rvalue`, `SourceInfo`, and `Statement`
+   --> src/optimizations/vectorization.rs:690:31
+    |
+690 |     use crate::mir::{Builder, Statement, Rvalue, Operand, Constant, ConstantValue, Place, SourceInfo};
+    |                               ^^^^^^^^^  ^^^^^^                                           ^^^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+   --> src/optimizations/vectorization.rs:693:9
+    |
+693 |     use crate::error::SourceLocation;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Builder`, `Rvalue`, and `SourceInfo`
+    --> src/optimizations/loop_optimizations.rs:1134:22
+     |
+1134 |     use crate::mir::{Builder, Statement, Rvalue, Operand, Constant, ConstantValue, Place, SourceInfo};
+     |                      ^^^^^^^             ^^^^^^                                           ^^^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+    --> src/optimizations/loop_optimizations.rs:1137:9
+     |
+1137 |     use crate::error::SourceLocation;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `VersionRequirement`
+   --> src/package/resolver.rs:719:44
+    |
+719 |     use crate::package::version::{Version, VersionRequirement};
+    |                                            ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `self`
+ --> src/release/distribution.rs:8:22
+  |
+8 | use crate::release::{self, DistributionConfig, FailoverConfig, FailoverThreshold, RecoveryConfig};
+  |                      ^^^^
+
+warning: unused imports: `AudienceConfig`, `AuthConfig`, `ChannelMetadata`, `ChannelType`, `ChannelVisibility`, `HealthCheckConfig`, and `OptOutConfig`
+    --> src/release/distribution.rs:1300:29
+     |
+1300 |         AnnouncementConfig, AudienceConfig, OptOutConfig,
+     |                             ^^^^^^^^^^^^^^  ^^^^^^^^^^^^
+1301 |         MirrorConfig, SyncConfig, SyncMethod, SyncFrequency, LoadBalancingConfig,
+1302 |         LoadBalancingStrategy, HealthCheckConfig, ChannelVisibility,
+     |                                ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+1303 |         ChannelType, AuthConfig, ChannelMetadata,
+     |         ^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `UploadConfig as ReleaseUploadConfig`
+    --> src/release/distribution.rs:1308:61
+     |
+1308 |     use crate::release::{RetryConfig as ReleaseRetryConfig, UploadConfig as ReleaseUploadConfig};
+     |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+    --> src/release/updates.rs:2056:9
+     |
+2056 |     use super::*;
+     |         ^^^^^^^^
+
+warning: unused imports: `FunctionCall` and `FunctionReference`
+   --> src/resource/analysis.rs:570:34
+    |
+570 |     use crate::ast::{Identifier, FunctionCall, FunctionReference};
+    |                                  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Identifier` and `Module`
+   --> src/resource/mod.rs:191:22
+    |
+191 |     use crate::ast::{Module, Identifier};
+    |                      ^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `Identifier`
+    --> src/types/mod.rs:1233:41
+     |
+1233 |         use crate::ast::{TypeSpecifier, Identifier};
+     |                                         ^^^^^^^^^^
+
+warning: unused variable: `id1`
+   --> src/debug/breakpoints.rs:856:13
+    |
+856 |         let id1 = manager.create_line_breakpoint("test.aether".to_string(), 10, None).unwrap();
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_id1`
+
+warning: unused variable: `parser`
+   --> src/docs/parser.rs:954:17
+    |
+954 |         let mut parser = DocParser::new(&config).unwrap();
+    |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+   --> src/docs/parser.rs:954:13
+    |
+954 |         let mut parser = DocParser::new(&config).unwrap();
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `manager`
+    --> src/docs/renderer.rs:1279:13
+     |
+1279 |         let manager = AssetManager::new(&base_dir).unwrap();
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_manager`
+
+warning: unused variable: `renderer`
+    --> src/docs/renderer.rs:1292:13
+     |
+1292 |         let renderer = MarkdownRenderer::new().unwrap();
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_renderer`
+
+warning: unused variable: `renderer`
+    --> src/docs/renderer.rs:1298:13
+     |
+1298 |         let renderer = PdfRenderer::new().unwrap();
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_renderer`
+
+warning: variable does not need to be mutable
+   --> src/llvm_backend/context.rs:140:13
+    |
+140 |         let mut ctx = LLVMContext::new();
+    |             ----^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/llvm_backend/types.rs:258:13
+    |
+258 |         let mut converter = TypeConverter::new(&context);
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/mir/validation.rs:388:13
+    |
+388 |         let mut block = BasicBlock {
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/module_loader.rs:271:13
+    |
+271 |         let mut loader = ModuleLoader::new();
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `builder`
+   --> src/optimizations/vectorization.rs:802:17
+    |
+802 |         let mut builder = Builder::new();
+    |                 ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_builder`
+
+warning: variable does not need to be mutable
+   --> src/optimizations/vectorization.rs:802:13
+    |
+802 |         let mut builder = Builder::new();
+    |             ----^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `builder`
+   --> src/package/builder.rs:934:13
+    |
+934 |         let builder = PackageBuilder::new(config);
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_builder`
+
+warning: unused variable: `array_ptr`
+   --> src/runtime/mod.rs:259:17
+    |
+259 |             let array_ptr = array as *mut AetherArray;
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_array_ptr`
+
+warning: unused variable: `checker`
+    --> src/types/mod.rs:1162:13
+     |
+1162 |         let checker = TypeChecker::new();
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_checker`
+
+warning: methods `parse_function_signature`, `parse_type_definition`, and `extract_type_name` are never used
+   --> src/docs/parser.rs:875:8
+    |
+870 | impl SignatureParser {
+    | -------------------- methods in this implementation
+...
+875 |     fn parse_function_signature(&self, source: &str) -> Result<FunctionSignature, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+891 |     fn parse_type_definition(&self, source: &str) -> Result<TypeInfo, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+915 |     fn extract_type_name(&self, source: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: function `create_test_type` is never used
+   --> src/memory/mod.rs:494:8
+    |
+494 |     fn create_test_type() -> Type {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `resolver` is never read
+  --> src/patterns/composition.rs:20:5
+   |
+12 | pub struct CompositionEngine {
+   |            ----------------- field in this struct
+...
+20 |     resolver: ConflictResolver,
+   |     ^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&package::version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:503:61
+    |
+503 |                 Ok(compatible_versions.iter().max().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+    |
+    = note: `#[warn(suspicious_double_ref_op)]` on by default
+
+warning: using `.clone()` on a double reference, which returns `&package::version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:506:61
+    |
+506 |                 Ok(compatible_versions.iter().min().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&package::version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:510:61
+    |
+510 |                 Ok(compatible_versions.iter().min().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&package::version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:514:61
+    |
+514 |                 Ok(compatible_versions.iter().max().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: function `count_constants` is never used
+   --> tests/optimization_tests.rs:363:4
+    |
+363 | fn count_constants(function: &Function) -> usize {
+    |    ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: unused variable: `result`
+  --> tests/test_stdlib_io.rs:16:9
+   |
+16 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `stdout`
+   --> tests/cli_integration_tests.rs:132:10
+    |
+132 |     let (stdout, stderr, exit_code) = run_aether_cli(&[
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `stdout`
+   --> tests/cli_integration_tests.rs:163:10
+    |
+163 |     let (stdout, stderr, exit_code) = run_aether_cli(&[
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stdout`
+   --> tests/cli_integration_tests.rs:208:10
+    |
+208 |     let (stdout, stderr, exit_code) = run_aether_cli(&[
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stdout`
+   --> tests/cli_integration_tests.rs:293:10
+    |
+293 |     let (stdout, stderr, exit_code) = run_aether_cli(&[
+    |          ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stdout`
+
+warning: unused variable: `stderr`
+   --> tests/cli_integration_tests.rs:313:19
+    |
+313 |     let (_stdout, stderr, exit_code) = run_aether_cli(&["invalid_command"]);
+    |                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_stderr`
+
+warning: unused macro definition: `test_result`
+   --> tests/integration/../utils/test_runner.rs:317:14
+    |
+317 | macro_rules! test_result {
+    |              ^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_macros)]` on by default
+
+warning: unused import: `aether::pipeline::CompileOptions`
+ --> tests/integration/../utils/compiler_wrapper.rs:5:5
+  |
+5 | use aether::pipeline::CompileOptions;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Output`
+ --> tests/integration/../utils/compiler_wrapper.rs:8:29
+  |
+8 | use std::process::{Command, Output};
+  |                             ^^^^^^
+
+warning: unused import: `test_runner::TestResult`
+  --> tests/integration/multi_file_tests.rs:10:5
+   |
+10 |     test_runner::TestResult,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/../utils/assertions.rs:105:17
+    |
+105 |     if let Some(compilation_result) = result.success() {
+    |                 ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/../utils/assertions.rs:116:17
+    |
+116 |     if let Some(compilation_result) = result.success() {
+    |                 ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/../utils/assertions.rs:105:17
+    |
+105 |     if let Some(compilation_result) = result.success() {
+    |                 ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/resource_tests.rs:441:17
+    |
+441 |     if let Some(compilation_result) = result.success() {
+    |                 ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/pattern_tests.rs:519:21
+    |
+519 |         if let Some(compilation_result) = result.success() {
+    |                     ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/llm_workflow_tests.rs:137:21
+    |
+137 |         if let Some(compilation_result) = result.success() {
+    |                     ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+
+warning: unused variable: `execution`
+   --> tests/integration/llm_workflow_tests.rs:236:13
+    |
+236 |         let execution = result_v1.execute();
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_execution`
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/llm_workflow_tests.rs:433:21
+    |
+433 |         if let Some(compilation_result) = result.success() {
+    |                     ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+
+warning: unused variable: `compilation_result`
+   --> tests/integration/llm_workflow_tests.rs:734:21
+    |
+734 |         if let Some(compilation_result) = result.success() {
+    |                     ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_compilation_result`
+
+warning: function `fixture_path` is never used
+  --> tests/integration/../utils/mod.rs:11:8
+   |
+11 | pub fn fixture_path(filename: &str) -> PathBuf {
+   |        ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `load_fixture` is never used
+  --> tests/integration/../utils/mod.rs:16:8
+   |
+16 | pub fn load_fixture(filename: &str) -> String {
+   |        ^^^^^^^^^^^^
+
+warning: function `create_test_project` is never used
+  --> tests/integration/../utils/mod.rs:36:8
+   |
+36 | pub fn create_test_project(project_name: &str, files: &[(&str, &str)]) -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `test_id` is never used
+  --> tests/integration/../utils/mod.rs:51:8
+   |
+51 | pub fn test_id() -> String {
+   |        ^^^^^^^
+
+warning: struct `TestSuite` is never constructed
+ --> tests/integration/../utils/test_runner.rs:7:12
+  |
+7 | pub struct TestSuite {
+  |            ^^^^^^^^^
+
+warning: struct `Test` is never constructed
+  --> tests/integration/../utils/test_runner.rs:15:12
+   |
+15 | pub struct Test {
+   |            ^^^^
+
+warning: struct `TestResult` is never constructed
+  --> tests/integration/../utils/test_runner.rs:24:12
+   |
+24 | pub struct TestResult {
+   |            ^^^^^^^^^^
+   |
+   = note: `TestResult` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: struct `TestRunner` is never constructed
+  --> tests/integration/../utils/test_runner.rs:32:12
+   |
+32 | pub struct TestRunner {
+   |            ^^^^^^^^^^
+
+warning: associated items `new`, `add_test`, `add_test_with_timeout`, `add_test_expected_fail`, `setup`, and `teardown` are never used
+   --> tests/integration/../utils/test_runner.rs:40:12
+    |
+38  | impl TestSuite {
+    | -------------- associated items in this implementation
+39  |     /// Create a new test suite
+40  |     pub fn new(name: &str) -> Self {
+    |            ^^^
+...
+50  |     pub fn add_test<F>(mut self, name: &str, test_fn: F) -> Self
+    |            ^^^^^^^^
+...
+64  |     pub fn add_test_with_timeout<F>(mut self, name: &str, timeout: Duration, test_fn: F) -> Self
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+78  |     pub fn add_test_expected_fail<F>(mut self, name: &str, test_fn: F) -> Self
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+92  |     pub fn setup<F>(mut self, setup_fn: F) -> Self
+    |            ^^^^^
+...
+101 |     pub fn teardown<F>(mut self, teardown_fn: F) -> Self
+    |            ^^^^^^^^
+
+warning: associated items `success`, `success_with_details`, `failure`, `failure_with_details`, and `with_time` are never used
+   --> tests/integration/../utils/test_runner.rs:112:12
+    |
+110 | impl TestResult {
+    | --------------- associated items in this implementation
+111 |     /// Create a successful test result
+112 |     pub fn success(message: &str) -> Self {
+    |            ^^^^^^^
+...
+122 |     pub fn success_with_details(message: &str, details: &str) -> Self {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+132 |     pub fn failure(message: &str) -> Self {
+    |            ^^^^^^^
+...
+142 |     pub fn failure_with_details(message: &str, details: &str) -> Self {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+152 |     pub fn with_time(mut self, time: Duration) -> Self {
+    |            ^^^^^^^^^
+
+warning: associated items `new`, `verbose`, `parallel`, `add_suite`, and `run` are never used
+   --> tests/integration/../utils/test_runner.rs:160:12
+    |
+158 | impl TestRunner {
+    | --------------- associated items in this implementation
+159 |     /// Create a new test runner
+160 |     pub fn new() -> Self {
+    |            ^^^
+...
+169 |     pub fn verbose(mut self) -> Self {
+    |            ^^^^^^^
+...
+175 |     pub fn parallel(mut self) -> Self {
+    |            ^^^^^^^^
+...
+181 |     pub fn add_suite(mut self, suite: TestSuite) -> Self {
+    |            ^^^^^^^^^
+...
+187 |     pub fn run(&self) -> TestRunResults {
+    |            ^^^
+
+warning: struct `TestRunResults` is never constructed
+   --> tests/integration/../utils/test_runner.rs:247:12
+    |
+247 | pub struct TestRunResults {
+    |            ^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> tests/integration/../utils/test_runner.rs:254:12
+    |
+252 | impl TestRunResults {
+    | ------------------- associated items in this implementation
+253 |     /// Create new results
+254 |     pub fn new() -> Self {
+    |            ^^^
+...
+262 |     pub fn add_result(&mut self, suite_name: &str, test_name: &str, result: TestResult) {
+    |            ^^^^^^^^^^
+...
+270 |     pub fn total_tests(&self) -> usize {
+    |            ^^^^^^^^^^^
+...
+275 |     pub fn passed_tests(&self) -> usize {
+    |            ^^^^^^^^^^^^
+...
+283 |     pub fn failed_tests(&self) -> usize {
+    |            ^^^^^^^^^^^^
+...
+288 |     pub fn all_passed(&self) -> bool {
+    |            ^^^^^^^^^^
+...
+293 |     pub fn print_summary(&self) {
+    |            ^^^^^^^^^^^^^
+
+warning: methods `verbose`, `compile_file`, `compile_source`, and `temp_dir` are never used
+   --> tests/integration/../utils/compiler_wrapper.rs:33:12
+    |
+19  | impl TestCompiler {
+    | ----------------- methods in this implementation
+...
+33  |     pub fn verbose(mut self) -> Self {
+    |            ^^^^^^^
+...
+39  |     pub fn compile_file<P: AsRef<Path>>(&self, input: P) -> TestCompilationResult {
+    |            ^^^^^^^^^^^^
+...
+81  |     pub fn compile_source(&self, source: &str, filename: &str) -> TestCompilationResult {
+    |            ^^^^^^^^^^^^^^
+...
+102 |     pub fn temp_dir(&self) -> &Path {
+    |            ^^^^^^^^
+
+warning: fields `compilation_time`, `temp_dir`, and `verbose` are never read
+   --> tests/integration/../utils/compiler_wrapper.rs:118:9
+    |
+116 | pub struct TestCompilationResult {
+    |            --------------------- fields in this struct
+117 |     pub result: Result<CompilationResult, CompilerError>,
+118 |     pub compilation_time: std::time::Duration,
+    |         ^^^^^^^^^^^^^^^^
+119 |     pub temp_dir: PathBuf,
+    |         ^^^^^^^^
+120 |     pub verbose: bool,
+    |         ^^^^^^^
+
+warning: methods `result` and `print_details` are never used
+   --> tests/integration/../utils/compiler_wrapper.rs:135:12
+    |
+123 | impl TestCompilationResult {
+    | -------------------------- methods in this implementation
+...
+135 |     pub fn result(&self) -> &Result<CompilationResult, CompilerError> {
+    |            ^^^^^^
+...
+203 |     pub fn print_details(&self) {
+    |            ^^^^^^^^^^^^^
+
+warning: field `execution_time` is never read
+   --> tests/integration/../utils/compiler_wrapper.rs:227:9
+    |
+222 | pub struct ExecutionResult {
+    |            --------------- field in this struct
+...
+227 |     pub execution_time: std::time::Duration,
+    |         ^^^^^^^^^^^^^^
+
+warning: method `print_details` is never used
+   --> tests/integration/../utils/compiler_wrapper.rs:252:12
+    |
+230 | impl ExecutionResult {
+    | -------------------- method in this implementation
+...
+252 |     pub fn print_details(&self) {
+    |            ^^^^^^^^^^^^^
+
+warning: function `assert_execution_failure` is never used
+  --> tests/integration/../utils/assertions.rs:39:8
+   |
+39 | pub fn assert_execution_failure(result: &ExecutionResult, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_output_equals` is never used
+  --> tests/integration/../utils/assertions.rs:53:8
+   |
+53 | pub fn assert_output_equals(result: &ExecutionResult, expected: &str, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_compilation_time_under` is never used
+  --> tests/integration/../utils/assertions.rs:62:8
+   |
+62 | pub fn assert_compilation_time_under(result: &TestCompilationResult, max_duration: std::time::Duration, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_execution_time_under` is never used
+  --> tests/integration/../utils/assertions.rs:69:8
+   |
+69 | pub fn assert_execution_time_under(result: &ExecutionResult, max_duration: std::time::Duration, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_output_file_size_min` is never used
+  --> tests/integration/../utils/assertions.rs:87:8
+   |
+87 | pub fn assert_output_file_size_min(result: &TestCompilationResult, min_size: u64, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_warning_count` is never used
+   --> tests/integration/../utils/assertions.rs:102:8
+    |
+102 | pub fn assert_warning_count(result: &TestCompilationResult, expected_count: usize, message: &str) {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_warning_contains` is never used
+   --> tests/integration/../utils/assertions.rs:113:8
+    |
+113 | pub fn assert_warning_contains(result: &TestCompilationResult, expected_warning: &str, message: &str) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_no_warnings` is never used
+   --> tests/integration/../utils/assertions.rs:124:8
+    |
+124 | pub fn assert_no_warnings(result: &TestCompilationResult, message: &str) {
+    |        ^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_compile_and_execute_exact` is never used
+   --> tests/integration/../utils/assertions.rs:143:8
+    |
+143 | pub fn assert_compile_and_execute_exact(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `fixture_path` is never used
+  --> tests/integration/../utils/mod.rs:11:8
+   |
+11 | pub fn fixture_path(filename: &str) -> PathBuf {
+   |        ^^^^^^^^^^^^
+
+warning: methods `verbose`, `compile_file`, `compile_project`, and `temp_dir` are never used
+   --> tests/integration/../utils/compiler_wrapper.rs:33:12
+    |
+19  | impl TestCompiler {
+    | ----------------- methods in this implementation
+...
+33  |     pub fn verbose(mut self) -> Self {
+    |            ^^^^^^^
+...
+39  |     pub fn compile_file<P: AsRef<Path>>(&self, input: P) -> TestCompilationResult {
+    |            ^^^^^^^^^^^^
+...
+88  |     pub fn compile_project(&self, files: &[(&str, &str)]) -> TestCompilationResult {
+    |            ^^^^^^^^^^^^^^^
+...
+102 |     pub fn temp_dir(&self) -> &Path {
+    |            ^^^^^^^^
+
+warning: methods `verbose`, `compile_file`, and `temp_dir` are never used
+   --> tests/integration/../utils/compiler_wrapper.rs:33:12
+    |
+19  | impl TestCompiler {
+    | ----------------- methods in this implementation
+...
+33  |     pub fn verbose(mut self) -> Self {
+    |            ^^^^^^^
+...
+39  |     pub fn compile_file<P: AsRef<Path>>(&self, input: P) -> TestCompilationResult {
+    |            ^^^^^^^^^^^^
+...
+102 |     pub fn temp_dir(&self) -> &Path {
+    |            ^^^^^^^^
+
+warning: function `assert_compilation_error` is never used
+  --> tests/integration/../utils/assertions.rs:20:8
+   |
+20 | pub fn assert_compilation_error(result: &TestCompilationResult, expected_error: &str, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_output_file_exists` is never used
+  --> tests/integration/../utils/assertions.rs:76:8
+   |
+76 | pub fn assert_output_file_exists(result: &TestCompilationResult, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_compile_and_execute` is never used
+   --> tests/integration/../utils/assertions.rs:129:8
+    |
+129 | pub fn assert_compile_and_execute(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `result`, `execute`, and `print_details` are never used
+   --> tests/integration/../utils/compiler_wrapper.rs:135:12
+    |
+123 | impl TestCompilationResult {
+    | -------------------------- methods in this implementation
+...
+135 |     pub fn result(&self) -> &Result<CompilationResult, CompilerError> {
+    |            ^^^^^^
+...
+156 |     pub fn execute(&self) -> ExecutionResult {
+    |            ^^^^^^^
+...
+203 |     pub fn print_details(&self) {
+    |            ^^^^^^^^^^^^^
+
+warning: struct `ExecutionResult` is never constructed
+   --> tests/integration/../utils/compiler_wrapper.rs:222:12
+    |
+222 | pub struct ExecutionResult {
+    |            ^^^^^^^^^^^^^^^
+
+warning: methods `is_success`, `stdout`, `stderr`, `exit_code`, and `print_details` are never used
+   --> tests/integration/../utils/compiler_wrapper.rs:232:12
+    |
+230 | impl ExecutionResult {
+    | -------------------- methods in this implementation
+231 |     /// Check if execution was successful
+232 |     pub fn is_success(&self) -> bool {
+    |            ^^^^^^^^^^
+...
+237 |     pub fn stdout(&self) -> &str {
+    |            ^^^^^^
+...
+242 |     pub fn stderr(&self) -> &str {
+    |            ^^^^^^
+...
+247 |     pub fn exit_code(&self) -> i32 {
+    |            ^^^^^^^^^
+...
+252 |     pub fn print_details(&self) {
+    |            ^^^^^^^^^^^^^
+
+warning: function `assert_execution_success` is never used
+  --> tests/integration/../utils/assertions.rs:32:8
+   |
+32 | pub fn assert_execution_success(result: &ExecutionResult, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `assert_output_contains` is never used
+  --> tests/integration/../utils/assertions.rs:46:8
+   |
+46 | pub fn assert_output_contains(result: &ExecutionResult, expected: &str, message: &str) {
+   |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused doc comment
+  --> tests/property_based_tests.rs:32:1
+   |
+32 | /// Property test: Valid identifiers should always tokenize successfully
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+   |
+   = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+   = note: `#[warn(unused_doc_comments)]` on by default
+
+warning: unused doc comment
+  --> tests/property_based_tests.rs:55:1
+   |
+55 | /// Property test: Valid integers should always tokenize and parse correctly
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+   |
+   = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+  --> tests/property_based_tests.rs:87:1
+   |
+87 | /// Property test: Valid floats should always tokenize and parse correctly
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+   |
+   = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:119:1
+    |
+119 | /// Property test: String literals should always tokenize correctly
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:142:1
+    |
+142 | /// Property test: Well-formed modules should always parse successfully
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:180:1
+    |
+180 | /// Property test: Lexer should never crash on any input
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:194:1
+    |
+194 | /// Property test: Parser should never crash on valid tokens
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:232:1
+    |
+232 | /// Property test: Semantic analyzer should never crash on valid ASTs
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:281:1
+    |
+281 | /// Property test: Type checking should be consistent
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:337:1
+    |
+337 | /// Property test: Simple integer constants should be consistent
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: unused doc comment
+   --> tests/property_based_tests.rs:370:1
+    |
+370 | /// Property test: Module names should be preserved through the entire pipeline
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+
+warning: function `valid_string_literal` is never used
+  --> tests/property_based_tests.rs:12:4
+   |
+12 | fn valid_string_literal() -> impl Strategy<Value = String> {
+   |    ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `valid_float` is never used
+  --> tests/property_based_tests.rs:22:4
+   |
+22 | fn valid_float() -> impl Strategy<Value = f64> {
+   |    ^^^^^^^^^^^
+
+warning: `aether` (lib test) generated 185 warnings (146 duplicates) (run `cargo fix --lib -p aether --tests` to apply 23 suggestions)
+warning: `aether` (test "optimization_tests") generated 1 warning
+warning: `aether` (test "test_stdlib_io") generated 1 warning
+warning: `aether` (test "cli_integration_tests") generated 5 warnings
+warning: `aether` (test "integration_tests") generated 188 warnings (137 duplicates) (run `cargo fix --test "integration_tests"` to apply 3 suggestions)
+warning: `aether` (test "property_based_tests") generated 13 warnings
+warning: unused import: `aether::types::TypeChecker`
+  --> tests/test_ffi_struct_codegen.rs:10:5
+   |
+10 | use aether::types::TypeChecker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::rc::Rc`
+  --> tests/test_ffi_struct_codegen.rs:12:5
+   |
+12 | use std::rc::Rc;
+   |     ^^^^^^^^^^^
+
+warning: unused import: `std::cell::RefCell`
+  --> tests/test_ffi_struct_codegen.rs:13:5
+   |
+13 | use std::cell::RefCell;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:150:9
+    |
+150 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:191:9
+    |
+191 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:230:9
+    |
+230 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:275:9
+    |
+275 |     let mut module = Module {
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:346:9
+    |
+346 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `result`
+  --> tests/test_stdlib_collections.rs:16:9
+   |
+16 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused import: `std::path::PathBuf`
+ --> tests/test_pointer_codegen.rs:6:5
+  |
+6 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused variable: `result`
+  --> tests/test_pointer_codegen.rs:31:9
+   |
+31 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `result`
+  --> tests/test_pointer_codegen.rs:55:9
+   |
+55 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `result`
+  --> tests/test_pointer_codegen.rs:78:9
+   |
+78 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused import: `aether::ast::*`
+ --> tests/test_parser_contracts.rs:5:9
+  |
+5 |     use aether::ast::*;
+  |         ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `aether::error::SourceLocation`
+ --> tests/test_parser_contracts.rs:6:9
+  |
+6 |     use aether::error::SourceLocation;
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::path::Path`
+ --> tests/ownership_integration_test.rs:5:9
+  |
+5 |     use std::path::Path;
+  |         ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused variable: `result`
+  --> tests/test_stdlib_math.rs:16:9
+   |
+16 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: `aether` (test "test_ffi_struct_codegen") generated 8 warnings (run `cargo fix --test "test_ffi_struct_codegen"` to apply 8 suggestions)
+warning: `aether` (test "test_stdlib_collections") generated 1 warning
+warning: `aether` (test "test_pointer_codegen") generated 4 warnings (run `cargo fix --test "test_pointer_codegen"` to apply 1 suggestion)
+warning: `aether` (test "test_parser_contracts") generated 2 warnings (run `cargo fix --test "test_parser_contracts"` to apply 2 suggestions)
+warning: `aether` (test "ownership_integration_test") generated 1 warning (run `cargo fix --test "ownership_integration_test"` to apply 1 suggestion)
+warning: `aether` (test "test_stdlib_math") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (target/debug/deps/aether-a0973436e3b7beee)
+
+running 360 tests
+test ast::tests::test_identifier_creation ... ok
+test concurrency::actors::tests::test_message_priority ... ok
+test ast::resource::tests::test_resource_scope_builder ... ok
+test ast::tests::test_ast_pretty_printer ... ok
+test ast::resource::tests::test_cleanup_sequence ... ok
+test concurrency::actors::tests::test_message_dispatcher ... ok
+test concurrency::actors::tests::test_supervision_strategy ... ok
+test concurrency::actors::tests::test_actor_system_creation ... ok
+test concurrency::async_runtime::tests::test_runtime_config ... ok
+test concurrency::actors::tests::test_actor_system_start_stop ... ok
+test concurrency::async_runtime::tests::test_runtime_creation ... ok
+test concurrency::async_runtime::tests::test_task_priority_ordering ... ok
+test concurrency::async_runtime::tests::test_task_scheduling ... ok
+test concurrency::actors::tests::test_actor_creation ... ok
+test concurrency::channels::tests::test_bounded_channel_capacity ... ok
+test concurrency::channels::tests::test_channel_registry_creation ... ok
+test ast::tests::test_expression_serialization ... ok
+test concurrency::channels::tests::test_bounded_channel_creation ... ok
+test concurrency::channels::tests::test_channel_sender_cloning ... ok
+test concurrency::channels::tests::test_duplicate_channel_names ... ok
+test concurrency::channels::tests::test_message_sending_receiving ... ok
+test concurrency::channels::tests::test_unbounded_channel_creation ... ok
+test concurrency::actors::tests::test_actor_handle_messaging ... FAILED
+test concurrency::sync_primitives::tests::test_barrier_creation ... ok
+test concurrency::sync_primitives::tests::test_duplicate_names ... ok
+test concurrency::sync_primitives::tests::test_mutex_creation ... ok
+test concurrency::sync_primitives::tests::test_mutex_locking ... ok
+test concurrency::sync_primitives::tests::test_rw_lock_creation ... ok
+test concurrency::sync_primitives::tests::test_rw_lock_read_write ... ok
+test concurrency::sync_primitives::tests::test_semaphore_acquire_release ... ok
+test concurrency::sync_primitives::tests::test_semaphore_creation ... ok
+test concurrency::sync_primitives::tests::test_sync_primitive_manager_creation ... ok
+test concurrency::async_runtime::tests::test_runtime_start_stop ... ok
+test concurrency::tests::test_access_pattern_synchronization ... ok
+test concurrency::tests::test_channel_type_analysis ... ok
+test concurrency::tests::test_concurrency_analyzer ... ok
+test concurrency::tests::test_concurrency_manager_creation ... ok
+test concurrency::tests::test_thread_safety_analysis ... ok
+test concurrency::thread_safe::tests::test_atomic_bool_creation ... ok
+test concurrency::thread_safe::tests::test_atomic_bool_operations ... ok
+test concurrency::thread_safe::tests::test_atomic_i64_creation ... ok
+test concurrency::thread_safe::tests::test_atomic_i64_operations ... ok
+test concurrency::thread_safe::tests::test_concurrent_hashmap_creation ... ok
+test concurrency::thread_safe::tests::test_concurrent_hashmap_operations ... ok
+test concurrency::thread_safe::tests::test_lock_free_queue_operations ... ok
+test concurrency::thread_safe::tests::test_memory_ordering_conversion ... ok
+test concurrency::thread_safe::tests::test_thread_safe_manager_creation ... ok
+test concurrency::thread_safe::tests::test_thread_safe_vector_creation ... ok
+test concurrency::thread_safe::tests::test_thread_safe_vector_operations ... ok
+test contracts::tests::test_algorithm_hint_validation ... ok
+test contracts::tests::test_complexity_expectation_validation ... ok
+test contracts::tests::test_contract_validator_creation ... ok
+test contracts::tests::test_expression_type_inference ... ok
+test contracts::tests::test_performance_expectation_validation ... ok
+test contracts::tests::test_runtime_assertion_generation ... ok
+test debug::breakpoints::tests::test_breakpoint_creation ... ok
+test debug::breakpoints::tests::test_breakpoint_enable_disable ... ok
+test debug::breakpoints::tests::test_breakpoint_removal ... ok
+test debug::breakpoints::tests::test_breakpoint_statistics ... ok
+test debug::breakpoints::tests::test_conditional_breakpoint ... ok
+test debug::breakpoints::tests::test_function_breakpoint ... ok
+test debug::breakpoints::tests::test_line_breakpoint ... ok
+test debug::breakpoints::tests::test_watchpoint ... ok
+test debug::debugger::tests::test_breakpoint_management ... ok
+test debug::debugger::tests::test_debugger_config ... ok
+test debug::debugger::tests::test_debugger_interface_creation ... ok
+test debug::debugger::tests::test_execution_states ... ok
+test debug::debugger::tests::test_stack_frame ... ok
+test debug::debugger::tests::test_variable_watching ... ok
+test debug::dwarf::tests::test_die_creation ... ok
+test debug::dwarf::tests::test_dwarf_generator_creation ... ok
+test debug::dwarf::tests::test_line_program ... ok
+test debug::dwarf::tests::test_compilation_unit_creation ... ok
+test debug::dwarf::tests::test_source_file_management ... ok
+test debug::dwarf::tests::test_type_reference ... ok
+test debug::lsp::tests::test_completion_items ... ok
+test debug::lsp::tests::test_diagnostic_creation ... ok
+test debug::lsp::tests::test_language_server_creation ... ok
+test debug::lsp::tests::test_symbol_info ... ok
+test debug::source_map::tests::test_address_map ... ok
+test debug::source_map::tests::test_line_map ... ok
+test debug::source_map::tests::test_source_mapping ... ok
+test debug::source_map::tests::test_source_map_json ... ok
+test debug::source_map::tests::test_source_map_generator ... FAILED
+test debug::source_map::tests::test_variable_map ... FAILED
+test debug::tests::test_debug_config_default ... ok
+test debug::tests::test_debug_support_creation ... ok
+test debug::tests::test_debug_support_with_lsp ... ok
+test debug::tests::test_lsp_config_default ... ok
+test debug::lsp::tests::test_document_management ... ok
+test docs::examples::tests::test_example_categories ... ok
+test docs::examples::tests::test_example_difficulty_levels ... ok
+test docs::examples::tests::test_syntax_examples_generation ... ok
+test docs::examples::tests::test_example_manager_creation ... FAILED
+test docs::parser::tests::test_function_name_extraction ... ok
+test docs::parser::tests::test_comment_parser ... ok
+test docs::parser::tests::test_module_name_extraction ... ok
+test docs::parser::tests::test_source_file_discovery ... ok
+test docs::renderer::tests::test_html_renderer_creation ... ok
+test docs::renderer::tests::test_markdown_renderer ... ok
+test docs::renderer::tests::test_pdf_renderer ... ok
+test docs::renderer::tests::test_template_engine_creation ... ok
+test docs::tests::test_doc_config_default ... ok
+test docs::tests::test_output_formats ... ok
+test docs::tests::test_search_config ... ok
+test docs::tutorial::tests::test_basic_tutorial_generation ... ok
+test docs::tests::test_tutorial_creation ... ok
+test docs::tutorial::tests::test_difficulty_levels ... ok
+test docs::renderer::tests::test_asset_manager ... ok
+test docs::tutorial::tests::test_tutorial_generator_creation ... ok
+test docs::tests::test_documentation_structure ... ok
+test docs::tutorial::tests::test_tutorial_structure ... ok
+test error::enhancement::tests::test_type_error_enhancement ... ok
+test error::structured::tests::test_error_formatter ... ok
+test error::intent_analysis::tests::test_intent_analysis ... ok
+test error::structured::tests::test_structured_error_builder ... ok
+test error::tests::test_diagnostic_creation ... ok
+test error::tests::test_edit_distance ... ok
+test error::tests::test_source_location_display ... ok
+test error::tests::test_error_suggestion ... ok
+test ffi::tests::test_callback_registry ... ok
+test ffi::tests::test_callback_c_generation ... ok
+test ffi::tests::test_c_header_generation ... ok
+test ffi::tests::test_binding_generator ... ok
+test ffi::tests::test_ffi_analyzer ... ok
+test ffi::tests::test_enum_handler ... ok
+test ffi::tests::test_ffi_type_mapper ... ok
+test error::enhancement::tests::test_error_enhancement ... ok
+test ffi::tests::test_pointer_type_mapping ... ok
+test ffi::tests::test_ownership_validation ... FAILED
+test ffi::tests::test_rust_bindings_generation ... ok
+test ffi::tests::test_target_language_display ... ok
+test ffi::tests::test_struct_handler ... ok
+test lexer::tests::test_comments ... ok
+test lexer::tests::test_identifiers_and_keywords ... ok
+test lexer::tests::test_peek_token ... ok
+test lexer::tests::test_numbers ... ok
+test lexer::tests::test_quoted_identifiers ... ok
+test lexer::tests::test_source_locations ... ok
+test lexer::tests::test_simple_tokens ... ok
+test lexer::tests::test_strings ... ok
+test llvm_backend::context::tests::test_context_builder ... ok
+test llvm_backend::context::tests::test_context_creation ... ok
+test llvm_backend::context::tests::test_builder_creation ... ok
+test lexer::tests::test_error_cases ... ok
+test llvm_backend::context::tests::test_clear_modules ... ok
+test llvm_backend::context::tests::test_module_management ... ok
+test llvm_backend::tests::test_llvm_backend_creation ... ok
+test llvm_backend::tests::test_target_arch_native ... ok
+test llvm_backend::types::tests::test_array_type_conversion ... ok
+test llvm_backend::types::tests::test_function_type_conversion ... ok
+test llvm_backend::types::tests::test_named_type_conversion ... ok
+test llvm_backend::types::tests::test_pointer_type_conversion ... ok
+test llvm_backend::types::tests::test_primitive_type_conversion ... ok
+test llvm_backend::values::tests::test_const_array_integers ... ok
+test llvm_backend::values::tests::test_convert_boolean_constant ... ok
+test llvm_backend::values::tests::test_convert_integer_constant ... ok
+test llvm_backend::values::tests::test_convert_null_constant ... ok
+test llvm_backend::values::tests::test_convert_float_constant ... ok
+test llvm_backend::values::tests::test_const_helpers ... ok
+test llvm_backend::values::tests::test_const_struct ... ok
+test memory::tests::test_allocation_strategy_determination ... ok
+test llvm_backend::values::tests::test_convert_string_constant ... FAILED
+test memory::tests::test_linear_type_wrapper ... ok
+test memory::tests::test_linear_type_double_consume - should panic ... ok
+test memory::tests::test_memory_analyzer_creation ... ok
+test memory::tests::test_ref_counted_wrapper ... ok
+test memory::tests::test_region_creation ... ok
+test mir::dataflow::tests::test_liveness_analysis ... ok
+test mir::tests::test_cfg_analysis ... ok
+test mir::tests::test_constant_values ... ok
+test mir::lowering::tests::test_simple_function_lowering ... ok
+test mir::tests::test_mir_builder_basic ... ok
+test mir::validation::tests::test_validator_undefined_local ... ok
+test mir::validation::tests::test_validator_valid_function ... ok
+test optimizations::common_subexpression::tests::test_common_subexpression_elimination ... ok
+test optimizations::common_subexpression::tests::test_cse_with_invalidation ... ok
+test optimizations::constant_folding::tests::test_boolean_constant_folding ... ok
+test optimizations::constant_folding::tests::test_integer_constant_folding ... ok
+test optimizations::constant_folding::tests::test_unary_constant_folding ... ok
+test optimizations::dead_code_elimination::tests::test_dead_assignment_removal ... ok
+test optimizations::dead_code_elimination::tests::test_unreachable_block_removal ... ok
+test optimizations::inlining::tests::test_function_cost_calculation ... ok
+test optimizations::inlining::tests::test_program_inlining ... ok
+test optimizations::inlining::tests::test_should_inline_small_function ... ok
+test optimizations::interprocedural::tests::test_abstract_location ... ok
+test optimizations::interprocedural::tests::test_call_graph_building ... ok
+test optimizations::interprocedural::tests::test_function_summary ... ok
+test optimizations::interprocedural::tests::test_interprocedural_analysis_pass ... ok
+test optimizations::interprocedural::tests::test_side_effect_analysis ... ok
+test optimizations::loop_optimizations::tests::test_basic_induction_variable ... ok
+test optimizations::loop_optimizations::tests::test_dependence_analysis ... ok
+test optimizations::loop_optimizations::tests::test_derived_induction_variable ... ok
+test optimizations::loop_optimizations::tests::test_invariant_statement ... ok
+test optimizations::loop_optimizations::tests::test_loop_info_creation ... ok
+test optimizations::loop_optimizations::tests::test_loop_optimization_pass ... ok
+test optimizations::profile_guided::tests::test_block_layout_optimization ... ok
+test optimizations::profile_guided::tests::test_branch_probability_calculation ... ok
+test module_loader::tests::test_stdlib_module_loading ... ok
+test optimizations::profile_guided::tests::test_loop_profile ... ok
+test module_loader::tests::test_module_caching ... ok
+test optimizations::profile_guided::tests::test_inlining_decision ... FAILED
+test optimizations::profile_guided::tests::test_profile_guided_optimization_pass ... ok
+test optimizations::profile_guided::tests::test_profile_data_parsing ... ok
+test optimizations::profile_guided::tests::test_profile_statistics ... ok
+test optimizations::tests::test_default_pipeline ... ok
+test optimizations::tests::test_optimization_manager ... ok
+test optimizations::vectorization::tests::test_benefit_score_calculation ... ok
+test optimizations::vectorization::tests::test_dependency_analyzer ... ok
+test optimizations::vectorization::tests::test_memory_access_pattern_analysis ... ok
+test optimizations::vectorization::tests::test_vector_width_determination ... ok
+test llvm_backend::tests::test_llvm_backend_empty_program ... ok
+test optimizations::vectorization::tests::test_vectorizable_type_detection ... ok
+test optimizations::vectorization::tests::test_vectorization_pass_creation ... ok
+test llvm_backend::tests::test_target_triple_setting ... ok
+test optimizations::whole_program::tests::test_call_graph_building ... ok
+test optimizations::whole_program::tests::test_dead_function_detection ... ok
+test optimizations::whole_program::tests::test_function_analysis ... ok
+test optimizations::whole_program::tests::test_whole_program_optimization_pass ... ok
+test package::builder::tests::test_build_artifact_types ... ok
+test package::builder::tests::test_build_stage_status ... ok
+test package::builder::tests::test_script_interpreter_types ... ok
+test package::manifest::tests::test_build_config_default ... ok
+test package::manifest::tests::test_default_edition ... ok
+test package::builder::tests::test_build_stages_creation ... ok
+test package::builder::tests::test_package_builder_creation ... ok
+test package::manifest::tests::test_dependency_validation ... ok
+test package::manifest::tests::test_invalid_package_names ... ok
+test package::manifest::tests::test_valid_package_names ... ok
+test package::manifest::tests::test_manifest_parsing ... FAILED
+test package::registry::tests::test_auth_methods ... ok
+test package::registry::tests::test_cached_response_expiry ... ok
+test package::registry::tests::test_dependency_info ... ok
+test package::resolver::tests::test_cache_stats ... ok
+test package::resolver::tests::test_conflict_strategy ... ok
+test package::registry::tests::test_registry_config_creation ... ok
+test package::resolver::tests::test_dependency_graph ... ok
+test package::resolver::tests::test_resolution_key ... ok
+test package::resolver::tests::test_resolved_dependency ... ok
+test package::resolver::tests::test_resolver_config ... ok
+test package::resolver::tests::test_resolver_creation ... ok
+test package::tests::test_cache_stats ... ok
+test package::tests::test_install_options_default ... ok
+test package::tests::test_package_info_creation ... ok
+test package::version::tests::test_prerelease_precedence ... ok
+test package::tests::test_package_config_default ... ok
+test package::version::tests::test_version_comparison ... ok
+test package::version::tests::test_version_compatibility ... ok
+test package::version::tests::test_version_display ... ok
+test package::version::tests::test_version_increment ... ok
+test package::version::tests::test_version_parsing ... ok
+test package::version::tests::test_version_requirement_caret ... ok
+test package::version::tests::test_version_requirement_exact ... ok
+test package::version::tests::test_version_requirement_parsing ... ok
+test package::version::tests::test_version_requirement_tilde ... ok
+test package::version::tests::test_version_with_build ... ok
+test package::version::tests::test_version_with_prerelease ... ok
+test parser::tests::test_keyword_mapping ... ok
+test patterns::composition::tests::test_composition_engine ... ok
+test pipeline::tests::test_compilation_stats ... ok
+test parser::tests::test_parser_creation ... ok
+test pipeline::tests::test_compile_options_default ... ok
+test patterns::tests::test_pattern_library_creation ... ok
+test parser::tests::test_parser_error_handling ... ok
+test release::automation::tests::test_condition_evaluation ... FAILED
+test release::automation::tests::test_quality_gate_evaluation ... ok
+test parser::tests::test_module_with_constant_parsing ... ok
+test release::automation::tests::test_pipeline_creation ... ok
+test parser::tests::test_expression_parsing ... ok
+test release::automation::tests::test_variable_expansion ... ok
+test parser::tests::test_simple_module_parsing ... ok
+test release::distribution::tests::test_channel_addition ... ok
+test release::distribution::tests::test_content_type_detection ... ok
+test release::distribution::tests::test_distribution_manager_creation ... ok
+test release::distribution::tests::test_release_metadata_update ... ok
+test resource::tests::test_resource_manager_creation ... ok
+test resource::analysis::tests::test_resource_leak_detection ... FAILED
+test resource::analysis::tests::test_double_release_detection ... FAILED
+test resource::tests::test_resource_report_sexp ... ok
+test runtime::tests::test_array_operations ... ok
+test runtime::tests::test_string_operations ... ok
+test semantic::tests::test_contract_validation_failures ... ok
+test semantic::tests::test_contract_validation_integration ... ok
+test pipeline::tests::test_pipeline_creation ... ok
+test semantic::tests::test_constant_declaration_analysis ... ok
+test release::packaging::tests::test_package_name_generation ... ok
+test release::packaging::tests::test_deb_control_generation ... ok
+test stdlib::collections::tests::test_array_function_signatures ... FAILED
+test stdlib::collections::tests::test_collections_module_creation ... FAILED
+test release::packaging::tests::test_package_builder_creation ... ok
+test semantic::tests::test_expression_type_analysis ... ok
+test semantic::tests::test_type_mismatch_detection ... ok
+test semantic::tests::test_semantic_analyzer_creation ... ok
+test semantic::tests::test_variable_initialization_checking ... ok
+test stdlib::collections::tests::test_map_function_signatures ... FAILED
+test stdlib::console::tests::test_console_control_functions ... FAILED
+test stdlib::console::tests::test_console_input_functions ... FAILED
+test stdlib::console::tests::test_console_module_creation ... FAILED
+test stdlib::console::tests::test_console_output_functions ... FAILED
+test stdlib::console::tests::test_high_level_functions ... ok
+test stdlib::http::tests::test_http_function_signatures ... FAILED
+test stdlib::http::tests::test_http_module_creation ... FAILED
+test stdlib::io::tests::test_io_module_creation ... FAILED
+test stdlib::io::tests::test_external_function_signatures ... FAILED
+test stdlib::json::tests::test_json_function_signatures ... FAILED
+test stdlib::json::tests::test_json_module_creation ... FAILED
+test stdlib::math::tests::test_math_constants ... ok
+test stdlib::math::tests::test_math_module_creation ... ok
+test stdlib::math::tests::test_trigonometric_functions ... ok
+test stdlib::math::tests::test_utility_functions ... ok
+test stdlib::memory::tests::test_memory_function_signatures ... FAILED
+test stdlib::memory::tests::test_memory_module_creation ... FAILED
+test stdlib::network::tests::test_network_module_creation ... FAILED
+test stdlib::network::tests::test_socket_function_signatures ... FAILED
+test release::packaging::tests::test_checksum_calculation ... ok
+test stdlib::string::tests::test_string_function_signatures ... FAILED
+test stdlib::string::tests::test_string_manipulation_functions ... ok
+test stdlib::string::tests::test_string_module_creation ... FAILED
+test stdlib::string::tests::test_string_validation_functions ... ok
+test symbols::tests::test_hierarchical_lookup ... ok
+test symbols::tests::test_scope_kind_checking ... ok
+test symbols::tests::test_scope_management ... ok
+test symbols::tests::test_symbol_addition_and_lookup ... ok
+test symbols::tests::test_symbol_table_creation ... ok
+test symbols::tests::test_type_definitions ... ok
+test symbols::tests::test_variable_initialization_tracking ... ok
+test types::tests::test_ast_to_type_ownership ... ok
+test types::tests::test_compound_types ... ok
+test types::tests::test_constraint_checking ... ok
+test types::tests::test_generic_instantiation ... ok
+test types::tests::test_generic_types ... ok
+test types::tests::test_generic_unification ... ok
+test types::tests::test_ownership_compatibility ... ok
+test types::tests::test_ownership_display ... ok
+test types::tests::test_ownership_types ... ok
+test types::tests::test_primitive_types ... ok
+test types::tests::test_type_compatibility ... ok
+test types::tests::test_type_display ... ok
+test types::tests::test_type_unification ... ok
+test verification::contract_to_smt::tests::test_quantifier_conversion ... ok
+test stdlib::tests::test_module_listing ... ok
+test stdlib::tests::test_module_retrieval ... ok
+test verification::contract_to_smt::tests::test_simple_expression_conversion ... ok
+test verification::contracts::tests::test_aggregate_expressions ... ok
+test verification::contracts::tests::test_contract_creation ... ok
+test stdlib::tests::test_stdlib_creation ... ok
+test verification::contracts::tests::test_enhanced_contract_creation ... ok
+test verification::contracts::tests::test_expression_to_string ... ok
+test verification::contracts::tests::test_proof_obligation_generation ... ok
+test verification::contracts::tests::test_semantic_predicate ... ok
+test verification::contracts::tests::test_temporal_expressions ... ok
+test verification::invariants::tests::test_array_bounds_pattern ... ok
+test verification::invariants::tests::test_loop_invariant ... ok
+test verification::solver::tests::test_simple_verification ... ok
+test verification::tests::test_verification_engine_creation ... ok
+test verification::vcgen::tests::test_simple_function_vcs ... ok
+test verification::vcgen::tests::test_vc_generator_creation ... ok
+test release::automation::tests::test_stage_execution ... ok
+test profiling::tests::test_repeated_phases ... ok
+test profiling::tests::test_basic_profiling ... ok
+
+failures:
+
+---- concurrency::actors::tests::test_actor_handle_messaging stdout ----
+
+thread 'concurrency::actors::tests::test_actor_handle_messaging' panicked at src/concurrency/actors.rs:715:9:
+assertion failed: result.is_ok()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- debug::source_map::tests::test_source_map_generator stdout ----
+
+thread 'debug::source_map::tests::test_source_map_generator' panicked at src/debug/source_map.rs:447:9:
+assertion failed: !generator.mappings().is_empty()
+
+---- debug::source_map::tests::test_variable_map stdout ----
+
+thread 'debug::source_map::tests::test_variable_map' panicked at src/debug/source_map.rs:527:9:
+assertion failed: found.is_some()
+
+---- docs::examples::tests::test_example_manager_creation stdout ----
+
+thread 'docs::examples::tests::test_example_manager_creation' panicked at src/docs/examples.rs:1147:9:
+assertion failed: !manager.examples.is_empty()
+
+---- ffi::tests::test_ownership_validation stdout ----
+
+thread 'ffi::tests::test_ownership_validation' panicked at src/ffi/mod.rs:1334:9:
+assertion failed: result.is_err()
+
+---- llvm_backend::values::tests::test_convert_string_constant stdout ----
+
+thread 'llvm_backend::values::tests::test_convert_string_constant' panicked at src/llvm_backend/values.rs:205:9:
+assertion failed: matches!(string_val, BasicValueEnum::PointerValue(_))
+
+---- optimizations::profile_guided::tests::test_inlining_decision stdout ----
+
+thread 'optimizations::profile_guided::tests::test_inlining_decision' panicked at src/optimizations/profile_guided.rs:699:9:
+assertion `left == right` failed
+  left: NeverInline
+ right: Default
+
+---- package::manifest::tests::test_manifest_parsing stdout ----
+
+thread 'package::manifest::tests::test_manifest_parsing' panicked at src/package/manifest.rs:805:9:
+assertion failed: manifest.is_ok()
+
+---- release::automation::tests::test_condition_evaluation stdout ----
+
+thread 'release::automation::tests::test_condition_evaluation' panicked at src/release/automation.rs:1233:9:
+assertion failed: result
+
+---- resource::analysis::tests::test_resource_leak_detection stdout ----
+
+thread 'resource::analysis::tests::test_resource_leak_detection' panicked at src/resource/analysis.rs:592:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- resource::analysis::tests::test_double_release_detection stdout ----
+
+thread 'resource::analysis::tests::test_double_release_detection' panicked at src/resource/analysis.rs:615:90:
+called `Result::unwrap()` on an `Err` value: UndefinedSymbol { symbol: "buffer", location: SourceLocation { file: "<unknown>", line: 0, column: 0, offset: 0 } }
+
+---- stdlib::collections::tests::test_array_function_signatures stdout ----
+
+thread 'stdlib::collections::tests::test_array_function_signatures' panicked at src/stdlib/collections.rs:519:14:
+array_create function not found
+
+---- stdlib::collections::tests::test_collections_module_creation stdout ----
+
+thread 'stdlib::collections::tests::test_collections_module_creation' panicked at src/stdlib/collections.rs:494:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "array_create")
+
+---- stdlib::collections::tests::test_map_function_signatures stdout ----
+
+thread 'stdlib::collections::tests::test_map_function_signatures' panicked at src/stdlib/collections.rs:538:14:
+map_create function not found
+
+---- stdlib::console::tests::test_console_control_functions stdout ----
+
+thread 'stdlib::console::tests::test_console_control_functions' panicked at src/stdlib/console.rs:425:101:
+called `Option::unwrap()` on a `None` value
+
+---- stdlib::console::tests::test_console_input_functions stdout ----
+
+thread 'stdlib::console::tests::test_console_input_functions' panicked at src/stdlib/console.rs:410:95:
+called `Option::unwrap()` on a `None` value
+
+---- stdlib::console::tests::test_console_module_creation stdout ----
+
+thread 'stdlib::console::tests::test_console_module_creation' panicked at src/stdlib/console.rs:369:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "print_string")
+
+---- stdlib::console::tests::test_console_output_functions stdout ----
+
+thread 'stdlib::console::tests::test_console_output_functions' panicked at src/stdlib/console.rs:393:101:
+called `Option::unwrap()` on a `None` value
+
+---- stdlib::http::tests::test_http_function_signatures stdout ----
+
+thread 'stdlib::http::tests::test_http_function_signatures' panicked at src/stdlib/http.rs:301:14:
+parse_request_line function not found
+
+---- stdlib::http::tests::test_http_module_creation stdout ----
+
+thread 'stdlib::http::tests::test_http_module_creation' panicked at src/stdlib/http.rs:281:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "parse_request_line")
+
+---- stdlib::io::tests::test_io_module_creation stdout ----
+
+thread 'stdlib::io::tests::test_io_module_creation' panicked at src/stdlib/io.rs:184:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "open_file")
+
+---- stdlib::io::tests::test_external_function_signatures stdout ----
+
+thread 'stdlib::io::tests::test_external_function_signatures' panicked at src/stdlib/io.rs:207:14:
+open_file function not found
+
+---- stdlib::json::tests::test_json_function_signatures stdout ----
+
+thread 'stdlib::json::tests::test_json_function_signatures' panicked at src/stdlib/json.rs:328:14:
+parse_json function not found
+
+---- stdlib::json::tests::test_json_module_creation stdout ----
+
+thread 'stdlib::json::tests::test_json_module_creation' panicked at src/stdlib/json.rs:305:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "parse_json")
+
+---- stdlib::memory::tests::test_memory_function_signatures stdout ----
+
+thread 'stdlib::memory::tests::test_memory_function_signatures' panicked at src/stdlib/memory.rs:303:14:
+allocate function not found
+
+---- stdlib::memory::tests::test_memory_module_creation stdout ----
+
+thread 'stdlib::memory::tests::test_memory_module_creation' panicked at src/stdlib/memory.rs:283:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "allocate")
+
+---- stdlib::network::tests::test_network_module_creation stdout ----
+
+thread 'stdlib::network::tests::test_network_module_creation' panicked at src/stdlib/network.rs:248:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "socket_create")
+
+---- stdlib::network::tests::test_socket_function_signatures stdout ----
+
+thread 'stdlib::network::tests::test_socket_function_signatures' panicked at src/stdlib/network.rs:269:14:
+socket_create function not found
+
+---- stdlib::string::tests::test_string_function_signatures stdout ----
+
+thread 'stdlib::string::tests::test_string_function_signatures' panicked at src/stdlib/string.rs:416:14:
+string_concat function not found
+
+---- stdlib::string::tests::test_string_module_creation stdout ----
+
+thread 'stdlib::string::tests::test_string_module_creation' panicked at src/stdlib/string.rs:387:9:
+assertion failed: module.external_functions.iter().any(|f| f.name.name == "string_length")
+
+
+failures:
+    concurrency::actors::tests::test_actor_handle_messaging
+    debug::source_map::tests::test_source_map_generator
+    debug::source_map::tests::test_variable_map
+    docs::examples::tests::test_example_manager_creation
+    ffi::tests::test_ownership_validation
+    llvm_backend::values::tests::test_convert_string_constant
+    optimizations::profile_guided::tests::test_inlining_decision
+    package::manifest::tests::test_manifest_parsing
+    release::automation::tests::test_condition_evaluation
+    resource::analysis::tests::test_double_release_detection
+    resource::analysis::tests::test_resource_leak_detection
+    stdlib::collections::tests::test_array_function_signatures
+    stdlib::collections::tests::test_collections_module_creation
+    stdlib::collections::tests::test_map_function_signatures
+    stdlib::console::tests::test_console_control_functions
+    stdlib::console::tests::test_console_input_functions
+    stdlib::console::tests::test_console_module_creation
+    stdlib::console::tests::test_console_output_functions
+    stdlib::http::tests::test_http_function_signatures
+    stdlib::http::tests::test_http_module_creation
+    stdlib::io::tests::test_external_function_signatures
+    stdlib::io::tests::test_io_module_creation
+    stdlib::json::tests::test_json_function_signatures
+    stdlib::json::tests::test_json_module_creation
+    stdlib::memory::tests::test_memory_function_signatures
+    stdlib::memory::tests::test_memory_module_creation
+    stdlib::network::tests::test_network_module_creation
+    stdlib::network::tests::test_socket_function_signatures
+    stdlib::string::tests::test_string_function_signatures
+    stdlib::string::tests::test_string_module_creation
+
+test result: FAILED. 330 passed; 30 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`

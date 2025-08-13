@@ -1,0 +1,14 @@
+(DEFINE_MODULE
+  (NAME hello_world)
+  (INTENT "Hello World with printf")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Print hello world and return")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION printf "Hello, World!\n")))
+        (RETURN_VALUE 0)))))

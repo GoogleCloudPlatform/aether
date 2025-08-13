@@ -1,0 +1,54 @@
+;; Factorial Example
+;; Demonstrates recursion and contracts in AetherScript
+
+(DEFINE_MODULE
+  (NAME 'factorial_example')
+  (INTENT "Demonstrates recursive factorial computation with contracts")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME 'factorial')
+      (ACCEPTS_PARAMETER (NAME 'n') (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (INTENT "Computes factorial of n recursively")
+      (PRECONDITION (PREDICATE_GREATER_EQUAL 'n' 0) ASSERT_FAIL "n must be non-negative")
+      (POSTCONDITION (PREDICATE_GREATER 'result' 0) ASSERT_FAIL "factorial must be positive")
+      (BODY
+        (IF_STATEMENT
+          (CONDITION (EXPRESSION_LESS_EQUAL (VARIABLE_REFERENCE 'n') 1))
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE 
+            (RETURN_VALUE 
+              (EXPRESSION_MULTIPLY 
+                (VARIABLE_REFERENCE 'n')
+                (CALL_FUNCTION 'factorial' 
+                  (ARGUMENTS (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE 'n') 1))
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+
+    (DEFINE_FUNCTION
+      (NAME 'main')
+      (RETURNS INTEGER)
+      (INTENT "Test the factorial function")
+      (BODY
+        (DECLARE_VARIABLE (NAME 'n') (TYPE INTEGER) (INITIAL_VALUE 5))
+        (DECLARE_VARIABLE 
+          (NAME 'result') 
+          (TYPE INTEGER) 
+          (INITIAL_VALUE (CALL_FUNCTION 'factorial' (ARGUMENTS (VARIABLE_REFERENCE 'n'))))
+        )
+        
+        ;; Print the result (factorial of 5 = 120)
+        (EXPRESSION_STATEMENT
+          (CALL_FUNCTION 'puts' (ARGUMENTS (CALL_FUNCTION 'int_to_string' (ARGUMENTS (VARIABLE_REFERENCE 'result')))))
+        )
+        
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

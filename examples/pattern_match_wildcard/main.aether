@@ -1,0 +1,47 @@
+(DEFINE_MODULE
+  (NAME pattern_match_wildcard_test)
+  (INTENT "Test wildcard patterns for exhaustiveness")
+  (CONTENT
+    ; Define an Option type with 3 variants
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Status)
+      (INTENT "Multi-state status")
+      (VARIANTS
+        (VARIANT Success (HOLDS INTEGER))
+        (VARIANT Warning (HOLDS STRING))
+        (VARIANT Error (HOLDS STRING))))
+    
+    ; External function declaration for puts
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME puts)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME handle_status)
+      (ACCEPTS_PARAMETER (NAME "status") (TYPE Status))
+      (RETURNS STRING)
+      (BODY
+        ; This should pass - wildcard catches remaining cases
+        (RETURN_VALUE 
+          (MATCH_EXPRESSION status
+            (CASE (Success code)
+              (STRING_CONCAT "Success with code: " (TO_STRING code)))
+            (CASE (_)
+              "Something went wrong")))))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME s) (TYPE Status))
+        (ASSIGN
+          (TARGET_VARIABLE s)
+          (SOURCE_EXPRESSION (Warning "This is a warning")))
+        
+        (CALL_FUNCTION puts (CALL_FUNCTION handle_status s))
+        
+        (RETURN_VALUE 0)))
+  )
+)

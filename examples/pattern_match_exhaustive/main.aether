@@ -1,0 +1,64 @@
+(DEFINE_MODULE
+  (NAME pattern_match_exhaustive_test)
+  (INTENT "Test exhaustiveness checking in pattern matching")
+  (CONTENT
+    ; Define a simple Result type
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Result)
+      (INTENT "Represents success or failure")
+      (VARIANTS
+        (VARIANT Ok (HOLDS INTEGER))
+        (VARIANT Error (HOLDS STRING))))
+    
+    ; Define an Option type
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Option)
+      (INTENT "Optional value")
+      (VARIANTS
+        (VARIANT Some (HOLDS INTEGER))
+        (VARIANT None)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_non_exhaustive)
+      (ACCEPTS_PARAMETER (NAME "result") (TYPE Result))
+      (RETURNS STRING)
+      (BODY
+        ; This should fail - missing Error case
+        (RETURN_VALUE 
+          (MATCH_EXPRESSION result
+            (CASE (Ok value)
+              (STRING_CONCAT "Success: " (TO_STRING value)))))))
+    
+    (DEFINE_FUNCTION
+      (NAME test_exhaustive_wildcard)
+      (ACCEPTS_PARAMETER (NAME "result") (TYPE Result))
+      (RETURNS STRING)
+      (BODY
+        ; This should pass - wildcard covers remaining cases
+        (RETURN_VALUE 
+          (MATCH_EXPRESSION result
+            (CASE (Ok value)
+              (STRING_CONCAT "Success: " (TO_STRING value)))
+            (CASE (WILDCARD)
+              "Other case")))))
+    
+    (DEFINE_FUNCTION
+      (NAME test_exhaustive_all_variants)
+      (ACCEPTS_PARAMETER (NAME "opt") (TYPE Option))
+      (RETURNS INTEGER)
+      (BODY
+        ; This should pass - all variants covered
+        (RETURN_VALUE 
+          (MATCH_EXPRESSION opt
+            (CASE (Some value)
+              value)
+            (CASE (None)
+              0)))))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 0)))
+  )
+)

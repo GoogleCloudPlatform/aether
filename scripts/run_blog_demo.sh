@@ -1,0 +1,22 @@
+#!/bin/bash
+# Script to run a simple HTTP server demo
+
+echo "AetherScript Blog Server Demo"
+echo "============================="
+echo ""
+echo "This demo simulates what the AetherScript blog server would do:"
+echo ""
+echo "1. Starting HTTP server on port 8080..."
+echo "2. Server started successfully!"
+echo ""
+echo "Available endpoints:"
+echo "  GET / - Blog post listing page"
+echo "  GET /posts/post-1 - 'AetherScript: The LLM-First Language'"
+echo "  GET /posts/post-2 - 'Resource Management with AetherScript'"
+echo "  GET /posts/post-3 - 'Formal Verification in Practice'"
+echo ""
+echo "To run an actual HTTP server, you could use Python:"
+echo "python3 -m http.server 8080"
+echo ""
+echo "Or create a simple server with the compiled AetherScript"
+echo "once the HTTP runtime functions are fully implemented."

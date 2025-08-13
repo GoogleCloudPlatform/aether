@@ -1,0 +1,12 @@
+(DEFINE_MODULE
+  (NAME printf_debug)
+  (INTENT "Debug printf calls")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test simple printf")
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Test 1\n")
+        (CALL_FUNCTION printf "Test 2\n")
+        (RETURN_VALUE 0)))))

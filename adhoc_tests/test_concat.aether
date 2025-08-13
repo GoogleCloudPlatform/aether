@@ -1,0 +1,48 @@
+(DEFINE_MODULE
+  (NAME test_concat)
+  (INTENT "Test string concatenation")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME string_concat)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "str1") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "str2") (TYPE STRING)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Starting concat test...\n")
+        
+        ; Test string concatenation
+        (DECLARE_VARIABLE (NAME str1) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE str1)
+          (SOURCE_EXPRESSION "Hello, "))
+        
+        (DECLARE_VARIABLE (NAME str2) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE str2)
+          (SOURCE_EXPRESSION "World!"))
+        
+        (CALL_FUNCTION printf "str1: %s\n" str1)
+        (CALL_FUNCTION printf "str2: %s\n" str2)
+        
+        (DECLARE_VARIABLE (NAME result) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION string_concat str1 str2)))
+        
+        (CALL_FUNCTION printf "Concatenated: %s\n" result)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

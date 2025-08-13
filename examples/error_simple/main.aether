@@ -1,0 +1,30 @@
+(DEFINE_MODULE
+  (NAME error_simple)
+  (INTENT "Simple error handling test")
+  (CONTENT
+    ; External function
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_try_catch)
+      (RETURNS INTEGER)
+      (BODY
+        (TRY_EXECUTE
+          (CALL_FUNCTION printf "In try block\n")
+          (THROW_EXCEPTION 42))
+        
+        (CALL_FUNCTION printf "After try-catch\n")
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_try_catch)
+        (RETURN_VALUE 0)))
+  )
+)

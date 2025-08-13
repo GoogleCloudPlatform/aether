@@ -1,0 +1,16 @@
+(DEFINE_MODULE
+  (NAME arithmetic)
+  (INTENT "Test arithmetic operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add")
+      (INTENT "Add two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD x y))
+      )
+    )
+  )
+)

@@ -1,0 +1,62 @@
+(DEFINE_MODULE
+  (NAME arrays)
+  (INTENT "Test array functionality")
+  (CONTENT
+    ; External functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_arrays)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create an array literal
+        (DECLARE_VARIABLE (NAME arr) (TYPE (ARRAY_OF_TYPE INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE arr)
+          (SOURCE_EXPRESSION (ARRAY_LITERAL 1 2 3 4 5)))
+        
+        ; Get array length
+        (DECLARE_VARIABLE (NAME len) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE len)
+          (SOURCE_EXPRESSION (ARRAY_LENGTH arr)))
+        (CALL_FUNCTION printf "Array length: %d\n" len)
+        
+        ; Access array elements
+        (DECLARE_VARIABLE (NAME first) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE first)
+          (SOURCE_EXPRESSION (GET_ARRAY_ELEMENT arr 0)))
+        (CALL_FUNCTION printf "First element: %d\n" first)
+        
+        ; Set array element
+        (ASSIGN
+          (TARGET_ARRAY_ELEMENT arr 0)
+          (SOURCE_EXPRESSION 10))
+        (ASSIGN
+          (TARGET_VARIABLE first)
+          (SOURCE_EXPRESSION (GET_ARRAY_ELEMENT arr 0)))
+        (CALL_FUNCTION printf "First element after update: %d\n" first)
+        
+        ; Loop through array
+        (DECLARE_VARIABLE (NAME i) (TYPE INTEGER))
+        (LOOP_FOR_EACH_ELEMENT
+          (ELEMENT_VARIABLE val)
+          (COLLECTION arr)
+          (ITERATION_BODY
+            (CALL_FUNCTION printf "Element: %d\n" val)))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_arrays)
+        (RETURN_VALUE 0)))
+  )
+)

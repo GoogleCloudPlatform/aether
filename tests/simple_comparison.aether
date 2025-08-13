@@ -1,0 +1,26 @@
+(DEFINE_MODULE
+  (NAME simple_comparison)
+  (INTENT "Simple comparison operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "is_equal")
+      (INTENT "Check if two integers are equal")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (PREDICATE_EQUALS x y))
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "is_greater")
+      (INTENT "Check if x > y")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (PREDICATE_GREATER_THAN x y))
+      )
+    )
+  )
+)

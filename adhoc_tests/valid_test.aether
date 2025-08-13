@@ -1,0 +1,18 @@
+(DEFINE_MODULE
+  (NAME 'valid_test')
+  (INTENT "Test valid AetherScript file")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME 'PI')
+      (TYPE FLOAT)
+      (VALUE 3.14159)
+      (INTENT "Mathematical constant PI")
+    )
+    (DECLARE_CONSTANT
+      (NAME 'VERSION')
+      (TYPE STRING)
+      (VALUE "1.0.0")
+      (INTENT "Version number")
+    )
+  )
+)

@@ -1,0 +1,14 @@
+(DEFINE_MODULE
+  (NAME main)
+  (INTENT "A simple test program")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Program entry point")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

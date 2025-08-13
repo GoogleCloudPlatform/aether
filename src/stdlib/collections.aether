@@ -1,0 +1,239 @@
+(DEFINE_MODULE
+  (NAME collections)
+  (INTENT "Collection utilities and data structures for AetherScript")
+  (CONTENT
+    ; Import core module
+    (IMPORT_MODULE (NAME std_core))
+    
+    ; Export collection functions
+    (EXPORTS_FUNCTION (NAME array_length))
+    (EXPORTS_FUNCTION (NAME array_get))
+    (EXPORTS_FUNCTION (NAME array_set))
+    (EXPORTS_FUNCTION (NAME array_push))
+    (EXPORTS_FUNCTION (NAME array_pop))
+    (EXPORTS_FUNCTION (NAME array_slice))
+    (EXPORTS_FUNCTION (NAME array_concat))
+    (EXPORTS_FUNCTION (NAME array_map))
+    (EXPORTS_FUNCTION (NAME array_filter))
+    (EXPORTS_FUNCTION (NAME array_reduce))
+    (EXPORTS_FUNCTION (NAME array_find))
+    (EXPORTS_FUNCTION (NAME array_contains))
+    
+    ; External array functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME array_length)
+      (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INTEGER)))
+      (RETURNS INTEGER)
+      (CALLING_CONVENTION C))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME array_get)
+      (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INTEGER)))
+      (ACCEPTS_PARAMETER (NAME "index") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (CALLING_CONVENTION C))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME array_set)
+      (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INTEGER)))
+      (ACCEPTS_PARAMETER (NAME "index") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE INTEGER))
+      (RETURNS UNIT)
+      (CALLING_CONVENTION C))
+    
+    ; Push element to end of array
+    (DEFINE_FUNCTION
+      (NAME array_push)
+      (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INTEGER)))
+      (ACCEPTS_PARAMETER (NAME "value") (TYPE INTEGER))
+      (RETURNS (ARRAY INTEGER))
+      (METADATA
+        (COMPLEXITY "O(1)")
+        (MEMORY "heap-allocated"))
+      (BODY
+        ; Get current length
+        (DECLARE_VARIABLE (NAME "len") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE len)
+          (SOURCE_EXPRESSION (CALL_FUNCTION array_length (VARIABLE_REFERENCE array))))
+        
+        ; Create new array with size + 1
+        (DECLARE_VARIABLE (NAME "new_array") (TYPE (ARRAY INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE new_array)
+          (SOURCE_EXPRESSION 
+            (CALL_FUNCTION array_create 
+              (ARITHMETIC_ADD (VARIABLE_REFERENCE len) 1))))
+        
+        ; Copy existing elements
+        (DECLARE_VARIABLE (NAME "i") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_WHILE_CONDITION
+          (PREDICATE_LESS_THAN (VARIABLE_REFERENCE i) (VARIABLE_REFERENCE len))
+          (BODY
+            (CALL_FUNCTION array_set 
+              (VARIABLE_REFERENCE new_array)
+              (VARIABLE_REFERENCE i)
+              (CALL_FUNCTION array_get 
+                (VARIABLE_REFERENCE array)
+                (VARIABLE_REFERENCE i)))
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION 
+                (ARITHMETIC_ADD (VARIABLE_REFERENCE i) 1)))
+          ))
+        
+        ; Add new element
+        (CALL_FUNCTION array_set 
+          (VARIABLE_REFERENCE new_array)
+          (VARIABLE_REFERENCE len)
+          (VARIABLE_REFERENCE value))
+        
+        (RETURN_VALUE (VARIABLE_REFERENCE new_array))
+      ))
+    
+    ; Map function over array
+    (DEFINE_FUNCTION
+      (NAME array_map)
+      (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INTEGER)))
+      (ACCEPTS_PARAMETER (NAME "f") (TYPE FUNCTION))
+      (RETURNS (ARRAY INTEGER))
+      (METADATA
+        (COMPLEXITY "O(n)")
+        (MEMORY "heap-allocated"))
+      (BODY
+        (DECLARE_VARIABLE (NAME "len") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE len)
+          (SOURCE_EXPRESSION (CALL_FUNCTION array_length (VARIABLE_REFERENCE array))))
+        
+        (DECLARE_VARIABLE (NAME "result") (TYPE (ARRAY INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION array_create (VARIABLE_REFERENCE len))))
+        
+        (DECLARE_VARIABLE (NAME "i") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_WHILE_CONDITION
+          (PREDICATE_LESS_THAN (VARIABLE_REFERENCE i) (VARIABLE_REFERENCE len))
+          (BODY
+            (CALL_FUNCTION array_set 
+              (VARIABLE_REFERENCE result)
+              (VARIABLE_REFERENCE i)
+              (CALL_FUNCTION f 
+                (CALL_FUNCTION array_get 
+                  (VARIABLE_REFERENCE array)
+                  (VARIABLE_REFERENCE i))))
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION 
+                (ARITHMETIC_ADD (VARIABLE_REFERENCE i) 1)))
+          ))
+        
+        (RETURN_VALUE (VARIABLE_REFERENCE result))
+      ))
+    
+    ; Filter array by predicate
+    (DEFINE_FUNCTION
+      (NAME array_filter)
+      (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INTEGER)))
+      (ACCEPTS_PARAMETER (NAME "predicate") (TYPE FUNCTION))
+      (RETURNS (ARRAY INTEGER))
+      (METADATA
+        (COMPLEXITY "O(n)")
+        (MEMORY "heap-allocated"))
+      (BODY
+        ; First pass: count matching elements
+        (DECLARE_VARIABLE (NAME "len") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE len)
+          (SOURCE_EXPRESSION (CALL_FUNCTION array_length (VARIABLE_REFERENCE array))))
+        
+        (DECLARE_VARIABLE (NAME "count") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE count)
+          (SOURCE_EXPRESSION 0))
+        
+        (DECLARE_VARIABLE (NAME "i") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_WHILE_CONDITION
+          (PREDICATE_LESS_THAN (VARIABLE_REFERENCE i) (VARIABLE_REFERENCE len))
+          (BODY
+            (IF_CONDITION
+              (PREDICATE_EQUALS 
+                (CALL_FUNCTION predicate 
+                  (CALL_FUNCTION array_get 
+                    (VARIABLE_REFERENCE array)
+                    (VARIABLE_REFERENCE i)))
+                true)
+              (THEN_EXECUTE
+                (ASSIGN
+                  (TARGET_VARIABLE count)
+                  (SOURCE_EXPRESSION 
+                    (ARITHMETIC_ADD (VARIABLE_REFERENCE count) 1))))
+            )
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION 
+                (ARITHMETIC_ADD (VARIABLE_REFERENCE i) 1)))
+          ))
+        
+        ; Create result array
+        (DECLARE_VARIABLE (NAME "result") (TYPE (ARRAY INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION array_create (VARIABLE_REFERENCE count))))
+        
+        ; Second pass: copy matching elements
+        (ASSIGN
+          (TARGET_VARIABLE i)
+          (SOURCE_EXPRESSION 0))
+        
+        (DECLARE_VARIABLE (NAME "j") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE j)
+          (SOURCE_EXPRESSION 0))
+        
+        (LOOP_WHILE_CONDITION
+          (PREDICATE_LESS_THAN (VARIABLE_REFERENCE i) (VARIABLE_REFERENCE len))
+          (BODY
+            (DECLARE_VARIABLE (NAME "element") (TYPE INTEGER))
+            (ASSIGN
+              (TARGET_VARIABLE element)
+              (SOURCE_EXPRESSION 
+                (CALL_FUNCTION array_get 
+                  (VARIABLE_REFERENCE array)
+                  (VARIABLE_REFERENCE i))))
+            
+            (IF_CONDITION
+              (PREDICATE_EQUALS 
+                (CALL_FUNCTION predicate (VARIABLE_REFERENCE element))
+                true)
+              (THEN_EXECUTE
+                (CALL_FUNCTION array_set 
+                  (VARIABLE_REFERENCE result)
+                  (VARIABLE_REFERENCE j)
+                  (VARIABLE_REFERENCE element))
+                (ASSIGN
+                  (TARGET_VARIABLE j)
+                  (SOURCE_EXPRESSION 
+                    (ARITHMETIC_ADD (VARIABLE_REFERENCE j) 1))))
+            )
+            (ASSIGN
+              (TARGET_VARIABLE i)
+              (SOURCE_EXPRESSION 
+                (ARITHMETIC_ADD (VARIABLE_REFERENCE i) 1)))
+          ))
+        
+        (RETURN_VALUE (VARIABLE_REFERENCE result))
+      ))
+  ))

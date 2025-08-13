@@ -1,0 +1,32 @@
+(DEFINE_MODULE
+  (NAME test_tcp_minimal)
+  (INTENT "Minimal TCP test")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_listen)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Creating TCP listener...\n")
+        
+        (DECLARE_VARIABLE (NAME listener) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE listener)
+          (SOURCE_EXPRESSION (CALL_FUNCTION tcp_listen 12345)))
+        
+        (CALL_FUNCTION printf "Listener ID: %d\n" listener)
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

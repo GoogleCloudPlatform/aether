@@ -1,0 +1,21 @@
+(DEFINE_MODULE
+  (NAME variables_test)
+  (INTENT "Test simple calculations without explicit variable declarations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "calculate_sum")
+      (INTENT "Calculate sum using expressions")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD 
+          (EXPRESSION_MULTIPLY a 2) 
+          (EXPRESSION_MULTIPLY b 3)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test calculation functions")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION calculate_sum 3 4))))))

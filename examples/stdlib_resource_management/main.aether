@@ -1,0 +1,397 @@
+; Resource Management with Standard Library
+; Demonstrates safe resource handling, RAII patterns, and error recovery
+
+(DEFINE_MODULE
+  (NAME "resource_management")
+  (INTENT "Demonstrate safe resource management patterns")
+  
+  (IMPORT_MODULE "std.io")
+  (IMPORT_MODULE "std.collections")
+  (IMPORT_MODULE "std.concurrency")
+  
+  (CONTENT
+    (DEFINE_TYPE
+      (NAME "resource_tracker")
+      (FIELD (NAME "name") (TYPE STRING))
+      (FIELD (NAME "allocated_count") (TYPE INT))
+      (FIELD (NAME "freed_count") (TYPE INT))
+      (FIELD (NAME "peak_usage") (TYPE INT)))
+    
+    (DEFINE_FUNCTION
+      (NAME "demonstrate_file_resources")
+      (INTENT "Show automatic file resource cleanup")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "=== File Resource Management Demo ===\n")))
+        
+        ; Multiple file operations with guaranteed cleanup
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "1. Testing multiple file operations...")))
+        
+        (TRY_EXECUTE
+          (PROTECTED_BLOCK
+            ; Write to multiple files
+            (FOR_LOOP
+              (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+              (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 3)))
+              (UPDATE (ASSIGN (TARGET "i") 
+                (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+              (BODY
+                (DECLARE_VARIABLE (NAME "filename") (TYPE STRING)
+                  (INITIAL_VALUE (STRING_CONCAT
+                    (STRING_LITERAL "test_file_")
+                    (STRING_CONCAT
+                      (TO_STRING (VARIABLE_REFERENCE "i"))
+                      (STRING_LITERAL ".txt")))))
+                
+                (DECLARE_VARIABLE (NAME "content") (TYPE STRING)
+                  (INITIAL_VALUE (STRING_CONCAT
+                    (STRING_LITERAL "This is test file #")
+                    (TO_STRING (VARIABLE_REFERENCE "i")))))
+                
+                (IF_CONDITION (CALL_FUNCTION "std.io.write_file_safe"
+                    (ARGUMENTS 
+                      (VARIABLE_REFERENCE "filename")
+                      (VARIABLE_REFERENCE "content")
+                      (BOOL_LITERAL FALSE)))
+                  (THEN_EXECUTE
+                    (CALL_FUNCTION "std.io.println"
+                      (ARGUMENTS (STRING_CONCAT
+                        (STRING_LITERAL "  Created: ")
+                        (VARIABLE_REFERENCE "filename")))))
+                  (ELSE_EXECUTE
+                    (CALL_FUNCTION "std.io.println"
+                      (ARGUMENTS (STRING_CONCAT
+                        (STRING_LITERAL "  Failed to create: ")
+                        (VARIABLE_REFERENCE "filename"))))))))
+            
+            ; Simulate nested resource operations
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "\n2. Testing nested resource operations...")))
+            
+            (RESOURCE_SCOPE
+              (SCOPE_ID "outer_scope")
+              (ACQUIRES
+                (RESOURCE (TYPE "file_handle") (ID "outer_file") (CLEANUP "cleanup_file")))
+              (CLEANUP_GUARANTEED TRUE)
+              (BODY
+                (CALL_FUNCTION "std.io.println"
+                  (ARGUMENTS (STRING_LITERAL "  Outer resource acquired")))
+                
+                (RESOURCE_SCOPE
+                  (SCOPE_ID "inner_scope")
+                  (ACQUIRES
+                    (RESOURCE (TYPE "file_handle") (ID "inner_file") (CLEANUP "cleanup_file")))
+                  (CLEANUP_GUARANTEED TRUE)
+                  (BODY
+                    (CALL_FUNCTION "std.io.println"
+                      (ARGUMENTS (STRING_LITERAL "  Inner resource acquired")))
+                    
+                    ; Simulate work with resources
+                    (CALL_FUNCTION "std.io.println"
+                      (ARGUMENTS (STRING_LITERAL "  Working with both resources...")))
+                    
+                    ; Inner resource will be cleaned up here
+                    ))
+                
+                (CALL_FUNCTION "std.io.println"
+                  (ARGUMENTS (STRING_LITERAL "  Inner resource released")))
+                
+                ; Outer resource will be cleaned up here
+                ))
+            
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "  Outer resource released")))
+            
+            ; Test error handling with resources
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "\n3. Testing error recovery with resources...")))
+            
+            (TRY_EXECUTE
+              (PROTECTED_BLOCK
+                (RESOURCE_SCOPE
+                  (SCOPE_ID "error_test")
+                  (ACQUIRES
+                    (RESOURCE (TYPE "file_handle") (ID "test_file") (CLEANUP "cleanup_file")))
+                  (CLEANUP_GUARANTEED TRUE)
+                  (BODY
+                    (CALL_FUNCTION "std.io.println"
+                      (ARGUMENTS (STRING_LITERAL "  Resource acquired before error")))
+                    
+                    ; Simulate an error
+                    (IF_CONDITION (BOOL_LITERAL TRUE)
+                      (THEN_EXECUTE
+                        (THROW_EXCEPTION (TYPE "test_error")
+                          (MESSAGE (STRING_LITERAL "Simulated error")))))
+                    
+                    (CALL_FUNCTION "std.io.println"
+                      (ARGUMENTS (STRING_LITERAL "  This should not be printed"))))))
+              
+              (CATCH_EXCEPTION
+                (EXCEPTION_TYPE "test_error")
+                (BINDING_VARIABLE (NAME "e") (TYPE "test_error"))
+                (HANDLER_BLOCK
+                  (CALL_FUNCTION "std.io.println"
+                    (ARGUMENTS (STRING_CONCAT
+                      (STRING_LITERAL "  Caught exception: ")
+                      (FIELD_ACCESS (VARIABLE_REFERENCE "e") "message"))))
+                  (CALL_FUNCTION "std.io.println"
+                    (ARGUMENTS (STRING_LITERAL "  Resource was still cleaned up!"))))))
+            
+            (RETURN_VOID))
+          
+          (CATCH_EXCEPTION
+            (EXCEPTION_TYPE "io_error")
+            (BINDING_VARIABLE (NAME "e") (TYPE "io_error"))
+            (HANDLER_BLOCK
+              (CALL_FUNCTION "std.io.println"
+                (ARGUMENTS (STRING_CONCAT
+                  (STRING_LITERAL "I/O Error: ")
+                  (FIELD_ACCESS (VARIABLE_REFERENCE "e") "message")))))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "demonstrate_memory_tracking")
+      (INTENT "Show memory allocation tracking")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n=== Memory Resource Tracking Demo ===\n")))
+        
+        ; Create resource tracker
+        (DECLARE_VARIABLE (NAME "tracker") (TYPE "resource_tracker"))
+        (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "name"))
+          (SOURCE (STRING_LITERAL "Memory Allocations")))
+        (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "allocated_count"))
+          (SOURCE (INTEGER_LITERAL 0)))
+        (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "freed_count"))
+          (SOURCE (INTEGER_LITERAL 0)))
+        (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "peak_usage"))
+          (SOURCE (INTEGER_LITERAL 0)))
+        
+        ; Simulate allocations
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "Simulating memory allocations...")))
+        
+        (FOR_LOOP
+          (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+          (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 10)))
+          (UPDATE (ASSIGN (TARGET "i") 
+            (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+          (BODY
+            ; Simulate allocation
+            (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "allocated_count"))
+              (SOURCE (EXPRESSION_ADD 
+                (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "allocated_count")
+                (INTEGER_LITERAL 1))))
+            
+            ; Update peak usage
+            (DECLARE_VARIABLE (NAME "current_usage") (TYPE INT)
+              (INITIAL_VALUE (EXPRESSION_SUBTRACT
+                (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "allocated_count")
+                (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "freed_count"))))
+            
+            (IF_CONDITION (PREDICATE_GREATER_THAN 
+                (VARIABLE_REFERENCE "current_usage")
+                (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "peak_usage"))
+              (THEN_EXECUTE
+                (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "peak_usage"))
+                  (SOURCE (VARIABLE_REFERENCE "current_usage")))))
+            
+            ; Simulate some deallocations
+            (IF_CONDITION (PREDICATE_EQUALS 
+                (EXPRESSION_MODULO (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 3))
+                (INTEGER_LITERAL 0))
+              (THEN_EXECUTE
+                (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "freed_count"))
+                  (SOURCE (EXPRESSION_ADD 
+                    (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "freed_count")
+                    (INTEGER_LITERAL 1))))))))
+        
+        ; Display statistics
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\nResource Statistics:")))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "  Total allocated: ")
+            (TO_STRING (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "allocated_count")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "  Total freed: ")
+            (TO_STRING (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "freed_count")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "  Currently in use: ")
+            (TO_STRING (EXPRESSION_SUBTRACT
+              (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "allocated_count")
+              (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "freed_count"))))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "  Peak usage: ")
+            (TO_STRING (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "peak_usage")))))
+        
+        ; Check for leaks
+        (IF_CONDITION (PREDICATE_NOT_EQUALS
+            (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "allocated_count")
+            (FIELD_ACCESS (VARIABLE_REFERENCE "tracker") "freed_count"))
+          (THEN_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "\nWARNING: Potential memory leak detected!"))))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "\nAll resources properly freed!")))))
+        
+        (RETURN_VOID)))
+    
+    (DEFINE_FUNCTION
+      (NAME "demonstrate_concurrent_resources")
+      (INTENT "Show thread-safe resource management")
+      (RETURNS (TYPE VOID))
+      
+      (BODY
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n=== Concurrent Resource Management Demo ===\n")))
+        
+        ; Shared resource counter
+        (DECLARE_VARIABLE (NAME "resource_count") (TYPE "atomic_int")
+          (INITIAL_VALUE (CALL_FUNCTION "std.concurrency.atomic_create"
+            (ARGUMENTS (INTEGER_LITERAL 0)))))
+        
+        (DECLARE_VARIABLE (NAME "mutex") (TYPE "mutex")
+          (INITIAL_VALUE (CALL_FUNCTION "std.concurrency.mutex_create" (ARGUMENTS))))
+        
+        ; Create worker threads
+        (DECLARE_CONSTANT (NAME "NUM_THREADS") (TYPE INT) (VALUE (INTEGER_LITERAL 4)))
+        (DECLARE_VARIABLE (NAME "threads") (TYPE (ARRAY "thread" 4)))
+        
+        (FOR_LOOP
+          (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+          (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "NUM_THREADS")))
+          (UPDATE (ASSIGN (TARGET "i") 
+            (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+          (BODY
+            (ASSIGN (TARGET (ARRAY_ACCESS (VARIABLE_REFERENCE "threads") (VARIABLE_REFERENCE "i")))
+              (SOURCE (CALL_FUNCTION "std.concurrency.thread_create"
+                (ARGUMENTS 
+                  (LAMBDA ()
+                    ; Worker thread function
+                    (FOR_LOOP
+                      (INIT (DECLARE_VARIABLE (NAME "j") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+                      (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "j") (INTEGER_LITERAL 5)))
+                      (UPDATE (ASSIGN (TARGET "j") 
+                        (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "j") (INTEGER_LITERAL 1)))))
+                      (BODY
+                        ; Acquire resource with mutex protection
+                        (IF_CONDITION (CALL_FUNCTION "std.concurrency.mutex_lock"
+                            (ARGUMENTS 
+                              (VARIABLE_REFERENCE "mutex")
+                              (INTEGER_LITERAL -1)))
+                          (THEN_EXECUTE
+                            ; Critical section
+                            (DECLARE_VARIABLE (NAME "current") (TYPE INT)
+                              (INITIAL_VALUE (CALL_FUNCTION "std.concurrency.atomic_load"
+                                (ARGUMENTS (VARIABLE_REFERENCE "resource_count")))))
+                            
+                            (CALL_FUNCTION "std.io.println"
+                              (ARGUMENTS (STRING_CONCAT
+                                (STRING_LITERAL "Thread ")
+                                (STRING_CONCAT
+                                  (TO_STRING (CALL_FUNCTION "std.concurrency.thread_current_id" (ARGUMENTS)))
+                                  (STRING_CONCAT
+                                    (STRING_LITERAL " acquiring resource #")
+                                    (TO_STRING (EXPRESSION_ADD (VARIABLE_REFERENCE "current") (INTEGER_LITERAL 1))))))))
+                            
+                            ; Increment resource count
+                            (CALL_FUNCTION "std.concurrency.atomic_add"
+                              (ARGUMENTS 
+                                (VARIABLE_REFERENCE "resource_count")
+                                (INTEGER_LITERAL 1)))
+                            
+                            ; Simulate work
+                            (CALL_FUNCTION "std.concurrency.thread_yield" (ARGUMENTS))
+                            
+                            ; Release resource
+                            (CALL_FUNCTION "std.concurrency.atomic_add"
+                              (ARGUMENTS 
+                                (VARIABLE_REFERENCE "resource_count")
+                                (INTEGER_LITERAL -1)))
+                            
+                            (CALL_FUNCTION "std.io.println"
+                              (ARGUMENTS (STRING_CONCAT
+                                (STRING_LITERAL "Thread ")
+                                (STRING_CONCAT
+                                  (TO_STRING (CALL_FUNCTION "std.concurrency.thread_current_id" (ARGUMENTS)))
+                                  (STRING_LITERAL " released resource")))))
+                            
+                            ; Unlock mutex
+                            (CALL_FUNCTION "std.concurrency.mutex_unlock"
+                              (ARGUMENTS (VARIABLE_REFERENCE "mutex"))))))))
+                  (INTEGER_LITERAL 32768)))))))
+        
+        ; Wait for all threads
+        (FOR_LOOP
+          (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+          (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "NUM_THREADS")))
+          (UPDATE (ASSIGN (TARGET "i") 
+            (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+          (BODY
+            (CALL_FUNCTION "std.concurrency.thread_join"
+              (ARGUMENTS 
+                (ARRAY_ACCESS (VARIABLE_REFERENCE "threads") (VARIABLE_REFERENCE "i"))
+                (INTEGER_LITERAL -1)))))
+        
+        ; Verify all resources released
+        (DECLARE_VARIABLE (NAME "final_count") (TYPE INT)
+          (INITIAL_VALUE (CALL_FUNCTION "std.concurrency.atomic_load"
+            (ARGUMENTS (VARIABLE_REFERENCE "resource_count")))))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_CONCAT
+            (STRING_LITERAL "\nFinal resource count: ")
+            (TO_STRING (VARIABLE_REFERENCE "final_count")))))
+        
+        (IF_CONDITION (PREDICATE_EQUALS (VARIABLE_REFERENCE "final_count") (INTEGER_LITERAL 0))
+          (THEN_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "All resources properly managed in concurrent environment!"))))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION "std.io.println"
+              (ARGUMENTS (STRING_LITERAL "ERROR: Resource leak in concurrent code!")))))
+        
+        (RETURN_VOID)))
+    
+    (DEFINE_FUNCTION
+      (NAME "cleanup_file")
+      (INTENT "Cleanup function for file resources")
+      (ACCEPTS_PARAMETER (NAME "handle") (TYPE (POINTER VOID)))
+      (RETURNS (TYPE VOID))
+      (BODY
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "    [Cleanup] File resource released")))
+        (RETURN_VOID)))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (RETURNS (TYPE INT))
+      (BODY
+        ; Demonstrate file resource management
+        (CALL_FUNCTION "demonstrate_file_resources" (ARGUMENTS))
+        
+        ; Demonstrate memory tracking
+        (CALL_FUNCTION "demonstrate_memory_tracking" (ARGUMENTS))
+        
+        ; Demonstrate concurrent resource management
+        (CALL_FUNCTION "demonstrate_concurrent_resources" (ARGUMENTS))
+        
+        (CALL_FUNCTION "std.io.println"
+          (ARGUMENTS (STRING_LITERAL "\n=== Resource management demo complete! ===")))
+        
+        (RETURN_VALUE (INTEGER_LITERAL 0))))
+  )
+)

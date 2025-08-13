@@ -1,0 +1,31 @@
+(DEFINE_MODULE
+  (NAME control_flow)
+  (INTENT "Control flow with if-then-else")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "max")
+      (INTENT "Return the maximum of two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN x y)
+          (THEN_EXECUTE (RETURN_VALUE x))
+          (ELSE_EXECUTE (RETURN_VALUE y))
+        )
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "abs")
+      (INTENT "Return absolute value")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN x 0)
+          (THEN_EXECUTE (RETURN_VALUE x))
+          (ELSE_EXECUTE (RETURN_VALUE (EXPRESSION_SUBTRACT 0 x)))
+        )
+      )
+    )
+  )
+)

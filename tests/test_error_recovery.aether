@@ -1,0 +1,36 @@
+(DEFINE_MODULE
+  (NAME test_error_recovery)
+  (INTENT "Test error recovery in parser")
+  (CONTENT
+    ; This function is missing a closing paren
+    (DEFINE_FUNCTION
+      (NAME "broken_function")
+      (INTENT "Function with missing paren")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 42)
+    ; Missing closing paren here
+    
+    ; This function should still parse correctly
+    (DEFINE_FUNCTION
+      (NAME "good_function")
+      (INTENT "Function that should parse correctly")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 100)))
+    
+    ; Another broken function with wrong keyword
+    (DEFINE_FUNCTION
+      (NAME "another_broken")
+      (WRONG_KEYWORD "This should cause an error")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 200)))
+    
+    ; Final good function
+    (DEFINE_FUNCTION
+      (NAME "final_good")
+      (INTENT "Final function that should parse")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 300)))))

@@ -1,0 +1,10 @@
+(DEFINE_MODULE
+  (NAME tiny)
+  (INTENT "Tiny test")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Main")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 0)))))

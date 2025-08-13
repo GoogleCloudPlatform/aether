@@ -1,0 +1,53 @@
+(DEFINE_MODULE
+  (NAME error_demo)
+  (INTENT "Demonstrate error handling capabilities")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+
+    (DEFINE_FUNCTION
+      (NAME divide_safely)
+      (INTENT "Safe division with error handling")
+      (ACCEPTS_PARAMETER (NAME "numerator") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "denominator") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (TRY_EXECUTE
+          (PROTECTED_BLOCK
+            (IF_CONDITION
+              (PREDICATE_EQUALS (VARIABLE denominator) (INTEGER 0))
+              (THEN_EXECUTE
+                (THROW_EXCEPTION "Division by zero"))
+              (ELSE_EXECUTE
+                (RETURN_VALUE 
+                  (EXPRESSION_DIVIDE (VARIABLE numerator) (VARIABLE denominator))))))
+          
+          (CATCH_EXCEPTION (TYPE STRING) (NAME "error_msg")
+            (HANDLER_BLOCK
+              (CALL_FUNCTION printf "Error caught: %s\n" error_msg)
+              (RETURN_VALUE -1)))
+          
+          (FINALLY_EXECUTE
+            (CALL_FUNCTION printf "Division operation completed\n")))))
+
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Main function demonstrating error handling")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "result1") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION divide_safely (INTEGER 10) (INTEGER 2))))
+        
+        (DECLARE_VARIABLE (NAME "result2") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result2)
+          (SOURCE_EXPRESSION (CALL_FUNCTION divide_safely (INTEGER 10) (INTEGER 0))))
+        
+        (CALL_FUNCTION printf "Result 1: %d\n" result1)
+        (CALL_FUNCTION printf "Result 2: %d\n" result2)
+        
+        (RETURN_VALUE 0)))))

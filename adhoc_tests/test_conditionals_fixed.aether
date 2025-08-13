@@ -1,0 +1,34 @@
+(DEFINE_MODULE
+  (NAME conditional_test)
+  (INTENT "Test conditional expressions and control flow")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "max_of_two")
+      (INTENT "Return the maximum of two numbers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN a b)
+          (THEN_EXECUTE (RETURN_VALUE a))
+          (ELSE_EXECUTE (RETURN_VALUE b)))))
+    
+    (DEFINE_FUNCTION
+      (NAME "classify_number")
+      (INTENT "Classify a number as positive, negative, or zero")
+      (ACCEPTS_PARAMETER (NAME "n") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (IF_CONDITION (PREDICATE_GREATER_THAN n 0)
+          (THEN_EXECUTE (RETURN_VALUE 1))
+          (ELSE_EXECUTE 
+            (IF_CONDITION (PREDICATE_LESS_THAN n 0)
+              (THEN_EXECUTE (RETURN_VALUE -1))
+              (ELSE_EXECUTE (RETURN_VALUE 0)))))))
+    
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Test conditional functions")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (CALL_FUNCTION max_of_two 25 42))))))

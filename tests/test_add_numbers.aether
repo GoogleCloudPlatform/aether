@@ -1,0 +1,15 @@
+(DEFINE_MODULE
+  (NAME test_add_numbers)
+  (INTENT "Simple test module for adding two numbers")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add")
+      (INTENT "Add two integers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE
+          (EXPRESSION_ADD
+            a
+            b))))))

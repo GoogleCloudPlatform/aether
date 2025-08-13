@@ -1,0 +1,90 @@
+;; Demonstration of function metadata in AetherScript
+
+(module metadata_demo
+    ;; Function with preconditions
+    (function safe_divide (integer a) (integer b) integer
+        (precondition (!= b 0) ASSERT_FAIL "Division by zero")
+        (/ a b))
+    
+    ;; Function with postconditions
+    (function calculate_distance (float x1) (float y1) (float x2) (float y2) float
+        (postcondition (>= (return_value) 0.0) ASSERT_FAIL "Distance must be non-negative")
+        (let ((dx (- x2 x1))
+              (dy (- y2 y1)))
+            (sqrt (+ (* dx dx) (* dy dy)))))
+    
+    ;; Function with performance expectations
+    (function fast_lookup (string key) (optional string)
+        (algorithm_hint "hash table lookup")
+        (performance_expectation LATENCY_MS 0.01 "99th percentile")
+        (complexity_expectation TIME BIG_O "1")
+        ;; Implementation would go here
+        none)
+    
+    ;; Function with complexity expectations
+    (function merge_sort (array integer arr) (array integer)
+        (algorithm_hint "divide and conquer")
+        (complexity_expectation TIME BIG_O "n log n")
+        (complexity_expectation SPACE BIG_O "n")
+        ;; Implementation would go here
+        arr)
+    
+    ;; Function with thread safety annotations
+    (function thread_safe_counter () integer
+        (thread_safe true)
+        (may_block false)
+        ;; Implementation would use atomic operations
+        0)
+    
+    ;; Function with multiple contracts
+    (function binary_search (array integer sorted_arr) (integer target) integer
+        ;; Preconditions
+        (precondition (> (array_length sorted_arr) 0) ASSERT_FAIL "Array must not be empty")
+        (precondition (is_sorted sorted_arr) ASSERT_FAIL "Array must be sorted")
+        
+        ;; Postconditions
+        (postcondition 
+            (or (= (return_value) -1)
+                (= (array_access sorted_arr (return_value)) target))
+            ASSERT_FAIL "Must return valid index or -1")
+        
+        ;; Performance characteristics
+        (algorithm_hint "binary search")
+        (complexity_expectation TIME BIG_O "log n")
+        (performance_expectation LATENCY_MS 0.1 "worst case")
+        
+        ;; Thread safety
+        (thread_safe true)
+        (may_block false)
+        
+        ;; Simplified implementation
+        (let ((low 0)
+              (high (- (array_length sorted_arr) 1)))
+            (while (<= low high)
+                (invariant (or (< target (array_access sorted_arr low))
+                              (> target (array_access sorted_arr high))
+                              (exists_in_range sorted_arr target low high)))
+                (let ((mid (/ (+ low high) 2))
+                      (mid_val (array_access sorted_arr mid)))
+                    (cond
+                        ((= mid_val target) (return mid))
+                        ((< mid_val target) (set low (+ mid 1)))
+                        (else (set high (- mid 1))))))
+            -1))
+    
+    ;; Main function
+    (function main () integer
+        (print_string "=== Function Metadata Demo ===\n")
+        
+        ;; Test safe division
+        (print_string "\nTesting safe division:\n")
+        (print_int (safe_divide 10 2))
+        (print_string "\n")
+        ;; (safe_divide 10 0) ;; This would fail the precondition
+        
+        ;; Test distance calculation
+        (print_string "\nCalculating distance:\n")
+        (print_float (calculate_distance 0.0 0.0 3.0 4.0))
+        (print_string "\n")
+        
+        0))

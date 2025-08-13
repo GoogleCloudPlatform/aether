@@ -1,0 +1,352 @@
+; AetherScript Standard Library - Date/Time Manipulation
+; Provides date and time operations with safety guarantees
+
+(DEFINE_MODULE
+  (NAME "std.time")
+  (INTENT "Date and time manipulation with timezone awareness and safety")
+  
+  ; Time type definitions
+  (DEFINE_TYPE
+    (NAME "timestamp")
+    (INTENT "Unix timestamp in seconds since epoch")
+    (FIELD (NAME "seconds") (TYPE INT)))
+  
+  (DEFINE_TYPE
+    (NAME "datetime")
+    (INTENT "Structured date and time representation")
+    (FIELD (NAME "year") (TYPE INT))
+    (FIELD (NAME "month") (TYPE INT))
+    (FIELD (NAME "day") (TYPE INT))
+    (FIELD (NAME "hour") (TYPE INT))
+    (FIELD (NAME "minute") (TYPE INT))
+    (FIELD (NAME "second") (TYPE INT))
+    (FIELD (NAME "timezone_offset") (TYPE INT))) ; Minutes from UTC
+  
+  (DEFINE_TYPE
+    (NAME "duration")
+    (INTENT "Time duration with nanosecond precision")
+    (FIELD (NAME "seconds") (TYPE INT))
+    (FIELD (NAME "nanoseconds") (TYPE INT)))
+  
+  ; Current time functions
+  
+  (DEFINE_FUNCTION
+    (NAME "now")
+    (INTENT "Get current Unix timestamp")
+    (RETURNS (TYPE "timestamp"))
+    
+    (POSTCONDITION
+      (PREDICATE_GREATER_THAN 
+        (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "seconds")
+        (INTEGER_LITERAL 0))
+      (PROOF_HINT "Timestamp is positive"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "system_clock"))
+      (DETERMINISTIC FALSE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "ts") (TYPE "timestamp"))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds"))
+        (SOURCE (CALL_FUNCTION "aether_time_now" (ARGUMENTS))))
+      (RETURN_VALUE (VARIABLE_REFERENCE "ts"))))
+  
+  (DEFINE_FUNCTION
+    (NAME "now_utc")
+    (INTENT "Get current UTC datetime")
+    (RETURNS (TYPE "datetime"))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "year")
+          (INTEGER_LITERAL 1970))
+        (PREDICATE_BETWEEN 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "month")
+          (INTEGER_LITERAL 1) (INTEGER_LITERAL 12))
+        (PREDICATE_BETWEEN 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "day")
+          (INTEGER_LITERAL 1) (INTEGER_LITERAL 31)))
+      (PROOF_HINT "Date components are valid"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (READS "system_clock"))
+      (DETERMINISTIC FALSE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "ts") (TYPE "timestamp")
+        (INITIAL_VALUE (CALL_FUNCTION "now" (ARGUMENTS))))
+      (RETURN_VALUE (CALL_FUNCTION "timestamp_to_datetime"
+        (ARGUMENTS (VARIABLE_REFERENCE "ts") (INTEGER_LITERAL 0))))))
+  
+  ; Conversion functions
+  
+  (DEFINE_FUNCTION
+    (NAME "timestamp_to_datetime")
+    (INTENT "Convert Unix timestamp to datetime structure")
+    (ACCEPTS_PARAMETER (NAME "ts") (TYPE "timestamp") (INTENT "Timestamp to convert"))
+    (ACCEPTS_PARAMETER (NAME "timezone_offset") (TYPE INT) (INTENT "Timezone offset in minutes"))
+    (RETURNS (TYPE "datetime"))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds")
+          (INTEGER_LITERAL 0))
+        (PREDICATE_BETWEEN 
+          (VARIABLE_REFERENCE "timezone_offset")
+          (INTEGER_LITERAL -720) (INTEGER_LITERAL 840)))
+      (PROOF_HINT "Valid timestamp and timezone offset"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "dt") (TYPE "datetime"))
+      
+      ; Call runtime function to do the conversion
+      (CALL_FUNCTION "aether_timestamp_to_datetime"
+        (ARGUMENTS 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds")
+          (VARIABLE_REFERENCE "timezone_offset")
+          (ADDRESS_OF (VARIABLE_REFERENCE "dt"))))
+      
+      (RETURN_VALUE (VARIABLE_REFERENCE "dt"))))
+  
+  (DEFINE_FUNCTION
+    (NAME "datetime_to_timestamp")
+    (INTENT "Convert datetime to Unix timestamp")
+    (ACCEPTS_PARAMETER (NAME "dt") (TYPE "datetime") (INTENT "Datetime to convert"))
+    (RETURNS (TYPE "timestamp"))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "dt") "year")
+          (INTEGER_LITERAL 1970))
+        (PREDICATE_BETWEEN 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "dt") "month")
+          (INTEGER_LITERAL 1) (INTEGER_LITERAL 12))
+        (PREDICATE_BETWEEN 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "dt") "day")
+          (INTEGER_LITERAL 1) (INTEGER_LITERAL 31)))
+      (PROOF_HINT "Valid datetime components"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "ts") (TYPE "timestamp"))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds"))
+        (SOURCE (CALL_FUNCTION "aether_datetime_to_timestamp"
+          (ARGUMENTS (ADDRESS_OF (VARIABLE_REFERENCE "dt"))))))
+      (RETURN_VALUE (VARIABLE_REFERENCE "ts"))))
+  
+  ; Duration operations
+  
+  (DEFINE_FUNCTION
+    (NAME "duration_from_seconds")
+    (INTENT "Create duration from seconds")
+    (ACCEPTS_PARAMETER (NAME "seconds") (TYPE INT) (INTENT "Number of seconds"))
+    (RETURNS (TYPE "duration"))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (PREDICATE_EQUALS 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "seconds")
+          (VARIABLE_REFERENCE "seconds"))
+        (PREDICATE_EQUALS 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "nanoseconds")
+          (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Duration correctly initialized"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "dur") (TYPE "duration"))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "dur") "seconds"))
+        (SOURCE (VARIABLE_REFERENCE "seconds")))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "dur") "nanoseconds"))
+        (SOURCE (INTEGER_LITERAL 0)))
+      (RETURN_VALUE (VARIABLE_REFERENCE "dur"))))
+  
+  (DEFINE_FUNCTION
+    (NAME "add_duration")
+    (INTENT "Add duration to timestamp")
+    (ACCEPTS_PARAMETER (NAME "ts") (TYPE "timestamp") (INTENT "Base timestamp"))
+    (ACCEPTS_PARAMETER (NAME "dur") (TYPE "duration") (INTENT "Duration to add"))
+    (RETURNS (TYPE "timestamp"))
+    
+    (PRECONDITION
+      (PREDICATE_GREATER_THAN 
+        (EXPRESSION_ADD 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds")
+          (FIELD_ACCESS (VARIABLE_REFERENCE "dur") "seconds"))
+        (INTEGER_LITERAL 0))
+      (PROOF_HINT "Result must be positive timestamp"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "result") (TYPE "timestamp"))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "result") "seconds"))
+        (SOURCE (EXPRESSION_ADD 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds")
+          (FIELD_ACCESS (VARIABLE_REFERENCE "dur") "seconds"))))
+      (RETURN_VALUE (VARIABLE_REFERENCE "result"))))
+  
+  (DEFINE_FUNCTION
+    (NAME "subtract_duration")
+    (INTENT "Subtract duration from timestamp")
+    (ACCEPTS_PARAMETER (NAME "ts") (TYPE "timestamp") (INTENT "Base timestamp"))
+    (ACCEPTS_PARAMETER (NAME "dur") (TYPE "duration") (INTENT "Duration to subtract"))
+    (RETURNS (TYPE "timestamp"))
+    
+    (PRECONDITION
+      (PREDICATE_GREATER_THAN_OR_EQUAL_TO 
+        (EXPRESSION_SUBTRACT 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds")
+          (FIELD_ACCESS (VARIABLE_REFERENCE "dur") "seconds"))
+        (INTEGER_LITERAL 0))
+      (PROOF_HINT "Result must be non-negative timestamp"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "result") (TYPE "timestamp"))
+      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "result") "seconds"))
+        (SOURCE (EXPRESSION_SUBTRACT 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts") "seconds")
+          (FIELD_ACCESS (VARIABLE_REFERENCE "dur") "seconds"))))
+      (RETURN_VALUE (VARIABLE_REFERENCE "result"))))
+  
+  ; Formatting functions
+  
+  (DEFINE_FUNCTION
+    (NAME "format_iso8601")
+    (INTENT "Format datetime as ISO 8601 string")
+    (ACCEPTS_PARAMETER (NAME "dt") (TYPE "datetime") (INTENT "Datetime to format"))
+    (RETURNS (TYPE STRING))
+    
+    (POSTCONDITION
+      (PREDICATE_MATCHES_PATTERN 
+        (VARIABLE_REFERENCE "RETURNED_VALUE")
+        (STRING_LITERAL "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}"))
+      (PROOF_HINT "Output matches ISO 8601 format"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "buffer") (TYPE STRING)
+        (INITIAL_VALUE (CALL_FUNCTION "aether_allocate_string"
+          (ARGUMENTS (INTEGER_LITERAL 30)))))
+      
+      (CALL_FUNCTION "aether_format_datetime_iso8601"
+        (ARGUMENTS 
+          (ADDRESS_OF (VARIABLE_REFERENCE "dt"))
+          (VARIABLE_REFERENCE "buffer")))
+      
+      (RETURN_VALUE (VARIABLE_REFERENCE "buffer"))))
+  
+  (DEFINE_FUNCTION
+    (NAME "parse_iso8601")
+    (INTENT "Parse ISO 8601 string to datetime")
+    (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING) (INTENT "ISO 8601 string to parse"))
+    (RETURNS (TYPE "datetime"))
+    
+    (PRECONDITION
+      (PREDICATE_MATCHES_PATTERN 
+        (VARIABLE_REFERENCE "str")
+        (STRING_LITERAL "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}"))
+      (PROOF_HINT "Input must be valid ISO 8601 format"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE)
+      (EXCEPTION_SAFETY STRONG))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "dt") (TYPE "datetime"))
+      
+      (IF_CONDITION (PREDICATE_NOT 
+          (CALL_FUNCTION "aether_parse_datetime_iso8601"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "str")
+              (ADDRESS_OF (VARIABLE_REFERENCE "dt")))))
+        (THEN_EXECUTE
+          (THROW_EXCEPTION (TYPE "parse_error")
+            (MESSAGE (STRING_LITERAL "Invalid ISO 8601 datetime format")))))
+      
+      (RETURN_VALUE (VARIABLE_REFERENCE "dt"))))
+  
+  ; Comparison functions
+  
+  (DEFINE_FUNCTION
+    (NAME "timestamp_compare")
+    (INTENT "Compare two timestamps")
+    (ACCEPTS_PARAMETER (NAME "ts1") (TYPE "timestamp") (INTENT "First timestamp"))
+    (ACCEPTS_PARAMETER (NAME "ts2") (TYPE "timestamp") (INTENT "Second timestamp"))
+    (RETURNS (TYPE INT))
+    
+    (POSTCONDITION
+      (LOGICAL_AND
+        (LOGICAL_IMPLICATION
+          (PREDICATE_LESS_THAN 
+            (FIELD_ACCESS (VARIABLE_REFERENCE "ts1") "seconds")
+            (FIELD_ACCESS (VARIABLE_REFERENCE "ts2") "seconds"))
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (INTEGER_LITERAL -1)))
+        (LOGICAL_IMPLICATION
+          (PREDICATE_EQUALS 
+            (FIELD_ACCESS (VARIABLE_REFERENCE "ts1") "seconds")
+            (FIELD_ACCESS (VARIABLE_REFERENCE "ts2") "seconds"))
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (INTEGER_LITERAL 0)))
+        (LOGICAL_IMPLICATION
+          (PREDICATE_GREATER_THAN 
+            (FIELD_ACCESS (VARIABLE_REFERENCE "ts1") "seconds")
+            (FIELD_ACCESS (VARIABLE_REFERENCE "ts2") "seconds"))
+          (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (INTEGER_LITERAL 1))))
+      (PROOF_HINT "Returns -1, 0, or 1 based on comparison"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (IF_CONDITION (PREDICATE_LESS_THAN 
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts1") "seconds")
+          (FIELD_ACCESS (VARIABLE_REFERENCE "ts2") "seconds"))
+        (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL -1)))
+        (ELSE_EXECUTE
+          (IF_CONDITION (PREDICATE_GREATER_THAN 
+              (FIELD_ACCESS (VARIABLE_REFERENCE "ts1") "seconds")
+              (FIELD_ACCESS (VARIABLE_REFERENCE "ts2") "seconds"))
+            (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 1)))
+            (ELSE_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 0))))))))
+  
+  ; Export all types and functions
+  (EXPORT_TYPE "timestamp")
+  (EXPORT_TYPE "datetime")
+  (EXPORT_TYPE "duration")
+  (EXPORT_FUNCTION "now")
+  (EXPORT_FUNCTION "now_utc")
+  (EXPORT_FUNCTION "timestamp_to_datetime")
+  (EXPORT_FUNCTION "datetime_to_timestamp")
+  (EXPORT_FUNCTION "duration_from_seconds")
+  (EXPORT_FUNCTION "add_duration")
+  (EXPORT_FUNCTION "subtract_duration")
+  (EXPORT_FUNCTION "format_iso8601")
+  (EXPORT_FUNCTION "parse_iso8601")
+  (EXPORT_FUNCTION "timestamp_compare")
+)

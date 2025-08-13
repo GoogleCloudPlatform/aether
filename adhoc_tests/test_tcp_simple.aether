@@ -1,0 +1,68 @@
+(DEFINE_MODULE
+  (NAME test_tcp_simple)
+  (INTENT "Simple TCP connection test")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_listen)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "port") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME tcp_close)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "socket_id") (TYPE INTEGER)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Testing TCP listener creation...\n")
+        
+        ; Create TCP listener on port 9999
+        (DECLARE_VARIABLE (NAME listener) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE listener)
+          (SOURCE_EXPRESSION (CALL_FUNCTION tcp_listen 9999)))
+        
+        ; Check if listener was created successfully
+        (IF_CONDITION
+          (PREDICATE_LESS_THAN listener 0)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Failed to create TCP listener\n")
+          )
+        )
+        
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN listener -1)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "TCP listener created successfully on port 9999 (socket id: %d)\n" listener)
+          )
+        )
+        
+        ; Close the listener if it was created
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN listener -1)
+          (THEN_EXECUTE
+            (CALL_FUNCTION tcp_close listener)
+          )
+        )
+        
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN listener -1)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Listener closed\n")
+          )
+        )
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

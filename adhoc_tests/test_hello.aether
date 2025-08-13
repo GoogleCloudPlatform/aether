@@ -1,0 +1,10 @@
+(DEFINE_MODULE
+  (NAME hello_world)
+  (INTENT "Simple hello world program")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Main entry point")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 42)))))

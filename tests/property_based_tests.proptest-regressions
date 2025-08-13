@@ -1,0 +1,12 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 9702859d905f38e1b7c0d5117907beab733986b75d47f39477e030d3d5dfc23c # shrinks to value = -9.810477480974769e278
+cc c922e212245b087b87d7db878d0bc09b9f5202bf071500698bdbb8a648736e2f # shrinks to left_value = 1, right_value = 1
+cc c606cba4fb7e0888201d2b1d054a3a98924167fab1a208ec020f7a9e52aab568 # shrinks to module_name = "a", intent = "", const_name = "_", const_value = 0
+cc 825d427be62f1f68a521ebea2122182de7f6c235cc7dec1e935615a8b7a1d73d # shrinks to const_name = "a", int_value = 0, _string_value = ""
+cc 9262070d33deefe7dfe1956f4f3a28c4fbcc0f3aee186a445cb66cc11293c9d3 # shrinks to module_name = "A"
+cc 7c409d23758cef7610356a34c34fc18ef5d6c4be76877000a39644cd58cdfc54 # shrinks to identifier = "_"

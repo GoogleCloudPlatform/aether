@@ -1,0 +1,20 @@
+(DEFINE_MODULE
+  (NAME simple_break_test)
+  (INTENT "Simple test for break")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (LOOP_FIXED_ITERATIONS
+          (COUNTER i)
+          (FROM 1)
+          (TO 5)
+          (DO
+            (CALL_FUNCTION printf "i = %d\n" i)
+            (IF_CONDITION (PREDICATE_EQUALS i 3)
+              (THEN_EXECUTE
+                (BREAK_LOOP)))))
+        
+        (CALL_FUNCTION printf "Done!\n")
+        (RETURN_VALUE 0)))))

@@ -1,0 +1,115 @@
+(DEFINE_MODULE
+  (NAME test_dynamic_alloc)
+  (INTENT "Test dynamic memory allocation")
+  (CONTENT
+    ; Declare external functions
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_malloc)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "size") (TYPE INTEGER)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_free)
+      (LIBRARY "aether_runtime")
+      (RETURNS VOID)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING)))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_memory_used)
+      (LIBRARY "aether_runtime")
+      (RETURNS INTEGER))
+    
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME aether_realloc)
+      (LIBRARY "aether_runtime")
+      (RETURNS STRING)
+      (ACCEPTS_PARAMETER (NAME "ptr") (TYPE STRING))
+      (ACCEPTS_PARAMETER (NAME "new_size") (TYPE INTEGER)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "=== Dynamic Memory Allocation Test ===\n")
+        
+        ; Test malloc
+        (CALL_FUNCTION printf "\n1. Testing malloc:\n")
+        (DECLARE_VARIABLE (NAME ptr1) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE ptr1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 100)))
+        
+        (DECLARE_VARIABLE (NAME mem1) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE mem1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        (CALL_FUNCTION printf "   Allocated 100 bytes, total memory: %d\n" mem1)
+        
+        ; Test multiple allocations
+        (CALL_FUNCTION printf "\n2. Testing multiple allocations:\n")
+        (DECLARE_VARIABLE (NAME ptr2) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE ptr2)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 200)))
+        
+        (DECLARE_VARIABLE (NAME ptr3) (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE ptr3)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_malloc 300)))
+        
+        (DECLARE_VARIABLE (NAME mem2) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE mem2)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        (CALL_FUNCTION printf "   After 3 allocations, total memory: %d\n" mem2)
+        
+        ; Test realloc
+        (CALL_FUNCTION printf "\n3. Testing realloc:\n")
+        (ASSIGN
+          (TARGET_VARIABLE ptr1)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_realloc ptr1 500)))
+        
+        (DECLARE_VARIABLE (NAME mem3) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE mem3)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        (CALL_FUNCTION printf "   Reallocated first buffer to 500 bytes, total: %d\n" mem3)
+        
+        ; Test free
+        (CALL_FUNCTION printf "\n4. Testing free:\n")
+        (CALL_FUNCTION aether_free ptr2)
+        
+        (DECLARE_VARIABLE (NAME mem4) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE mem4)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        (CALL_FUNCTION printf "   Freed 200-byte buffer, total: %d\n" mem4)
+        
+        ; Free remaining
+        (CALL_FUNCTION printf "\n5. Freeing remaining allocations:\n")
+        (CALL_FUNCTION aether_free ptr1)
+        (CALL_FUNCTION aether_free ptr3)
+        
+        (DECLARE_VARIABLE (NAME final) (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE final)
+          (SOURCE_EXPRESSION (CALL_FUNCTION aether_memory_used)))
+        (CALL_FUNCTION printf "   Final memory: %d bytes\n" final)
+        
+        (IF_CONDITION
+          (PREDICATE_EQUALS final 0)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "\n✓ All memory successfully freed!\n")
+          )
+        )
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

@@ -1,0 +1,20 @@
+(DEFINE_MODULE
+  (NAME printf_test)
+  (INTENT "Test external printf function")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (RETURNS INTEGER)
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING)))
+      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test printf call")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION printf "Hello, World!\n")))
+        (RETURN_VALUE 0)))))

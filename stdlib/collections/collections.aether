@@ -1,0 +1,348 @@
+; AetherScript Standard Library - Collection Utilities
+; Provides verified collection operations with safety guarantees
+
+(DEFINE_MODULE
+  (NAME "std.collections")
+  (INTENT "Collection utilities with verified patterns and safety guarantees")
+  
+  ; Array operations
+  
+  (DEFINE_FUNCTION
+    (NAME "sort_verified")
+    (INTENT "Sort array with verified correctness using quicksort")
+    (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INT 1000)) (INTENT "Array to sort"))
+    (ACCEPTS_PARAMETER (NAME "size") (TYPE INT) (INTENT "Number of elements to sort"))
+    (RETURNS (TYPE VOID))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "array") (NULL_LITERAL))
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 0))
+        (PREDICATE_LESS_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 1000)))
+      (PROOF_HINT "Array must be valid and size within bounds"))
+    
+    (POSTCONDITION
+      (FOR_ALL (NAME "i") (TYPE INT)
+        (RANGE (INTEGER_LITERAL 0) (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 2)))
+        (PREDICATE_LESS_THAN_OR_EQUAL_TO
+          (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "i"))
+          (ARRAY_ACCESS (VARIABLE_REFERENCE "array") 
+            (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+      (PROOF_HINT "Array is sorted in ascending order")
+      (VERIFICATION_METHOD SMT_SOLVER))
+    
+    (INVARIANT
+      (PERMUTATION (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "array@pre"))
+      (PROOF_HINT "Sorting preserves all original elements"))
+    
+    (COMPLEXITY_EXPECTATION (TYPE TIME) (NOTATION BIG_O) (VALUE "O(n log n)"))
+    (COMPLEXITY_EXPECTATION (TYPE SPACE) (NOTATION BIG_O) (VALUE "O(log n)"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE FALSE)
+      (SIDE_EFFECTS (MODIFIES "array"))
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (CALL_FUNCTION "quicksort_internal"
+        (ARGUMENTS 
+          (VARIABLE_REFERENCE "array")
+          (INTEGER_LITERAL 0)
+          (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 1))))
+      (RETURN_VOID)))
+  
+  (DEFINE_FUNCTION
+    (NAME "quicksort_internal")
+    (INTENT "Internal quicksort implementation")
+    (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INT 1000)))
+    (ACCEPTS_PARAMETER (NAME "low") (TYPE INT))
+    (ACCEPTS_PARAMETER (NAME "high") (TYPE INT))
+    (RETURNS (TYPE VOID))
+    
+    (BODY
+      (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "low") (VARIABLE_REFERENCE "high"))
+        (THEN_EXECUTE
+          (DECLARE_VARIABLE (NAME "pivot_index") (TYPE INT)
+            (INITIAL_VALUE (CALL_FUNCTION "partition"
+              (ARGUMENTS 
+                (VARIABLE_REFERENCE "array")
+                (VARIABLE_REFERENCE "low")
+                (VARIABLE_REFERENCE "high")))))
+          
+          (CALL_FUNCTION "quicksort_internal"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "array")
+              (VARIABLE_REFERENCE "low")
+              (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "pivot_index") (INTEGER_LITERAL 1))))
+          
+          (CALL_FUNCTION "quicksort_internal"
+            (ARGUMENTS 
+              (VARIABLE_REFERENCE "array")
+              (EXPRESSION_ADD (VARIABLE_REFERENCE "pivot_index") (INTEGER_LITERAL 1))
+              (VARIABLE_REFERENCE "high")))))
+      (RETURN_VOID)))
+  
+  (DEFINE_FUNCTION
+    (NAME "partition")
+    (INTENT "Partition array for quicksort")
+    (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INT 1000)))
+    (ACCEPTS_PARAMETER (NAME "low") (TYPE INT))
+    (ACCEPTS_PARAMETER (NAME "high") (TYPE INT))
+    (RETURNS (TYPE INT))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "pivot") (TYPE INT)
+        (INITIAL_VALUE (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "high"))))
+      
+      (DECLARE_VARIABLE (NAME "i") (TYPE INT)
+        (INITIAL_VALUE (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "low") (INTEGER_LITERAL 1))))
+      
+      (FOR_LOOP
+        (INIT (DECLARE_VARIABLE (NAME "j") (TYPE INT) (INITIAL_VALUE (VARIABLE_REFERENCE "low"))))
+        (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "j") (VARIABLE_REFERENCE "high")))
+        (UPDATE (ASSIGN (TARGET "j") 
+          (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "j") (INTEGER_LITERAL 1)))))
+        (BODY
+          (IF_CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO
+              (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "j"))
+              (VARIABLE_REFERENCE "pivot"))
+            (THEN_EXECUTE
+              (ASSIGN (TARGET "i") 
+                (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1))))
+              (CALL_FUNCTION "swap"
+                (ARGUMENTS 
+                  (VARIABLE_REFERENCE "array")
+                  (VARIABLE_REFERENCE "i")
+                  (VARIABLE_REFERENCE "j")))))))
+      
+      (CALL_FUNCTION "swap"
+        (ARGUMENTS 
+          (VARIABLE_REFERENCE "array")
+          (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1))
+          (VARIABLE_REFERENCE "high")))
+      
+      (RETURN_VALUE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+  
+  (DEFINE_FUNCTION
+    (NAME "swap")
+    (INTENT "Swap two elements in array")
+    (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INT 1000)))
+    (ACCEPTS_PARAMETER (NAME "i") (TYPE INT))
+    (ACCEPTS_PARAMETER (NAME "j") (TYPE INT))
+    (RETURNS (TYPE VOID))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "temp") (TYPE INT)
+        (INITIAL_VALUE (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "i"))))
+      
+      (ASSIGN (TARGET (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "i")))
+        (SOURCE (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "j"))))
+      
+      (ASSIGN (TARGET (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "j")))
+        (SOURCE (VARIABLE_REFERENCE "temp")))
+      
+      (RETURN_VOID)))
+  
+  ; Functional operations
+  
+  (DEFINE_FUNCTION
+    (NAME "filter")
+    (INTENT "Filter array elements based on predicate")
+    (ACCEPTS_PARAMETER (NAME "input") (TYPE (ARRAY INT 1000)) (INTENT "Input array"))
+    (ACCEPTS_PARAMETER (NAME "input_size") (TYPE INT) (INTENT "Number of elements in input"))
+    (ACCEPTS_PARAMETER (NAME "predicate") (TYPE (FUNCTION (INT) BOOL)) (INTENT "Filter predicate"))
+    (ACCEPTS_PARAMETER (NAME "output") (TYPE (ARRAY INT 1000)) (INTENT "Output array"))
+    (RETURNS (TYPE INT))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "input") (NULL_LITERAL))
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "output") (NULL_LITERAL))
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "input_size") (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Arrays must be valid and size non-negative"))
+    
+    (POSTCONDITION
+      (PREDICATE_LESS_THAN_OR_EQUAL_TO 
+        (VARIABLE_REFERENCE "RETURNED_VALUE")
+        (VARIABLE_REFERENCE "input_size"))
+      (PROOF_HINT "Output size cannot exceed input size"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "output_index") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0)))
+      
+      (FOR_LOOP
+        (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+        (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "input_size")))
+        (UPDATE (ASSIGN (TARGET "i") 
+          (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+        (BODY
+          (IF_CONDITION (CALL_FUNCTION "predicate"
+              (ARGUMENTS (ARRAY_ACCESS (VARIABLE_REFERENCE "input") (VARIABLE_REFERENCE "i"))))
+            (THEN_EXECUTE
+              (ASSIGN (TARGET (ARRAY_ACCESS (VARIABLE_REFERENCE "output") (VARIABLE_REFERENCE "output_index")))
+                (SOURCE (ARRAY_ACCESS (VARIABLE_REFERENCE "input") (VARIABLE_REFERENCE "i"))))
+              (ASSIGN (TARGET "output_index")
+                (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "output_index") (INTEGER_LITERAL 1))))))))
+      
+      (RETURN_VALUE (VARIABLE_REFERENCE "output_index"))))
+  
+  (DEFINE_FUNCTION
+    (NAME "map")
+    (INTENT "Transform array elements using function")
+    (ACCEPTS_PARAMETER (NAME "input") (TYPE (ARRAY INT 1000)) (INTENT "Input array"))
+    (ACCEPTS_PARAMETER (NAME "size") (TYPE INT) (INTENT "Number of elements"))
+    (ACCEPTS_PARAMETER (NAME "transform") (TYPE (FUNCTION (INT) INT)) (INTENT "Transform function"))
+    (ACCEPTS_PARAMETER (NAME "output") (TYPE (ARRAY INT 1000)) (INTENT "Output array"))
+    (RETURNS (TYPE VOID))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "input") (NULL_LITERAL))
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "output") (NULL_LITERAL))
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Arrays must be valid and size non-negative"))
+    
+    (POSTCONDITION
+      (FOR_ALL (NAME "i") (TYPE INT)
+        (RANGE (INTEGER_LITERAL 0) (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 1)))
+        (PREDICATE_EQUALS
+          (ARRAY_ACCESS (VARIABLE_REFERENCE "output") (VARIABLE_REFERENCE "i"))
+          (CALL_FUNCTION "transform" 
+            (ARGUMENTS (ARRAY_ACCESS (VARIABLE_REFERENCE "input") (VARIABLE_REFERENCE "i"))))))
+      (PROOF_HINT "Each output element is transformed from corresponding input"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (FOR_LOOP
+        (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+        (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "size")))
+        (UPDATE (ASSIGN (TARGET "i") 
+          (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+        (BODY
+          (ASSIGN (TARGET (ARRAY_ACCESS (VARIABLE_REFERENCE "output") (VARIABLE_REFERENCE "i")))
+            (SOURCE (CALL_FUNCTION "transform"
+              (ARGUMENTS (ARRAY_ACCESS (VARIABLE_REFERENCE "input") (VARIABLE_REFERENCE "i"))))))))
+      
+      (RETURN_VOID)))
+  
+  (DEFINE_FUNCTION
+    (NAME "reduce")
+    (INTENT "Reduce array to single value using accumulator function")
+    (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INT 1000)) (INTENT "Input array"))
+    (ACCEPTS_PARAMETER (NAME "size") (TYPE INT) (INTENT "Number of elements"))
+    (ACCEPTS_PARAMETER (NAME "initial") (TYPE INT) (INTENT "Initial accumulator value"))
+    (ACCEPTS_PARAMETER (NAME "accumulator") (TYPE (FUNCTION (INT INT) INT)) (INTENT "Accumulator function"))
+    (RETURNS (TYPE INT))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "array") (NULL_LITERAL))
+        (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 0)))
+      (PROOF_HINT "Array must be valid and size non-negative"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "result") (TYPE INT) (INITIAL_VALUE (VARIABLE_REFERENCE "initial")))
+      
+      (FOR_LOOP
+        (INIT (DECLARE_VARIABLE (NAME "i") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0))))
+        (CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "i") (VARIABLE_REFERENCE "size")))
+        (UPDATE (ASSIGN (TARGET "i") 
+          (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1)))))
+        (BODY
+          (ASSIGN (TARGET "result")
+            (SOURCE (CALL_FUNCTION "accumulator"
+              (ARGUMENTS 
+                (VARIABLE_REFERENCE "result")
+                (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "i"))))))))
+      
+      (RETURN_VALUE (VARIABLE_REFERENCE "result"))))
+  
+  ; Search operations
+  
+  (DEFINE_FUNCTION
+    (NAME "binary_search")
+    (INTENT "Binary search in sorted array")
+    (ACCEPTS_PARAMETER (NAME "array") (TYPE (ARRAY INT 1000)) (INTENT "Sorted array"))
+    (ACCEPTS_PARAMETER (NAME "size") (TYPE INT) (INTENT "Number of elements"))
+    (ACCEPTS_PARAMETER (NAME "target") (TYPE INT) (INTENT "Value to search for"))
+    (RETURNS (TYPE INT))
+    
+    (PRECONDITION
+      (LOGICAL_AND
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "array") (NULL_LITERAL))
+        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 0))
+        (FOR_ALL (NAME "i") (TYPE INT)
+          (RANGE (INTEGER_LITERAL 0) (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 2)))
+          (PREDICATE_LESS_THAN_OR_EQUAL_TO
+            (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "i"))
+            (ARRAY_ACCESS (VARIABLE_REFERENCE "array") 
+              (EXPRESSION_ADD (VARIABLE_REFERENCE "i") (INTEGER_LITERAL 1))))))
+      (PROOF_HINT "Array must be sorted"))
+    
+    (POSTCONDITION
+      (LOGICAL_OR
+        (PREDICATE_EQUALS (VARIABLE_REFERENCE "RETURNED_VALUE") (INTEGER_LITERAL -1))
+        (LOGICAL_AND
+          (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "RETURNED_VALUE") (INTEGER_LITERAL 0))
+          (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "RETURNED_VALUE") (VARIABLE_REFERENCE "size"))
+          (PREDICATE_EQUALS 
+            (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "RETURNED_VALUE"))
+            (VARIABLE_REFERENCE "target"))))
+      (PROOF_HINT "Returns index of target or -1 if not found"))
+    
+    (COMPLEXITY_EXPECTATION (TYPE TIME) (NOTATION BIG_O) (VALUE "O(log n)"))
+    
+    (BEHAVIORAL_SPEC
+      (PURE TRUE)
+      (DETERMINISTIC TRUE))
+    
+    (BODY
+      (DECLARE_VARIABLE (NAME "left") (TYPE INT) (INITIAL_VALUE (INTEGER_LITERAL 0)))
+      (DECLARE_VARIABLE (NAME "right") (TYPE INT) 
+        (INITIAL_VALUE (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "size") (INTEGER_LITERAL 1))))
+      
+      (WHILE_LOOP
+        (CONDITION (PREDICATE_LESS_THAN_OR_EQUAL_TO 
+          (VARIABLE_REFERENCE "left") 
+          (VARIABLE_REFERENCE "right")))
+        (BODY
+          (DECLARE_VARIABLE (NAME "mid") (TYPE INT)
+            (INITIAL_VALUE (EXPRESSION_DIVIDE
+              (EXPRESSION_ADD (VARIABLE_REFERENCE "left") (VARIABLE_REFERENCE "right"))
+              (INTEGER_LITERAL 2))))
+          
+          (IF_CONDITION (PREDICATE_EQUALS 
+              (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "mid"))
+              (VARIABLE_REFERENCE "target"))
+            (THEN_EXECUTE (RETURN_VALUE (VARIABLE_REFERENCE "mid")))
+            (ELSE_EXECUTE
+              (IF_CONDITION (PREDICATE_LESS_THAN
+                  (ARRAY_ACCESS (VARIABLE_REFERENCE "array") (VARIABLE_REFERENCE "mid"))
+                  (VARIABLE_REFERENCE "target"))
+                (THEN_EXECUTE
+                  (ASSIGN (TARGET "left")
+                    (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "mid") (INTEGER_LITERAL 1)))))
+                (ELSE_EXECUTE
+                  (ASSIGN (TARGET "right")
+                    (SOURCE (EXPRESSION_SUBTRACT (VARIABLE_REFERENCE "mid") (INTEGER_LITERAL 1))))))))))
+      
+      (RETURN_VALUE (INTEGER_LITERAL -1))))
+  
+  ; Export all functions
+  (EXPORT_FUNCTION "sort_verified")
+  (EXPORT_FUNCTION "filter")
+  (EXPORT_FUNCTION "map")
+  (EXPORT_FUNCTION "reduce")
+  (EXPORT_FUNCTION "binary_search")
+)

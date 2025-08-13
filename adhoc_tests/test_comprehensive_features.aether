@@ -1,0 +1,116 @@
+(DEFINE_MODULE
+  (NAME comprehensive_test)
+  (INTENT "Test all newly implemented features")
+  (CONTENT
+    ; String operations test
+    (DEFINE_FUNCTION
+      (NAME test_strings)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "str1") (TYPE STRING))
+        (DECLARE_VARIABLE (NAME "str2") (TYPE STRING))
+        (DECLARE_VARIABLE (NAME "result") (TYPE STRING))
+        
+        (ASSIGN (TARGET_VARIABLE str1) (SOURCE_EXPRESSION "Hello, "))
+        (ASSIGN (TARGET_VARIABLE str2) (SOURCE_EXPRESSION "World!"))
+        
+        ; Test string concatenation
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (STRING_CONCAT str1 str2)))
+        
+        (CALL_FUNCTION printf "Concatenated: %s\n" result)
+        
+        ; Test string length
+        (DECLARE_VARIABLE (NAME "len") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE len)
+          (SOURCE_EXPRESSION (STRING_LENGTH result)))
+        
+        (CALL_FUNCTION printf "Length: %d\n" len)
+        
+        ; Test substring
+        (DECLARE_VARIABLE (NAME "sub") (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE sub)
+          (SOURCE_EXPRESSION (SUBSTRING result 0 5)))
+        
+        (CALL_FUNCTION printf "Substring: %s\n" sub)
+        
+        (RETURN_VALUE 0)
+      ))
+    
+    ; Array operations test
+    (DEFINE_FUNCTION
+      (NAME test_arrays)
+      (RETURNS INTEGER)
+      (BODY
+        ; Create array literal
+        (DECLARE_VARIABLE (NAME "numbers") (TYPE (ARRAY_OF_TYPE INTEGER)))
+        (ASSIGN
+          (TARGET_VARIABLE numbers)
+          (SOURCE_EXPRESSION (ARRAY_LITERAL 10 20 30 40 50)))
+        
+        ; Get array element
+        (DECLARE_VARIABLE (NAME "third") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE third)
+          (SOURCE_EXPRESSION (GET_ARRAY_ELEMENT numbers 2)))
+        
+        (CALL_FUNCTION printf "Third element: %d\n" third)
+        
+        ; Get array length
+        (DECLARE_VARIABLE (NAME "size") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE size)
+          (SOURCE_EXPRESSION (ARRAY_LENGTH numbers)))
+        
+        (CALL_FUNCTION printf "Array size: %d\n" size)
+        
+        (RETURN_VALUE 0)
+      ))
+    
+    ; External function test
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME getenv)
+      (LIBRARY "libc")
+      (SYMBOL "getenv")
+      (ACCEPTS_PARAMETER (NAME "name") (TYPE STRING))
+      (RETURNS STRING)
+      (CALLING_CONVENTION "C")
+      (THREAD_SAFE true)
+      (MAY_BLOCK false))
+    
+    (DEFINE_FUNCTION
+      (NAME test_external)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "path") (TYPE STRING))
+        (ASSIGN
+          (TARGET_VARIABLE path)
+          (SOURCE_EXPRESSION (CALL_FUNCTION getenv "PATH")))
+        
+        (CALL_FUNCTION printf "PATH environment variable: %s\n" path)
+        
+        (RETURN_VALUE 0)
+      ))
+    
+    ; Main function to run all tests
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "=== Testing String Operations ===\n")
+        (CALL_FUNCTION test_strings)
+        
+        (CALL_FUNCTION printf "\n=== Testing Array Operations ===\n")
+        (CALL_FUNCTION test_arrays)
+        
+        (CALL_FUNCTION printf "\n=== Testing External Functions ===\n")
+        (CALL_FUNCTION test_external)
+        
+        (CALL_FUNCTION printf "\n=== All tests completed! ===\n")
+        
+        (RETURN_VALUE 0)
+      ))
+  ))

@@ -1,0 +1,10 @@
+(DEFINE_MODULE
+  (NAME simple_test)
+  (INTENT "Simple function test")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME test_func)
+      (INTENT "Simple test function")  
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 42)))))

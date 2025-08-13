@@ -1,0 +1,196 @@
+(DEFINE_MODULE
+  (NAME comparison_logic)
+  (INTENT "Demonstrate comparison and logical operations")
+  (CONTENT
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME printf)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "format") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME test_comparisons)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME a) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME b) (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE a)
+          (SOURCE_EXPRESSION 5))
+        
+        (ASSIGN
+          (TARGET_VARIABLE b)
+          (SOURCE_EXPRESSION 3))
+        
+        ; Test equals
+        (IF_CONDITION
+          (PREDICATE_EQUALS a b)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "%d == %d: true\n" a b))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "%d == %d: false\n" a b)))
+        
+        ; Test not equals
+        (IF_CONDITION
+          (PREDICATE_NOT_EQUALS a b)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "%d != %d: true\n" a b))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "%d != %d: false\n" a b)))
+        
+        ; Test less than
+        (IF_CONDITION
+          (PREDICATE_LESS_THAN a b)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "%d < %d: true\n" a b))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "%d < %d: false\n" a b)))
+        
+        ; Test less than or equal
+        (IF_CONDITION
+          (PREDICATE_LESS_THAN_OR_EQUAL_TO a b)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "%d <= %d: true\n" a b))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "%d <= %d: false\n" a b)))
+        
+        ; Test greater than
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN a b)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "%d > %d: true\n" a b))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "%d > %d: false\n" a b)))
+        
+        ; Test greater than or equal
+        (IF_CONDITION
+          (PREDICATE_GREATER_THAN_OR_EQUAL_TO a b)
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "%d >= %d: true\n" a b))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "%d >= %d: false\n" a b)))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_logical_operations)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME x) (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME y) (TYPE INTEGER))
+        
+        (ASSIGN
+          (TARGET_VARIABLE x)
+          (SOURCE_EXPRESSION 10))
+        
+        (ASSIGN
+          (TARGET_VARIABLE y)
+          (SOURCE_EXPRESSION 20))
+        
+        ; Test AND
+        (IF_CONDITION
+          (LOGICAL_AND
+            (PREDICATE_GREATER_THAN x 5)
+            (PREDICATE_LESS_THAN y 30))
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "x > 5 AND y < 30: true\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "x > 5 AND y < 30: false\n")))
+        
+        ; Test OR
+        (IF_CONDITION
+          (LOGICAL_OR
+            (PREDICATE_LESS_THAN x 5)
+            (PREDICATE_GREATER_THAN y 15))
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "x < 5 OR y > 15: true\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "x < 5 OR y > 15: false\n")))
+        
+        ; Test NOT
+        (IF_CONDITION
+          (LOGICAL_NOT (PREDICATE_EQUALS x y))
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "NOT (x == y): true\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "NOT (x == y): false\n")))
+        
+        ; Complex logical expression
+        (IF_CONDITION
+          (LOGICAL_AND
+            (LOGICAL_OR
+              (PREDICATE_GREATER_THAN x 5)
+              (PREDICATE_EQUALS x 10))
+            (LOGICAL_NOT (PREDICATE_GREATER_THAN y 50)))
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "Complex expression: true\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "Complex expression: false\n")))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME test_boolean_variables)
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME flag1) (TYPE BOOLEAN))
+        (DECLARE_VARIABLE (NAME flag2) (TYPE BOOLEAN))
+        (DECLARE_VARIABLE (NAME result) (TYPE BOOLEAN))
+        
+        (ASSIGN
+          (TARGET_VARIABLE flag1)
+          (SOURCE_EXPRESSION TRUE))
+        
+        (ASSIGN
+          (TARGET_VARIABLE flag2)
+          (SOURCE_EXPRESSION FALSE))
+        
+        ; Boolean AND
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (LOGICAL_AND flag1 flag2)))
+        
+        (IF_CONDITION
+          result
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "TRUE AND FALSE = true\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "TRUE AND FALSE = false\n")))
+        
+        ; Boolean OR
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (LOGICAL_OR flag1 flag2)))
+        
+        (IF_CONDITION
+          result
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "TRUE OR FALSE = true\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "TRUE OR FALSE = false\n")))
+        
+        ; Boolean NOT
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (LOGICAL_NOT flag1)))
+        
+        (IF_CONDITION
+          result
+          (THEN_EXECUTE
+            (CALL_FUNCTION printf "NOT TRUE = true\n"))
+          (ELSE_EXECUTE
+            (CALL_FUNCTION printf "NOT TRUE = false\n")))
+        
+        (RETURN_VALUE 0)))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION test_comparisons)
+        (CALL_FUNCTION test_logical_operations)
+        (CALL_FUNCTION test_boolean_variables)
+        (RETURN_VALUE 0)))
+  )
+)

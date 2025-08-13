@@ -1,0 +1,21 @@
+(DEFINE_MODULE
+  (NAME test_string_usage)
+  (INTENT "Test string constant usage")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME GREETING)
+      (TYPE STRING)
+      (VALUE "Hello")
+      (INTENT "Test string"))
+      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Use string constant")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE 
+          (TARGET_VARIABLE (IDENTIFIER temp))
+          (VARIABLE_TYPE STRING)
+          (MUTABILITY MUTABLE)
+          (SOURCE_EXPRESSION GREETING))
+        (RETURN_VALUE 42)))))

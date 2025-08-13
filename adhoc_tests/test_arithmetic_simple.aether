@@ -1,0 +1,19 @@
+(DEFINE_MODULE
+  (NAME arithmetic_test)
+  (INTENT "Test arithmetic operations")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test basic arithmetic")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "a") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "b") (TYPE INTEGER))
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        
+        (ASSIGN (TARGET_VARIABLE a) (SOURCE_EXPRESSION 10))
+        (ASSIGN (TARGET_VARIABLE b) (SOURCE_EXPRESSION 5))
+        (ASSIGN (TARGET_VARIABLE result) (SOURCE_EXPRESSION (EXPRESSION_ADD a b)))
+        
+        (CALL_FUNCTION printf "10 + 5 = %d\n" result)
+        (RETURN_VALUE 0)))))

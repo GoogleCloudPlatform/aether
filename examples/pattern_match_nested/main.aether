@@ -1,0 +1,75 @@
+(DEFINE_MODULE
+  (NAME pattern_match_nested_test)
+  (INTENT "Test nested pattern matching capabilities")
+  (CONTENT
+    ; Define a Result type
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Result)
+      (INTENT "Represents success or failure")
+      (VARIANTS
+        (VARIANT Ok (HOLDS INTEGER))
+        (VARIANT Error (HOLDS STRING))))
+    
+    ; Define an Option type
+    (DEFINE_ENUMERATION_TYPE
+      (NAME Option)
+      (INTENT "Optional value")
+      (VARIANTS
+        (VARIANT Some (HOLDS Result))  ; Option can hold a Result
+        (VARIANT None)))
+    
+    ; For now, we'll skip the Pair type since HOLDS only supports one type
+    
+    ; External function declaration
+    (DECLARE_EXTERNAL_FUNCTION
+      (NAME puts)
+      (LIBRARY "libc")
+      (ACCEPTS_PARAMETER (NAME "str") (TYPE STRING))
+      (RETURNS INTEGER))
+    
+    (DEFINE_FUNCTION
+      (NAME handle_nested_option)
+      (ACCEPTS_PARAMETER (NAME "opt") (TYPE Option))
+      (RETURNS STRING)
+      (BODY
+        ; Test nested pattern matching
+        (RETURN_VALUE 
+          (MATCH_EXPRESSION opt
+            (CASE (Some (Ok value))
+              (STRING_CONCAT "Success with value: " (TO_STRING value)))
+            (CASE (Some (Error msg))
+              (STRING_CONCAT "Error: " msg))
+            (CASE (None)
+              "Nothing")))))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (RETURNS INTEGER)
+      (BODY
+        ; Test with Some(Ok(42))
+        (DECLARE_VARIABLE (NAME nested1) (TYPE Option))
+        (ASSIGN
+          (TARGET_VARIABLE nested1)
+          (SOURCE_EXPRESSION (Some (Ok 42))))
+        
+        (CALL_FUNCTION puts (CALL_FUNCTION handle_nested_option nested1))
+        
+        ; Test with Some(Error("failed"))
+        (DECLARE_VARIABLE (NAME nested2) (TYPE Option))
+        (ASSIGN
+          (TARGET_VARIABLE nested2)
+          (SOURCE_EXPRESSION (Some (Error "failed"))))
+        
+        (CALL_FUNCTION puts (CALL_FUNCTION handle_nested_option nested2))
+        
+        ; Test with None
+        (DECLARE_VARIABLE (NAME nested3) (TYPE Option))
+        (ASSIGN
+          (TARGET_VARIABLE nested3)
+          (SOURCE_EXPRESSION (None)))
+        
+        (CALL_FUNCTION puts (CALL_FUNCTION handle_nested_option nested3))
+        
+        (RETURN_VALUE 0)))
+  )
+)

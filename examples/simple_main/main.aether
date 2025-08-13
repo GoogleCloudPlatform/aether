@@ -1,0 +1,28 @@
+(DEFINE_MODULE
+  (NAME main)
+  (INTENT "Simple test module")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Main function")
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION "divide" (ARGUMENTS (INTEGER_LITERAL 10) (INTEGER_LITERAL 0)))
+        (RETURN_VALUE 0)
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "divide")
+      (INTENT "Divide function")
+      (ACCEPTS_PARAMETER (NAME "numerator") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "denominator") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (PRECONDITION
+        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "denominator") (INTEGER_LITERAL 0)))
+      (BODY
+        (RETURN_VALUE (EXPRESSION_DIVIDE (VARIABLE_REFERENCE "numerator") (VARIABLE_REFERENCE "denominator")))
+      )
+    )
+  )
+)
+

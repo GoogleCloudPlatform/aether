@@ -1,0 +1,16 @@
+(DEFINE_MODULE
+  (NAME test_constants)
+  (INTENT "Test constant resolution debugging")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME PI_APPROX)
+      (TYPE INTEGER) 
+      (VALUE 3)
+      (INTENT "Simple constant for testing"))
+    
+    (DEFINE_FUNCTION
+      (NAME test_function)
+      (INTENT "Test using constant")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE PI_APPROX)))))

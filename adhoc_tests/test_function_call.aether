@@ -1,0 +1,23 @@
+(DEFINE_MODULE
+  (NAME function_call_test)
+  (INTENT "Test function call functionality")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME add)
+      (INTENT "Add two numbers")
+      (ACCEPTS_PARAMETER (NAME "a") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "b") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD a b))))
+        
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Test function calls")
+      (RETURNS INTEGER)
+      (BODY
+        (DECLARE_VARIABLE (NAME "result") (TYPE INTEGER))
+        (ASSIGN
+          (TARGET_VARIABLE result)
+          (SOURCE_EXPRESSION (CALL_FUNCTION add 5 3)))
+        (RETURN_VALUE result)))))

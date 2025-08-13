@@ -1,0 +1,18 @@
+(DEFINE_MODULE invalid_contracts
+  (INTENT "Test module with invalid contracts")
+  
+  (DEFINE_FUNCTION bad_performance
+    (INTENT "Function with invalid performance expectation")
+    (ACCEPTS_PARAMETER x INTEGER)
+    (RETURNS INTEGER)
+    (PERFORMANCE_EXPECTATION
+      (METRIC "LatencyMs")
+      (TARGET -10.0)
+      (CONTEXT "Invalid negative latency"))
+    (COMPLEXITY_EXPECTATION
+      (TYPE "Time")
+      (NOTATION "BigO")
+      (VALUE "O(invalid)"))
+    (BODY
+      (RETURN_VALUE x)))
+)

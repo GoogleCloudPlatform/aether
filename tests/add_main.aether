@@ -1,0 +1,24 @@
+(DEFINE_MODULE
+  (NAME add_test)
+  (INTENT "Test arithmetic with main function")
+  (CONTENT
+    (DEFINE_FUNCTION
+      (NAME "add")
+      (INTENT "Add two integers")
+      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
+      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE (EXPRESSION_ADD x y))
+      )
+    )
+    (DEFINE_FUNCTION
+      (NAME "main")
+      (INTENT "Main entry point")
+      (RETURNS INTEGER)
+      (BODY
+        (RETURN_VALUE 0)
+      )
+    )
+  )
+)

@@ -1,0 +1,15 @@
+(DEFINE_MODULE
+  (NAME simple_string)
+  (INTENT "Simple string constant test")
+  (CONTENT
+    (DECLARE_CONSTANT
+      (NAME GREETING)
+      (TYPE STRING)
+      (VALUE "Hello"))
+    
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Main function")
+      (RETURNS INTEGER)
+      (BODY 
+        (RETURN_VALUE 0)))))

@@ -1,0 +1,11 @@
+(DEFINE_MODULE
+  (NAME hello_print)
+  (INTENT "Hello world with printf")
+  (CONTENT      
+    (DEFINE_FUNCTION
+      (NAME main)
+      (INTENT "Print hello world")
+      (RETURNS INTEGER)
+      (BODY
+        (CALL_FUNCTION printf "Hello, World!\n")
+        (RETURN_VALUE 0)))))
