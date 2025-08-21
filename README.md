@@ -129,7 +129,7 @@ aether tokens program.aether
 
 ## 📄 License
 
-This project is licensed under the Apache 2 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2 License - see the [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 
@@ -140,3 +140,11 @@ This project is licensed under the Apache 2 - see the [LICENSE](LICENSE) file fo
 ---
 
 *Aether: Bridging human intention and machine execution through explicit, verifiable code.*
+
+**NOTE**
+This project is a demonstration of vibe coding intended to provide a trustworthy and verifiable example that developers and researchers can use. It is not intended
+for use in a production environment.
+
+This is not an officially supported Google product. This project is not
+eligible for the [Google Open Source Software Vulnerability Rewards
+Program](https://bughunters.google.com/open-source-security).
