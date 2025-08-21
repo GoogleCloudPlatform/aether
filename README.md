@@ -1,8 +1,8 @@
-# AetherScript
+# Aether
 
 **A modern systems programming language with LLM-first design principles**
 
-AetherScript combines memory safety through an ownership system with S-expression syntax for enhanced metaprogramming capabilities. Designed for high-performance applications while maintaining safety, expressiveness, and AI-friendly code generation.
+Aether combines memory safety through an ownership system with S-expression syntax for enhanced metaprogramming capabilities. Designed for high-performance applications while maintaining safety, expressiveness, and AI-friendly code generation.
 
 ## 🚀 Quick Start
 
@@ -13,8 +13,8 @@ AetherScript combines memory safety through an ownership system with S-expressio
 
 ### Build and Install
 ```bash
-git clone https://github.com/keithballinger/logos.git
-cd logos
+git clone https://github.com/GoogleCloudPlatform/Aether
+cd Aether
 cargo build --release
 ```
 
@@ -22,14 +22,14 @@ cargo build --release
 ```aether
 (DEFINE_MODULE
   (NAME 'hello_world')
-  (INTENT "Simple greeting program demonstrating AetherScript syntax")
+  (INTENT "Simple greeting program demonstrating Aether syntax")
   (CONTENT
     (DEFINE_FUNCTION
       (NAME 'main')
       (RETURNS INTEGER)
       (BODY
-        (EXPRESSION_STATEMENT 
-          (CALL_FUNCTION 'printf' "Hello, AetherScript!\n"))
+        (EXPRESSION_STATEMENT
+          (CALL_FUNCTION 'printf' "Hello, Aether!\n"))
         (RETURN_VALUE 0)))))
 ```
 
@@ -59,7 +59,7 @@ Compile and run:
 ## 🌐 Working Examples
 
 ### HTTP Blog Server
-AetherScript includes a complete, working HTTP server implementation:
+Aether includes a complete, working HTTP server implementation:
 
 ```bash
 # Compile the blog server
@@ -74,7 +74,7 @@ curl http://localhost:8080
 
 See **[examples/README.md](examples/README.md)** for all available examples including:
 - ✅ **Working HTTP blog servers** with styled HTML
-- 🚀 **LLM-optimized web applications** 
+- 🚀 **LLM-optimized web applications**
 - 🔧 **FFI networking integration**
 - 📊 **Resource management demonstrations**
 
@@ -84,7 +84,7 @@ See **[examples/README.md](examples/README.md)** for all available examples incl
 # Compile to executable
 aether compile program.aether
 
-# Type checking only  
+# Type checking only
 aether check program.aether
 
 # Run directly
@@ -129,14 +129,14 @@ aether tokens program.aether
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2 - see the [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 
-- **Repository**: https://github.com/keithballinger/logos
+- **Repository**: https://github.com/GoogleCloudPlatform/Aether
 - **Documentation**: Complete docs in this repository
 - **Examples**: Live HTTP server demos in `/examples`
 
 ---
 
-*AetherScript: Bridging human intention and machine execution through explicit, verifiable code.*
+*Aether: Bridging human intention and machine execution through explicit, verifiable code.*
