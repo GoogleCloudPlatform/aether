@@ -93,7 +93,7 @@ Beyond primitive types, semantic meaning:
 (DEFINE_SEMANTIC_TYPE
   (NAME "email_address")
   (BASE_TYPE STRING)
-  (CONSTRAINT (MATCHES_REGEX "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"))
+  (CONSTRAINT (MATCHES_REGEX "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ))
   (SEMANTIC_CATEGORY "contact_information")
   (PRIVACY_LEVEL "personally_identifiable")
 )
@@ -245,7 +245,7 @@ Compiler generates working code for valid sections even when other parts fail:
           (CATCH_EXCEPTION
             (EXCEPTION_TYPE request_validation_error)
             (HANDLER_BLOCK
-              (RETURN_VALUE (CREATE_ERROR_RESPONSE "Invalid request"))))))))
+              (RETURN_VALUE (CREATE_ERROR_RESPONSE "Invalid request")))))))
 )
 ```
 
