@@ -4,14 +4,24 @@
 
 Aether combines memory safety through an ownership system with S-expression syntax for enhanced metaprogramming capabilities. Designed for high-performance applications while maintaining safety, expressiveness, and AI-friendly code generation.
 
+**NOTE**
+This project is a demonstration of vibe coding intended to provide a trustworthy and verifiable example that developers and researchers can use. It is not intended
+for use in a production environment.
+
+This is not an officially supported Google product. This project is not
+eligible for the [Google Open Source Software Vulnerability Rewards
+Program](https://bughunters.google.com/open-source-security).
+
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Rust toolchain (1.70+)
 - LLVM 17+
 - Git
 
 ### Build and Install
+
 ```bash
 git clone https://github.com/GoogleCloudPlatform/Aether
 cd Aether
@@ -19,6 +29,7 @@ cargo build --release
 ```
 
 ### Hello World
+
 ```aether
 (DEFINE_MODULE
   (NAME 'hello_world')
@@ -34,6 +45,7 @@ cargo build --release
 ```
 
 Compile and run:
+
 ```bash
 ./target/release/aether compile examples/hello_world.aether
 ./hello_world
@@ -59,6 +71,7 @@ Compile and run:
 ## 🌐 Working Examples
 
 ### HTTP Blog Server
+
 Aether includes a complete, working HTTP server implementation:
 
 ```bash
@@ -73,6 +86,7 @@ curl http://localhost:8080
 ```
 
 See **[examples/README.md](examples/README.md)** for all available examples including:
+
 - ✅ **Working HTTP blog servers** with styled HTML
 - 🚀 **LLM-optimized web applications**
 - 🔧 **FFI networking integration**
@@ -113,6 +127,7 @@ aether tokens program.aether
 ## 🎯 Status
 
 **Production Ready** - AetherScript is fully functional with:
+
 - ✅ **360 unit tests** passing
 - ✅ **Complete compiler pipeline** (lexing → parsing → semantic analysis → LLVM codegen)
 - ✅ **Ownership system** with move/borrow tracking
@@ -139,12 +154,4 @@ This project is licensed under the Apache 2 License - see the [LICENSE](LICENSE)
 
 ---
 
-*Aether: Bridging human intention and machine execution through explicit, verifiable code.*
-
-**NOTE**
-This project is a demonstration of vibe coding intended to provide a trustworthy and verifiable example that developers and researchers can use. It is not intended
-for use in a production environment.
-
-This is not an officially supported Google product. This project is not
-eligible for the [Google Open Source Software Vulnerability Rewards
-Program](https://bughunters.google.com/open-source-security).
+_Aether: Bridging human intention and machine execution through explicit, verifiable code._
