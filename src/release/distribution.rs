@@ -33,7 +33,7 @@ pub struct DistributionManager {
     
     /// CDN manager
     cdn_manager: Option<CdnManager>,
-    
+    f
     /// Distribution history
     history: Vec<DistributionRecord>,
     
@@ -748,8 +748,8 @@ pub struct GeoRestrictions {
 /// Geographic restriction types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GeoRestrictionType {
-    Whitelist,
-    Blacklist,
+    Allowlist,
+    Blocklist,
     None,
 }
 
