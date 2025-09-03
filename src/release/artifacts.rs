@@ -1477,7 +1477,7 @@ Released on: {}
 fn generate_license(&self, license_type: &str, format: &DocumentationFormat, output_path: &PathBuf) -> Result<Artifact, SemanticError> {
         println!("Generating license file for: {}", license_type);
 
-        let license_content = include_str!("../../../../LICENSE");
+        let license_content = include_str!("../../LICENSE");
 
         std::fs::write(output_path, license_content.as_bytes()).map_err(|e| SemanticError::Internal {
             message: format!("Failed to write license: {}", e),
