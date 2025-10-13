@@ -57,7 +57,7 @@ sha2 = "0.10"
 # Date and time
 chrono = { version = "0.4", features = ["serde"] }
 broadcast = "0.1"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 
 # Number of CPUs
 num_cpus = "1.16"
