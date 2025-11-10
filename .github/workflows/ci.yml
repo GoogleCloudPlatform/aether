@@ -52,7 +52,7 @@ jobs:
         toolchain: ${{ matrix.rust }}
 
     - name: Cache cargo registry
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -93,7 +93,7 @@ jobs:
         components: clippy
 
     - name: Cache cargo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -147,7 +147,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Cache cargo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -184,7 +184,7 @@ jobs:
       run: cargo install cargo-tarpaulin
 
     - name: Cache cargo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -213,7 +213,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Cache cargo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -265,7 +265,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Cache cargo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -291,7 +291,7 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Cache cargo
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
