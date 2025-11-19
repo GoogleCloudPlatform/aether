@@ -40,7 +40,7 @@ tokio = { version = "1.0", features = ["full"], optional = true }
 unicode-segmentation = "1.10"
 
 # LLVM code generation
-inkwell = { version = "0.4", features = ["llvm17-0"] }
+inkwell = { version = "0.7", features = ["llvm17-0"] }
 
 # System information for profiling
 libc = "0.2"
