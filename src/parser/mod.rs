@@ -61,6 +61,7 @@ pub enum KeywordType {
     
     // Type keywords
     Integer,
+    Integer64,
     Float,
     String,
     Char,
@@ -286,6 +287,7 @@ impl Parser {
             ("MATCH_EXPRESSION", KeywordType::MatchExpression),
             ("CASE", KeywordType::Case),
             ("INTEGER", KeywordType::Integer),
+            ("INTEGER64", KeywordType::Integer64),
             ("FLOAT", KeywordType::Float),
             ("STRING", KeywordType::String),
             ("CHAR", KeywordType::Char),
@@ -1951,6 +1953,13 @@ impl Parser {
                             source_location: location,
                         })
                     }
+                    Some(KeywordType::Integer64) => {
+                        self.advance();
+                        Ok(TypeSpecifier::Primitive {
+                            type_name: PrimitiveType::Integer64,
+                            source_location: location,
+                        })
+                    }
                     Some(KeywordType::Float) => {
                         self.advance();
                         Ok(TypeSpecifier::Primitive {
@@ -2404,6 +2413,17 @@ impl Parser {
                         let right = Box::new(self.parse_expression()?);
                         self.consume_right_paren()?;
                         Ok(Expression::GreaterThan {
+                            left,
+                            right,
+                            source_location: start_location,
+                        })
+                    }
+                    Some(KeywordType::PredicateGreaterThanOrEqualTo) => {
+                        self.advance(); // consume PREDICATE_GREATER_THAN_OR_EQUAL_TO
+                        let left = Box::new(self.parse_expression()?);
+                        let right = Box::new(self.parse_expression()?);
+                        self.consume_right_paren()?;
+                        Ok(Expression::GreaterThanOrEqual {
                             left,
                             right,
                             source_location: start_location,

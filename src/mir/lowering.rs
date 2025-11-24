@@ -829,6 +829,10 @@ impl LoweringContext {
                 self.lower_binary_op(BinOp::Le, left, right, source_location)
             }
             
+            ast::Expression::GreaterThanOrEqual { left, right, source_location } => {
+                self.lower_binary_op(BinOp::Ge, left, right, source_location)
+            }
+            
             ast::Expression::FunctionCall { call, source_location } => {
                 self.lower_function_call(call, source_location)
             }

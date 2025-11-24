@@ -1404,6 +1404,22 @@ impl SemanticAnalyzer {
                 }
             }
             
+            Expression::GreaterThanOrEqual { left, right, source_location } => {
+                let left_type = self.analyze_expression(left)?;
+                let right_type = self.analyze_expression(right)?;
+                
+                // Check types are compatible for comparison
+                if self.type_checker.borrow().types_compatible(&left_type, &right_type) {
+                    Ok(Type::primitive(PrimitiveType::Boolean))
+                } else {
+                    Err(SemanticError::TypeMismatch {
+                        expected: left_type.to_string(),
+                        found: right_type.to_string(),
+                        location: source_location.clone(),
+                    })
+                }
+            }
+            
             // TODO: Handle other expression types
             _ => {
                 eprintln!("Warning: Unhandled expression type in semantic analysis");

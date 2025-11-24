@@ -116,6 +116,7 @@ impl<'ctx> LLVMBackend<'ctx> {
         match ty {
             crate::types::Type::Primitive(prim) => match prim {
                 crate::ast::PrimitiveType::Integer => self.context.i32_type().into(),
+                crate::ast::PrimitiveType::Integer64 => self.context.i64_type().into(),
                 crate::ast::PrimitiveType::Float => self.context.f64_type().into(),
                 crate::ast::PrimitiveType::Boolean => self.context.i32_type().into(), // Use i32 for bool
                 crate::ast::PrimitiveType::String => self.context.i8_type().ptr_type(AddressSpace::default()).into(),
@@ -285,6 +286,9 @@ impl<'ctx> LLVMBackend<'ctx> {
                 crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer) => {
                     self.context.i32_type().fn_type(&param_types, ext_func.variadic)
                 }
+                crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer64) => {
+                    self.context.i64_type().fn_type(&param_types, ext_func.variadic)
+                }
                 crate::types::Type::Primitive(crate::ast::PrimitiveType::Float) => {
                     self.context.f64_type().fn_type(&param_types, ext_func.variadic)
                 }
@@ -376,6 +380,9 @@ impl<'ctx> LLVMBackend<'ctx> {
                             crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer) => {
                                 self.context.i32_type().into()
                             }
+                            crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer64) => {
+                                self.context.i64_type().into()
+                            }
                             crate::types::Type::Primitive(crate::ast::PrimitiveType::Float) => {
                                 self.context.f64_type().into()
                             }
@@ -405,6 +412,9 @@ impl<'ctx> LLVMBackend<'ctx> {
                     }
                     crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer) => {
                         self.context.i32_type().fn_type(&param_types, false)
+                    }
+                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer64) => {
+                        self.context.i64_type().fn_type(&param_types, false)
                     }
                     crate::types::Type::Primitive(crate::ast::PrimitiveType::Float) => {
                         self.context.f64_type().fn_type(&param_types, false)
@@ -2118,6 +2128,7 @@ impl<'ctx> LLVMBackend<'ctx> {
         function_declarations.insert("aether_runtime_init".to_string(), init_fn);
         
         let i32_type = self.context.i32_type();
+        let i64_type = self.context.i64_type();
         let i8_type = self.context.i8_type();
         let i8_ptr_type = i8_type.ptr_type(AddressSpace::default());
         let void_type = self.context.void_type();
@@ -2241,28 +2252,28 @@ impl<'ctx> LLVMBackend<'ctx> {
         function_declarations.insert("tcp_close".to_string(), tcp_close_fn);
         
         // Memory management functions
-        // aether_malloc(int size) -> void*
-        let malloc_type = i8_ptr_type.fn_type(&[i32_type.into()], false);
+        // aether_malloc(int64 size) -> int64
+        let malloc_type = i64_type.fn_type(&[i64_type.into()], false);
         let malloc_fn = self.module.add_function("aether_malloc", malloc_type, None);
         function_declarations.insert("aether_malloc".to_string(), malloc_fn);
         
-        // aether_free(void* ptr) -> void
-        let free_type = void_type.fn_type(&[i8_ptr_type.into()], false);
+        // aether_free(int64 ptr) -> void
+        let free_type = void_type.fn_type(&[i64_type.into()], false);
         let free_fn = self.module.add_function("aether_free", free_type, None);
         function_declarations.insert("aether_free".to_string(), free_fn);
         
-        // aether_realloc(void* ptr, int new_size) -> void*
-        let realloc_type = i8_ptr_type.fn_type(&[i8_ptr_type.into(), i32_type.into()], false);
+        // aether_realloc(int64 ptr, int64 new_size) -> int64
+        let realloc_type = i64_type.fn_type(&[i64_type.into(), i64_type.into()], false);
         let realloc_fn = self.module.add_function("aether_realloc", realloc_type, None);
         function_declarations.insert("aether_realloc".to_string(), realloc_fn);
         
-        // aether_gc_add_root(void* ptr) -> void
-        let gc_add_root_type = void_type.fn_type(&[i8_ptr_type.into()], false);
+        // aether_gc_add_root(int64 ptr) -> void
+        let gc_add_root_type = void_type.fn_type(&[i64_type.into()], false);
         let gc_add_root_fn = self.module.add_function("aether_gc_add_root", gc_add_root_type, None);
         function_declarations.insert("aether_gc_add_root".to_string(), gc_add_root_fn);
         
-        // aether_gc_remove_root(void* ptr) -> void
-        let gc_remove_root_type = void_type.fn_type(&[i8_ptr_type.into()], false);
+        // aether_gc_remove_root(int64 ptr) -> void
+        let gc_remove_root_type = void_type.fn_type(&[i64_type.into()], false);
         let gc_remove_root_fn = self.module.add_function("aether_gc_remove_root", gc_remove_root_type, None);
         function_declarations.insert("aether_gc_remove_root".to_string(), gc_remove_root_fn);
         
