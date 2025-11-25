@@ -722,6 +722,13 @@ impl Parser {
                         source_location: start_location,
                     });
                 }
+                Keyword::Int32 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Integer32,
+                        source_location: start_location,
+                    });
+                }
                 Keyword::Int64 => {
                     self.advance();
                     return Ok(TypeSpecifier::Primitive {
@@ -733,6 +740,20 @@ impl Parser {
                     self.advance();
                     return Ok(TypeSpecifier::Primitive {
                         type_name: PrimitiveType::Float,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Float32 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Float32,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Float64 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Float64,
                         source_location: start_location,
                     });
                 }

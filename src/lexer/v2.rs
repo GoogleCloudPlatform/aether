@@ -127,8 +127,11 @@ pub enum Keyword {
 
     // Types
     Int,
+    Int32,
     Int64,
     Float,
+    Float32,
+    Float64,
     String_,
     Char,
     Bool,
@@ -243,8 +246,11 @@ impl Lexer {
 
         // Type keywords
         self.keywords.insert("Int".to_string(), Keyword::Int);
+        self.keywords.insert("Int32".to_string(), Keyword::Int32);
         self.keywords.insert("Int64".to_string(), Keyword::Int64);
         self.keywords.insert("Float".to_string(), Keyword::Float);
+        self.keywords.insert("Float32".to_string(), Keyword::Float32);
+        self.keywords.insert("Float64".to_string(), Keyword::Float64);
         self.keywords.insert("String".to_string(), Keyword::String_);
         self.keywords.insert("Char".to_string(), Keyword::Char);
         self.keywords.insert("Bool".to_string(), Keyword::Bool);
