@@ -51,7 +51,7 @@ fn find_runtime_library() -> Result<PathBuf, CompilerError> {
     // Check environment variable first
     if let Ok(path) = std::env::var("AETHER_RUNTIME_PATH") {
         let runtime_path = PathBuf::from(&path);
-        if runtime_path.exists() {
+        if runtime_path.is_file() {
             return Ok(runtime_path);
         }
         // If it's a directory, look for the library inside
@@ -193,17 +193,27 @@ impl CompilationPipeline {
     }
 
     /// Parse a single source file using V2 parser
-    fn parse_file(&self, path: &Path, source: &str) -> Result<Module, CompilerError> {
-        Self::parse_source(path, source)
+    fn parse_file(&self, path: &Path, source: &str, verbose: bool) -> Result<Module, CompilerError> {
+        Self::parse_source(path, source, verbose)
     }
 
     /// Parse source code using V2 parser (static for use in parallel contexts)
-    fn parse_source(path: &Path, source: &str) -> Result<Module, CompilerError> {
+    fn parse_source(path: &Path, source: &str, verbose: bool) -> Result<Module, CompilerError> {
         let filename = path.to_string_lossy().to_string();
 
         // Use V2 lexer and parser (Swift/Rust-like syntax)
         let mut lexer = lexer_v2::Lexer::new(source, filename);
         let tokens = lexer.tokenize()?;
+
+        // Debug: Print token stream if verbose is enabled
+        if verbose {
+            eprintln!("Token stream for {}:", path.display());
+            eprintln!("=================");
+            for token in &tokens {
+                eprintln!("{:?}", token);
+            }
+            eprintln!("=================\n");
+        }
         let mut parser = parser_v2::Parser::new(tokens);
         parser.parse_module().map_err(CompilerError::from)
     }
@@ -238,9 +248,10 @@ impl CompilationPipeline {
             // Decide whether to use parallel or sequential parsing
             let modules = if self.options.parallel && input_files.len() > 1 {
                 // Parallel parsing
+                let verbose_for_parallel = self.options.verbose; // Capture verbose flag for parallel closure
                 let results: Result<Vec<_>, _> = input_files
                     .par_iter()
-                    .map(|input_file| {
+                    .map(move |input_file| { // Add 'move' to transfer ownership of captured variables
                         // Read file
                         let source =
                             fs::read_to_string(input_file).map_err(|e| CompilerError::IoError {
@@ -250,7 +261,7 @@ impl CompilationPipeline {
                         let lines = source.lines().count();
 
                         // Parse with V2 parser
-                        let module = Self::parse_source(input_file, &source)?;
+                        let module = Self::parse_source(input_file, &source, verbose_for_parallel)?; // Pass verbose
 
                         Ok::<(Module, usize), CompilerError>((module, lines))
                     })
@@ -278,7 +289,7 @@ impl CompilationPipeline {
                     stats.lines_of_code += source.lines().count();
 
                     // Parse with appropriate syntax version
-                    let module = self.parse_file(input_file, &source)?;
+                    let module = self.parse_file(input_file, &source, self.options.verbose)?;
 
                     modules.push(module);
                 }

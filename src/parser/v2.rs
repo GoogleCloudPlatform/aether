@@ -17,10 +17,10 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode, ElseIf,
-    EnumVariant, Expression, ExternalFunction, Function, FunctionCall as AstFunctionCall,
-    FunctionMetadata, FunctionReference, Identifier, ImportStatement, LambdaBody, MatchCase,
-    Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
+    Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode,
+    ConstantDeclaration, ElseIf, EnumVariant, Expression, ExternalFunction, Function,
+    FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, Identifier,
+    ImportStatement, LambdaBody, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
     Statement, StructField, TypeDefinition, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
@@ -261,11 +261,15 @@ impl Parser {
         while !self.is_at_end() {
             match &self.peek().token_type {
                 TokenType::Keyword(kw) => match kw {
-                    Keyword::Func | Keyword::Struct | Keyword::Enum | Keyword::Import => return,
+                    Keyword::Func | Keyword::Struct | Keyword::Enum | Keyword::Import | Keyword::Const => return,
                     _ => {}
                 },
                 TokenType::At => return,         // Annotation
-                TokenType::RightBrace => return, // End of module
+                TokenType::RightBrace => {
+                    eprintln!("DEBUG: synchronize_to_module_item consuming RightBrace");
+                    self.advance();
+                    return;
+                }
                 _ => {}
             }
             self.advance();
@@ -393,6 +397,7 @@ impl Parser {
         let mut function_definitions = Vec::new();
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
+        let mut constant_declarations = Vec::new();
 
         // Support both "module name;" (file-scoped) and "module name { }" (inline)
         if self.check(&TokenType::Semicolon) {
@@ -404,6 +409,7 @@ impl Parser {
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut constant_declarations,
                 ) {
                     self.add_error(e);
                     self.synchronize_to_module_item();
@@ -418,6 +424,7 @@ impl Parser {
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut constant_declarations,
                 ) {
                     self.add_error(e);
                     self.synchronize_to_module_item();
@@ -441,7 +448,7 @@ impl Parser {
             imports,
             exports: Vec::new(),
             type_definitions,
-            constant_declarations: Vec::new(),
+            constant_declarations,
             function_definitions,
             external_functions,
             source_location: start_location,
@@ -467,6 +474,7 @@ impl Parser {
         let mut function_definitions = Vec::new();
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
+        let mut constant_declarations = Vec::new();
 
         // Support both "module name;" (file-scoped) and "module name { }" (inline)
         if self.check(&TokenType::Semicolon) {
@@ -475,14 +483,18 @@ impl Parser {
 
             // Parse remaining items until EOF with error recovery
             while !self.is_at_end() {
+                eprintln!("DEBUG: parse_module loop at token: {:?}", self.peek().token_type);
                 if let Err(e) = self.parse_module_item(
                     &mut imports,
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut constant_declarations,
                 ) {
+                    eprintln!("DEBUG: parse_module_item error. Peeking: {:?}", self.peek().token_type);
                     self.add_error(e);
                     self.synchronize_to_module_item();
+                    eprintln!("DEBUG: After synchronize_to_module_item. Peeking: {:?}", self.peek().token_type);
                 }
             }
         } else if self.check(&TokenType::LeftBrace) {
@@ -495,6 +507,7 @@ impl Parser {
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut constant_declarations,
                 ) {
                     self.add_error(e);
                     self.synchronize_to_module_item();
@@ -523,7 +536,7 @@ impl Parser {
             imports,
             exports: Vec::new(),
             type_definitions,
-            constant_declarations: Vec::new(),
+            constant_declarations,
             function_definitions,
             external_functions,
             source_location: start_location,
@@ -537,6 +550,7 @@ impl Parser {
         function_definitions: &mut Vec<Function>,
         external_functions: &mut Vec<ExternalFunction>,
         type_definitions: &mut Vec<TypeDefinition>,
+        constant_declarations: &mut Vec<ConstantDeclaration>,
     ) -> Result<(), ParserError> {
         // Check for annotation (could be @extern)
         if self.check(&TokenType::At) {
@@ -565,9 +579,11 @@ impl Parser {
             type_definitions.push(self.parse_struct()?);
         } else if self.check_keyword(Keyword::Enum) {
             type_definitions.push(self.parse_enum()?);
+        } else if self.check_keyword(Keyword::Const) {
+            constant_declarations.push(self.parse_constant_declaration()?);
         } else {
             return Err(ParserError::UnexpectedToken {
-                expected: "import, func, struct, enum, or annotation".to_string(),
+                expected: "import, func, struct, enum, const, or annotation".to_string(),
                 found: format!("{:?}", self.peek().token_type),
                 location: self.current_location(),
             });
@@ -593,6 +609,28 @@ impl Parser {
         Ok(ImportStatement {
             module_name,
             alias: None,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a constant declaration
+    /// Grammar: "const" IDENTIFIER ":" type "=" expression ";"
+    fn parse_constant_declaration(&mut self) -> Result<ConstantDeclaration, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Const, "expected 'const'")?;
+        let name = self.parse_identifier()?;
+        self.expect(&TokenType::Colon, "expected ':' after constant name")?;
+        let type_spec = self.parse_type()?;
+        self.expect(&TokenType::Equal, "expected '=' after type")?;
+        let value = self.parse_expression()?;
+        self.expect(&TokenType::Semicolon, "expected ';' after constant declaration")?;
+
+        Ok(ConstantDeclaration {
+            name,
+            type_spec: Box::new(type_spec),
+            value: Box::new(value),
+            intent: None,
             source_location: start_location,
         })
     }
@@ -709,6 +747,13 @@ impl Parser {
                     self.advance();
                     return Ok(TypeSpecifier::Primitive {
                         type_name: PrimitiveType::String,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Char => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Char,
                         source_location: start_location,
                     });
                 }
@@ -1881,21 +1926,21 @@ impl Parser {
         self.expect(&TokenType::LeftBrace, "expected '{'")?;
 
         // Parse left operand (must be a primary expression, not another binary)
-        let left = self.parse_primary_expression()?;
+        let mut left = self.parse_primary_expression()?;
 
-        // Parse the binary operator
-        let operator = self.parse_binary_operator()?;
-
-        // Parse right operand
-        let right = self.parse_expression()?;
+        // Loop to handle chained binary operations
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            let operator = self.parse_binary_operator()?;
+            let right = self.parse_primary_expression()?; // Use primary expression for right operand for now
+            left = self.build_binary_expression(left, operator, right, start_location.clone());
+        }
 
         self.expect(
             &TokenType::RightBrace,
             "expected '}' after binary expression",
         )?;
 
-        // Build the appropriate Expression variant based on operator
-        Ok(self.build_binary_expression(left, operator, right, start_location))
+        Ok(left)
     }
 
     /// Parse a primary expression (non-binary): literals, identifiers

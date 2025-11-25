@@ -13,5 +13,5 @@ func calculate_area(radius: Float) -> Float {
 
 func main() -> Int {
     let area: Float = calculate_area(5.0);
-    return MAX_SIZE;
+    return 0;
 }
