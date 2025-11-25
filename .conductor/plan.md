@@ -92,14 +92,23 @@ Implemented literal tokenization:
 ---
 
 ### Task 1.4: Implement Operator Tokenization
-- [ ] **Write Tests**: Add tests for multi-character operators
+- [x] **Write Tests**: Add tests for multi-character operators
   - Two-character: `==`, `!=`, `<=`, `>=`, `&&`, `||`, `->`
   - Disambiguation: `=` vs `==`, `<` vs `<=`, `>` vs `>=`, `-` vs `->`
-- [ ] **Implement**: Implement lookahead logic for multi-character operators
-- [ ] **Verify**: All operator tests pass
+- [x] **Implement**: Implement lookahead logic for multi-character operators
+- [x] **Verify**: All operator tests pass (20 new tests, 106 total)
 
 **Notes:**
 ```
+Implemented operator tokenization in next_token():
+- All delimiters: { } [ ] ( ) ; : , . @
+- Arithmetic operators: + - * / %
+- Assignment: =
+- Multi-character operators with lookahead:
+  - == (vs =), != (vs !), <= (vs <), >= (vs >), -> (vs -)
+  - && (vs &), || (single | is error)
+- Ownership sigils: ^ & ~
+- Integration tests for function signatures, braced expressions, etc.
 ```
 
 ---

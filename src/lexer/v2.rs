@@ -534,20 +534,177 @@ impl Lexer {
     pub fn next_token(&mut self) -> Result<Token, LexerError> {
         self.skip_whitespace();
 
+        let location = self.current_location();
+
         match self.current_char {
-            None => Ok(Token::new(
-                TokenType::Eof,
-                self.current_location(),
-                String::new(),
-            )),
+            None => Ok(Token::new(TokenType::Eof, location, String::new())),
+
+            // Identifiers and keywords
             Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => Ok(self.read_identifier()),
+
+            // Numbers
             Some(ch) if ch.is_ascii_digit() => self.read_number(),
+
+            // String literals
             Some('"') => self.read_string(),
+
+            // Character literals
             Some('\'') => self.read_char(),
-            Some(ch) => {
-                let location = self.current_location();
-                Err(LexerError::UnexpectedCharacter { character: ch, location })
+
+            // Delimiters
+            Some('{') => {
+                self.advance();
+                Ok(Token::new(TokenType::LeftBrace, location, "{".to_string()))
             }
+            Some('}') => {
+                self.advance();
+                Ok(Token::new(TokenType::RightBrace, location, "}".to_string()))
+            }
+            Some('[') => {
+                self.advance();
+                Ok(Token::new(TokenType::LeftBracket, location, "[".to_string()))
+            }
+            Some(']') => {
+                self.advance();
+                Ok(Token::new(TokenType::RightBracket, location, "]".to_string()))
+            }
+            Some('(') => {
+                self.advance();
+                Ok(Token::new(TokenType::LeftParen, location, "(".to_string()))
+            }
+            Some(')') => {
+                self.advance();
+                Ok(Token::new(TokenType::RightParen, location, ")".to_string()))
+            }
+            Some(';') => {
+                self.advance();
+                Ok(Token::new(TokenType::Semicolon, location, ";".to_string()))
+            }
+            Some(':') => {
+                self.advance();
+                Ok(Token::new(TokenType::Colon, location, ":".to_string()))
+            }
+            Some(',') => {
+                self.advance();
+                Ok(Token::new(TokenType::Comma, location, ",".to_string()))
+            }
+            Some('.') => {
+                self.advance();
+                Ok(Token::new(TokenType::Dot, location, ".".to_string()))
+            }
+            Some('@') => {
+                self.advance();
+                Ok(Token::new(TokenType::At, location, "@".to_string()))
+            }
+
+            // Arithmetic operators
+            Some('+') => {
+                self.advance();
+                Ok(Token::new(TokenType::Plus, location, "+".to_string()))
+            }
+            Some('*') => {
+                self.advance();
+                Ok(Token::new(TokenType::Star, location, "*".to_string()))
+            }
+            Some('/') => {
+                self.advance();
+                Ok(Token::new(TokenType::Slash, location, "/".to_string()))
+            }
+            Some('%') => {
+                self.advance();
+                Ok(Token::new(TokenType::Percent, location, "%".to_string()))
+            }
+
+            // Minus or Arrow
+            Some('-') => {
+                self.advance();
+                if self.current_char == Some('>') {
+                    self.advance();
+                    Ok(Token::new(TokenType::Arrow, location, "->".to_string()))
+                } else {
+                    Ok(Token::new(TokenType::Minus, location, "-".to_string()))
+                }
+            }
+
+            // Equal or EqualEqual
+            Some('=') => {
+                self.advance();
+                if self.current_char == Some('=') {
+                    self.advance();
+                    Ok(Token::new(TokenType::EqualEqual, location, "==".to_string()))
+                } else {
+                    Ok(Token::new(TokenType::Equal, location, "=".to_string()))
+                }
+            }
+
+            // Bang or BangEqual
+            Some('!') => {
+                self.advance();
+                if self.current_char == Some('=') {
+                    self.advance();
+                    Ok(Token::new(TokenType::BangEqual, location, "!=".to_string()))
+                } else {
+                    Ok(Token::new(TokenType::Bang, location, "!".to_string()))
+                }
+            }
+
+            // Less or LessEqual
+            Some('<') => {
+                self.advance();
+                if self.current_char == Some('=') {
+                    self.advance();
+                    Ok(Token::new(TokenType::LessEqual, location, "<=".to_string()))
+                } else {
+                    Ok(Token::new(TokenType::Less, location, "<".to_string()))
+                }
+            }
+
+            // Greater or GreaterEqual
+            Some('>') => {
+                self.advance();
+                if self.current_char == Some('=') {
+                    self.advance();
+                    Ok(Token::new(TokenType::GreaterEqual, location, ">=".to_string()))
+                } else {
+                    Ok(Token::new(TokenType::Greater, location, ">".to_string()))
+                }
+            }
+
+            // Ampersand or AmpAmp
+            Some('&') => {
+                self.advance();
+                if self.current_char == Some('&') {
+                    self.advance();
+                    Ok(Token::new(TokenType::AmpAmp, location, "&&".to_string()))
+                } else {
+                    Ok(Token::new(TokenType::Ampersand, location, "&".to_string()))
+                }
+            }
+
+            // Pipe or PipePipe
+            Some('|') => {
+                self.advance();
+                if self.current_char == Some('|') {
+                    self.advance();
+                    Ok(Token::new(TokenType::PipePipe, location, "||".to_string()))
+                } else {
+                    // Single pipe is not a valid token in V2 syntax
+                    Err(LexerError::UnexpectedCharacter { character: '|', location })
+                }
+            }
+
+            // Ownership sigils
+            Some('^') => {
+                self.advance();
+                Ok(Token::new(TokenType::Caret, location, "^".to_string()))
+            }
+            Some('~') => {
+                self.advance();
+                Ok(Token::new(TokenType::Tilde, location, "~".to_string()))
+            }
+
+            // Unknown character
+            Some(ch) => Err(LexerError::UnexpectedCharacter { character: ch, location }),
         }
     }
 
@@ -1398,5 +1555,265 @@ mod tests {
         let result = lexer.tokenize();
 
         assert!(matches!(result, Err(LexerError::UnterminatedString { .. })));
+    }
+
+    // ==================== OPERATOR TOKENIZATION TESTS ====================
+
+    #[test]
+    fn test_lexer_tokenize_delimiters() {
+        let mut lexer = Lexer::new("{ } [ ] ( ) ; : , . @", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 12); // 11 delimiters + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[1].token_type, TokenType::RightBrace));
+        assert!(matches!(tokens[2].token_type, TokenType::LeftBracket));
+        assert!(matches!(tokens[3].token_type, TokenType::RightBracket));
+        assert!(matches!(tokens[4].token_type, TokenType::LeftParen));
+        assert!(matches!(tokens[5].token_type, TokenType::RightParen));
+        assert!(matches!(tokens[6].token_type, TokenType::Semicolon));
+        assert!(matches!(tokens[7].token_type, TokenType::Colon));
+        assert!(matches!(tokens[8].token_type, TokenType::Comma));
+        assert!(matches!(tokens[9].token_type, TokenType::Dot));
+        assert!(matches!(tokens[10].token_type, TokenType::At));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_arithmetic_operators() {
+        let mut lexer = Lexer::new("+ - * / %", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 6); // 5 operators + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Plus));
+        assert!(matches!(tokens[1].token_type, TokenType::Minus));
+        assert!(matches!(tokens[2].token_type, TokenType::Star));
+        assert!(matches!(tokens[3].token_type, TokenType::Slash));
+        assert!(matches!(tokens[4].token_type, TokenType::Percent));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_comparison_operators() {
+        let mut lexer = Lexer::new("== != < <= > >=", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 7); // 6 operators + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::EqualEqual));
+        assert!(matches!(tokens[1].token_type, TokenType::BangEqual));
+        assert!(matches!(tokens[2].token_type, TokenType::Less));
+        assert!(matches!(tokens[3].token_type, TokenType::LessEqual));
+        assert!(matches!(tokens[4].token_type, TokenType::Greater));
+        assert!(matches!(tokens[5].token_type, TokenType::GreaterEqual));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_logical_operators() {
+        let mut lexer = Lexer::new("&& || !", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 operators + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::AmpAmp));
+        assert!(matches!(tokens[1].token_type, TokenType::PipePipe));
+        assert!(matches!(tokens[2].token_type, TokenType::Bang));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_assignment_operator() {
+        let mut lexer = Lexer::new("=", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].token_type, TokenType::Equal));
+        assert_eq!(tokens[0].lexeme, "=");
+    }
+
+    #[test]
+    fn test_lexer_tokenize_arrow_operator() {
+        let mut lexer = Lexer::new("->", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].token_type, TokenType::Arrow));
+        assert_eq!(tokens[0].lexeme, "->");
+    }
+
+    #[test]
+    fn test_lexer_tokenize_ownership_sigils() {
+        let mut lexer = Lexer::new("^ & ~", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // 3 sigils + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Caret));
+        assert!(matches!(tokens[1].token_type, TokenType::Ampersand));
+        assert!(matches!(tokens[2].token_type, TokenType::Tilde));
+    }
+
+    #[test]
+    fn test_lexer_disambiguate_equal_vs_equalequal() {
+        let mut lexer = Lexer::new("= == =", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0].token_type, TokenType::Equal));
+        assert!(matches!(tokens[1].token_type, TokenType::EqualEqual));
+        assert!(matches!(tokens[2].token_type, TokenType::Equal));
+    }
+
+    #[test]
+    fn test_lexer_disambiguate_less_vs_lessequal() {
+        let mut lexer = Lexer::new("< <= <", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0].token_type, TokenType::Less));
+        assert!(matches!(tokens[1].token_type, TokenType::LessEqual));
+        assert!(matches!(tokens[2].token_type, TokenType::Less));
+    }
+
+    #[test]
+    fn test_lexer_disambiguate_greater_vs_greaterequal() {
+        let mut lexer = Lexer::new("> >= >", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0].token_type, TokenType::Greater));
+        assert!(matches!(tokens[1].token_type, TokenType::GreaterEqual));
+        assert!(matches!(tokens[2].token_type, TokenType::Greater));
+    }
+
+    #[test]
+    fn test_lexer_disambiguate_minus_vs_arrow() {
+        let mut lexer = Lexer::new("- -> -", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0].token_type, TokenType::Minus));
+        assert!(matches!(tokens[1].token_type, TokenType::Arrow));
+        assert!(matches!(tokens[2].token_type, TokenType::Minus));
+    }
+
+    #[test]
+    fn test_lexer_disambiguate_ampersand_vs_ampamp() {
+        let mut lexer = Lexer::new("& && &", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0].token_type, TokenType::Ampersand));
+        assert!(matches!(tokens[1].token_type, TokenType::AmpAmp));
+        assert!(matches!(tokens[2].token_type, TokenType::Ampersand));
+    }
+
+    #[test]
+    fn test_lexer_disambiguate_bang_vs_bangequal() {
+        let mut lexer = Lexer::new("! != !", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0].token_type, TokenType::Bang));
+        assert!(matches!(tokens[1].token_type, TokenType::BangEqual));
+        assert!(matches!(tokens[2].token_type, TokenType::Bang));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_function_signature() {
+        let mut lexer = Lexer::new("func foo(x: Int) -> Int", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 10); // func foo ( x : Int ) -> Int EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Func)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "foo"));
+        assert!(matches!(tokens[2].token_type, TokenType::LeftParen));
+        assert!(matches!(tokens[3].token_type, TokenType::Identifier(ref s) if s == "x"));
+        assert!(matches!(tokens[4].token_type, TokenType::Colon));
+        assert!(matches!(tokens[5].token_type, TokenType::Keyword(Keyword::Int)));
+        assert!(matches!(tokens[6].token_type, TokenType::RightParen));
+        assert!(matches!(tokens[7].token_type, TokenType::Arrow));
+        assert!(matches!(tokens[8].token_type, TokenType::Keyword(Keyword::Int)));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_braced_expression() {
+        let mut lexer = Lexer::new("{a + b}", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 6); // { a + b } EOF
+        assert!(matches!(tokens[0].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "a"));
+        assert!(matches!(tokens[2].token_type, TokenType::Plus));
+        assert!(matches!(tokens[3].token_type, TokenType::Identifier(ref s) if s == "b"));
+        assert!(matches!(tokens[4].token_type, TokenType::RightBrace));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_variable_declaration() {
+        let mut lexer = Lexer::new("let x: Int = 42;", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 8); // let x : Int = 42 ; EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "x"));
+        assert!(matches!(tokens[2].token_type, TokenType::Colon));
+        assert!(matches!(tokens[3].token_type, TokenType::Keyword(Keyword::Int)));
+        assert!(matches!(tokens[4].token_type, TokenType::Equal));
+        assert!(matches!(tokens[5].token_type, TokenType::IntegerLiteral(42)));
+        assert!(matches!(tokens[6].token_type, TokenType::Semicolon));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_comparison_expression() {
+        let mut lexer = Lexer::new("{x > 0}", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 6); // { x > 0 } EOF
+        assert!(matches!(tokens[0].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "x"));
+        assert!(matches!(tokens[2].token_type, TokenType::Greater));
+        assert!(matches!(tokens[3].token_type, TokenType::IntegerLiteral(0)));
+        assert!(matches!(tokens[4].token_type, TokenType::RightBrace));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_annotation() {
+        let mut lexer = Lexer::new("@requires({n > 0})", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 10); // @ requires ( { n > 0 } ) EOF
+        assert!(matches!(tokens[0].token_type, TokenType::At));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "requires"));
+        assert!(matches!(tokens[2].token_type, TokenType::LeftParen));
+        assert!(matches!(tokens[3].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[4].token_type, TokenType::Identifier(ref s) if s == "n"));
+        assert!(matches!(tokens[5].token_type, TokenType::Greater));
+        assert!(matches!(tokens[6].token_type, TokenType::IntegerLiteral(0)));
+        assert!(matches!(tokens[7].token_type, TokenType::RightBrace));
+        assert!(matches!(tokens[8].token_type, TokenType::RightParen));
+        assert!(matches!(tokens[9].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_generic_type() {
+        let mut lexer = Lexer::new("Array<Int>", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 5); // Array < Int > EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Array)));
+        assert!(matches!(tokens[1].token_type, TokenType::Less));
+        assert!(matches!(tokens[2].token_type, TokenType::Keyword(Keyword::Int)));
+        assert!(matches!(tokens[3].token_type, TokenType::Greater));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_complex_expression() {
+        let mut lexer = Lexer::new("{{a * b} + {c / 2}}", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // { { a * b } + { c / 2 } } EOF = 14 tokens
+        assert_eq!(tokens.len(), 14);
+        assert!(matches!(tokens[0].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[1].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[2].token_type, TokenType::Identifier(ref s) if s == "a"));
+        assert!(matches!(tokens[3].token_type, TokenType::Star));
+        assert!(matches!(tokens[4].token_type, TokenType::Identifier(ref s) if s == "b"));
+        assert!(matches!(tokens[5].token_type, TokenType::RightBrace));
+        assert!(matches!(tokens[6].token_type, TokenType::Plus));
     }
 }
