@@ -29,9 +29,19 @@ use crate::lexer::v2::{Keyword, Token, TokenType};
 /// Internal enum for binary operators during parsing
 #[derive(Debug, Clone, Copy)]
 enum BinaryOp {
-    Add, Subtract, Multiply, Divide, Modulo,
-    Equals, NotEquals, LessThan, LessEqual, GreaterThan, GreaterEqual,
-    And, Or,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Equals,
+    NotEquals,
+    LessThan,
+    LessEqual,
+    GreaterThan,
+    GreaterEqual,
+    And,
+    Or,
 }
 
 /// V2 Parser for AetherScript
@@ -81,7 +91,9 @@ impl Parser {
     pub fn peek(&self) -> &Token {
         self.tokens.get(self.position).unwrap_or_else(|| {
             // Return the last token (should be EOF)
-            self.tokens.last().expect("Token stream should not be empty")
+            self.tokens
+                .last()
+                .expect("Token stream should not be empty")
         })
     }
 
@@ -100,9 +112,13 @@ impl Parser {
 
     /// Get the previous token
     pub fn previous(&self) -> &Token {
-        self.tokens.get(self.position.saturating_sub(1)).unwrap_or_else(|| {
-            self.tokens.first().expect("Token stream should not be empty")
-        })
+        self.tokens
+            .get(self.position.saturating_sub(1))
+            .unwrap_or_else(|| {
+                self.tokens
+                    .first()
+                    .expect("Token stream should not be empty")
+            })
     }
 
     /// Check if we've reached the end of the token stream
@@ -140,7 +156,11 @@ impl Parser {
     }
 
     /// Consume a keyword if it matches, otherwise return an error
-    pub fn expect_keyword(&mut self, keyword: Keyword, message: &str) -> Result<&Token, ParserError> {
+    pub fn expect_keyword(
+        &mut self,
+        keyword: Keyword,
+        message: &str,
+    ) -> Result<&Token, ParserError> {
         if self.check_keyword(keyword.clone()) {
             Ok(self.advance())
         } else {
@@ -244,7 +264,7 @@ impl Parser {
                     Keyword::Func | Keyword::Struct | Keyword::Enum | Keyword::Import => return,
                     _ => {}
                 },
-                TokenType::At => return, // Annotation
+                TokenType::At => return,         // Annotation
                 TokenType::RightBrace => return, // End of module
                 _ => {}
             }
@@ -313,10 +333,7 @@ impl Parser {
                 format!("Unexpected end of file in {}", context),
                 Some("Check for unclosed braces or missing code"),
             ),
-            _ => (
-                format!("Unexpected token {:?} in {}", token, context),
-                None,
-            ),
+            _ => (format!("Unexpected token {:?} in {}", token, context), None),
         };
 
         ParserError::SyntaxError {
@@ -733,7 +750,10 @@ impl Parser {
                     self.advance();
                     self.expect(&TokenType::Less, "expected '<' after Map")?;
                     let key_type = self.parse_type()?;
-                    self.expect(&TokenType::Comma, "expected ',' between Map key and value types")?;
+                    self.expect(
+                        &TokenType::Comma,
+                        "expected ',' between Map key and value types",
+                    )?;
                     let value_type = self.parse_type()?;
                     self.expect(&TokenType::Greater, "expected '>' to close Map type")?;
                     return Ok(TypeSpecifier::Map {
@@ -952,7 +972,10 @@ impl Parser {
                 }
             }
 
-            self.expect(&TokenType::RightParen, "expected ')' after annotation arguments")?;
+            self.expect(
+                &TokenType::RightParen,
+                "expected ')' after annotation arguments",
+            )?;
         }
 
         Ok(Annotation {
@@ -1044,7 +1067,10 @@ impl Parser {
             }
 
             self.expect(&TokenType::RightBrace, "expected '}' to close expression")?;
-            return Ok(AnnotationValue::Expression(expr_tokens.trim().to_string(), start));
+            return Ok(AnnotationValue::Expression(
+                expr_tokens.trim().to_string(),
+                start,
+            ));
         }
 
         // Identifier
@@ -1063,7 +1089,10 @@ impl Parser {
 
     /// Parse an external function declaration
     /// Grammar: "@extern" "(" args ")" "func" IDENTIFIER "(" params ")" "->" type ";"
-    pub fn parse_external_function(&mut self, annotation: Annotation) -> Result<ExternalFunction, ParserError> {
+    pub fn parse_external_function(
+        &mut self,
+        annotation: Annotation,
+    ) -> Result<ExternalFunction, ParserError> {
         let start_location = annotation.source_location.clone();
 
         // Extract library from annotation
@@ -1099,11 +1128,17 @@ impl Parser {
         self.expect(&TokenType::RightParen, "expected ')' after parameters")?;
 
         // Parse return type (required for extern functions)
-        self.expect(&TokenType::Arrow, "expected '->' for extern function return type")?;
+        self.expect(
+            &TokenType::Arrow,
+            "expected '->' for extern function return type",
+        )?;
         let return_type = self.parse_type()?;
 
         // Expect semicolon (no body for extern functions)
-        self.expect(&TokenType::Semicolon, "expected ';' after extern function declaration")?;
+        self.expect(
+            &TokenType::Semicolon,
+            "expected ';' after extern function declaration",
+        )?;
 
         Ok(ExternalFunction {
             name,
@@ -1275,7 +1310,10 @@ impl Parser {
         };
 
         // Expect semicolon
-        self.expect(&TokenType::Semicolon, "expected ';' after variable declaration")?;
+        self.expect(
+            &TokenType::Semicolon,
+            "expected ';' after variable declaration",
+        )?;
 
         Ok(Statement::VariableDeclaration {
             name,
@@ -1565,7 +1603,10 @@ impl Parser {
         if let TokenType::Identifier(_) = &self.peek().token_type {
             // Look ahead to see if this is an assignment
             if let Some(next) = self.peek_next() {
-                if matches!(next.token_type, TokenType::Equal | TokenType::LeftBracket | TokenType::Dot) {
+                if matches!(
+                    next.token_type,
+                    TokenType::Equal | TokenType::LeftBracket | TokenType::Dot
+                ) {
                     return self.parse_assignment();
                 }
             }
@@ -1752,7 +1793,10 @@ impl Parser {
                                     arg_exprs.push(self.parse_expression()?);
                                 }
                             }
-                            self.expect(&TokenType::RightParen, "expected ')' after method arguments")?;
+                            self.expect(
+                                &TokenType::RightParen,
+                                "expected ')' after method arguments",
+                            )?;
 
                             // Convert expressions to Argument structs
                             let arguments: Vec<Argument> = arg_exprs
@@ -1845,7 +1889,10 @@ impl Parser {
         // Parse right operand
         let right = self.parse_expression()?;
 
-        self.expect(&TokenType::RightBrace, "expected '}' after binary expression")?;
+        self.expect(
+            &TokenType::RightBrace,
+            "expected '}' after binary expression",
+        )?;
 
         // Build the appropriate Expression variant based on operator
         Ok(self.build_binary_expression(left, operator, right, start_location))
@@ -2003,7 +2050,10 @@ impl Parser {
                                     arg_exprs.push(self.parse_expression()?);
                                 }
                             }
-                            self.expect(&TokenType::RightParen, "expected ')' after method arguments")?;
+                            self.expect(
+                                &TokenType::RightParen,
+                                "expected ')' after method arguments",
+                            )?;
 
                             // Convert expressions to Argument structs
                             let arguments: Vec<Argument> = arg_exprs
@@ -2103,7 +2153,10 @@ impl Parser {
         if self.is_lambda_param_start() {
             // Parse as lambda parameters
             let params = self.parse_lambda_params()?;
-            self.expect(&TokenType::RightParen, "expected ')' after lambda parameters")?;
+            self.expect(
+                &TokenType::RightParen,
+                "expected ')' after lambda parameters",
+            )?;
             return self.parse_lambda_after_params(captures, params, start_location);
         }
 
@@ -2248,7 +2301,10 @@ impl Parser {
         let mut captures = Vec::new();
 
         // Expect opening bracket
-        self.expect(&TokenType::LeftBracket, "expected '[' to start capture list")?;
+        self.expect(
+            &TokenType::LeftBracket,
+            "expected '[' to start capture list",
+        )?;
 
         // Parse captures until we see ]
         while !self.check(&TokenType::RightBracket) {
@@ -2697,7 +2753,10 @@ mod tests {
     #[test]
     fn test_parser_peek() {
         let parser = parser_from_source("let x");
-        assert!(matches!(parser.peek().token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(
+            parser.peek().token_type,
+            TokenType::Keyword(Keyword::Let)
+        ));
     }
 
     #[test]
@@ -2772,7 +2831,10 @@ mod tests {
         assert!(result.is_err());
 
         // Position should NOT have advanced
-        assert!(matches!(parser.peek().token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(
+            parser.peek().token_type,
+            TokenType::Keyword(Keyword::Let)
+        ));
     }
 
     #[test]
@@ -2896,7 +2958,7 @@ mod tests {
     #[test]
     fn test_parse_module_with_multiple_imports() {
         let mut parser = parser_from_source(
-            "module Test { import std.io; import std.collections; import math; }"
+            "module Test { import std.io; import std.collections; import math; }",
         );
         let result = parser.parse_module();
 
@@ -2910,14 +2972,16 @@ mod tests {
 
     #[test]
     fn test_parse_module_with_deeply_nested_import() {
-        let mut parser = parser_from_source(
-            "module Test { import std.collections.hashmap.HashMap; }"
-        );
+        let mut parser =
+            parser_from_source("module Test { import std.collections.hashmap.HashMap; }");
         let result = parser.parse_module();
 
         assert!(result.is_ok());
         let module = result.unwrap();
-        assert_eq!(module.imports[0].module_name.name, "std.collections.hashmap.HashMap");
+        assert_eq!(
+            module.imports[0].module_name.name,
+            "std.collections.hashmap.HashMap"
+        );
     }
 
     #[test]
@@ -2996,7 +3060,13 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        assert!(matches!(
+            type_spec,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3006,7 +3076,13 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer64, .. }));
+        assert!(matches!(
+            type_spec,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer64,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3016,7 +3092,13 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Float, .. }));
+        assert!(matches!(
+            type_spec,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Float,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3026,7 +3108,13 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
+        assert!(matches!(
+            type_spec,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::String,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3036,7 +3124,13 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Boolean, .. }));
+        assert!(matches!(
+            type_spec,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Boolean,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3046,7 +3140,13 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Void, .. }));
+        assert!(matches!(
+            type_spec,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Void,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3056,7 +3156,13 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::SizeT, .. }));
+        assert!(matches!(
+            type_spec,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::SizeT,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3067,7 +3173,13 @@ module Test {
         assert!(result.is_ok());
         let type_spec = result.unwrap();
         if let TypeSpecifier::Array { element_type, .. } = type_spec {
-            assert!(matches!(*element_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+            assert!(matches!(
+                *element_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    ..
+                }
+            ));
         } else {
             panic!("Expected Array type");
         }
@@ -3094,9 +3206,26 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Map { key_type, value_type, .. } = type_spec {
-            assert!(matches!(*key_type, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
-            assert!(matches!(*value_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        if let TypeSpecifier::Map {
+            key_type,
+            value_type,
+            ..
+        } = type_spec
+        {
+            assert!(matches!(
+                *key_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    ..
+                }
+            ));
+            assert!(matches!(
+                *value_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    ..
+                }
+            ));
         } else {
             panic!("Expected Map type");
         }
@@ -3109,9 +3238,20 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Pointer { target_type, is_mutable, .. } = type_spec {
+        if let TypeSpecifier::Pointer {
+            target_type,
+            is_mutable,
+            ..
+        } = type_spec
+        {
             assert!(!is_mutable);
-            assert!(matches!(*target_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+            assert!(matches!(
+                *target_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    ..
+                }
+            ));
         } else {
             panic!("Expected Pointer type");
         }
@@ -3124,9 +3264,20 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Pointer { target_type, is_mutable, .. } = type_spec {
+        if let TypeSpecifier::Pointer {
+            target_type,
+            is_mutable,
+            ..
+        } = type_spec
+        {
             assert!(is_mutable);
-            assert!(matches!(*target_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Void, .. }));
+            assert!(matches!(
+                *target_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Void,
+                    ..
+                }
+            ));
         } else {
             panic!("Expected MutPointer type");
         }
@@ -3139,9 +3290,20 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+        if let TypeSpecifier::Owned {
+            ownership,
+            base_type,
+            ..
+        } = type_spec
+        {
             assert_eq!(ownership, OwnershipKind::Owned);
-            assert!(matches!(*base_type, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
+            assert!(matches!(
+                *base_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    ..
+                }
+            ));
         } else {
             panic!("Expected Owned type");
         }
@@ -3154,9 +3316,20 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+        if let TypeSpecifier::Owned {
+            ownership,
+            base_type,
+            ..
+        } = type_spec
+        {
             assert_eq!(ownership, OwnershipKind::Borrowed);
-            assert!(matches!(*base_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+            assert!(matches!(
+                *base_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    ..
+                }
+            ));
         } else {
             panic!("Expected Borrowed type");
         }
@@ -3169,9 +3342,20 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+        if let TypeSpecifier::Owned {
+            ownership,
+            base_type,
+            ..
+        } = type_spec
+        {
             assert_eq!(ownership, OwnershipKind::BorrowedMut);
-            assert!(matches!(*base_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+            assert!(matches!(
+                *base_type,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    ..
+                }
+            ));
         } else {
             panic!("Expected BorrowedMut type");
         }
@@ -3184,7 +3368,12 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+        if let TypeSpecifier::Owned {
+            ownership,
+            base_type,
+            ..
+        } = type_spec
+        {
             assert_eq!(ownership, OwnershipKind::Shared);
             // Resource is a user-defined type
             assert!(matches!(*base_type, TypeSpecifier::Named { .. }));
@@ -3214,7 +3403,12 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Generic { base_type, type_arguments, .. } = type_spec {
+        if let TypeSpecifier::Generic {
+            base_type,
+            type_arguments,
+            ..
+        } = type_spec
+        {
             assert_eq!(base_type.name, "Result");
             assert_eq!(type_arguments.len(), 2);
         } else {
@@ -3229,10 +3423,19 @@ module Test {
 
         assert!(result.is_ok());
         let type_spec = result.unwrap();
-        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+        if let TypeSpecifier::Owned {
+            ownership,
+            base_type,
+            ..
+        } = type_spec
+        {
             assert_eq!(ownership, OwnershipKind::Owned);
             if let TypeSpecifier::Array { element_type, .. } = *base_type {
-                if let TypeSpecifier::Owned { ownership: inner_ownership, .. } = *element_type {
+                if let TypeSpecifier::Owned {
+                    ownership: inner_ownership,
+                    ..
+                } = *element_type
+                {
                     assert_eq!(inner_ownership, OwnershipKind::Borrowed);
                 } else {
                     panic!("Expected borrowed element type");
@@ -3273,7 +3476,13 @@ module Test {
         assert_eq!(func.name.name, "foo");
         assert!(func.parameters.is_empty());
         // Default return type should be Void
-        assert!(matches!(*func.return_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Void, .. }));
+        assert!(matches!(
+            *func.return_type,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Void,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3285,7 +3494,13 @@ module Test {
         let func = result.unwrap();
         assert_eq!(func.name.name, "answer");
         assert!(func.parameters.is_empty());
-        assert!(matches!(*func.return_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        assert!(matches!(
+            *func.return_type,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3298,7 +3513,13 @@ module Test {
         assert_eq!(func.name.name, "greet");
         assert_eq!(func.parameters.len(), 1);
         assert_eq!(func.parameters[0].name.name, "name");
-        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
+        assert!(matches!(
+            *func.parameters[0].param_type,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::String,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3312,32 +3533,59 @@ module Test {
         assert_eq!(func.parameters.len(), 2);
         assert_eq!(func.parameters[0].name.name, "a");
         assert_eq!(func.parameters[1].name.name, "b");
-        assert!(matches!(*func.return_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        assert!(matches!(
+            *func.return_type,
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn test_parse_function_complex_types() {
-        let mut parser = parser_from_source("func process(items: Array<Int>, config: Map<String, Int>) -> Bool { }");
+        let mut parser = parser_from_source(
+            "func process(items: Array<Int>, config: Map<String, Int>) -> Bool { }",
+        );
         let result = parser.parse_function();
 
         assert!(result.is_ok());
         let func = result.unwrap();
         assert_eq!(func.name.name, "process");
         assert_eq!(func.parameters.len(), 2);
-        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Array { .. }));
-        assert!(matches!(*func.parameters[1].param_type, TypeSpecifier::Map { .. }));
+        assert!(matches!(
+            *func.parameters[0].param_type,
+            TypeSpecifier::Array { .. }
+        ));
+        assert!(matches!(
+            *func.parameters[1].param_type,
+            TypeSpecifier::Map { .. }
+        ));
     }
 
     #[test]
     fn test_parse_function_ownership_types() {
-        let mut parser = parser_from_source("func transfer(owned: ^String, borrowed: &Int) -> Void { }");
+        let mut parser =
+            parser_from_source("func transfer(owned: ^String, borrowed: &Int) -> Void { }");
         let result = parser.parse_function();
 
         assert!(result.is_ok());
         let func = result.unwrap();
         assert_eq!(func.parameters.len(), 2);
-        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Owned { ownership: OwnershipKind::Owned, .. }));
-        assert!(matches!(*func.parameters[1].param_type, TypeSpecifier::Owned { ownership: OwnershipKind::Borrowed, .. }));
+        assert!(matches!(
+            *func.parameters[0].param_type,
+            TypeSpecifier::Owned {
+                ownership: OwnershipKind::Owned,
+                ..
+            }
+        ));
+        assert!(matches!(
+            *func.parameters[1].param_type,
+            TypeSpecifier::Owned {
+                ownership: OwnershipKind::Borrowed,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -3418,7 +3666,13 @@ func calculate(
 
         assert!(result.is_ok());
         let func = result.unwrap();
-        assert!(matches!(*func.return_type, TypeSpecifier::Pointer { is_mutable: false, .. }));
+        assert!(matches!(
+            *func.return_type,
+            TypeSpecifier::Pointer {
+                is_mutable: false,
+                ..
+            }
+        ));
     }
 
     // ==================== Annotation Parsing Tests ====================
@@ -3444,7 +3698,9 @@ func calculate(
         assert_eq!(annotation.name, "extern");
         assert_eq!(annotation.arguments.len(), 1);
         assert_eq!(annotation.arguments[0].label, Some("library".to_string()));
-        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::String(s) if s == "libc"));
+        assert!(
+            matches!(&annotation.arguments[0].value, AnnotationValue::String(s) if s == "libc")
+        );
     }
 
     #[test]
@@ -3458,7 +3714,9 @@ func calculate(
         assert_eq!(annotation.arguments.len(), 2);
         assert_eq!(annotation.arguments[0].label, Some("library".to_string()));
         assert_eq!(annotation.arguments[1].label, Some("symbol".to_string()));
-        assert!(matches!(&annotation.arguments[1].value, AnnotationValue::String(s) if s == "malloc"));
+        assert!(
+            matches!(&annotation.arguments[1].value, AnnotationValue::String(s) if s == "malloc")
+        );
     }
 
     #[test]
@@ -3471,7 +3729,9 @@ func calculate(
         assert_eq!(annotation.name, "requires");
         assert_eq!(annotation.arguments.len(), 1);
         assert!(annotation.arguments[0].label.is_none());
-        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Expression(expr, _) if expr.contains("n") && expr.contains(">") && expr.contains("0")));
+        assert!(
+            matches!(&annotation.arguments[0].value, AnnotationValue::Expression(expr, _) if expr.contains("n") && expr.contains(">") && expr.contains("0"))
+        );
     }
 
     #[test]
@@ -3483,7 +3743,9 @@ func calculate(
         let annotation = result.unwrap();
         assert_eq!(annotation.name, "category");
         assert_eq!(annotation.arguments.len(), 1);
-        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Identifier(s) if s == "math"));
+        assert!(
+            matches!(&annotation.arguments[0].value, AnnotationValue::Identifier(s) if s == "math")
+        );
     }
 
     #[test]
@@ -3495,7 +3757,10 @@ func calculate(
         let annotation = result.unwrap();
         assert_eq!(annotation.name, "priority");
         assert_eq!(annotation.arguments.len(), 1);
-        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Integer(10)));
+        assert!(matches!(
+            &annotation.arguments[0].value,
+            AnnotationValue::Integer(10)
+        ));
     }
 
     #[test]
@@ -3507,7 +3772,10 @@ func calculate(
         let annotation = result.unwrap();
         assert_eq!(annotation.name, "deprecated");
         assert_eq!(annotation.arguments.len(), 1);
-        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Boolean(true)));
+        assert!(matches!(
+            &annotation.arguments[0].value,
+            AnnotationValue::Boolean(true)
+        ));
     }
 
     #[test]
@@ -3539,7 +3807,9 @@ func calculate(
 
     #[test]
     fn test_parse_external_function_basic() {
-        let mut parser = parser_from_source("@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>;");
+        let mut parser = parser_from_source(
+            "@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>;",
+        );
 
         // First parse the annotation
         let annotation = parser.parse_annotation().unwrap();
@@ -3585,7 +3855,9 @@ func calculate(
 
     #[test]
     fn test_parse_external_function_error_missing_semicolon() {
-        let mut parser = parser_from_source("@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>");
+        let mut parser = parser_from_source(
+            "@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>",
+        );
 
         let annotation = parser.parse_annotation().unwrap();
         let result = parser.parse_external_function(annotation);
@@ -3602,13 +3874,29 @@ func calculate(
 
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::VariableDeclaration { name, type_spec, mutability, initial_value, .. } = stmt {
+        if let Statement::VariableDeclaration {
+            name,
+            type_spec,
+            mutability,
+            initial_value,
+            ..
+        } = stmt
+        {
             assert_eq!(name.name, "x");
-            assert!(matches!(*type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+            assert!(matches!(
+                *type_spec,
+                TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    ..
+                }
+            ));
             assert!(matches!(mutability, Mutability::Immutable));
             assert!(initial_value.is_some());
             let value = initial_value.unwrap();
-            assert!(matches!(*value, Expression::IntegerLiteral { value: 42, .. }));
+            assert!(matches!(
+                *value,
+                Expression::IntegerLiteral { value: 42, .. }
+            ));
         } else {
             panic!("Expected VariableDeclaration");
         }
@@ -3621,7 +3909,10 @@ func calculate(
 
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::VariableDeclaration { name, mutability, .. } = stmt {
+        if let Statement::VariableDeclaration {
+            name, mutability, ..
+        } = stmt
+        {
             assert_eq!(name.name, "counter");
             assert!(matches!(mutability, Mutability::Mutable));
         } else {
@@ -3639,7 +3930,9 @@ func calculate(
         if let Statement::VariableDeclaration { initial_value, .. } = stmt {
             assert!(initial_value.is_some());
             let value = initial_value.unwrap();
-            assert!(matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello"));
+            assert!(
+                matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello")
+            );
         } else {
             panic!("Expected VariableDeclaration");
         }
@@ -3671,7 +3964,10 @@ func calculate(
         if let Statement::VariableDeclaration { initial_value, .. } = stmt {
             assert!(initial_value.is_some());
             let value = initial_value.unwrap();
-            assert!(matches!(*value, Expression::BooleanLiteral { value: true, .. }));
+            assert!(matches!(
+                *value,
+                Expression::BooleanLiteral { value: true, .. }
+            ));
         } else {
             panic!("Expected VariableDeclaration");
         }
@@ -3687,7 +3983,10 @@ func calculate(
         if let Statement::VariableDeclaration { initial_value, .. } = stmt {
             assert!(initial_value.is_some());
             let value = initial_value.unwrap();
-            assert!(matches!(*value, Expression::CharacterLiteral { value: 'a', .. }));
+            assert!(matches!(
+                *value,
+                Expression::CharacterLiteral { value: 'a', .. }
+            ));
         } else {
             panic!("Expected VariableDeclaration");
         }
@@ -3700,7 +3999,12 @@ func calculate(
 
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::VariableDeclaration { name, initial_value, .. } = stmt {
+        if let Statement::VariableDeclaration {
+            name,
+            initial_value,
+            ..
+        } = stmt
+        {
             assert_eq!(name.name, "x");
             assert!(initial_value.is_none());
         } else {
@@ -3715,10 +4019,18 @@ func calculate(
 
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::VariableDeclaration { name, type_spec, initial_value, .. } = stmt {
+        if let Statement::VariableDeclaration {
+            name,
+            type_spec,
+            initial_value,
+            ..
+        } = stmt
+        {
             assert_eq!(name.name, "x");
             // Type should be _inferred placeholder
-            assert!(matches!(*type_spec, TypeSpecifier::Named { ref name, .. } if name.name == "_inferred"));
+            assert!(
+                matches!(*type_spec, TypeSpecifier::Named { ref name, .. } if name.name == "_inferred")
+            );
             assert!(initial_value.is_some());
         } else {
             panic!("Expected VariableDeclaration");
@@ -3786,7 +4098,9 @@ func calculate(
 
         assert!(result.is_ok());
         let expr = result.unwrap();
-        assert!(matches!(expr, Expression::StringLiteral { ref value, .. } if value == "hello world"));
+        assert!(
+            matches!(expr, Expression::StringLiteral { ref value, .. } if value == "hello world")
+        );
     }
 
     #[test]
@@ -3796,7 +4110,10 @@ func calculate(
 
         assert!(result.is_ok());
         let expr = result.unwrap();
-        assert!(matches!(expr, Expression::BooleanLiteral { value: true, .. }));
+        assert!(matches!(
+            expr,
+            Expression::BooleanLiteral { value: true, .. }
+        ));
     }
 
     #[test]
@@ -3820,7 +4137,10 @@ func calculate(
         let stmt = result.unwrap();
         if let Statement::Assignment { target, value, .. } = stmt {
             assert!(matches!(target, AssignmentTarget::Variable { ref name } if name.name == "x"));
-            assert!(matches!(*value, Expression::IntegerLiteral { value: 42, .. }));
+            assert!(matches!(
+                *value,
+                Expression::IntegerLiteral { value: 42, .. }
+            ));
         } else {
             panic!("Expected Assignment");
         }
@@ -3834,8 +4154,12 @@ func calculate(
         assert!(result.is_ok());
         let stmt = result.unwrap();
         if let Statement::Assignment { target, value, .. } = stmt {
-            assert!(matches!(target, AssignmentTarget::Variable { ref name } if name.name == "name"));
-            assert!(matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello"));
+            assert!(
+                matches!(target, AssignmentTarget::Variable { ref name } if name.name == "name")
+            );
+            assert!(
+                matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello")
+            );
         } else {
             panic!("Expected Assignment");
         }
@@ -3864,8 +4188,13 @@ func calculate(
         let stmt = result.unwrap();
         if let Statement::Assignment { target, .. } = stmt {
             if let AssignmentTarget::ArrayElement { array, index } = target {
-                assert!(matches!(*array, Expression::Variable { ref name, .. } if name.name == "arr"));
-                assert!(matches!(*index, Expression::IntegerLiteral { value: 0, .. }));
+                assert!(
+                    matches!(*array, Expression::Variable { ref name, .. } if name.name == "arr")
+                );
+                assert!(matches!(
+                    *index,
+                    Expression::IntegerLiteral { value: 0, .. }
+                ));
             } else {
                 panic!("Expected ArrayElement target");
             }
@@ -3882,8 +4211,14 @@ func calculate(
         assert!(result.is_ok());
         let stmt = result.unwrap();
         if let Statement::Assignment { target, .. } = stmt {
-            if let AssignmentTarget::StructField { instance, field_name } = target {
-                assert!(matches!(*instance, Expression::Variable { ref name, .. } if name.name == "point"));
+            if let AssignmentTarget::StructField {
+                instance,
+                field_name,
+            } = target
+            {
+                assert!(
+                    matches!(*instance, Expression::Variable { ref name, .. } if name.name == "point")
+                );
                 assert_eq!(field_name.name, "x");
             } else {
                 panic!("Expected StructField target");
@@ -3928,7 +4263,10 @@ func calculate(
         let expr = result.unwrap();
         if let Expression::Add { left, right, .. } = expr {
             assert!(matches!(*left, Expression::IntegerLiteral { value: 1, .. }));
-            assert!(matches!(*right, Expression::IntegerLiteral { value: 2, .. }));
+            assert!(matches!(
+                *right,
+                Expression::IntegerLiteral { value: 2, .. }
+            ));
         } else {
             panic!("Expected Add expression, got {:?}", expr);
         }
@@ -4120,7 +4458,10 @@ func calculate(
         let stmt = result.unwrap();
         if let Statement::Return { value, .. } = stmt {
             assert!(value.is_some());
-            assert!(matches!(*value.unwrap(), Expression::IntegerLiteral { value: 42, .. }));
+            assert!(matches!(
+                *value.unwrap(),
+                Expression::IntegerLiteral { value: 42, .. }
+            ));
         } else {
             panic!("Expected Return statement");
         }
@@ -4162,8 +4503,17 @@ func calculate(
 
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::If { condition, else_ifs, else_block, .. } = stmt {
-            assert!(matches!(*condition, Expression::BooleanLiteral { value: true, .. }));
+        if let Statement::If {
+            condition,
+            else_ifs,
+            else_block,
+            ..
+        } = stmt
+        {
+            assert!(matches!(
+                *condition,
+                Expression::BooleanLiteral { value: true, .. }
+            ));
             assert!(else_ifs.is_empty());
             assert!(else_block.is_none());
         } else {
@@ -4192,7 +4542,12 @@ func calculate(
 
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::If { else_ifs, else_block, .. } = stmt {
+        if let Statement::If {
+            else_ifs,
+            else_block,
+            ..
+        } = stmt
+        {
             assert_eq!(else_ifs.len(), 1);
             assert!(else_block.is_some());
         } else {
@@ -4222,7 +4577,10 @@ func calculate(
         assert!(result.is_ok());
         let stmt = result.unwrap();
         if let Statement::WhileLoop { condition, .. } = stmt {
-            assert!(matches!(*condition, Expression::BooleanLiteral { value: true, .. }));
+            assert!(matches!(
+                *condition,
+                Expression::BooleanLiteral { value: true, .. }
+            ));
         } else {
             panic!("Expected WhileLoop statement");
         }
@@ -4296,7 +4654,10 @@ func calculate(
         let result = parser.parse_statement();
 
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), Statement::VariableDeclaration { .. }));
+        assert!(matches!(
+            result.unwrap(),
+            Statement::VariableDeclaration { .. }
+        ));
     }
 
     #[test]
@@ -4386,7 +4747,8 @@ func calculate(
 
     #[test]
     fn test_parse_struct_complex_types() {
-        let mut parser = parser_from_source("struct Data { items: Array<Int>; lookup: Map<String, Int>; }");
+        let mut parser =
+            parser_from_source("struct Data { items: Array<Int>; lookup: Map<String, Int>; }");
         let result = parser.parse_struct();
 
         assert!(result.is_ok());
@@ -4608,7 +4970,12 @@ func classify(n: Int) -> Int {
 
         assert!(result.is_ok());
         let func = result.unwrap();
-        if let Statement::If { else_ifs, else_block, .. } = &func.body.statements[0] {
+        if let Statement::If {
+            else_ifs,
+            else_block,
+            ..
+        } = &func.body.statements[0]
+        {
             assert_eq!(else_ifs.len(), 1);
             assert!(else_block.is_some());
         } else {
@@ -4697,7 +5064,10 @@ func take_owned(data: ^Data) -> Int {
 
         assert!(result.is_ok());
         let func = result.unwrap();
-        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Owned { .. }));
+        assert!(matches!(
+            *func.parameters[0].param_type,
+            TypeSpecifier::Owned { .. }
+        ));
     }
 
     #[test]
@@ -4712,7 +5082,13 @@ func read_only(data: &Data) -> Int {
 
         assert!(result.is_ok());
         let func = result.unwrap();
-        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Owned { ownership: OwnershipKind::Borrowed, .. }));
+        assert!(matches!(
+            *func.parameters[0].param_type,
+            TypeSpecifier::Owned {
+                ownership: OwnershipKind::Borrowed,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -4755,7 +5131,10 @@ func good() -> Int {
 
         // The good function should still be parsed
         assert!(module.function_definitions.len() >= 1);
-        assert!(module.function_definitions.iter().any(|f| f.name.name == "good"));
+        assert!(module
+            .function_definitions
+            .iter()
+            .any(|f| f.name.name == "good"));
     }
 
     #[test]
@@ -4782,7 +5161,9 @@ func third() -> Int {
         assert!(!errors.is_empty());
 
         let module = result.unwrap();
-        let func_names: Vec<_> = module.function_definitions.iter()
+        let func_names: Vec<_> = module
+            .function_definitions
+            .iter()
             .map(|f| f.name.name.as_str())
             .collect();
 
@@ -4810,7 +5191,10 @@ func valid() -> Int {
 
         // The valid function should be parsed after recovery
         let module = result.unwrap();
-        assert!(module.function_definitions.iter().any(|f| f.name.name == "valid"));
+        assert!(module
+            .function_definitions
+            .iter()
+            .any(|f| f.name.name == "valid"));
     }
 
     #[test]
@@ -4931,7 +5315,12 @@ func next_item() -> Int {
         if let Expression::Match { cases, .. } = expr {
             assert_eq!(cases.len(), 2);
             // First case: Some(x)
-            if let Pattern::EnumVariant { variant_name, binding, .. } = &cases[0].pattern {
+            if let Pattern::EnumVariant {
+                variant_name,
+                binding,
+                ..
+            } = &cases[0].pattern
+            {
                 assert_eq!(variant_name.name, "Some");
                 assert!(binding.is_some());
             } else {
@@ -4956,7 +5345,10 @@ func next_item() -> Int {
             assert!(matches!(cases[0].pattern, Pattern::Literal { .. }));
             assert!(matches!(cases[1].pattern, Pattern::Literal { .. }));
             // Last should be wildcard
-            assert!(matches!(cases[2].pattern, Pattern::Wildcard { binding: None, .. }));
+            assert!(matches!(
+                cases[2].pattern,
+                Pattern::Wildcard { binding: None, .. }
+            ));
         } else {
             panic!("Expected Match expression");
         }
@@ -5428,10 +5820,7 @@ func next_item() -> Int {
 
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let expr = result.unwrap();
-        if let Expression::Range {
-            start, end, ..
-        } = expr
-        {
+        if let Expression::Range { start, end, .. } = expr {
             assert!(start.is_none());
             assert!(end.is_some());
         } else {
@@ -5447,10 +5836,7 @@ func next_item() -> Int {
 
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let expr = result.unwrap();
-        if let Expression::Range {
-            start, end, ..
-        } = expr
-        {
+        if let Expression::Range { start, end, .. } = expr {
             assert!(start.is_some());
             assert!(end.is_none());
         } else {
@@ -5485,7 +5871,13 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok());
         let expr = result.unwrap();
-        if let Expression::Range { start, end, inclusive, .. } = expr {
+        if let Expression::Range {
+            start,
+            end,
+            inclusive,
+            ..
+        } = expr
+        {
             assert!(start.is_none());
             assert!(end.is_some());
             assert!(!inclusive);
@@ -5502,7 +5894,10 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok());
         let expr = result.unwrap();
-        if let Expression::Range { start, inclusive, .. } = expr {
+        if let Expression::Range {
+            start, inclusive, ..
+        } = expr
+        {
             assert!(start.is_none());
             assert!(inclusive);
         } else {
@@ -5616,7 +6011,12 @@ func next_item() -> Int {
         assert!(result.is_ok());
         let expr = result.unwrap();
         // Should be MethodCall for fourth()
-        if let Expression::MethodCall { method_name, receiver, .. } = expr {
+        if let Expression::MethodCall {
+            method_name,
+            receiver,
+            ..
+        } = expr
+        {
             assert_eq!(method_name.name, "fourth");
             // Receiver should be MethodCall for third()
             assert!(matches!(*receiver, Expression::MethodCall { .. }));
@@ -5633,7 +6033,12 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok());
         let expr = result.unwrap();
-        if let Expression::MethodCall { method_name, arguments, .. } = expr {
+        if let Expression::MethodCall {
+            method_name,
+            arguments,
+            ..
+        } = expr
+        {
             assert_eq!(method_name.name, "get");
             assert_eq!(arguments.len(), 1);
         } else {
@@ -5699,7 +6104,12 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok());
         let expr = result.unwrap();
-        if let Expression::MethodCall { method_name, arguments, .. } = expr {
+        if let Expression::MethodCall {
+            method_name,
+            arguments,
+            ..
+        } = expr
+        {
             assert_eq!(method_name.name, "map");
             assert_eq!(arguments.len(), 1);
             // The argument should be a lambda
@@ -5732,7 +6142,13 @@ func next_item() -> Int {
         let result = parser.parse_for_loop();
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::ForEachLoop { collection, body, element_binding, .. } = stmt {
+        if let Statement::ForEachLoop {
+            collection,
+            body,
+            element_binding,
+            ..
+        } = stmt
+        {
             assert_eq!(element_binding.name, "i");
             if let Expression::Range { inclusive, .. } = *collection {
                 assert!(inclusive);
@@ -5753,7 +6169,10 @@ func next_item() -> Int {
         let result = parser.parse_return_statement();
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::Return { value: Some(expr), .. } = stmt {
+        if let Statement::Return {
+            value: Some(expr), ..
+        } = stmt
+        {
             assert!(matches!(*expr, Expression::Lambda { .. }));
         } else {
             panic!("Expected Return statement with Lambda");
@@ -5793,7 +6212,12 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let expr = result.unwrap();
-        if let Expression::Lambda { captures, parameters, .. } = expr {
+        if let Expression::Lambda {
+            captures,
+            parameters,
+            ..
+        } = expr
+        {
             assert_eq!(captures.len(), 1);
             assert_eq!(captures[0].name.name, "x");
             assert!(matches!(captures[0].mode, CaptureMode::ByValue));
@@ -5828,7 +6252,12 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let expr = result.unwrap();
-        if let Expression::Lambda { captures, parameters, .. } = expr {
+        if let Expression::Lambda {
+            captures,
+            parameters,
+            ..
+        } = expr
+        {
             assert_eq!(captures.len(), 1);
             assert_eq!(captures[0].name.name, "counter");
             assert!(matches!(captures[0].mode, CaptureMode::ByMutableReference));
@@ -5846,7 +6275,12 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let expr = result.unwrap();
-        if let Expression::Lambda { captures, parameters, .. } = expr {
+        if let Expression::Lambda {
+            captures,
+            parameters,
+            ..
+        } = expr
+        {
             assert_eq!(captures.len(), 3);
             assert_eq!(captures[0].name.name, "x");
             assert!(matches!(captures[0].mode, CaptureMode::ByValue));
@@ -5868,7 +6302,12 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let expr = result.unwrap();
-        if let Expression::Lambda { captures, parameters, .. } = expr {
+        if let Expression::Lambda {
+            captures,
+            parameters,
+            ..
+        } = expr
+        {
             assert_eq!(captures.len(), 0);
             assert_eq!(parameters.len(), 1);
         } else {
@@ -5900,7 +6339,12 @@ func next_item() -> Int {
         let result = parser.parse_expression();
         assert!(result.is_ok(), "Error: {:?}", result.err());
         let expr = result.unwrap();
-        if let Expression::Lambda { captures, return_type, .. } = expr {
+        if let Expression::Lambda {
+            captures,
+            return_type,
+            ..
+        } = expr
+        {
             assert_eq!(captures.len(), 1);
             assert!(return_type.is_some());
         } else {

@@ -15,8 +15,8 @@
 //! Integration tests for safe memory allocation
 
 use aether::pipeline::{CompilationPipeline, CompileOptions};
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
 #[test]
 fn test_memory_allocation_tracking() {
@@ -67,18 +67,20 @@ FUNCTION main() -> INTEGER {
     // Write test file
     let test_path = PathBuf::from("test_memory_alloc.aether");
     fs::write(&test_path, source).expect("Failed to write test file");
-    
+
     // Compile the test
     let mut options = CompileOptions::default();
     options.output = Some(PathBuf::from("test_memory_alloc"));
     options.keep_intermediates = false;
-    
+
     let mut pipeline = CompilationPipeline::new(options);
-    let result = pipeline.compile_files(&[test_path.clone()]).expect("Compilation failed");
-    
+    let result = pipeline
+        .compile_files(&[test_path.clone()])
+        .expect("Compilation failed");
+
     // Clean up test file
     fs::remove_file(&test_path).ok();
-    
+
     assert!(result.executable_path.exists(), "No output generated");
 }
 
@@ -108,18 +110,20 @@ FUNCTION main() -> INTEGER {
     // Write test file
     let test_path = PathBuf::from("test_double_free.aether");
     fs::write(&test_path, source).expect("Failed to write test file");
-    
+
     // Compile the test
     let mut options = CompileOptions::default();
     options.output = Some(PathBuf::from("test_double_free"));
     options.keep_intermediates = false;
-    
+
     let mut pipeline = CompilationPipeline::new(options);
-    let result = pipeline.compile_files(&[test_path.clone()]).expect("Compilation failed");
-    
+    let result = pipeline
+        .compile_files(&[test_path.clone()])
+        .expect("Compilation failed");
+
     // Clean up test file
     fs::remove_file(&test_path).ok();
-    
+
     assert!(result.executable_path.exists(), "No output generated");
 }
 
@@ -158,17 +162,19 @@ FUNCTION main() -> INTEGER {
     // Write test file
     let test_path = PathBuf::from("test_realloc.aether");
     fs::write(&test_path, source).expect("Failed to write test file");
-    
+
     // Compile the test
     let mut options = CompileOptions::default();
     options.output = Some(PathBuf::from("test_realloc"));
     options.keep_intermediates = false;
-    
+
     let mut pipeline = CompilationPipeline::new(options);
-    let result = pipeline.compile_files(&[test_path.clone()]).expect("Compilation failed");
-    
+    let result = pipeline
+        .compile_files(&[test_path.clone()])
+        .expect("Compilation failed");
+
     // Clean up test file
     fs::remove_file(&test_path).ok();
-    
+
     assert!(result.executable_path.exists(), "No output generated");
 }

@@ -49,7 +49,7 @@ fn test_printf_variadic() {
     // Write test program
     let test_file = PathBuf::from("test_printf_variadic.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -58,20 +58,23 @@ fn test_printf_variadic() {
         .arg("test_printf_variadic")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_printf_variadic")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success());
     let stdout = String::from_utf8_lossy(&run_output.stdout);
     assert!(stdout.contains("Hello World! The answer is 42"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_printf_variadic").ok();
@@ -118,7 +121,7 @@ fn test_multiple_variadic_functions() {
     // Write test program
     let test_file = PathBuf::from("test_multiple_variadic.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -127,27 +130,30 @@ fn test_multiple_variadic_functions() {
         .arg("test_multiple_variadic")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_multiple_variadic")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success());
     let stdout = String::from_utf8_lossy(&run_output.stdout);
     assert!(stdout.contains("Testing variadic 123"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_multiple_variadic").ok();
     fs::remove_file("test_multiple_variadic.o").ok();
 }
 
-#[test] 
+#[test]
 fn test_non_variadic_external_function() {
     let test_program = r#"
 (DEFINE_MODULE
@@ -178,7 +184,7 @@ fn test_non_variadic_external_function() {
     // Write test program
     let test_file = PathBuf::from("test_non_variadic.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -187,20 +193,23 @@ fn test_non_variadic_external_function() {
         .arg("test_non_variadic")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_non_variadic")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success());
     let stdout = String::from_utf8_lossy(&run_output.stdout);
     assert!(stdout.contains("Hello from non-variadic function!"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_non_variadic").ok();

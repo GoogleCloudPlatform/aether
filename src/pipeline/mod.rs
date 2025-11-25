@@ -143,11 +143,14 @@ impl CompilationPipeline {
     }
 
     /// Compile multiple source files into a single executable
-    pub fn compile_files(&mut self, input_files: &[PathBuf]) -> Result<CompilationResult, CompilerError> {
+    pub fn compile_files(
+        &mut self,
+        input_files: &[PathBuf],
+    ) -> Result<CompilationResult, CompilerError> {
         let start_time = std::time::Instant::now();
         let mut stats = CompilationStats::default();
         let mut intermediate_files = Vec::new();
-        
+
         // Initialize profiler if enabled
         let mut profiler = CompilationProfiler::new();
         if self.options.enable_profiling {
@@ -160,8 +163,12 @@ impl CompilationPipeline {
         }
         let parse_start = std::time::Instant::now();
         let program = {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("parsing")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("parsing"))
+            } else {
+                None
+            };
+
             // Decide whether to use parallel or sequential parsing
             let modules = if self.options.parallel && input_files.len() > 1 {
                 // Parallel parsing
@@ -169,8 +176,8 @@ impl CompilationPipeline {
                     .par_iter()
                     .map(|input_file| {
                         // Read file
-                        let source = fs::read_to_string(input_file)
-                            .map_err(|e| CompilerError::IoError {
+                        let source =
+                            fs::read_to_string(input_file).map_err(|e| CompilerError::IoError {
                                 message: format!("Failed to read {}: {}", input_file.display(), e),
                             })?;
 
@@ -197,8 +204,8 @@ impl CompilationPipeline {
 
                 for input_file in input_files {
                     // Read file
-                    let source = fs::read_to_string(input_file)
-                        .map_err(|e| CompilerError::IoError {
+                    let source =
+                        fs::read_to_string(input_file).map_err(|e| CompilerError::IoError {
                             message: format!("Failed to read {}: {}", input_file.display(), e),
                         })?;
 
@@ -212,16 +219,18 @@ impl CompilationPipeline {
 
                 modules
             };
-            
+
             Program {
                 modules,
                 source_location: crate::error::SourceLocation::unknown(),
             }
         };
-        
+
         stats.modules_compiled = program.modules.len();
-        stats.phase_times.insert("parsing".to_string(), parse_start.elapsed().as_millis());
-        
+        stats
+            .phase_times
+            .insert("parsing".to_string(), parse_start.elapsed().as_millis());
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_parsing");
         }
@@ -231,22 +240,29 @@ impl CompilationPipeline {
             println!("Phase 2: Semantic analysis...");
         }
         let semantic_start = std::time::Instant::now();
-        
+
         let symbol_table = {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("semantic_analysis")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("semantic_analysis"))
+            } else {
+                None
+            };
+
             let mut analyzer = SemanticAnalyzer::new();
             analyzer.analyze_program(&program)?;
-            
+
             let analysis_stats = analyzer.get_statistics().clone();
             stats.functions_compiled = analysis_stats.functions_analyzed;
-            
+
             // Extract symbol table for MIR lowering
             analyzer.get_symbol_table()
         };
-        
-        stats.phase_times.insert("semantic_analysis".to_string(), semantic_start.elapsed().as_millis());
-        
+
+        stats.phase_times.insert(
+            "semantic_analysis".to_string(),
+            semantic_start.elapsed().as_millis(),
+        );
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_semantic_analysis");
         }
@@ -256,9 +272,9 @@ impl CompilationPipeline {
             if self.options.verbose {
                 println!("\nSyntax check completed successfully!");
             }
-            
+
             stats.total_time_ms = start_time.elapsed().as_millis();
-            
+
             // Return dummy result for syntax check
             return Ok(CompilationResult {
                 executable_path: PathBuf::from("syntax-check-only"),
@@ -272,27 +288,42 @@ impl CompilationPipeline {
             println!("Phase 3: Generating intermediate representation...");
         }
         let mir_start = std::time::Instant::now();
-        
+
         let mut mir_program = {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("mir_generation")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("mir_generation"))
+            } else {
+                None
+            };
+
             eprintln!("AST has {} modules", program.modules.len());
             for module in &program.modules {
-                eprintln!("  Module '{}' has {} functions", module.name.name, module.function_definitions.len());
+                eprintln!(
+                    "  Module '{}' has {} functions",
+                    module.name.name,
+                    module.function_definitions.len()
+                );
                 for (idx, func) in module.function_definitions.iter().enumerate() {
                     eprintln!("    Function {}: {}", idx, func.name.name);
                 }
-                eprintln!("  Module '{}' has {} constants", module.name.name, module.constant_declarations.len());
+                eprintln!(
+                    "  Module '{}' has {} constants",
+                    module.name.name,
+                    module.constant_declarations.len()
+                );
                 for (idx, constant) in module.constant_declarations.iter().enumerate() {
                     eprintln!("    Constant {}: {}", idx, constant.name.name);
                 }
             }
-            
+
             mir::lowering::lower_ast_to_mir_with_symbols(&program, symbol_table)?
         };
-        
-        stats.phase_times.insert("mir_generation".to_string(), mir_start.elapsed().as_millis());
-        
+
+        stats.phase_times.insert(
+            "mir_generation".to_string(),
+            mir_start.elapsed().as_millis(),
+        );
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_mir_generation");
         }
@@ -302,10 +333,14 @@ impl CompilationPipeline {
             println!("Phase 4: Running optimizations...");
         }
         let opt_start = std::time::Instant::now();
-        
+
         if self.options.optimization_level > 0 {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("optimization")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("optimization"))
+            } else {
+                None
+            };
+
             let mut opt_manager = OptimizationManager::new();
             // Set up optimization passes based on level
             if self.options.optimization_level > 0 {
@@ -313,9 +348,11 @@ impl CompilationPipeline {
             }
             opt_manager.optimize_program(&mut mir_program)?;
         }
-        
-        stats.phase_times.insert("optimization".to_string(), opt_start.elapsed().as_millis());
-        
+
+        stats
+            .phase_times
+            .insert("optimization".to_string(), opt_start.elapsed().as_millis());
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_optimization");
         }
@@ -325,35 +362,42 @@ impl CompilationPipeline {
             println!("Phase 5: Generating LLVM IR...");
         }
         let codegen_start = std::time::Instant::now();
-        
+
         let context = Context::create();
-        let module_name = input_files.first()
+        let module_name = input_files
+            .first()
             .and_then(|p| p.file_stem())
             .and_then(|s| s.to_str())
             .unwrap_or("main");
-        
+
         let mut backend = LLVMBackend::new(&context, module_name);
-        
+
         {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("llvm_codegen")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("llvm_codegen"))
+            } else {
+                None
+            };
+
             // Initialize LLVM targets
             LLVMBackend::initialize_targets();
-            
+
             // Set target triple - use specified or native
-            let target_triple = self.options.target_triple.clone()
-                .unwrap_or_else(|| {
-                    use crate::llvm_backend::TargetArch;
-                    TargetArch::native().target_triple().to_string()
-                });
+            let target_triple = self.options.target_triple.clone().unwrap_or_else(|| {
+                use crate::llvm_backend::TargetArch;
+                TargetArch::native().target_triple().to_string()
+            });
             backend.set_target_triple(&target_triple)?;
-            
+
             // Generate LLVM IR from MIR
             backend.generate_ir(&mir_program)?;
         }
-        
-        stats.phase_times.insert("llvm_codegen".to_string(), codegen_start.elapsed().as_millis());
-        
+
+        stats.phase_times.insert(
+            "llvm_codegen".to_string(),
+            codegen_start.elapsed().as_millis(),
+        );
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_llvm_codegen");
         }
@@ -363,28 +407,36 @@ impl CompilationPipeline {
             println!("Phase 6: Generating object file...");
         }
         let object_start = std::time::Instant::now();
-        
+
         let object_file = self.generate_object_file(&backend, module_name)?;
         if self.options.keep_intermediates {
             intermediate_files.push(object_file.clone());
         }
-        
-        stats.phase_times.insert("object_generation".to_string(), object_start.elapsed().as_millis());
+
+        stats.phase_times.insert(
+            "object_generation".to_string(),
+            object_start.elapsed().as_millis(),
+        );
 
         // Check if output is object file only
-        let output_is_object = self.options.output.as_ref()
+        let output_is_object = self
+            .options
+            .output
+            .as_ref()
             .map(|p| p.extension().map(|e| e == "o").unwrap_or(false))
             .unwrap_or(false);
-        
+
         let executable_path = if output_is_object || self.options.emit_object_only {
             // Just copy the object file to the output path
-            let output_path = self.options.output.clone()
+            let output_path = self
+                .options
+                .output
+                .clone()
                 .unwrap_or_else(|| object_file.clone());
             if object_file != output_path {
-                fs::copy(&object_file, &output_path)
-                    .map_err(|e| CompilerError::IoError {
-                        message: format!("Failed to copy object file: {}", e),
-                    })?;
+                fs::copy(&object_file, &output_path).map_err(|e| CompilerError::IoError {
+                    message: format!("Failed to copy object file: {}", e),
+                })?;
             }
             output_path
         } else {
@@ -397,15 +449,17 @@ impl CompilationPipeline {
                 }
             }
             let link_start = std::time::Instant::now();
-            
+
             let output_path = if self.options.compile_as_library {
                 self.link_library(&object_file, module_name)?
             } else {
                 self.link_executable(&object_file, module_name)?
             };
-            
-            stats.phase_times.insert("linking".to_string(), link_start.elapsed().as_millis());
-            
+
+            stats
+                .phase_times
+                .insert("linking".to_string(), link_start.elapsed().as_millis());
+
             output_path
         };
 
@@ -424,7 +478,7 @@ impl CompilationPipeline {
             println!("Total time: {}ms", stats.total_time_ms);
             println!("Output: {}", executable_path.display());
         }
-        
+
         // Print profiling report if enabled
         if self.options.enable_profiling {
             profiler.print_summary();
@@ -438,92 +492,110 @@ impl CompilationPipeline {
     }
 
     /// Generate object file from LLVM module
-    fn generate_object_file(&self, backend: &LLVMBackend, base_name: &str) -> Result<PathBuf, CompilerError> {
+    fn generate_object_file(
+        &self,
+        backend: &LLVMBackend,
+        base_name: &str,
+    ) -> Result<PathBuf, CompilerError> {
         let object_path = PathBuf::from(format!("{}.o", base_name));
-        
+
         // Write object file
         backend.write_object_file(&object_path)?;
-        
+
         Ok(object_path)
     }
 
     /// Link object file(s) into executable
-    fn link_executable(&self, object_file: &Path, base_name: &str) -> Result<PathBuf, CompilerError> {
-        let output_path = self.options.output.clone()
+    fn link_executable(
+        &self,
+        object_file: &Path,
+        base_name: &str,
+    ) -> Result<PathBuf, CompilerError> {
+        let output_path = self
+            .options
+            .output
+            .clone()
             .unwrap_or_else(|| PathBuf::from(base_name));
-        
+
         // Use system linker (ld or clang)
         let mut cmd = if cfg!(target_os = "macos") {
             Command::new("clang")
         } else {
             Command::new("cc")
         };
-        
+
         cmd.arg("-o").arg(&output_path);
         cmd.arg(object_file);
-        
+
         // Add library paths
         for lib_path in &self.options.library_paths {
             cmd.arg(format!("-L{}", lib_path.display()));
         }
-        
+
         // Add libraries
         for lib in &self.options.link_libraries {
             cmd.arg(format!("-l{}", lib));
         }
-        
+
         // Add AetherScript runtime library directly
         let runtime_lib_path = PathBuf::from("/Users/keithballinger/Desktop/projects/logos/runtime/target/release/libaether_runtime.dylib");
-        
+
         cmd.arg(&runtime_lib_path);
-        
+
         // Add standard C library
         if !self.options.link_libraries.contains(&"c".to_string()) {
             cmd.arg("-lc");
         }
-        
+
         // Add math library if needed
         if !self.options.link_libraries.contains(&"m".to_string()) {
             cmd.arg("-lm");
         }
-        
+
         if self.options.verbose {
             println!("Linking command: {:?}", cmd);
         }
-        
-        let output = cmd.output()
-            .map_err(|e| CompilerError::IoError {
-                message: format!("Failed to run linker: {}", e),
-            })?;
-        
+
+        let output = cmd.output().map_err(|e| CompilerError::IoError {
+            message: format!("Failed to run linker: {}", e),
+        })?;
+
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
             return Err(SemanticError::InvalidType {
                 type_name: "linking".to_string(),
                 reason: format!("linker error: {}", error_msg),
                 location: crate::error::SourceLocation::unknown(),
-            }.into());
+            }
+            .into());
         }
-        
+
         // Make executable on Unix
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = fs::metadata(&output_path)
                 .map_err(|e| CompilerError::IoError {
-                    message: format!("Failed to get metadata for {}: {}", output_path.display(), e),
+                    message: format!(
+                        "Failed to get metadata for {}: {}",
+                        output_path.display(),
+                        e
+                    ),
                 })?
                 .permissions();
             perms.set_mode(0o755);
-            fs::set_permissions(&output_path, perms)
-                .map_err(|e| CompilerError::IoError {
-                    message: format!("Failed to set permissions on {}: {}", output_path.display(), e),
-                })?;
+            fs::set_permissions(&output_path, perms).map_err(|e| CompilerError::IoError {
+                message: format!(
+                    "Failed to set permissions on {}: {}",
+                    output_path.display(),
+                    e
+                ),
+            })?;
         }
-        
+
         Ok(output_path)
     }
-    
+
     /// Link object file(s) into a shared library
     fn link_library(&self, object_file: &Path, base_name: &str) -> Result<PathBuf, CompilerError> {
         let lib_extension = if cfg!(target_os = "macos") {
@@ -533,17 +605,25 @@ impl CompilationPipeline {
         } else {
             "so"
         };
-        
-        let lib_prefix = if cfg!(target_os = "windows") { "" } else { "lib" };
-        
-        let output_path = self.options.output.clone()
-            .unwrap_or_else(|| PathBuf::from(format!("{}{}.{}", lib_prefix, base_name, lib_extension)));
-        
+
+        let lib_prefix = if cfg!(target_os = "windows") {
+            ""
+        } else {
+            "lib"
+        };
+
+        let output_path = self.options.output.clone().unwrap_or_else(|| {
+            PathBuf::from(format!("{}{}.{}", lib_prefix, base_name, lib_extension))
+        });
+
         // Use system linker to create shared library
         let mut cmd = if cfg!(target_os = "macos") {
             let mut cmd = Command::new("clang");
             cmd.arg("-dynamiclib");
-            cmd.arg("-install_name").arg(format!("@rpath/{}", output_path.file_name().unwrap().to_string_lossy()));
+            cmd.arg("-install_name").arg(format!(
+                "@rpath/{}",
+                output_path.file_name().unwrap().to_string_lossy()
+            ));
             cmd
         } else if cfg!(target_os = "windows") {
             let mut cmd = Command::new("cl");
@@ -555,47 +635,47 @@ impl CompilationPipeline {
             cmd.arg("-fPIC");
             cmd
         };
-        
+
         cmd.arg("-o").arg(&output_path);
         cmd.arg(object_file);
-        
+
         // Add library paths
         for lib_path in &self.options.library_paths {
             cmd.arg(format!("-L{}", lib_path.display()));
         }
-        
+
         // Add libraries
         for lib in &self.options.link_libraries {
             cmd.arg(format!("-l{}", lib));
         }
-        
+
         // Add AetherScript runtime library
         let runtime_lib_path = PathBuf::from("/Users/keithballinger/Desktop/projects/logos/runtime/target/release/libaether_runtime.dylib");
         cmd.arg(&runtime_lib_path);
-        
+
         // Add standard C library
         if !self.options.link_libraries.contains(&"c".to_string()) {
             cmd.arg("-lc");
         }
-        
+
         if self.options.verbose {
             println!("Library linking command: {:?}", cmd);
         }
-        
-        let output = cmd.output()
-            .map_err(|e| CompilerError::IoError {
-                message: format!("Failed to run linker: {}", e),
-            })?;
-        
+
+        let output = cmd.output().map_err(|e| CompilerError::IoError {
+            message: format!("Failed to run linker: {}", e),
+        })?;
+
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
             return Err(SemanticError::InvalidType {
                 type_name: "linking".to_string(),
                 reason: format!("linker error: {}", error_msg),
                 location: crate::error::SourceLocation::unknown(),
-            }.into());
+            }
+            .into());
         }
-        
+
         Ok(output_path)
     }
 }

@@ -13,16 +13,16 @@
 // limitations under the License.
 
 //! Memory management system for AetherScript
-//! 
+//!
 //! Implements deterministic memory management with region-based allocation,
 //! reference counting, and linear types for zero-copy operations.
 
 use crate::ast::*;
-use crate::types::{Type, TypeChecker};
 use crate::error::{SemanticError, SourceLocation};
+use crate::types::{Type, TypeChecker};
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::cell::RefCell;
 
 /// Memory allocation strategy
 #[derive(Debug, Clone, PartialEq)]
@@ -59,13 +59,13 @@ pub enum AllocationStatus {
 struct MemoryRegion {
     /// Start address
     start: usize,
-    
+
     /// Current size
     size: usize,
-    
+
     /// Permissions
     permissions: MemoryPermissions,
-    
+
     /// Allocation status
     status: AllocationStatus,
 }
@@ -105,29 +105,29 @@ impl MemoryAnalyzer {
             escape_analysis: EscapeAnalyzer::new(),
         }
     }
-    
+
     /// Create a new memory region
     pub fn create_region(&mut self, parent: Option<RegionId>) -> RegionId {
         let id = RegionId(self.next_region_id);
         self.next_region_id += 1;
-        
+
         let region = MemoryRegion {
             start: 0,
             size: 0,
             permissions: MemoryPermissions::Read,
             status: AllocationStatus::Free,
         };
-        
+
         self.regions.insert(id.clone(), region);
         id
     }
-    
+
     /// Enter a memory region
     pub fn enter_region(&mut self, region_id: RegionId) {
         self.region_stack.push(self.active_region.clone());
         self.active_region = Some(region_id);
     }
-    
+
     /// Exit current region and deallocate if needed
     pub fn exit_region(&mut self) -> Result<(), SemanticError> {
         if let Some(_region_id) = &self.active_region {
@@ -146,17 +146,23 @@ impl MemoryAnalyzer {
             })
         }
     }
-    
+
     /// Analyze a function for memory allocation strategy
-    pub fn analyze_function(&mut self, function: &Function) -> Result<FunctionMemoryInfo, SemanticError> {
+    pub fn analyze_function(
+        &mut self,
+        function: &Function,
+    ) -> Result<FunctionMemoryInfo, SemanticError> {
         // Create function-level region
         let function_region = self.create_region(self.active_region.clone());
         self.enter_region(function_region.clone());
-        
+
         // Analyze parameters
         let mut param_allocations = Vec::new();
         for param in &function.parameters {
-            let param_type = self.type_checker.borrow().ast_type_to_type(&param.param_type)?;
+            let param_type = self
+                .type_checker
+                .borrow()
+                .ast_type_to_type(&param.param_type)?;
             let allocation = self.determine_allocation_strategy(
                 &param.name.name,
                 &param_type,
@@ -165,16 +171,16 @@ impl MemoryAnalyzer {
             )?;
             param_allocations.push(allocation);
         }
-        
+
         // Analyze function body
         self.analyze_block(&function.body)?;
-        
+
         // Perform escape analysis
         let escapes = self.escape_analysis.analyze_function(function)?;
-        
+
         // Exit function region
         self.exit_region()?;
-        
+
         Ok(FunctionMemoryInfo {
             region_id: function_region.clone(),
             parameter_allocations: param_allocations,
@@ -182,47 +188,54 @@ impl MemoryAnalyzer {
             escaping_values: escapes,
         })
     }
-    
+
     /// Analyze a block for memory allocations
     fn analyze_block(&mut self, block: &Block) -> Result<(), SemanticError> {
         // Create block-level region
         let block_region = self.create_region(self.active_region.clone());
         self.enter_region(block_region);
-        
+
         for statement in &block.statements {
             self.analyze_statement(statement)?;
         }
-        
+
         // Exit block region
         self.exit_region()?;
-        
+
         Ok(())
     }
-    
+
     /// Analyze a statement for memory allocations
     fn analyze_statement(&mut self, statement: &Statement) -> Result<(), SemanticError> {
         match statement {
-            Statement::VariableDeclaration { name, type_spec, mutability, initial_value, source_location, .. } => {
+            Statement::VariableDeclaration {
+                name,
+                type_spec,
+                mutability,
+                initial_value,
+                source_location,
+                ..
+            } => {
                 let var_type = self.type_checker.borrow().ast_type_to_type(type_spec)?;
                 let is_mutable = matches!(mutability, Mutability::Mutable);
-                
+
                 // Check if this should be a linear type
                 let is_linear = self.should_use_linear_type(&var_type, initial_value.as_deref());
-                
+
                 let allocation = self.determine_allocation_strategy(
                     &name.name,
                     &var_type,
                     source_location,
                     is_mutable,
                 )?;
-                
+
                 if is_linear {
                     self.linear_types.insert(name.name.clone());
                 }
-                
+
                 self.allocation_map.insert(name.name.clone(), allocation);
             }
-            
+
             Statement::Assignment { target, value, .. } => {
                 // Check for linear type violations
                 if let AssignmentTarget::Variable { name } = target {
@@ -232,8 +245,13 @@ impl MemoryAnalyzer {
                     }
                 }
             }
-            
-            Statement::If { then_block, else_ifs, else_block, .. } => {
+
+            Statement::If {
+                then_block,
+                else_ifs,
+                else_block,
+                ..
+            } => {
                 self.analyze_block(then_block)?;
                 for else_if in else_ifs {
                     self.analyze_block(&else_if.block)?;
@@ -242,14 +260,19 @@ impl MemoryAnalyzer {
                     self.analyze_block(else_block)?;
                 }
             }
-            
-            Statement::WhileLoop { body, .. } |
-            Statement::ForEachLoop { body, .. } |
-            Statement::FixedIterationLoop { body, .. } => {
+
+            Statement::WhileLoop { body, .. }
+            | Statement::ForEachLoop { body, .. }
+            | Statement::FixedIterationLoop { body, .. } => {
                 self.analyze_block(body)?;
             }
-            
-            Statement::TryBlock { protected_block, catch_clauses, finally_block, .. } => {
+
+            Statement::TryBlock {
+                protected_block,
+                catch_clauses,
+                finally_block,
+                ..
+            } => {
                 self.analyze_block(protected_block)?;
                 for catch in catch_clauses {
                     self.analyze_block(&catch.handler_block)?;
@@ -258,13 +281,13 @@ impl MemoryAnalyzer {
                     self.analyze_block(finally)?;
                 }
             }
-            
+
             _ => {}
         }
-        
+
         Ok(())
     }
-    
+
     /// Determine allocation strategy for a variable
     fn determine_allocation_strategy(
         &self,
@@ -274,7 +297,7 @@ impl MemoryAnalyzer {
         is_mutable: bool,
     ) -> Result<AllocationInfo, SemanticError> {
         let size = self.estimate_type_size(var_type);
-        
+
         // Determine strategy based on type and size
         let strategy = if size <= 64 && !is_mutable && self.is_stack_eligible(var_type) {
             AllocationStrategy::Stack
@@ -285,7 +308,7 @@ impl MemoryAnalyzer {
         } else {
             AllocationStrategy::Stack // Fallback
         };
-        
+
         Ok(AllocationInfo {
             variable_name: name.to_string(),
             allocation_type: var_type.clone(),
@@ -294,29 +317,31 @@ impl MemoryAnalyzer {
             location: location.clone(),
         })
     }
-    
+
     /// Estimate size of a type in bytes
     fn estimate_type_size(&self, var_type: &Type) -> usize {
         match var_type {
             Type::Primitive(prim) => match prim {
                 PrimitiveType::Boolean => 1,
                 PrimitiveType::Integer32 | PrimitiveType::Float32 => 4,
-                PrimitiveType::Integer | PrimitiveType::Integer64 | 
-                PrimitiveType::Float | PrimitiveType::Float64 => 8,
+                PrimitiveType::Integer
+                | PrimitiveType::Integer64
+                | PrimitiveType::Float
+                | PrimitiveType::Float64 => 8,
                 PrimitiveType::String => 24, // String header size
-                _ => 8, // Default pointer size
+                _ => 8,                      // Default pointer size
             },
             Type::Pointer { .. } => 8,
             Type::Array { element_type, .. } => {
                 // Array header + elements (estimate)
                 24 + self.estimate_type_size(element_type) * 10
             }
-            Type::Map { .. } => 48, // HashMap header estimate
+            Type::Map { .. } => 48,      // HashMap header estimate
             Type::Function { .. } => 16, // Function pointer
-            _ => 24, // Default struct size
+            _ => 24,                     // Default struct size
         }
     }
-    
+
     /// Check if type is eligible for stack allocation
     fn is_stack_eligible(&self, var_type: &Type) -> bool {
         match var_type {
@@ -326,7 +351,7 @@ impl MemoryAnalyzer {
             _ => false,
         }
     }
-    
+
     /// Check if type should use reference counting
     fn should_use_ref_counting(&self, var_type: &Type) -> bool {
         match var_type {
@@ -335,7 +360,7 @@ impl MemoryAnalyzer {
             _ => false,
         }
     }
-    
+
     /// Check if a type should be linear
     fn should_use_linear_type(&self, var_type: &Type, _initial_value: Option<&Expression>) -> bool {
         // Large arrays or unique resources should be linear
@@ -344,19 +369,28 @@ impl MemoryAnalyzer {
                 // Large arrays benefit from zero-copy
                 self.estimate_type_size(var_type) > 1024
             }
-            Type::Pointer { is_mutable: true, .. } => {
+            Type::Pointer {
+                is_mutable: true, ..
+            } => {
                 // Mutable unique pointers should be linear
                 true
             }
             _ => false,
         }
     }
-    
+
     /// Validate linear type assignment
-    fn validate_linear_type_assignment(&self, name: &str, value: &Expression) -> Result<(), SemanticError> {
+    fn validate_linear_type_assignment(
+        &self,
+        name: &str,
+        value: &Expression,
+    ) -> Result<(), SemanticError> {
         // Check that the value is a move, not a copy
         match value {
-            Expression::Variable { name: var_name, source_location } => {
+            Expression::Variable {
+                name: var_name,
+                source_location,
+            } => {
                 if self.linear_types.contains(&var_name.name) {
                     // This is a move - the source variable will be invalidated
                     Ok(())
@@ -371,7 +405,7 @@ impl MemoryAnalyzer {
             _ => Ok(()), // Other expressions create new values
         }
     }
-    
+
     /// Get allocations for a specific region
     fn get_region_allocations(&self, region_id: &RegionId) -> Vec<AllocationInfo> {
         vec![]
@@ -389,26 +423,31 @@ impl EscapeAnalyzer {
             escaping_values: HashSet::new(),
         }
     }
-    
+
     fn analyze_function(&mut self, function: &Function) -> Result<HashSet<String>, SemanticError> {
         self.escaping_values.clear();
-        
+
         // Analyze function body for escaping values
         self.analyze_block_for_escapes(&function.body)?;
-        
+
         Ok(self.escaping_values.clone())
     }
-    
+
     fn analyze_block_for_escapes(&mut self, block: &Block) -> Result<(), SemanticError> {
         for statement in &block.statements {
             self.analyze_statement_for_escapes(statement)?;
         }
         Ok(())
     }
-    
-    fn analyze_statement_for_escapes(&mut self, statement: &Statement) -> Result<(), SemanticError> {
+
+    fn analyze_statement_for_escapes(
+        &mut self,
+        statement: &Statement,
+    ) -> Result<(), SemanticError> {
         match statement {
-            Statement::Return { value: Some(expr), .. } => {
+            Statement::Return {
+                value: Some(expr), ..
+            } => {
                 // Values returned from functions escape
                 self.mark_escaping_expression(expr);
             }
@@ -422,7 +461,7 @@ impl EscapeAnalyzer {
         }
         Ok(())
     }
-    
+
     fn mark_escaping_expression(&mut self, expr: &Expression) {
         match expr {
             Expression::Variable { name, .. } => {
@@ -435,12 +474,12 @@ impl EscapeAnalyzer {
             _ => {}
         }
     }
-    
+
     fn is_escaping_target(&self, target: &AssignmentTarget) -> bool {
         match target {
-            AssignmentTarget::StructField { .. } |
-            AssignmentTarget::ArrayElement { .. } |
-            AssignmentTarget::MapValue { .. } => true,
+            AssignmentTarget::StructField { .. }
+            | AssignmentTarget::ArrayElement { .. }
+            | AssignmentTarget::MapValue { .. } => true,
             _ => false,
         }
     }
@@ -467,13 +506,13 @@ impl<T> RefCounted<T> {
             value: Rc::new(RefCell::new(value)),
         }
     }
-    
+
     pub fn clone(&self) -> Self {
         Self {
             value: Rc::clone(&self.value),
         }
     }
-    
+
     pub fn strong_count(&self) -> usize {
         Rc::strong_count(&self.value)
     }
@@ -487,15 +526,13 @@ pub struct Linear<T> {
 
 impl<T> Linear<T> {
     pub fn new(value: T) -> Self {
-        Self {
-            value: Some(value),
-        }
+        Self { value: Some(value) }
     }
-    
+
     pub fn take(mut self) -> T {
         self.value.take().expect("Linear value already consumed")
     }
-    
+
     pub fn is_consumed(&self) -> bool {
         self.value.is_none()
     }
@@ -504,11 +541,11 @@ impl<T> Linear<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     fn create_test_type() -> Type {
         Type::primitive(PrimitiveType::Integer)
     }
-    
+
     #[test]
     fn test_memory_analyzer_creation() {
         let type_checker = Rc::new(RefCell::new(TypeChecker::new()));
@@ -516,69 +553,63 @@ mod tests {
         assert_eq!(analyzer.next_region_id, 0);
         assert!(analyzer.regions.is_empty());
     }
-    
+
     #[test]
     fn test_region_creation() {
         let type_checker = Rc::new(RefCell::new(TypeChecker::new()));
         let mut analyzer = MemoryAnalyzer::new(type_checker);
-        
+
         let region1 = analyzer.create_region(None);
         assert_eq!(region1.0, 0);
-        
+
         let region2 = analyzer.create_region(Some(region1.clone()));
         assert_eq!(region2.0, 1);
-        
+
         assert_eq!(analyzer.regions.len(), 2);
     }
-    
+
     #[test]
     fn test_allocation_strategy_determination() {
         let type_checker = Rc::new(RefCell::new(TypeChecker::new()));
         let analyzer = MemoryAnalyzer::new(type_checker);
-        
+
         // Small primitive should use stack
         let int_type = Type::primitive(PrimitiveType::Integer);
-        let alloc = analyzer.determine_allocation_strategy(
-            "x",
-            &int_type,
-            &SourceLocation::unknown(),
-            false,
-        ).unwrap();
-        
+        let alloc = analyzer
+            .determine_allocation_strategy("x", &int_type, &SourceLocation::unknown(), false)
+            .unwrap();
+
         assert_eq!(alloc.strategy, AllocationStrategy::Stack);
         assert_eq!(alloc.size_bytes, 8);
-        
+
         // Array should use ref counting
         let array_type = Type::array(Type::primitive(PrimitiveType::Integer), None);
-        let alloc = analyzer.determine_allocation_strategy(
-            "arr",
-            &array_type,
-            &SourceLocation::unknown(),
-            false,
-        ).unwrap();
-        
+        let alloc = analyzer
+            .determine_allocation_strategy("arr", &array_type, &SourceLocation::unknown(), false)
+            .unwrap();
+
         assert_eq!(alloc.strategy, AllocationStrategy::RefCounted);
     }
-    
+
     #[test]
     fn test_ref_counted_wrapper() {
         let rc1 = RefCounted::new(42);
         assert_eq!(rc1.strong_count(), 1);
-        
+
         let rc2 = rc1.clone();
         assert_eq!(rc1.strong_count(), 2);
         assert_eq!(rc2.strong_count(), 2);
     }
-    
+
     #[test]
     fn test_linear_type_wrapper() {
         let linear = Linear::new(vec![1, 2, 3]);
         assert!(!linear.is_consumed());
-        
+
         let value = linear.take();
         assert_eq!(value, vec![1, 2, 3]);
     }
-    
+
     #[test]
     #[should_panic(expected = "Linear value already consumed")]
     fn test_linear_type_double_consume() {

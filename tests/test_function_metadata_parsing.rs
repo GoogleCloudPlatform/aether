@@ -14,9 +14,9 @@
 
 //! Tests for function metadata parsing
 
-use aether::parser::Parser;
+use aether::ast::{ComplexityNotation, ComplexityType, FailureAction, PerformanceMetric};
 use aether::lexer::Lexer;
-use aether::ast::{PerformanceMetric, ComplexityType, ComplexityNotation, FailureAction};
+use aether::parser::Parser;
 
 #[test]
 fn test_function_with_precondition() {
@@ -33,18 +33,24 @@ fn test_function_with_precondition() {
       (BODY
         (EXPRESSION_DIVIDE 'a' 'b')))))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let function = &program.modules[0].function_definitions[0];
-    
+
     assert_eq!(function.name.name, "safe_divide");
     assert_eq!(function.metadata.preconditions.len(), 1);
-    assert_eq!(function.metadata.preconditions[0].message, Some("Divisor cannot be zero".to_string()));
-    assert_eq!(function.metadata.preconditions[0].failure_action, FailureAction::AssertFail);
+    assert_eq!(
+        function.metadata.preconditions[0].message,
+        Some("Divisor cannot be zero".to_string())
+    );
+    assert_eq!(
+        function.metadata.preconditions[0].failure_action,
+        FailureAction::AssertFail
+    );
 }
 
 #[test]
@@ -63,16 +69,19 @@ fn test_function_with_postcondition() {
           (THEN_EXECUTE (EXPRESSION_NEGATE 'x'))
           (ELSE_EXECUTE 'x'))))))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let function = &program.modules[0].function_definitions[0];
-    
+
     assert_eq!(function.metadata.postconditions.len(), 1);
-    assert_eq!(function.metadata.postconditions[0].message, Some("Result must be non-negative".to_string()));
+    assert_eq!(
+        function.metadata.postconditions[0].message,
+        Some("Result must be non-negative".to_string())
+    );
 }
 
 #[test]
@@ -88,14 +97,14 @@ fn test_function_with_performance_expectation() {
       (BODY
         (RETURN_VOID)))))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let function = &program.modules[0].function_definitions[0];
-    
+
     assert!(function.metadata.performance_expectation.is_some());
     let perf = function.metadata.performance_expectation.as_ref().unwrap();
     assert_eq!(perf.metric, PerformanceMetric::LatencyMs);
@@ -117,14 +126,14 @@ fn test_function_with_complexity_expectation() {
       (BODY
         'arr'))))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let function = &program.modules[0].function_definitions[0];
-    
+
     assert!(function.metadata.complexity_expectation.is_some());
     let complexity = function.metadata.complexity_expectation.as_ref().unwrap();
     assert_eq!(complexity.complexity_type, ComplexityType::Time);
@@ -146,15 +155,18 @@ fn test_function_with_algorithm_hint() {
       (BODY
         'arr'))))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let function = &program.modules[0].function_definitions[0];
-    
-    assert_eq!(function.metadata.algorithm_hint, Some("divide-and-conquer".to_string()));
+
+    assert_eq!(
+        function.metadata.algorithm_hint,
+        Some("divide-and-conquer".to_string())
+    );
 }
 
 #[test]
@@ -181,17 +193,20 @@ fn test_function_with_multiple_metadata() {
       (BODY
         -1))))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let function = &program.modules[0].function_definitions[0];
-    
+
     assert_eq!(function.metadata.preconditions.len(), 1);
     assert_eq!(function.metadata.postconditions.len(), 1);
-    assert_eq!(function.metadata.algorithm_hint, Some("binary search".to_string()));
+    assert_eq!(
+        function.metadata.algorithm_hint,
+        Some("binary search".to_string())
+    );
     assert!(function.metadata.complexity_expectation.is_some());
     assert!(function.metadata.performance_expectation.is_some());
     assert_eq!(function.metadata.thread_safe, Some(true));

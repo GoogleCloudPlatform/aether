@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use proptest::prelude::*;
 use aether::lexer::{Lexer, TokenType};
 use aether::parser::Parser;
 use aether::semantic::SemanticAnalyzer;
+use proptest::prelude::*;
 
 /// Generate valid AetherScript identifiers
 fn valid_identifier() -> impl Strategy<Value = String> {
@@ -49,13 +49,13 @@ proptest! {
     fn test_valid_identifiers_tokenize(identifier in valid_identifier()) {
         let source = format!("({})", identifier);
         let mut lexer = Lexer::new(&source, "test.aether".to_string());
-        
+
         let result = lexer.tokenize();
         prop_assert!(result.is_ok());
-        
+
         let tokens = result.unwrap();
         prop_assert!(tokens.len() >= 3); // LeftParen, Identifier, RightParen, Eof
-        
+
         // Check that identifier is properly tokenized
         let identifier_token = &tokens[1];
         if let TokenType::Identifier(name) = &identifier_token.token_type {
@@ -82,15 +82,15 @@ proptest! {
                 )
             )
         )"#, value);
-        
+
         let mut lexer = Lexer::new(&source, "test.aether".to_string());
         let tokens = lexer.tokenize();
         prop_assert!(tokens.is_ok());
-        
+
         let mut parser = Parser::new(tokens.unwrap());
         let program = parser.parse_program();
         prop_assert!(program.is_ok());
-        
+
         // Verify semantic analysis passes for valid integer
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&program.unwrap());
@@ -114,15 +114,15 @@ proptest! {
                 )
             )
         )"#, value);
-        
+
         let mut lexer = Lexer::new(&source, "test.aether".to_string());
         let tokens = lexer.tokenize();
         prop_assert!(tokens.is_ok());
-        
+
         let mut parser = Parser::new(tokens.unwrap());
         let program = parser.parse_program();
         prop_assert!(program.is_ok());
-        
+
         // Verify semantic analysis passes for valid float
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&program.unwrap());
@@ -136,14 +136,14 @@ proptest! {
     fn test_string_literals_tokenize(content in "[a-zA-Z0-9 ]{0,20}") {
         let string_literal = format!(r#""{}""#, content);
         let source = format!("({})", string_literal);
-        
+
         let mut lexer = Lexer::new(&source, "test.aether".to_string());
         let result = lexer.tokenize();
         prop_assert!(result.is_ok());
-        
+
         let tokens = result.unwrap();
         prop_assert!(tokens.len() >= 3); // LeftParen, String, RightParen, Eof
-        
+
         // Check that string is properly tokenized
         if let TokenType::String(value) = &tokens[1].token_type {
             prop_assert_eq!(value, &content);
@@ -174,15 +174,15 @@ proptest! {
                 )
             )
         )"#, module_name, intent, const_name, const_value);
-        
+
         let mut lexer = Lexer::new(&source, "test.aether".to_string());
         let tokens = lexer.tokenize();
         prop_assert!(tokens.is_ok());
-        
+
         let mut parser = Parser::new(tokens.unwrap());
         let program = parser.parse_program();
         prop_assert!(program.is_ok());
-        
+
         let prog = program.unwrap();
         prop_assert_eq!(prog.modules.len(), 1);
         prop_assert_eq!(&prog.modules[0].name.name, &module_name);
@@ -196,10 +196,10 @@ proptest! {
     #[test]
     fn test_lexer_never_crashes(input in fuzz_string()) {
         let mut lexer = Lexer::new(&input, "fuzz.aether".to_string());
-        
+
         // The lexer should never panic, even on invalid input
         let _result = lexer.tokenize();
-        
+
         // We don't care if it succeeds or fails, just that it doesn't crash
         prop_assert!(true);
     }
@@ -232,12 +232,12 @@ proptest! {
                 location: aether::error::SourceLocation::unknown(),
             }
         }).collect();
-        
+
         let mut parser = Parser::new(test_tokens);
-        
+
         // Parser should never panic, even on malformed token streams
         let _result = parser.parse_program();
-        
+
         // We don't care if it succeeds or fails, just that it doesn't crash
         prop_assert!(true);
     }
@@ -276,17 +276,17 @@ proptest! {
             external_functions: Vec::new(),
             source_location: aether::error::SourceLocation::unknown(),
         };
-        
+
         let program = aether::ast::Program {
             modules: vec![module],
             source_location: aether::error::SourceLocation::unknown(),
         };
-        
+
         let mut analyzer = SemanticAnalyzer::new();
-        
+
         // Semantic analyzer should never panic
         let _result = analyzer.analyze_program(&program);
-        
+
         // We don't care if it succeeds or fails, just that it doesn't crash
         prop_assert!(true);
     }
@@ -313,16 +313,16 @@ proptest! {
                 )
             )
         )"#, const_name, int_value);
-        
+
         let mut lexer = Lexer::new(&int_source, "test.aether".to_string());
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&program);
-        
+
         prop_assert!(result.is_ok(), "Integer constant with integer value should pass type checking");
-        
+
         // Test that string constants with integer values always fail type checking
         let mixed_source = format!(r#"(DEFINE_MODULE
             (NAME 'test')
@@ -336,14 +336,14 @@ proptest! {
                 )
             )
         )"#, const_name, int_value);
-        
+
         let mut lexer = Lexer::new(&mixed_source, "test.aether".to_string());
         let tokens = lexer.tokenize().unwrap();
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&program);
-        
+
         prop_assert!(result.is_err(), "String constant with integer value should fail type checking");
     }
 }
@@ -366,15 +366,15 @@ proptest! {
                 )
             )
         )"#, value);
-        
+
         let mut lexer = Lexer::new(&source, "test.aether".to_string());
         let tokens = lexer.tokenize();
         prop_assert!(tokens.is_ok());
-        
+
         let mut parser = Parser::new(tokens.unwrap());
         let program = parser.parse_program();
         prop_assert!(program.is_ok());
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&program.unwrap());
         prop_assert!(result.is_ok(), "Simple integer constants should always type check correctly");
@@ -390,20 +390,20 @@ proptest! {
             (INTENT "Test module name preservation")
             (CONTENT)
         )"#, module_name);
-        
+
         let mut lexer = Lexer::new(&source, "test.aether".to_string());
         let tokens = lexer.tokenize().unwrap();
-        
+
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
-        
+
         prop_assert_eq!(program.modules.len(), 1);
         prop_assert_eq!(&program.modules[0].name.name, &module_name);
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&program);
         prop_assert!(result.is_ok());
-        
+
         // Module name should still be preserved after semantic analysis
         prop_assert_eq!(&program.modules[0].name.name, &module_name);
     }

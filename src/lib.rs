@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! AetherScript Compiler Library
-//! 
+//!
 //! A compiler for the AetherScript programming language, designed for
 //! optimal generation by Large Language Models (LLMs).
 
@@ -49,8 +49,8 @@ pub mod verification;
 // External dependency stubs
 pub mod external_stubs;
 
-use crate::pipeline::{CompileOptions, CompilationPipeline, CompilationResult};
 use crate::error::CompilerError;
+use crate::pipeline::{CompilationPipeline, CompilationResult, CompileOptions};
 use std::path::PathBuf;
 
 /// The main compiler interface
@@ -65,77 +65,77 @@ impl Compiler {
             options: CompileOptions::default(),
         }
     }
-    
+
     /// Create a compiler with custom options
     pub fn with_options(options: CompileOptions) -> Self {
         Self { options }
     }
-    
+
     /// Set optimization level (0-3)
     pub fn optimization_level(mut self, level: u8) -> Self {
         self.options.optimization_level = level.min(3);
         self
     }
-    
+
     /// Enable debug info generation
     pub fn debug_info(mut self, enable: bool) -> Self {
         self.options.debug_info = enable;
         self
     }
-    
+
     /// Set output file path
     pub fn output(mut self, path: PathBuf) -> Self {
         self.options.output = Some(path);
         self
     }
-    
+
     /// Set target triple
     pub fn target(mut self, triple: String) -> Self {
         self.options.target_triple = Some(triple);
         self
     }
-    
+
     /// Add library search path
     pub fn library_path(mut self, path: PathBuf) -> Self {
         self.options.library_paths.push(path);
         self
     }
-    
+
     /// Add library to link
     pub fn link_library(mut self, lib: String) -> Self {
         self.options.link_libraries.push(lib);
         self
     }
-    
+
     /// Enable verbose output
     pub fn verbose(mut self, enable: bool) -> Self {
         self.options.verbose = enable;
         self
     }
-    
+
     /// Keep intermediate files
     pub fn keep_intermediates(mut self, enable: bool) -> Self {
         self.options.keep_intermediates = enable;
         self
     }
-    
+
     /// Enable profiling
     pub fn profile(mut self, enable: bool) -> Self {
         self.options.enable_profiling = enable;
         self
     }
-    
+
     /// Enable or disable parallel compilation
     pub fn parallel(mut self, enable: bool) -> Self {
         self.options.parallel = enable;
         self
     }
-    
+
     /// Compile a single source file
     pub fn compile_file(&self, input: PathBuf) -> Result<CompilationResult, CompilerError> {
         self.compile_files(&[input])
     }
-    
+
     /// Compile multiple source files
     pub fn compile_files(&self, inputs: &[PathBuf]) -> Result<CompilationResult, CompilerError> {
         let mut pipeline = CompilationPipeline::new(self.options.clone());

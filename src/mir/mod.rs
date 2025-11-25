@@ -13,17 +13,17 @@
 // limitations under the License.
 
 //! Middle Intermediate Representation (MIR) for AetherScript
-//! 
+//!
 //! MIR is a lower-level representation that uses SSA form and basic blocks
 //! for optimization and analysis. It serves as the bridge between the AST
 //! and the final code generation phase.
 
-pub mod lowering;
 pub mod dataflow;
+pub mod lowering;
 pub mod validation;
 
-use crate::types::Type;
 use crate::error::SourceLocation;
+use crate::types::Type;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -88,11 +88,11 @@ pub enum Statement {
         rvalue: Rvalue,
         source_info: SourceInfo,
     },
-    
+
     /// Storage marker for lifetime analysis
     StorageLive(LocalId),
     StorageDead(LocalId),
-    
+
     /// No-op (used for placeholders)
     Nop,
 }
@@ -102,48 +102,42 @@ pub enum Statement {
 pub enum Rvalue {
     /// Use of an operand
     Use(Operand),
-    
+
     /// Binary operation
     BinaryOp {
         op: BinOp,
         left: Operand,
         right: Operand,
     },
-    
+
     /// Unary operation
-    UnaryOp {
-        op: UnOp,
-        operand: Operand,
-    },
-    
+    UnaryOp { op: UnOp, operand: Operand },
+
     /// Function call
-    Call {
-        func: Operand,
-        args: Vec<Operand>,
-    },
-    
+    Call { func: Operand, args: Vec<Operand> },
+
     /// Aggregate construction (arrays, structs)
     Aggregate {
         kind: AggregateKind,
         operands: Vec<Operand>,
     },
-    
+
     /// Cast operation
     Cast {
         kind: CastKind,
         operand: Operand,
         ty: Type,
     },
-    
+
     /// Reference/address-of operation
     Ref {
         place: Place,
         mutability: Mutability,
     },
-    
+
     /// Array/slice length
     Len(Place),
-    
+
     /// Discriminant for enums
     Discriminant(Place),
 }
@@ -153,10 +147,10 @@ pub enum Rvalue {
 pub enum Operand {
     /// Copy a place
     Copy(Place),
-    
+
     /// Move a place (consumes it)
     Move(Place),
-    
+
     /// Constant value
     Constant(Constant),
 }
@@ -173,44 +167,36 @@ pub struct Place {
 pub enum PlaceElem {
     /// Dereference
     Deref,
-    
+
     /// Field access
-    Field {
-        field: FieldIdx,
-        ty: Type,
-    },
-    
+    Field { field: FieldIdx, ty: Type },
+
     /// Array/slice indexing
     Index(LocalId),
-    
+
     /// Subslice
-    Subslice {
-        from: u64,
-        to: Option<u64>,
-    },
+    Subslice { from: u64, to: Option<u64> },
 }
 
 /// Block terminators (control flow)
 #[derive(Debug, Clone)]
 pub enum Terminator {
     /// Unconditional jump
-    Goto {
-        target: BasicBlockId,
-    },
-    
+    Goto { target: BasicBlockId },
+
     /// Conditional branch
     SwitchInt {
         discriminant: Operand,
         switch_ty: Type,
         targets: SwitchTargets,
     },
-    
+
     /// Function return
     Return,
-    
+
     /// Unreachable code
     Unreachable,
-    
+
     /// Function call with landing pad
     Call {
         func: Operand,
@@ -219,14 +205,14 @@ pub enum Terminator {
         target: Option<BasicBlockId>,
         cleanup: Option<BasicBlockId>,
     },
-    
+
     /// Drop (destructor call)
     Drop {
         place: Place,
         target: BasicBlockId,
         unwind: Option<BasicBlockId>,
     },
-    
+
     /// Assert (runtime check)
     Assert {
         condition: Operand,
@@ -265,14 +251,14 @@ pub enum BinOp {
     Div,
     Rem,
     Mod,
-    
+
     // Bitwise
     BitXor,
     BitAnd,
     BitOr,
     Shl,
     Shr,
-    
+
     // Comparison
     Eq,
     Ne,
@@ -280,11 +266,11 @@ pub enum BinOp {
     Le,
     Gt,
     Ge,
-    
+
     // Logical
     And,
     Or,
-    
+
     // Pointer operations
     Offset,
 }
@@ -301,10 +287,10 @@ pub enum UnOp {
 pub enum CastKind {
     /// Numeric cast (int to float, etc.)
     Numeric,
-    
+
     /// Pointer to pointer cast
     Pointer,
-    
+
     /// Unsizing cast (e.g., array to slice)
     Unsize,
 }
@@ -315,7 +301,7 @@ pub enum AggregateKind {
     Array(Type),
     Tuple,
     Struct(String, Vec<String>), // struct name and field names
-    Enum(String, String),         // enum name and variant name
+    Enum(String, String),        // enum name and variant name
 }
 
 /// Mutability
@@ -418,19 +404,19 @@ pub type ScopeId = u32;
 pub struct Builder {
     /// Current function being built
     current_function: Option<Function>,
-    
+
     /// Next local ID
     next_local_id: LocalId,
-    
+
     /// Next basic block ID
     next_block_id: BasicBlockId,
-    
+
     /// Current basic block
     pub current_block: Option<BasicBlockId>,
-    
+
     /// Scope stack
     scopes: Vec<Scope>,
-    
+
     /// Next scope ID
     next_scope_id: ScopeId,
 }
@@ -458,7 +444,7 @@ impl Builder {
             next_scope_id: 0,
         }
     }
-    
+
     /// Start building a new function
     pub fn start_function(&mut self, name: String, params: Vec<(String, Type)>, return_type: Type) {
         let function = Function {
@@ -470,9 +456,9 @@ impl Builder {
             entry_block: 0,
             return_local: None,
         };
-        
+
         self.current_function = Some(function);
-        
+
         // Create locals for parameters
         for (param_name, param_type) in params {
             let local_id = self.new_local(param_type.clone(), false);
@@ -484,7 +470,7 @@ impl Builder {
                 });
             }
         }
-        
+
         // Create entry block
         let entry_block = self.new_block();
         if let Some(func) = &mut self.current_function {
@@ -492,49 +478,57 @@ impl Builder {
         }
         self.current_block = Some(entry_block);
     }
-    
+
     /// Finish building the current function
     pub fn finish_function(&mut self) -> Function {
-        self.current_function.take().expect("No function being built")
+        self.current_function
+            .take()
+            .expect("No function being built")
     }
-    
+
     /// Create a new local
     pub fn new_local(&mut self, ty: Type, is_mutable: bool) -> LocalId {
         let local_id = self.next_local_id;
         self.next_local_id += 1;
-        
+
         if let Some(func) = &mut self.current_function {
-            func.locals.insert(local_id, Local {
-                ty,
-                is_mutable,
-                source_info: None,
-            });
+            func.locals.insert(
+                local_id,
+                Local {
+                    ty,
+                    is_mutable,
+                    source_info: None,
+                },
+            );
         }
-        
+
         local_id
     }
-    
+
     /// Create a new basic block
     pub fn new_block(&mut self) -> BasicBlockId {
         let block_id = self.next_block_id;
         self.next_block_id += 1;
-        
+
         if let Some(func) = &mut self.current_function {
-            func.basic_blocks.insert(block_id, BasicBlock {
-                id: block_id,
-                statements: Vec::new(),
-                terminator: Terminator::Unreachable,
-            });
+            func.basic_blocks.insert(
+                block_id,
+                BasicBlock {
+                    id: block_id,
+                    statements: Vec::new(),
+                    terminator: Terminator::Unreachable,
+                },
+            );
         }
-        
+
         block_id
     }
-    
+
     /// Switch to a different basic block
     pub fn switch_to_block(&mut self, block_id: BasicBlockId) {
         self.current_block = Some(block_id);
     }
-    
+
     /// Add a statement to the current block
     pub fn push_statement(&mut self, statement: Statement) {
         if let (Some(func), Some(block_id)) = (&mut self.current_function, self.current_block) {
@@ -543,7 +537,7 @@ impl Builder {
             }
         }
     }
-    
+
     /// Set the terminator for the current block
     pub fn set_terminator(&mut self, terminator: Terminator) {
         if let (Some(func), Some(block_id)) = (&mut self.current_function, self.current_block) {
@@ -552,20 +546,20 @@ impl Builder {
             }
         }
     }
-    
+
     /// Push a new scope
     pub fn push_scope(&mut self) -> ScopeId {
         let scope_id = self.next_scope_id;
         self.next_scope_id += 1;
-        
+
         self.scopes.push(Scope {
             parent: Some(scope_id),
             variables: HashMap::new(),
         });
-        
+
         scope_id
     }
-    
+
     /// Pop a scope and emit storage dead statements
     pub fn pop_scope(&mut self) {
         if let Some(scope) = self.scopes.pop() {
@@ -580,11 +574,11 @@ impl Builder {
 /// Control Flow Graph (CFG) utilities
 pub mod cfg {
     use super::*;
-    
+
     /// Get predecessors of a basic block
     pub fn predecessors(func: &Function, block_id: BasicBlockId) -> Vec<BasicBlockId> {
         let mut preds = Vec::new();
-        
+
         for (pred_id, block) in &func.basic_blocks {
             match &block.terminator {
                 Terminator::Goto { target } => {
@@ -597,7 +591,9 @@ pub mod cfg {
                         preds.push(*pred_id);
                     }
                 }
-                Terminator::Call { target, cleanup, .. } => {
+                Terminator::Call {
+                    target, cleanup, ..
+                } => {
                     if target.as_ref() == Some(&block_id) || cleanup.as_ref() == Some(&block_id) {
                         preds.push(*pred_id);
                     }
@@ -607,7 +603,9 @@ pub mod cfg {
                         preds.push(*pred_id);
                     }
                 }
-                Terminator::Assert { target, cleanup, .. } => {
+                Terminator::Assert {
+                    target, cleanup, ..
+                } => {
                     if *target == block_id || cleanup.as_ref() == Some(&block_id) {
                         preds.push(*pred_id);
                     }
@@ -615,10 +613,10 @@ pub mod cfg {
                 _ => {}
             }
         }
-        
+
         preds
     }
-    
+
     /// Get successors of a basic block
     pub fn successors(block: &BasicBlock) -> Vec<BasicBlockId> {
         match &block.terminator {
@@ -629,7 +627,9 @@ pub mod cfg {
                 succs
             }
             Terminator::Return | Terminator::Unreachable => vec![],
-            Terminator::Call { target, cleanup, .. } => {
+            Terminator::Call {
+                target, cleanup, ..
+            } => {
                 let mut succs = Vec::new();
                 if let Some(t) = target {
                     succs.push(*t);
@@ -646,7 +646,9 @@ pub mod cfg {
                 }
                 succs
             }
-            Terminator::Assert { target, cleanup, .. } => {
+            Terminator::Assert {
+                target, cleanup, ..
+            } => {
                 let mut succs = vec![*target];
                 if let Some(c) = cleanup {
                     succs.push(*c);
@@ -660,36 +662,39 @@ pub mod cfg {
 /// Pretty printer for MIR
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "fn {}({}) -> {} {{", 
+        writeln!(
+            f,
+            "fn {}({}) -> {} {{",
             self.name,
-            self.parameters.iter()
+            self.parameters
+                .iter()
                 .map(|p| format!("{}: {}", p.name, p.ty))
                 .collect::<Vec<_>>()
                 .join(", "),
             self.return_type
         )?;
-        
+
         // Print locals
         for (id, local) in &self.locals {
             writeln!(f, "    let _{}: {};", id, local.ty)?;
         }
-        
+
         writeln!(f)?;
-        
+
         // Print basic blocks
         for block_id in 0..self.basic_blocks.len() as u32 {
             if let Some(block) = self.basic_blocks.get(&block_id) {
                 writeln!(f, "  bb{}:", block_id)?;
-                
+
                 for stmt in &block.statements {
                     writeln!(f, "    {:?}", stmt)?;
                 }
-                
+
                 writeln!(f, "    {:?}", block.terminator)?;
                 writeln!(f)?;
             }
         }
-        
+
         writeln!(f, "}}")
     }
 }
@@ -697,13 +702,13 @@ impl fmt::Display for Function {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Type;
     use crate::ast::PrimitiveType;
-    
+    use crate::types::Type;
+
     #[test]
     fn test_mir_builder_basic() {
         let mut builder = Builder::new();
-        
+
         // Build a simple function: fn add(x: i32, y: i32) -> i32
         builder.start_function(
             "add".to_string(),
@@ -713,10 +718,10 @@ mod tests {
             ],
             Type::primitive(PrimitiveType::Integer),
         );
-        
+
         // Create a temporary for the result
         let result = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
-        
+
         // Add statement: _2 = _0 + _1
         builder.push_statement(Statement::Assign {
             place: Place {
@@ -725,40 +730,46 @@ mod tests {
             },
             rvalue: Rvalue::BinaryOp {
                 op: BinOp::Add,
-                left: Operand::Copy(Place { local: 0, projection: vec![] }),
-                right: Operand::Copy(Place { local: 1, projection: vec![] }),
+                left: Operand::Copy(Place {
+                    local: 0,
+                    projection: vec![],
+                }),
+                right: Operand::Copy(Place {
+                    local: 1,
+                    projection: vec![],
+                }),
             },
             source_info: SourceInfo {
                 span: SourceLocation::unknown(),
                 scope: 0,
             },
         });
-        
+
         // Set terminator: return _2
         builder.set_terminator(Terminator::Return);
-        
+
         let function = builder.finish_function();
-        
+
         assert_eq!(function.name, "add");
         assert_eq!(function.parameters.len(), 2);
         assert_eq!(function.locals.len(), 3); // 2 params + 1 temp
         assert_eq!(function.basic_blocks.len(), 1);
     }
-    
+
     #[test]
     fn test_cfg_analysis() {
         let mut builder = Builder::new();
-        
+
         builder.start_function(
             "test".to_string(),
             vec![],
             Type::primitive(PrimitiveType::Void),
         );
-        
+
         let bb0 = builder.current_block.unwrap();
         let bb1 = builder.new_block();
         let bb2 = builder.new_block();
-        
+
         // bb0 -> bb1, bb2
         builder.switch_to_block(bb0);
         builder.set_terminator(Terminator::SwitchInt {
@@ -773,67 +784,67 @@ mod tests {
                 otherwise: bb2,
             },
         });
-        
+
         // bb1 -> bb2
         builder.switch_to_block(bb1);
         builder.set_terminator(Terminator::Goto { target: bb2 });
-        
+
         // bb2 -> return
         builder.switch_to_block(bb2);
         builder.set_terminator(Terminator::Return);
-        
+
         let function = builder.finish_function();
-        
+
         // Test predecessors
         let bb2_preds = cfg::predecessors(&function, bb2);
         assert_eq!(bb2_preds.len(), 2);
         assert!(bb2_preds.contains(&bb0));
         assert!(bb2_preds.contains(&bb1));
-        
+
         // Test successors
         let bb0_succs = cfg::successors(&function.basic_blocks[&bb0]);
         assert_eq!(bb0_succs.len(), 2);
         assert!(bb0_succs.contains(&bb1));
         assert!(bb0_succs.contains(&bb2));
     }
-    
+
     #[test]
     fn test_constant_values() {
         let bool_const = Constant {
             ty: Type::primitive(PrimitiveType::Boolean),
             value: ConstantValue::Bool(true),
         };
-        
+
         let int_const = Constant {
             ty: Type::primitive(PrimitiveType::Integer),
             value: ConstantValue::Integer(42),
         };
-        
+
         let float_const = Constant {
             ty: Type::primitive(PrimitiveType::Float),
             value: ConstantValue::Float(3.14),
         };
-        
+
         let string_const = Constant {
             ty: Type::primitive(PrimitiveType::String),
             value: ConstantValue::String("hello".to_string()),
         };
-        
+
         match bool_const.value {
             ConstantValue::Bool(v) => assert!(v),
             _ => panic!("Wrong constant type"),
         }
-        
+
         match int_const.value {
             ConstantValue::Integer(v) => assert_eq!(v, 42),
             _ => panic!("Wrong constant type"),
         }
-        
+
         match float_const.value {
             ConstantValue::Float(v) => assert!((v - 3.14).abs() < f64::EPSILON),
             _ => panic!("Wrong constant type"),
         }
-        
+
         match string_const.value {
             ConstantValue::String(ref v) => assert_eq!(v, "hello"),
             _ => panic!("Wrong constant type"),

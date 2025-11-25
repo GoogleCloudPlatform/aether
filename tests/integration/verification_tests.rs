@@ -18,15 +18,12 @@
 #[path = "../utils/mod.rs"]
 mod utils;
 
-use utils::{
-    compiler_wrapper::TestCompiler,
-    assertions::*,
-};
+use utils::{assertions::*, compiler_wrapper::TestCompiler};
 
 #[test]
 fn test_basic_contract_verification() {
     let compiler = TestCompiler::new("basic_contracts");
-    
+
     let source = r#"
 (DEFINE_MODULE basic_contracts
   (DEFINE_FUNCTION
@@ -60,7 +57,7 @@ fn test_basic_contract_verification() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "basic_contracts.aether");
     assert_compile_and_execute(&result, "Result: 5.00", "Basic contract verification");
 }
@@ -68,7 +65,7 @@ fn test_basic_contract_verification() {
 #[test]
 fn test_contract_violation_detection() {
     let compiler = TestCompiler::new("contract_violation");
-    
+
     let source = r#"
 (DEFINE_MODULE contract_violation
   (DEFINE_FUNCTION
@@ -99,7 +96,7 @@ fn test_contract_violation_detection() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "contract_violation.aether");
     // Should either fail compilation or issue a strong warning
     if result.is_success() {
@@ -112,7 +109,7 @@ fn test_contract_violation_detection() {
 #[test]
 fn test_contract_propagation() {
     let compiler = TestCompiler::new("contract_propagation");
-    
+
     let source = r#"
 (DEFINE_MODULE contract_propagation
   (DEFINE_FUNCTION
@@ -163,7 +160,7 @@ fn test_contract_propagation() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "contract_propagation.aether");
     assert_compile_and_execute(&result, "Sqrt result: 4.00", "Contract propagation");
 }
@@ -171,7 +168,7 @@ fn test_contract_propagation() {
 #[test]
 fn test_proof_obligations_generation() {
     let compiler = TestCompiler::new("proof_obligations");
-    
+
     let source = r#"
 (DEFINE_MODULE proof_obligations
   (DEFINE_FUNCTION
@@ -215,7 +212,7 @@ fn test_proof_obligations_generation() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "proof_obligations.aether");
     assert_compile_and_execute(&result, "5! = 120", "Proof obligations generation");
 }
@@ -223,7 +220,7 @@ fn test_proof_obligations_generation() {
 #[test]
 fn test_behavioral_specification_validation() {
     let compiler = TestCompiler::new("behavioral_specs");
-    
+
     let source = r#"
 (DEFINE_MODULE behavioral_specs
   (DEFINE_FUNCTION
@@ -275,18 +272,22 @@ fn test_behavioral_specification_validation() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "behavioral_specs.aether");
     assert_compile_and_execute(&result, "Result: 25", "Behavioral specification validation");
-    
+
     let execution = result.execute();
-    assert_output_contains(&execution, "LOG: Calculation completed", "Side effect validation");
+    assert_output_contains(
+        &execution,
+        "LOG: Calculation completed",
+        "Side effect validation",
+    );
 }
 
 #[test]
 fn test_smt_solver_integration() {
     let compiler = TestCompiler::new("smt_solver");
-    
+
     let source = r#"
 (DEFINE_MODULE smt_solver
   (DEFINE_FUNCTION
@@ -367,7 +368,7 @@ fn test_smt_solver_integration() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "smt_solver.aether");
     assert_compile_and_execute(&result, "Found at index: 3", "SMT solver integration");
 }
@@ -375,7 +376,7 @@ fn test_smt_solver_integration() {
 #[test]
 fn test_intent_mismatch_detection() {
     let compiler = TestCompiler::new("intent_mismatch");
-    
+
     let source = r#"
 (DEFINE_MODULE intent_mismatch
   // Function claims to calculate average but actually calculates sum
@@ -401,14 +402,14 @@ fn test_intent_mismatch_detection() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "intent_mismatch.aether");
-    
+
     // Should compile but issue intent mismatch warning
     if result.is_success() {
         assert_warning_contains(&result, "intent mismatch", "Intent mismatch warning");
     }
-    
+
     // Program should still execute (though with wrong behavior)
     let execution = result.execute();
     if execution.is_success() {

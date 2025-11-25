@@ -18,18 +18,16 @@
 #[path = "../utils/mod.rs"]
 mod utils;
 
-use utils::{
-    compiler_wrapper::TestCompiler,
-    assertions::*,
-    test_runner::TestResult,
-};
+use utils::{assertions::*, compiler_wrapper::TestCompiler, test_runner::TestResult};
 
 #[test]
 fn test_simple_two_file_project() {
     let compiler = TestCompiler::new("simple_two_file");
-    
+
     let files = &[
-        ("main.aether", r#"
+        (
+            "main.aether",
+            r#"
 (DEFINE_MODULE main
   (IMPORT_MODULE "math_lib")
   
@@ -44,8 +42,11 @@ fn test_simple_two_file_project() {
         (ARGUMENTS (STRING_LITERAL "Result: %d\n") (VARIABLE_REFERENCE "result")))
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
-        "#),
-        ("math_lib.aether", r#"
+        "#,
+        ),
+        (
+            "math_lib.aether",
+            r#"
 (DEFINE_MODULE math_lib
   (EXPORT_FUNCTION "add")
   
@@ -67,9 +68,10 @@ fn test_simple_two_file_project() {
       (RETURN_VALUE 
         (EXPRESSION_ADD (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b")))))
 )
-        "#),
+        "#,
+        ),
     ];
-    
+
     let result = compiler.compile_project(files);
     assert_compile_and_execute(&result, "Result: 8", "Simple two-file project");
 }
@@ -77,9 +79,11 @@ fn test_simple_two_file_project() {
 #[test]
 fn test_complex_multi_module_dependency() {
     let compiler = TestCompiler::new("complex_multi_module");
-    
+
     let files = &[
-        ("main.aether", r#"
+        (
+            "main.aether",
+            r#"
 (DEFINE_MODULE main
   (IMPORT_MODULE "data_structures")
   (IMPORT_MODULE "algorithms")
@@ -107,8 +111,11 @@ fn test_complex_multi_module_dependency() {
         (ARGUMENTS (STRING_LITERAL "Sum: %d\n") (VARIABLE_REFERENCE "sum")))
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
-        "#),
-        ("data_structures.aether", r#"
+        "#,
+        ),
+        (
+            "data_structures.aether",
+            r#"
 (DEFINE_MODULE data_structures
   (EXPORT_FUNCTION "create_array")
   (EXPORT_FUNCTION "set_element")
@@ -169,8 +176,11 @@ fn test_complex_multi_module_dependency() {
           (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "arr") "size"))
                   (SOURCE (EXPRESSION_ADD (VARIABLE_REFERENCE "index") (INTEGER_LITERAL 1))))))))
 )
-        "#),
-        ("algorithms.aether", r#"
+        "#,
+        ),
+        (
+            "algorithms.aether",
+            r#"
 (DEFINE_MODULE algorithms
   (IMPORT_MODULE "data_structures")
   (EXPORT_FUNCTION "sum_array")
@@ -203,9 +213,10 @@ fn test_complex_multi_module_dependency() {
                       (VARIABLE_REFERENCE "i")))))))
       (RETURN_VALUE (VARIABLE_REFERENCE "sum"))))
 )
-        "#),
+        "#,
+        ),
     ];
-    
+
     let result = compiler.compile_project(files);
     assert_compile_and_execute(&result, "Sum: 60", "Complex multi-module project");
 }
@@ -213,9 +224,11 @@ fn test_complex_multi_module_dependency() {
 #[test]
 fn test_circular_dependency_detection() {
     let compiler = TestCompiler::new("circular_dependency");
-    
+
     let files = &[
-        ("module_a.aether", r#"
+        (
+            "module_a.aether",
+            r#"
 (DEFINE_MODULE module_a
   (IMPORT_MODULE "module_b")
   (EXPORT_FUNCTION "function_a")
@@ -226,8 +239,11 @@ fn test_circular_dependency_detection() {
     (BODY
       (RETURN_VALUE (CALL_FUNCTION "module_b.function_b"))))
 )
-        "#),
-        ("module_b.aether", r#"
+        "#,
+        ),
+        (
+            "module_b.aether",
+            r#"
 (DEFINE_MODULE module_b
   (IMPORT_MODULE "module_a")  
   (EXPORT_FUNCTION "function_b")
@@ -238,19 +254,25 @@ fn test_circular_dependency_detection() {
     (BODY
       (RETURN_VALUE (CALL_FUNCTION "module_a.function_a"))))
 )
-        "#),
+        "#,
+        ),
     ];
-    
+
     let result = compiler.compile_project(files);
-    assert_compilation_error(&result, "circular dependency", "Circular dependency detection");
+    assert_compilation_error(
+        &result,
+        "circular dependency",
+        "Circular dependency detection",
+    );
 }
 
 #[test]
 fn test_standard_library_imports() {
     let compiler = TestCompiler::new("stdlib_imports");
-    
-    let files = &[
-        ("main.aether", r#"
+
+    let files = &[(
+        "main.aether",
+        r#"
 (DEFINE_MODULE main
   (IMPORT_MODULE "std_string")
   (IMPORT_MODULE "std_math")
@@ -280,23 +302,29 @@ fn test_standard_library_imports() {
       
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
-        "#),
-    ];
-    
+        "#,
+    )];
+
     let result = compiler.compile_project(files);
     assert_compilation_success(&result, "Standard library imports");
-    
+
     let execution = result.execute();
     assert_execution_success(&execution, "Standard library execution");
-    assert_output_contains(&execution, "Message: Hello, World!", "Standard library output");
+    assert_output_contains(
+        &execution,
+        "Message: Hello, World!",
+        "Standard library output",
+    );
 }
 
 #[test]
 fn test_module_aliasing() {
     let compiler = TestCompiler::new("module_aliasing");
-    
+
     let files = &[
-        ("main.aether", r#"
+        (
+            "main.aether",
+            r#"
 (DEFINE_MODULE main
   (IMPORT_MODULE "very_long_module_name" (ALIAS "short"))
   
@@ -312,8 +340,11 @@ fn test_module_aliasing() {
         (ARGUMENTS (STRING_LITERAL "Result: %d\n") (VARIABLE_REFERENCE "result")))
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
-        "#),
-        ("very_long_module_name.aether", r#"
+        "#,
+        ),
+        (
+            "very_long_module_name.aether",
+            r#"
 (DEFINE_MODULE very_long_module_name
   (EXPORT_FUNCTION "calculate")
   
@@ -324,9 +355,10 @@ fn test_module_aliasing() {
     (BODY
       (RETURN_VALUE (EXPRESSION_MULTIPLY (VARIABLE_REFERENCE "input") (INTEGER_LITERAL 2)))))
 )
-        "#),
+        "#,
+        ),
     ];
-    
+
     let result = compiler.compile_project(files);
     assert_compile_and_execute(&result, "Result: 84", "Module aliasing");
 }
@@ -334,10 +366,12 @@ fn test_module_aliasing() {
 #[test]
 fn test_incremental_compilation() {
     let compiler = TestCompiler::new("incremental_compilation");
-    
+
     // First compilation
     let files_v1 = &[
-        ("main.aether", r#"
+        (
+            "main.aether",
+            r#"
 (DEFINE_MODULE main
   (IMPORT_MODULE "calculator")
   
@@ -352,8 +386,11 @@ fn test_incremental_compilation() {
         (ARGUMENTS (STRING_LITERAL "V1 Result: %d\n") (VARIABLE_REFERENCE "result")))
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
-        "#),
-        ("calculator.aether", r#"
+        "#,
+        ),
+        (
+            "calculator.aether",
+            r#"
 (DEFINE_MODULE calculator
   (EXPORT_FUNCTION "add")
   
@@ -365,15 +402,18 @@ fn test_incremental_compilation() {
     (BODY
       (RETURN_VALUE (EXPRESSION_ADD (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b")))))
 )
-        "#),
+        "#,
+        ),
     ];
-    
+
     let result_v1 = compiler.compile_project(files_v1);
     assert_compile_and_execute(&result_v1, "V1 Result: 15", "First compilation");
-    
+
     // Second compilation with modified calculator
     let files_v2 = &[
-        ("main.aether", r#"
+        (
+            "main.aether",
+            r#"
 (DEFINE_MODULE main
   (IMPORT_MODULE "calculator")
   
@@ -388,8 +428,11 @@ fn test_incremental_compilation() {
         (ARGUMENTS (STRING_LITERAL "V2 Result: %d\n") (VARIABLE_REFERENCE "result")))
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
-        "#),
-        ("calculator.aether", r#"
+        "#,
+        ),
+        (
+            "calculator.aether",
+            r#"
 (DEFINE_MODULE calculator
   (EXPORT_FUNCTION "add")
   (EXPORT_FUNCTION "multiply")
@@ -410,9 +453,10 @@ fn test_incremental_compilation() {
     (BODY
       (RETURN_VALUE (EXPRESSION_MULTIPLY (VARIABLE_REFERENCE "a") (VARIABLE_REFERENCE "b")))))
 )
-        "#),
+        "#,
+        ),
     ];
-    
+
     let result_v2 = compiler.compile_project(files_v2);
     assert_compile_and_execute(&result_v2, "V2 Result: 50", "Incremental compilation");
 }

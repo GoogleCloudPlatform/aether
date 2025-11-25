@@ -18,15 +18,12 @@
 #[path = "../utils/mod.rs"]
 mod utils;
 
-use utils::{
-    compiler_wrapper::TestCompiler,
-    assertions::*,
-};
+use utils::{assertions::*, compiler_wrapper::TestCompiler};
 
 #[test]
 fn test_pattern_discovery_by_intent() {
     let compiler = TestCompiler::new("pattern_discovery");
-    
+
     let source = r#"
 (DEFINE_MODULE pattern_discovery
   (USE_PATTERN_LIBRARY)
@@ -48,9 +45,9 @@ fn test_pattern_discovery_by_intent() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "pattern_discovery.aether");
-    
+
     // Should either compile successfully or provide helpful error about pattern system
     if result.is_success() {
         assert_compile_and_execute(&result, "Safe element: 30", "Pattern discovery");
@@ -63,7 +60,7 @@ fn test_pattern_discovery_by_intent() {
 #[test]
 fn test_sequential_pattern_composition() {
     let compiler = TestCompiler::new("sequential_composition");
-    
+
     let source = r#"
 (DEFINE_MODULE sequential_composition
   (USE_PATTERN_LIBRARY)
@@ -108,9 +105,9 @@ fn test_sequential_pattern_composition() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "sequential_composition.aether");
-    
+
     if result.is_success() {
         assert_compilation_success(&result, "Sequential pattern composition");
     } else {
@@ -122,7 +119,7 @@ fn test_sequential_pattern_composition() {
 #[test]
 fn test_nested_pattern_composition() {
     let compiler = TestCompiler::new("nested_composition");
-    
+
     let source = r#"
 (DEFINE_MODULE nested_composition
   (USE_PATTERN_LIBRARY)
@@ -169,9 +166,9 @@ fn test_nested_pattern_composition() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "nested_composition.aether");
-    
+
     if result.is_success() {
         assert_compile_and_execute(&result, "Safe sum: 55", "Nested pattern composition");
     } else {
@@ -182,7 +179,7 @@ fn test_nested_pattern_composition() {
 #[test]
 fn test_parallel_pattern_composition() {
     let compiler = TestCompiler::new("parallel_composition");
-    
+
     let source = r#"
 (DEFINE_MODULE parallel_composition
   (USE_PATTERN_LIBRARY)
@@ -231,20 +228,24 @@ fn test_parallel_pattern_composition() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "parallel_composition.aether");
-    
+
     if result.is_success() {
         assert_compile_and_execute(&result, "Total sum: 55", "Parallel pattern composition");
     } else {
-        assert_compilation_error(&result, "pattern", "Parallel pattern composition integration");
+        assert_compilation_error(
+            &result,
+            "pattern",
+            "Parallel pattern composition integration",
+        );
     }
 }
 
 #[test]
 fn test_pipeline_pattern_composition() {
     let compiler = TestCompiler::new("pipeline_composition");
-    
+
     let source = r#"
 (DEFINE_MODULE pipeline_composition
   (USE_PATTERN_LIBRARY)
@@ -298,20 +299,24 @@ fn test_pipeline_pattern_composition() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "pipeline_composition.aether");
-    
+
     if result.is_success() {
         assert_compilation_success(&result, "Pipeline pattern composition");
     } else {
-        assert_compilation_error(&result, "pattern", "Pipeline pattern composition integration");
+        assert_compilation_error(
+            &result,
+            "pattern",
+            "Pipeline pattern composition integration",
+        );
     }
 }
 
 #[test]
 fn test_pattern_verification() {
     let compiler = TestCompiler::new("pattern_verification");
-    
+
     let source = r#"
 (DEFINE_MODULE pattern_verification
   (USE_PATTERN_LIBRARY)
@@ -355,14 +360,22 @@ fn test_pattern_verification() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "pattern_verification.aether");
-    
+
     if result.is_success() {
         let execution = result.execute();
         if execution.is_success() {
-            assert_output_contains(&execution, "Valid index result: 300", "Pattern verification - valid case");
-            assert_output_contains(&execution, "Invalid index result: 0", "Pattern verification - invalid case");
+            assert_output_contains(
+                &execution,
+                "Valid index result: 300",
+                "Pattern verification - valid case",
+            );
+            assert_output_contains(
+                &execution,
+                "Invalid index result: 0",
+                "Pattern verification - invalid case",
+            );
         }
     } else {
         assert_compilation_error(&result, "pattern", "Pattern verification integration");
@@ -372,7 +385,7 @@ fn test_pattern_verification() {
 #[test]
 fn test_custom_pattern_definition() {
     let compiler = TestCompiler::new("custom_pattern");
-    
+
     let source = r#"
 (DEFINE_MODULE custom_pattern
   (DEFINE_CUSTOM_PATTERN
@@ -452,14 +465,22 @@ fn test_custom_pattern_definition() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "custom_pattern.aether");
-    
+
     if result.is_success() {
         let execution = result.execute();
         if execution.is_success() {
-            assert_output_contains(&execution, "Division result: 4.20", "Custom pattern execution");
-            assert_output_contains(&execution, "LOG[division.log]: Division started", "Custom pattern logging");
+            assert_output_contains(
+                &execution,
+                "Division result: 4.20",
+                "Custom pattern execution",
+            );
+            assert_output_contains(
+                &execution,
+                "LOG[division.log]: Division started",
+                "Custom pattern logging",
+            );
         }
     } else {
         assert_compilation_error(&result, "pattern", "Custom pattern definition integration");
@@ -469,7 +490,7 @@ fn test_custom_pattern_definition() {
 #[test]
 fn test_pattern_performance_estimation() {
     let compiler = TestCompiler::new("pattern_performance");
-    
+
     let source = r#"
 (DEFINE_MODULE pattern_performance
   (USE_PATTERN_LIBRARY)
@@ -523,22 +544,28 @@ fn test_pattern_performance_estimation() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "pattern_performance.aether");
-    
+
     if result.is_success() {
         // Should compile and potentially provide performance analysis
         assert_compilation_success(&result, "Pattern performance estimation");
-        
+
         if let Some(compilation_result) = result.success() {
             // Look for performance-related warnings or information
             // Note: Current CompilationResult doesn't track warnings
             let has_performance_info = false;
-            
-            println!("Performance-aware compilation completed. Performance info available: {}", 
-                     has_performance_info);
+
+            println!(
+                "Performance-aware compilation completed. Performance info available: {}",
+                has_performance_info
+            );
         }
     } else {
-        assert_compilation_error(&result, "pattern", "Pattern performance estimation integration");
+        assert_compilation_error(
+            &result,
+            "pattern",
+            "Pattern performance estimation integration",
+        );
     }
 }

@@ -141,7 +141,7 @@ fn test_string_runtime_functions() {
     // Write test program
     let test_file = PathBuf::from("test_string_runtime.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -150,20 +150,23 @@ fn test_string_runtime_functions() {
         .arg("test_string_runtime")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_string_runtime")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success(), "Test program failed");
     let stdout = String::from_utf8_lossy(&run_output.stdout);
     assert!(stdout.contains("All string runtime tests passed!"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_string_runtime").ok();

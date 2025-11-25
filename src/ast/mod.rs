@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Abstract Syntax Tree definitions for AetherScript
-//! 
+//!
 //! Defines AST node types for all language constructs
 
 use crate::error::SourceLocation;
@@ -229,15 +229,16 @@ pub enum PrimitiveType {
 impl PrimitiveType {
     /// Check if this is a numeric type
     pub fn is_numeric(&self) -> bool {
-        matches!(self, 
-            PrimitiveType::Integer | 
-            PrimitiveType::Integer32 | 
-            PrimitiveType::Integer64 |
-            PrimitiveType::Float |
-            PrimitiveType::Float32 |
-            PrimitiveType::Float64 |
-            PrimitiveType::SizeT |
-            PrimitiveType::UIntPtrT
+        matches!(
+            self,
+            PrimitiveType::Integer
+                | PrimitiveType::Integer32
+                | PrimitiveType::Integer64
+                | PrimitiveType::Float
+                | PrimitiveType::Float32
+                | PrimitiveType::Float64
+                | PrimitiveType::SizeT
+                | PrimitiveType::UIntPtrT
         )
     }
 }
@@ -820,14 +821,14 @@ pub enum Expression {
         entries: Vec<MapEntry>,
         source_location: SourceLocation,
     },
-    
+
     // Pattern matching
     Match {
         value: Box<Expression>,
         cases: Vec<MatchCase>,
         source_location: SourceLocation,
     },
-    
+
     // Enum variant construction
     EnumVariant {
         enum_name: Identifier,
@@ -909,9 +910,16 @@ pub struct FunctionCall {
 /// Function reference
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FunctionReference {
-    Local { name: Identifier },
-    Qualified { module: Identifier, name: Identifier },
-    External { name: Identifier },
+    Local {
+        name: Identifier,
+    },
+    Qualified {
+        module: Identifier,
+        name: Identifier,
+    },
+    External {
+        name: Identifier,
+    },
 }
 
 /// Function argument
@@ -978,7 +986,10 @@ pub struct Identifier {
 
 impl Identifier {
     pub fn new(name: String, source_location: SourceLocation) -> Self {
-        Self { name, source_location }
+        Self {
+            name,
+            source_location,
+        }
     }
 }
 
@@ -1014,11 +1025,15 @@ impl ASTPrettyPrinter {
         let mut result = String::new();
         result.push_str("Program {\n");
         self.indent();
-        
+
         for module in &program.modules {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_module(module)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_module(module)
+            ));
         }
-        
+
         self.dedent();
         result.push_str("}\n");
         result
@@ -1028,27 +1043,47 @@ impl ASTPrettyPrinter {
         let mut result = String::new();
         result.push_str(&format!("Module '{}' {{\n", module.name.name));
         self.indent();
-        
+
         if let Some(intent) = &module.intent {
-            result.push_str(&format!("{}intent: \"{}\"\n", self.current_indent(), intent));
+            result.push_str(&format!(
+                "{}intent: \"{}\"\n",
+                self.current_indent(),
+                intent
+            ));
         }
-        
+
         for import in &module.imports {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_import(import)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_import(import)
+            ));
         }
-        
+
         for type_def in &module.type_definitions {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_type_definition(type_def)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_type_definition(type_def)
+            ));
         }
-        
+
         for constant in &module.constant_declarations {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_constant_declaration(constant)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_constant_declaration(constant)
+            ));
         }
-        
+
         for function in &module.function_definitions {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_function(function)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_function(function)
+            ));
         }
-        
+
         self.dedent();
         result.push_str(&format!("{}}}", self.current_indent()));
         result
@@ -1067,7 +1102,11 @@ impl ASTPrettyPrinter {
             TypeDefinition::Structured { name, fields, .. } => {
                 let mut result = format!("struct {} {{\n", name.name);
                 for field in fields {
-                    result.push_str(&format!("  {}: {},\n", field.name.name, self.print_type_specifier(&field.field_type)));
+                    result.push_str(&format!(
+                        "  {}: {},\n",
+                        field.name.name,
+                        self.print_type_specifier(&field.field_type)
+                    ));
                 }
                 result.push('}');
                 result
@@ -1080,8 +1119,16 @@ impl ASTPrettyPrinter {
                 result.push('}');
                 result
             }
-            TypeDefinition::Alias { new_name, original_type, .. } => {
-                format!("type {} = {}", new_name.name, self.print_type_specifier(original_type))
+            TypeDefinition::Alias {
+                new_name,
+                original_type,
+                ..
+            } => {
+                format!(
+                    "type {} = {}",
+                    new_name.name,
+                    self.print_type_specifier(original_type)
+                )
             }
         }
     }
@@ -1090,32 +1137,72 @@ impl ASTPrettyPrinter {
         match type_spec {
             TypeSpecifier::Primitive { type_name, .. } => format!("{:?}", type_name),
             TypeSpecifier::Named { name, .. } => name.name.clone(),
-            TypeSpecifier::Array { element_type, size, .. } => {
+            TypeSpecifier::Array {
+                element_type, size, ..
+            } => {
                 if let Some(size) = size {
-                    format!("[{}; {}]", self.print_type_specifier(element_type), self.print_expression(size))
+                    format!(
+                        "[{}; {}]",
+                        self.print_type_specifier(element_type),
+                        self.print_expression(size)
+                    )
                 } else {
                     format!("[{}]", self.print_type_specifier(element_type))
                 }
             }
-            TypeSpecifier::Map { key_type, value_type, .. } => {
-                format!("Map<{}, {}>", self.print_type_specifier(key_type), self.print_type_specifier(value_type))
+            TypeSpecifier::Map {
+                key_type,
+                value_type,
+                ..
+            } => {
+                format!(
+                    "Map<{}, {}>",
+                    self.print_type_specifier(key_type),
+                    self.print_type_specifier(value_type)
+                )
             }
-            TypeSpecifier::Pointer { target_type, is_mutable, .. } => {
+            TypeSpecifier::Pointer {
+                target_type,
+                is_mutable,
+                ..
+            } => {
                 if *is_mutable {
                     format!("*mut {}", self.print_type_specifier(target_type))
                 } else {
                     format!("*const {}", self.print_type_specifier(target_type))
                 }
             }
-            TypeSpecifier::Function { parameter_types, return_type, .. } => {
-                let params: Vec<String> = parameter_types.iter().map(|t| self.print_type_specifier(t)).collect();
-                format!("fn({}) -> {}", params.join(", "), self.print_type_specifier(return_type))
+            TypeSpecifier::Function {
+                parameter_types,
+                return_type,
+                ..
+            } => {
+                let params: Vec<String> = parameter_types
+                    .iter()
+                    .map(|t| self.print_type_specifier(t))
+                    .collect();
+                format!(
+                    "fn({}) -> {}",
+                    params.join(", "),
+                    self.print_type_specifier(return_type)
+                )
             }
-            TypeSpecifier::Generic { base_type, type_arguments, .. } => {
-                let args: Vec<String> = type_arguments.iter().map(|t| self.print_type_specifier(t)).collect();
+            TypeSpecifier::Generic {
+                base_type,
+                type_arguments,
+                ..
+            } => {
+                let args: Vec<String> = type_arguments
+                    .iter()
+                    .map(|t| self.print_type_specifier(t))
+                    .collect();
                 format!("{}<{}>", base_type.name, args.join(", "))
             }
-            TypeSpecifier::Owned { ownership, base_type, .. } => {
+            TypeSpecifier::Owned {
+                ownership,
+                base_type,
+                ..
+            } => {
                 let prefix = match ownership {
                     OwnershipKind::Owned => "^",
                     OwnershipKind::Borrowed => "&",
@@ -1124,7 +1211,9 @@ impl ASTPrettyPrinter {
                 };
                 format!("{}{}", prefix, self.print_type_specifier(base_type))
             }
-            TypeSpecifier::TypeParameter { name, constraints, .. } => {
+            TypeSpecifier::TypeParameter {
+                name, constraints, ..
+            } => {
                 if constraints.is_empty() {
                     name.name.clone()
                 } else {
@@ -1137,21 +1226,34 @@ impl ASTPrettyPrinter {
     }
 
     fn print_constant_declaration(&self, constant: &ConstantDeclaration) -> String {
-        format!("const {}: {} = {}", 
-                constant.name.name, 
-                self.print_type_specifier(&constant.type_spec),
-                self.print_expression(&constant.value))
+        format!(
+            "const {}: {} = {}",
+            constant.name.name,
+            self.print_type_specifier(&constant.type_spec),
+            self.print_expression(&constant.value)
+        )
     }
 
     fn print_function(&mut self, function: &Function) -> String {
         let mut result = format!("fn {}(", function.name.name);
-        
-        let params: Vec<String> = function.parameters.iter().map(|p| {
-            format!("{}: {}", p.name.name, self.print_type_specifier(&p.param_type))
-        }).collect();
+
+        let params: Vec<String> = function
+            .parameters
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}: {}",
+                    p.name.name,
+                    self.print_type_specifier(&p.param_type)
+                )
+            })
+            .collect();
         result.push_str(&params.join(", "));
-        result.push_str(&format!(") -> {} {{\n", self.print_type_specifier(&function.return_type)));
-        
+        result.push_str(&format!(
+            ") -> {} {{\n",
+            self.print_type_specifier(&function.return_type)
+        ));
+
         self.indent();
         result.push_str(&self.print_block(&function.body));
         self.dedent();
@@ -1162,15 +1264,26 @@ impl ASTPrettyPrinter {
     fn print_block(&mut self, block: &Block) -> String {
         let mut result = String::new();
         for statement in &block.statements {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_statement(statement)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_statement(statement)
+            ));
         }
         result
     }
 
     fn print_statement(&self, statement: &Statement) -> String {
         match statement {
-            Statement::VariableDeclaration { name, type_spec, mutability, initial_value, .. } => {
-                let mut result = format!("{} {}: {}", 
+            Statement::VariableDeclaration {
+                name,
+                type_spec,
+                mutability,
+                initial_value,
+                ..
+            } => {
+                let mut result = format!(
+                    "{} {}: {}",
                     match mutability {
                         Mutability::Mutable => "let mut",
                         Mutability::Immutable => "let",
@@ -1185,7 +1298,11 @@ impl ASTPrettyPrinter {
                 result
             }
             Statement::Assignment { target, value, .. } => {
-                format!("{} = {};", self.print_assignment_target(target), self.print_expression(value))
+                format!(
+                    "{} = {};",
+                    self.print_assignment_target(target),
+                    self.print_expression(value)
+                )
             }
             Statement::Return { value, .. } => {
                 if let Some(value) = value {
@@ -1202,13 +1319,24 @@ impl ASTPrettyPrinter {
         match target {
             AssignmentTarget::Variable { name } => name.name.clone(),
             AssignmentTarget::ArrayElement { array, index } => {
-                format!("{}[{}]", self.print_expression(array), self.print_expression(index))
+                format!(
+                    "{}[{}]",
+                    self.print_expression(array),
+                    self.print_expression(index)
+                )
             }
-            AssignmentTarget::StructField { instance, field_name } => {
+            AssignmentTarget::StructField {
+                instance,
+                field_name,
+            } => {
                 format!("{}.{}", self.print_expression(instance), field_name.name)
             }
             AssignmentTarget::MapValue { map, key } => {
-                format!("{}[{}]", self.print_expression(map), self.print_expression(key))
+                format!(
+                    "{}[{}]",
+                    self.print_expression(map),
+                    self.print_expression(key)
+                )
             }
             AssignmentTarget::Dereference { pointer } => {
                 format!("*{}", self.print_expression(pointer))
@@ -1225,17 +1353,31 @@ impl ASTPrettyPrinter {
             Expression::NullLiteral { .. } => "null".to_string(),
             Expression::Variable { name, .. } => name.name.clone(),
             Expression::Add { left, right, .. } => {
-                format!("({} + {})", self.print_expression(left), self.print_expression(right))
+                format!(
+                    "({} + {})",
+                    self.print_expression(left),
+                    self.print_expression(right)
+                )
             }
             Expression::FunctionCall { call, .. } => {
                 let func_name = match &call.function_reference {
                     FunctionReference::Local { name } => name.name.clone(),
-                    FunctionReference::Qualified { module, name } => format!("{}.{}", module.name, name.name),
+                    FunctionReference::Qualified { module, name } => {
+                        format!("{}.{}", module.name, name.name)
+                    }
                     FunctionReference::External { name } => name.name.clone(),
                 };
-                let args: Vec<String> = call.arguments.iter().map(|arg| {
-                    format!("{}: {}", arg.parameter_name.name, self.print_expression(&arg.value))
-                }).collect();
+                let args: Vec<String> = call
+                    .arguments
+                    .iter()
+                    .map(|arg| {
+                        format!(
+                            "{}: {}",
+                            arg.parameter_name.name,
+                            self.print_expression(&arg.value)
+                        )
+                    })
+                    .collect();
                 format!("{}({})", func_name, args.join(", "))
             }
             _ => "/* expression */".to_string(),
@@ -1252,21 +1394,21 @@ impl Default for ASTPrettyPrinter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_identifier_creation() {
         let loc = SourceLocation::new("test.aether".to_string(), 1, 1, 0);
         let id = Identifier::new("test_identifier".to_string(), loc.clone());
-        
+
         assert_eq!(id.name, "test_identifier");
         assert_eq!(id.source_location, loc);
     }
-    
+
     #[test]
     fn test_ast_pretty_printer() {
         let mut printer = ASTPrettyPrinter::new();
         let loc = SourceLocation::new("test.aether".to_string(), 1, 1, 0);
-        
+
         let module = Module {
             name: Identifier::new("test_module".to_string(), loc.clone()),
             intent: Some("Test module".to_string()),
@@ -1278,12 +1420,12 @@ mod tests {
             external_functions: vec![],
             source_location: loc,
         };
-        
+
         let output = printer.print_module(&module);
         assert!(output.contains("Module 'test_module'"));
         assert!(output.contains("intent: \"Test module\""));
     }
-    
+
     #[test]
     fn test_expression_serialization() {
         let loc = SourceLocation::new("test.aether".to_string(), 1, 1, 0);
@@ -1291,10 +1433,10 @@ mod tests {
             value: 42,
             source_location: loc,
         };
-        
+
         let serialized = serde_json::to_string(&expr).unwrap();
         let deserialized: Expression = serde_json::from_str(&serialized).unwrap();
-        
+
         match deserialized {
             Expression::IntegerLiteral { value, .. } => assert_eq!(value, 42),
             _ => panic!("Deserialization failed"),

@@ -13,31 +13,29 @@
 // limitations under the License.
 
 use aether::ast::*;
-use aether::semantic::SemanticAnalyzer;
 use aether::error::SourceLocation;
+use aether::semantic::SemanticAnalyzer;
 
 /// Helper function to create a simple test module with control flow in AST form
 fn create_control_flow_ast() -> Program {
     let loc = SourceLocation::unknown();
-    
+
     // Create a function with if statement
     let if_func = Function {
         name: Identifier::new("test_if".to_string(), loc.clone()),
         intent: Some("Test if statement".to_string()),
         generic_parameters: Vec::new(),
-        parameters: vec![
-            Parameter {
-                name: Identifier::new("x".to_string(), loc.clone()),
-                param_type: Box::new(TypeSpecifier::Primitive {
-                    type_name: PrimitiveType::Integer,
-                    source_location: loc.clone(),
-                }),
-                intent: None,
-                constraint: None,
-                passing_mode: PassingMode::ByValue,
+        parameters: vec![Parameter {
+            name: Identifier::new("x".to_string(), loc.clone()),
+            param_type: Box::new(TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
                 source_location: loc.clone(),
-            }
-        ],
+            }),
+            intent: None,
+            constraint: None,
+            passing_mode: PassingMode::ByValue,
+            source_location: loc.clone(),
+        }],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,
             source_location: loc.clone(),
@@ -54,47 +52,41 @@ fn create_control_flow_ast() -> Program {
             may_block: None,
         },
         body: Block {
-            statements: vec![
-                Statement::If {
-                    condition: Box::new(Expression::GreaterThan {
-                        left: Box::new(Expression::Variable {
-                            name: Identifier::new("x".to_string(), loc.clone()),
-                            source_location: loc.clone(),
-                        }),
-                        right: Box::new(Expression::IntegerLiteral {
-                            value: 10,
-                            source_location: loc.clone(),
-                        }),
+            statements: vec![Statement::If {
+                condition: Box::new(Expression::GreaterThan {
+                    left: Box::new(Expression::Variable {
+                        name: Identifier::new("x".to_string(), loc.clone()),
                         source_location: loc.clone(),
                     }),
-                    then_block: Block {
-                        statements: vec![
-                            Statement::Return {
-                                value: Some(Box::new(Expression::IntegerLiteral {
-                                    value: 1,
-                                    source_location: loc.clone(),
-                                })),
-                                source_location: loc.clone(),
-                            }
-                        ],
-                        source_location: loc.clone(),
-                    },
-                    else_ifs: vec![],
-                    else_block: Some(Block {
-                        statements: vec![
-                            Statement::Return {
-                                value: Some(Box::new(Expression::IntegerLiteral {
-                                    value: 0,
-                                    source_location: loc.clone(),
-                                })),
-                                source_location: loc.clone(),
-                            }
-                        ],
+                    right: Box::new(Expression::IntegerLiteral {
+                        value: 10,
                         source_location: loc.clone(),
                     }),
                     source_location: loc.clone(),
-                }
-            ],
+                }),
+                then_block: Block {
+                    statements: vec![Statement::Return {
+                        value: Some(Box::new(Expression::IntegerLiteral {
+                            value: 1,
+                            source_location: loc.clone(),
+                        })),
+                        source_location: loc.clone(),
+                    }],
+                    source_location: loc.clone(),
+                },
+                else_ifs: vec![],
+                else_block: Some(Block {
+                    statements: vec![Statement::Return {
+                        value: Some(Box::new(Expression::IntegerLiteral {
+                            value: 0,
+                            source_location: loc.clone(),
+                        })),
+                        source_location: loc.clone(),
+                    }],
+                    source_location: loc.clone(),
+                }),
+                source_location: loc.clone(),
+            }],
             source_location: loc.clone(),
         },
         export_info: None,
@@ -106,19 +98,17 @@ fn create_control_flow_ast() -> Program {
         name: Identifier::new("test_while".to_string(), loc.clone()),
         intent: Some("Test while loop".to_string()),
         generic_parameters: Vec::new(),
-        parameters: vec![
-            Parameter {
-                name: Identifier::new("n".to_string(), loc.clone()),
-                param_type: Box::new(TypeSpecifier::Primitive {
-                    type_name: PrimitiveType::Integer,
-                    source_location: loc.clone(),
-                }),
-                intent: None,
-                constraint: None,
-                passing_mode: PassingMode::ByValue,
+        parameters: vec![Parameter {
+            name: Identifier::new("n".to_string(), loc.clone()),
+            param_type: Box::new(TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
                 source_location: loc.clone(),
-            }
-        ],
+            }),
+            intent: None,
+            constraint: None,
+            passing_mode: PassingMode::ByValue,
+            source_location: loc.clone(),
+        }],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,
             source_location: loc.clone(),
@@ -164,25 +154,23 @@ fn create_control_flow_ast() -> Program {
                     }),
                     invariant: None,
                     body: Block {
-                        statements: vec![
-                            Statement::Assignment {
-                                target: AssignmentTarget::Variable {
+                        statements: vec![Statement::Assignment {
+                            target: AssignmentTarget::Variable {
+                                name: Identifier::new("count".to_string(), loc.clone()),
+                            },
+                            value: Box::new(Expression::Add {
+                                left: Box::new(Expression::Variable {
                                     name: Identifier::new("count".to_string(), loc.clone()),
-                                },
-                                value: Box::new(Expression::Add {
-                                    left: Box::new(Expression::Variable {
-                                        name: Identifier::new("count".to_string(), loc.clone()),
-                                        source_location: loc.clone(),
-                                    }),
-                                    right: Box::new(Expression::IntegerLiteral {
-                                        value: 1,
-                                        source_location: loc.clone(),
-                                    }),
+                                    source_location: loc.clone(),
+                                }),
+                                right: Box::new(Expression::IntegerLiteral {
+                                    value: 1,
                                     source_location: loc.clone(),
                                 }),
                                 source_location: loc.clone(),
-                            }
-                        ],
+                            }),
+                            source_location: loc.clone(),
+                        }],
                         source_location: loc.clone(),
                     },
                     label: None,
@@ -194,7 +182,7 @@ fn create_control_flow_ast() -> Program {
                         source_location: loc.clone(),
                     })),
                     source_location: loc.clone(),
-                }
+                },
             ],
             source_location: loc.clone(),
         },
@@ -224,10 +212,12 @@ fn create_control_flow_ast() -> Program {
 #[test]
 fn test_if_statement_semantic_analysis() {
     let program = create_control_flow_ast();
-    
+
     let mut analyzer = SemanticAnalyzer::new();
-    analyzer.analyze_program(&program).expect("Semantic analysis should succeed");
-    
+    analyzer
+        .analyze_program(&program)
+        .expect("Semantic analysis should succeed");
+
     let stats = analyzer.get_statistics();
     assert_eq!(stats.modules_analyzed, 1);
     assert_eq!(stats.functions_analyzed, 2);
@@ -237,7 +227,7 @@ fn test_if_statement_semantic_analysis() {
 #[test]
 fn test_non_boolean_condition_error() {
     let loc = SourceLocation::unknown();
-    
+
     // Create a function with non-boolean if condition
     let bad_func = Function {
         name: Identifier::new("bad_if".to_string(), loc.clone()),
@@ -260,26 +250,22 @@ fn test_non_boolean_condition_error() {
             may_block: None,
         },
         body: Block {
-            statements: vec![
-                Statement::If {
-                    condition: Box::new(Expression::IntegerLiteral {
-                        value: 42, // This should fail - not a boolean
-                        source_location: loc.clone(),
-                    }),
-                    then_block: Block {
-                        statements: vec![
-                            Statement::Return {
-                                value: None,
-                                source_location: loc.clone(),
-                            }
-                        ],
-                        source_location: loc.clone(),
-                    },
-                    else_ifs: vec![],
-                    else_block: None,
+            statements: vec![Statement::If {
+                condition: Box::new(Expression::IntegerLiteral {
+                    value: 42, // This should fail - not a boolean
                     source_location: loc.clone(),
-                }
-            ],
+                }),
+                then_block: Block {
+                    statements: vec![Statement::Return {
+                        value: None,
+                        source_location: loc.clone(),
+                    }],
+                    source_location: loc.clone(),
+                },
+                else_ifs: vec![],
+                else_block: None,
+                source_location: loc.clone(),
+            }],
             source_location: loc.clone(),
         },
         export_info: None,
@@ -305,16 +291,18 @@ fn test_non_boolean_condition_error() {
 
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     assert!(result.is_err());
     let errors = result.unwrap_err();
-    assert!(errors.iter().any(|e| e.to_string().contains("Type mismatch")));
+    assert!(errors
+        .iter()
+        .any(|e| e.to_string().contains("Type mismatch")));
 }
 
 #[test]
 fn test_loop_variable_scope() {
     let loc = SourceLocation::unknown();
-    
+
     // Create a for-each loop with element binding
     let foreach_func = Function {
         name: Identifier::new("test_foreach".to_string(), loc.clone()),
@@ -382,7 +370,7 @@ fn test_loop_variable_scope() {
                         source_location: loc.clone(),
                     })),
                     source_location: loc.clone(),
-                }
+                },
             ],
             source_location: loc.clone(),
         },
@@ -409,7 +397,7 @@ fn test_loop_variable_scope() {
 
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     assert!(result.is_err());
     let errors = result.unwrap_err();
     // Check that we got an error (might be Type mismatch instead of Undefined symbol
@@ -420,7 +408,7 @@ fn test_loop_variable_scope() {
 #[test]
 fn test_break_continue_statements() {
     let loc = SourceLocation::unknown();
-    
+
     // Create a function with break and continue
     let loop_func = Function {
         name: Identifier::new("test_break_continue".to_string(), loc.clone()),
@@ -443,48 +431,40 @@ fn test_break_continue_statements() {
             may_block: None,
         },
         body: Block {
-            statements: vec![
-                Statement::WhileLoop {
-                    condition: Box::new(Expression::BooleanLiteral {
-                        value: true,
-                        source_location: loc.clone(),
-                    }),
-                    invariant: None,
-                    body: Block {
-                        statements: vec![
-                            Statement::If {
-                                condition: Box::new(Expression::BooleanLiteral {
-                                    value: true,
-                                    source_location: loc.clone(),
-                                }),
-                                then_block: Block {
-                                    statements: vec![
-                                        Statement::Break {
-                                            target_label: None,
-                                            source_location: loc.clone(),
-                                        }
-                                    ],
-                                    source_location: loc.clone(),
-                                },
-                                else_ifs: vec![],
-                                else_block: Some(Block {
-                                    statements: vec![
-                                        Statement::Continue {
-                                            target_label: None,
-                                            source_location: loc.clone(),
-                                        }
-                                    ],
-                                    source_location: loc.clone(),
-                                }),
-                                source_location: loc.clone(),
-                            }
-                        ],
-                        source_location: loc.clone(),
-                    },
-                    label: None,
+            statements: vec![Statement::WhileLoop {
+                condition: Box::new(Expression::BooleanLiteral {
+                    value: true,
                     source_location: loc.clone(),
-                }
-            ],
+                }),
+                invariant: None,
+                body: Block {
+                    statements: vec![Statement::If {
+                        condition: Box::new(Expression::BooleanLiteral {
+                            value: true,
+                            source_location: loc.clone(),
+                        }),
+                        then_block: Block {
+                            statements: vec![Statement::Break {
+                                target_label: None,
+                                source_location: loc.clone(),
+                            }],
+                            source_location: loc.clone(),
+                        },
+                        else_ifs: vec![],
+                        else_block: Some(Block {
+                            statements: vec![Statement::Continue {
+                                target_label: None,
+                                source_location: loc.clone(),
+                            }],
+                            source_location: loc.clone(),
+                        }),
+                        source_location: loc.clone(),
+                    }],
+                    source_location: loc.clone(),
+                },
+                label: None,
+                source_location: loc.clone(),
+            }],
             source_location: loc.clone(),
         },
         export_info: None,
@@ -509,13 +489,15 @@ fn test_break_continue_statements() {
     };
 
     let mut analyzer = SemanticAnalyzer::new();
-    analyzer.analyze_program(&program).expect("Semantic analysis should succeed for break/continue");
+    analyzer
+        .analyze_program(&program)
+        .expect("Semantic analysis should succeed for break/continue");
 }
 
 #[test]
 fn test_try_catch_analysis() {
     let loc = SourceLocation::unknown();
-    
+
     // Create a function with try-catch block
     let try_func = Function {
         name: Identifier::new("test_try_catch".to_string(), loc.clone()),
@@ -538,46 +520,38 @@ fn test_try_catch_analysis() {
             may_block: None,
         },
         body: Block {
-            statements: vec![
-                Statement::TryBlock {
-                    protected_block: Block {
-                        statements: vec![
-                            Statement::Return {
-                                value: Some(Box::new(Expression::IntegerLiteral {
-                                    value: 42,
-                                    source_location: loc.clone(),
-                                })),
+            statements: vec![Statement::TryBlock {
+                protected_block: Block {
+                    statements: vec![Statement::Return {
+                        value: Some(Box::new(Expression::IntegerLiteral {
+                            value: 42,
+                            source_location: loc.clone(),
+                        })),
+                        source_location: loc.clone(),
+                    }],
+                    source_location: loc.clone(),
+                },
+                catch_clauses: vec![CatchClause {
+                    exception_type: Box::new(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::String, // Use a known type for now
+                        source_location: loc.clone(),
+                    }),
+                    binding_variable: Some(Identifier::new("e".to_string(), loc.clone())),
+                    handler_block: Block {
+                        statements: vec![Statement::Return {
+                            value: Some(Box::new(Expression::IntegerLiteral {
+                                value: -1,
                                 source_location: loc.clone(),
-                            }
-                        ],
+                            })),
+                            source_location: loc.clone(),
+                        }],
                         source_location: loc.clone(),
                     },
-                    catch_clauses: vec![
-                        CatchClause {
-                            exception_type: Box::new(TypeSpecifier::Primitive {
-                                type_name: PrimitiveType::String, // Use a known type for now
-                                source_location: loc.clone(),
-                            }),
-                            binding_variable: Some(Identifier::new("e".to_string(), loc.clone())),
-                            handler_block: Block {
-                                statements: vec![
-                                    Statement::Return {
-                                        value: Some(Box::new(Expression::IntegerLiteral {
-                                            value: -1,
-                                            source_location: loc.clone(),
-                                        })),
-                                        source_location: loc.clone(),
-                                    }
-                                ],
-                                source_location: loc.clone(),
-                            },
-                            source_location: loc.clone(),
-                        }
-                    ],
-                    finally_block: None,
                     source_location: loc.clone(),
-                }
-            ],
+                }],
+                finally_block: None,
+                source_location: loc.clone(),
+            }],
             source_location: loc.clone(),
         },
         export_info: None,
@@ -602,5 +576,7 @@ fn test_try_catch_analysis() {
     };
 
     let mut analyzer = SemanticAnalyzer::new();
-    analyzer.analyze_program(&program).expect("Semantic analysis should succeed for try-catch");
+    analyzer
+        .analyze_program(&program)
+        .expect("Semantic analysis should succeed for try-catch");
 }

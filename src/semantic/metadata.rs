@@ -13,12 +13,12 @@
 // limitations under the License.
 
 //! Enhanced Metadata System for LLM-First Language
-//! 
+//!
 //! This module implements the rich metadata system that makes AetherScript
 //! optimal for LLM code generation and verification.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Semantic type definition beyond primitive types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,8 +89,14 @@ pub enum SideEffectType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RetryPolicy {
     None,
-    Fixed { attempts: u32, delay_ms: u64 },
-    ExponentialBackoff { max_attempts: u32, initial_delay_ms: u64 },
+    Fixed {
+        attempts: u32,
+        delay_ms: u64,
+    },
+    ExponentialBackoff {
+        max_attempts: u32,
+        initial_delay_ms: u64,
+    },
     Custom(String),
 }
 
@@ -227,11 +233,11 @@ pub struct GenerationHints {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StylePreference {
-    Defensive,      // Lots of validation
-    Performance,    // Optimize for speed
-    Readable,       // Optimize for clarity
-    Minimal,        // Least code possible
-    Comprehensive,  // Handle all edge cases
+    Defensive,     // Lots of validation
+    Performance,   // Optimize for speed
+    Readable,      // Optimize for clarity
+    Minimal,       // Least code possible
+    Comprehensive, // Handle all edge cases
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

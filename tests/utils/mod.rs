@@ -14,12 +14,12 @@
 
 //! Test utilities for AetherScript integration tests
 
-pub mod test_runner;
-pub mod compiler_wrapper;
 pub mod assertions;
+pub mod compiler_wrapper;
+pub mod test_runner;
 
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Helper to get test fixture path
 pub fn fixture_path(filename: &str) -> PathBuf {
@@ -49,7 +49,7 @@ pub fn cleanup_temp_dir(path: &Path) {
 /// Create a test project with multiple files
 pub fn create_test_project(project_name: &str, files: &[(&str, &str)]) -> PathBuf {
     let project_dir = create_temp_dir(project_name);
-    
+
     for (filename, content) in files {
         let file_path = project_dir.join(filename);
         if let Some(parent) = file_path.parent() {
@@ -57,7 +57,7 @@ pub fn create_test_project(project_name: &str, files: &[(&str, &str)]) -> PathBu
         }
         fs::write(&file_path, content).expect("Failed to write file");
     }
-    
+
     project_dir
 }
 

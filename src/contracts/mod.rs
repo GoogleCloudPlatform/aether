@@ -13,15 +13,18 @@
 // limitations under the License.
 
 //! Contract validation and metadata processing for AetherScript
-//! 
+//!
 //! Implements contract assertion validation, metadata parsing, and runtime assertion generation
 
-use crate::ast::{ContractAssertion, FunctionMetadata, PerformanceExpectation, ComplexityExpectation, Expression, FailureAction};
+use crate::ast::{
+    ComplexityExpectation, ContractAssertion, Expression, FailureAction, FunctionMetadata,
+    PerformanceExpectation,
+};
 use crate::error::{SemanticError, SourceLocation};
 use crate::types::{Type, TypeChecker};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 /// Contract validation result
 #[derive(Debug, Clone)]
@@ -132,7 +135,11 @@ impl ContractValidator {
 
         // Validate performance expectations
         if let Some(perf_expectation) = &metadata.performance_expectation {
-            if let Err(error) = self.validate_performance_expectation(perf_expectation, function_name, function_location) {
+            if let Err(error) = self.validate_performance_expectation(
+                perf_expectation,
+                function_name,
+                function_location,
+            ) {
                 self.stats.contract_errors += 1;
                 result.errors.push(error);
                 result.is_valid = false;
@@ -143,7 +150,11 @@ impl ContractValidator {
 
         // Validate complexity expectations
         if let Some(complexity_expectation) = &metadata.complexity_expectation {
-            if let Err(error) = self.validate_complexity_expectation(complexity_expectation, function_name, function_location) {
+            if let Err(error) = self.validate_complexity_expectation(
+                complexity_expectation,
+                function_name,
+                function_location,
+            ) {
                 self.stats.contract_errors += 1;
                 result.errors.push(error);
                 result.is_valid = false;
@@ -161,7 +172,11 @@ impl ContractValidator {
 
         // Validate exception specifications
         for exception_type in &metadata.throws_exceptions {
-            if let Err(error) = context.type_checker.borrow().ast_type_to_type(exception_type) {
+            if let Err(error) = context
+                .type_checker
+                .borrow()
+                .ast_type_to_type(exception_type)
+            {
                 result.errors.push(SemanticError::InvalidType {
                     type_name: format!("{:?}", exception_type),
                     reason: format!("Exception type validation failed: {}", error),
@@ -186,8 +201,11 @@ impl ContractValidator {
 
         // Validate that the condition expression is boolean
         let condition_type = self.infer_expression_type(&assertion.condition, context)?;
-        
-        if !matches!(condition_type, Type::Primitive(crate::ast::PrimitiveType::Boolean)) {
+
+        if !matches!(
+            condition_type,
+            Type::Primitive(crate::ast::PrimitiveType::Boolean)
+        ) {
             return Err(SemanticError::TypeMismatch {
                 expected: "Boolean".to_string(),
                 found: condition_type.to_string(),
@@ -199,21 +217,30 @@ impl ContractValidator {
         match assertion.failure_action {
             FailureAction::ThrowException => {
                 // Check if function declares that it throws exceptions
-                warnings.push(format!("{} uses ThrowException but function may need exception declaration", assertion_type));
+                warnings.push(format!(
+                    "{} uses ThrowException but function may need exception declaration",
+                    assertion_type
+                ));
             }
             FailureAction::LogWarning => {
                 // Warning-only contracts are generally safe
             }
             FailureAction::AssertFail => {
                 // Assert failures should be used carefully in production
-                warnings.push(format!("{} uses AssertFail which may terminate program execution", assertion_type));
+                warnings.push(format!(
+                    "{} uses AssertFail which may terminate program execution",
+                    assertion_type
+                ));
             }
         }
 
         // Validate message if present
         if let Some(message) = &assertion.message {
             if message.is_empty() {
-                warnings.push(format!("{} has empty message - consider providing meaningful error description", assertion_type));
+                warnings.push(format!(
+                    "{} has empty message - consider providing meaningful error description",
+                    assertion_type
+                ));
             }
         }
 
@@ -237,7 +264,8 @@ impl ContractValidator {
                         location: location.clone(),
                     });
                 }
-                if expectation.target_value > 60000.0 { // 1 minute
+                if expectation.target_value > 60000.0 {
+                    // 1 minute
                     return Err(SemanticError::InvalidContract {
                         contract_type: "PerformanceExpectation".to_string(),
                         reason: "Latency expectation exceeds reasonable bounds (60s)".to_string(),
@@ -262,10 +290,12 @@ impl ContractValidator {
                         location: location.clone(),
                     });
                 }
-                if expectation.target_value > 1_000_000_000.0 { // 1GB
+                if expectation.target_value > 1_000_000_000.0 {
+                    // 1GB
                     return Err(SemanticError::InvalidContract {
                         contract_type: "PerformanceExpectation".to_string(),
-                        reason: "Memory usage expectation exceeds reasonable bounds (1GB)".to_string(),
+                        reason: "Memory usage expectation exceeds reasonable bounds (1GB)"
+                            .to_string(),
                         location: location.clone(),
                     });
                 }
@@ -284,15 +314,39 @@ impl ContractValidator {
     ) -> Result<(), SemanticError> {
         // Validate complexity notation format
         let valid_complexities = [
-            "O(1)", "O(log n)", "O(n)", "O(n log n)", "O(n^2)", "O(n^3)", "O(2^n)", "O(n!)",
-            "Θ(1)", "Θ(log n)", "Θ(n)", "Θ(n log n)", "Θ(n^2)", "Θ(n^3)", "Θ(2^n)", "Θ(n!)",
-            "Ω(1)", "Ω(log n)", "Ω(n)", "Ω(n log n)", "Ω(n^2)", "Ω(n^3)", "Ω(2^n)", "Ω(n!)",
+            "O(1)",
+            "O(log n)",
+            "O(n)",
+            "O(n log n)",
+            "O(n^2)",
+            "O(n^3)",
+            "O(2^n)",
+            "O(n!)",
+            "Θ(1)",
+            "Θ(log n)",
+            "Θ(n)",
+            "Θ(n log n)",
+            "Θ(n^2)",
+            "Θ(n^3)",
+            "Θ(2^n)",
+            "Θ(n!)",
+            "Ω(1)",
+            "Ω(log n)",
+            "Ω(n)",
+            "Ω(n log n)",
+            "Ω(n^2)",
+            "Ω(n^3)",
+            "Ω(2^n)",
+            "Ω(n!)",
         ];
 
         if !valid_complexities.contains(&expectation.value.as_str()) {
             return Err(SemanticError::InvalidContract {
                 contract_type: "ComplexityExpectation".to_string(),
-                reason: format!("Invalid complexity notation: '{}'. Expected standard big-O notation.", expectation.value),
+                reason: format!(
+                    "Invalid complexity notation: '{}'. Expected standard big-O notation.",
+                    expectation.value
+                ),
                 location: location.clone(),
             });
         }
@@ -308,11 +362,28 @@ impl ContractValidator {
     /// Validate algorithm hints
     fn validate_algorithm_hint(&self, hint: &str, function_name: &str) -> Option<String> {
         let known_algorithms = [
-            "binary_search", "linear_search", "quick_sort", "merge_sort", "heap_sort",
-            "bubble_sort", "insertion_sort", "selection_sort", "radix_sort",
-            "dijkstra", "bellman_ford", "floyd_warshall", "dfs", "bfs",
-            "dynamic_programming", "greedy", "divide_and_conquer", "backtracking",
-            "hash_table", "binary_tree", "balanced_tree", "graph_traversal"
+            "binary_search",
+            "linear_search",
+            "quick_sort",
+            "merge_sort",
+            "heap_sort",
+            "bubble_sort",
+            "insertion_sort",
+            "selection_sort",
+            "radix_sort",
+            "dijkstra",
+            "bellman_ford",
+            "floyd_warshall",
+            "dfs",
+            "bfs",
+            "dynamic_programming",
+            "greedy",
+            "divide_and_conquer",
+            "backtracking",
+            "hash_table",
+            "binary_tree",
+            "balanced_tree",
+            "graph_traversal",
         ];
 
         if !known_algorithms.contains(&hint) {
@@ -341,26 +412,41 @@ impl ContractValidator {
             Expression::StringLiteral { .. } => {
                 Ok(Type::primitive(crate::ast::PrimitiveType::String))
             }
-            Expression::Variable { name, source_location } => {
-                context.parameter_types.get(&name.name)
-                    .cloned()
-                    .ok_or_else(|| SemanticError::UndefinedSymbol {
-                        symbol: name.name.clone(),
-                        location: source_location.clone(),
-                    })
+            Expression::Variable {
+                name,
+                source_location,
+            } => context
+                .parameter_types
+                .get(&name.name)
+                .cloned()
+                .ok_or_else(|| SemanticError::UndefinedSymbol {
+                    symbol: name.name.clone(),
+                    location: source_location.clone(),
+                }),
+            Expression::Equals {
+                left: _, right: _, ..
             }
-            Expression::Equals { left: _, right: _, .. } |
-            Expression::NotEquals { left: _, right: _, .. } |
-            Expression::LessThan { left: _, right: _, .. } |
-            Expression::LessThanOrEqual { left: _, right: _, .. } |
-            Expression::GreaterThan { left: _, right: _, .. } |
-            Expression::GreaterThanOrEqual { left: _, right: _, .. } => {
+            | Expression::NotEquals {
+                left: _, right: _, ..
+            }
+            | Expression::LessThan {
+                left: _, right: _, ..
+            }
+            | Expression::LessThanOrEqual {
+                left: _, right: _, ..
+            }
+            | Expression::GreaterThan {
+                left: _, right: _, ..
+            }
+            | Expression::GreaterThanOrEqual {
+                left: _, right: _, ..
+            } => {
                 // Comparison operators always return boolean
                 Ok(Type::primitive(crate::ast::PrimitiveType::Boolean))
             }
-            Expression::LogicalAnd { .. } |
-            Expression::LogicalOr { .. } |
-            Expression::LogicalNot { .. } => {
+            Expression::LogicalAnd { .. }
+            | Expression::LogicalOr { .. }
+            | Expression::LogicalNot { .. } => {
                 // Logical operators always return boolean
                 Ok(Type::primitive(crate::ast::PrimitiveType::Boolean))
             }
@@ -369,7 +455,7 @@ impl ContractValidator {
             _ => Err(SemanticError::UnsupportedFeature {
                 feature: "Complex expression type inference in contracts".to_string(),
                 location: SourceLocation::unknown(),
-            })
+            }),
         }
     }
 
@@ -380,9 +466,12 @@ impl ContractValidator {
         function_name: &str,
     ) -> String {
         let mut code = String::new();
-        
-        code.push_str(&format!("// Runtime assertions for function {}\n", function_name));
-        
+
+        code.push_str(&format!(
+            "// Runtime assertions for function {}\n",
+            function_name
+        ));
+
         // Generate precondition checks
         if !metadata.preconditions.is_empty() {
             code.push_str("#[cfg(debug_assertions)]\n");
@@ -390,21 +479,24 @@ impl ContractValidator {
             for (i, precondition) in metadata.preconditions.iter().enumerate() {
                 let condition_code = self.expression_to_code(&precondition.condition);
                 let default_message = format!("Precondition {} violated", i + 1);
-                let message = precondition.message.as_deref()
-                    .unwrap_or(&default_message);
-                
+                let message = precondition.message.as_deref().unwrap_or(&default_message);
+
                 match precondition.failure_action {
                     FailureAction::ThrowException => {
-                        code.push_str(&format!("    if !({}) {{ panic!(\"Precondition violation in {}: {}\"); }}\n", 
-                                              condition_code, function_name, message));
+                        code.push_str(&format!(
+                            "    if !({}) {{ panic!(\"Precondition violation in {}: {}\"); }}\n",
+                            condition_code, function_name, message
+                        ));
                     }
                     FailureAction::LogWarning => {
                         code.push_str(&format!("    if !({}) {{ eprintln!(\"Warning: Precondition violation in {}: {}\"); }}\n", 
                                               condition_code, function_name, message));
                     }
                     FailureAction::AssertFail => {
-                        code.push_str(&format!("    assert!({}, \"Precondition violation in {}: {}\");\n", 
-                                              condition_code, function_name, message));
+                        code.push_str(&format!(
+                            "    assert!({}, \"Precondition violation in {}: {}\");\n",
+                            condition_code, function_name, message
+                        ));
                     }
                 }
             }
@@ -421,13 +513,22 @@ impl ContractValidator {
             Expression::IntegerLiteral { value, .. } => value.to_string(),
             Expression::Variable { name, .. } => name.name.clone(),
             Expression::Equals { left, right, .. } => {
-                format!("({} == {})", self.expression_to_code(left), self.expression_to_code(right))
+                format!(
+                    "({} == {})",
+                    self.expression_to_code(left),
+                    self.expression_to_code(right)
+                )
             }
             Expression::LessThan { left, right, .. } => {
-                format!("({} < {})", self.expression_to_code(left), self.expression_to_code(right))
+                format!(
+                    "({} < {})",
+                    self.expression_to_code(left),
+                    self.expression_to_code(right)
+                )
             }
             Expression::LogicalAnd { operands, .. } => {
-                let conditions: Vec<String> = operands.iter()
+                let conditions: Vec<String> = operands
+                    .iter()
                     .map(|op| self.expression_to_code(op))
                     .collect();
                 format!("({})", conditions.join(" && "))
@@ -457,7 +558,9 @@ impl Default for ContractValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{PrimitiveType, Identifier, PerformanceMetric, ComplexityType, ComplexityNotation};
+    use crate::ast::{
+        ComplexityNotation, ComplexityType, Identifier, PerformanceMetric, PrimitiveType,
+    };
     use crate::error::SourceLocation;
 
     #[test]
@@ -478,7 +581,9 @@ mod tests {
             target_value: 100.0,
             context: Some("API response time".to_string()),
         };
-        assert!(validator.validate_performance_expectation(&valid_perf, "test_func", &location).is_ok());
+        assert!(validator
+            .validate_performance_expectation(&valid_perf, "test_func", &location)
+            .is_ok());
 
         // Invalid latency expectation (negative)
         let invalid_perf = PerformanceExpectation {
@@ -486,7 +591,9 @@ mod tests {
             target_value: -10.0,
             context: None,
         };
-        assert!(validator.validate_performance_expectation(&invalid_perf, "test_func", &location).is_err());
+        assert!(validator
+            .validate_performance_expectation(&invalid_perf, "test_func", &location)
+            .is_err());
 
         // Invalid latency expectation (too high)
         let too_high_perf = PerformanceExpectation {
@@ -494,7 +601,9 @@ mod tests {
             target_value: 100000.0,
             context: None,
         };
-        assert!(validator.validate_performance_expectation(&too_high_perf, "test_func", &location).is_err());
+        assert!(validator
+            .validate_performance_expectation(&too_high_perf, "test_func", &location)
+            .is_err());
     }
 
     #[test]
@@ -508,7 +617,9 @@ mod tests {
             notation: ComplexityNotation::BigO,
             value: "O(n log n)".to_string(),
         };
-        assert!(validator.validate_complexity_expectation(&valid_complexity, "test_func", &location).is_ok());
+        assert!(validator
+            .validate_complexity_expectation(&valid_complexity, "test_func", &location)
+            .is_ok());
 
         // Invalid complexity expectation
         let invalid_complexity = ComplexityExpectation {
@@ -516,7 +627,9 @@ mod tests {
             notation: ComplexityNotation::BigO,
             value: "O(invalid)".to_string(),
         };
-        assert!(validator.validate_complexity_expectation(&invalid_complexity, "test_func", &location).is_err());
+        assert!(validator
+            .validate_complexity_expectation(&invalid_complexity, "test_func", &location)
+            .is_err());
     }
 
     #[test]
@@ -524,10 +637,14 @@ mod tests {
         let validator = ContractValidator::new();
 
         // Valid algorithm hint
-        assert!(validator.validate_algorithm_hint("binary_search", "test_func").is_none());
+        assert!(validator
+            .validate_algorithm_hint("binary_search", "test_func")
+            .is_none());
 
         // Invalid algorithm hint
-        assert!(validator.validate_algorithm_hint("unknown_algorithm", "test_func").is_some());
+        assert!(validator
+            .validate_algorithm_hint("unknown_algorithm", "test_func")
+            .is_some());
     }
 
     #[test]
@@ -535,7 +652,7 @@ mod tests {
         let validator = ContractValidator::new();
         let mut parameter_types = HashMap::new();
         parameter_types.insert("x".to_string(), Type::primitive(PrimitiveType::Integer));
-        
+
         let context = ContractContext {
             parameter_types,
             return_type: Type::primitive(PrimitiveType::Boolean),
@@ -547,22 +664,32 @@ mod tests {
             value: true,
             source_location: SourceLocation::unknown(),
         };
-        let inferred_type = validator.infer_expression_type(&bool_expr, &context).unwrap();
-        assert!(matches!(inferred_type, Type::Primitive(PrimitiveType::Boolean)));
+        let inferred_type = validator
+            .infer_expression_type(&bool_expr, &context)
+            .unwrap();
+        assert!(matches!(
+            inferred_type,
+            Type::Primitive(PrimitiveType::Boolean)
+        ));
 
         // Test variable reference
         let var_expr = Expression::Variable {
             name: Identifier::new("x".to_string(), SourceLocation::unknown()),
             source_location: SourceLocation::unknown(),
         };
-        let inferred_type = validator.infer_expression_type(&var_expr, &context).unwrap();
-        assert!(matches!(inferred_type, Type::Primitive(PrimitiveType::Integer)));
+        let inferred_type = validator
+            .infer_expression_type(&var_expr, &context)
+            .unwrap();
+        assert!(matches!(
+            inferred_type,
+            Type::Primitive(PrimitiveType::Integer)
+        ));
     }
 
     #[test]
     fn test_runtime_assertion_generation() {
         let validator = ContractValidator::new();
-        
+
         let metadata = FunctionMetadata {
             preconditions: vec![ContractAssertion {
                 condition: Box::new(Expression::BooleanLiteral {

@@ -14,8 +14,8 @@
 
 //! Integration tests for pointer operations in LLVM codegen
 
-use aether::Compiler;
 use aether::error::CompilerError;
+use aether::Compiler;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -35,18 +35,18 @@ fn test_pointer_address_of() -> Result<(), CompilerError> {
                     (INITIAL_VALUE (ADDRESS_OF (VARIABLE_REFERENCE 'x'))))
                 (RETURN (DEREFERENCE (VARIABLE_REFERENCE 'ptr')))))))
     "#;
-    
+
     // Create a temporary directory for the test
     let temp_dir = TempDir::new()?;
     let test_file = temp_dir.path().join("test_address_of.aether");
     fs::write(&test_file, source)?;
-    
+
     let compiler = Compiler::new();
     let result = compiler.compile_file(test_file)?;
-    
+
     // For now, just verify compilation succeeds
     // Compilation succeeded if we got here without error
-    
+
     Ok(())
 }
 
@@ -60,16 +60,16 @@ fn test_pointer_arithmetic() -> Result<(), CompilerError> {
                       (ptr2 (POINTER_ADD ptr 2)))
                     (DEREFERENCE ptr2))))
     "#;
-    
+
     let temp_dir = TempDir::new()?;
     let test_file = temp_dir.path().join("test_pointer_add.aether");
     fs::write(&test_file, source)?;
-    
+
     let compiler = Compiler::new();
     let result = compiler.compile_file(test_file)?;
-    
+
     // Compilation succeeded if we got here without error
-    
+
     Ok(())
 }
 
@@ -83,15 +83,15 @@ fn test_pointer_dereference() -> Result<(), CompilerError> {
                       (y (DEREFERENCE ptr)))
                     y)))
     "#;
-    
+
     let temp_dir = TempDir::new()?;
     let test_file = temp_dir.path().join("test_deref.aether");
     fs::write(&test_file, source)?;
-    
+
     let compiler = Compiler::new();
     let result = compiler.compile_file(test_file)?;
-    
+
     // Compilation succeeded if we got here without error
-    
+
     Ok(())
 }

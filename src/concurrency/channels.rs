@@ -19,8 +19,8 @@
 use crate::error::SemanticError;
 use crate::types::Type;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, Condvar};
 use std::sync::mpsc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 /// Channel registry for managing all channels
@@ -28,7 +28,7 @@ use std::time::{Duration, Instant};
 pub struct ChannelRegistry {
     /// Registered channels
     channels: HashMap<String, ChannelInfo>,
-    
+
     /// Channel statistics
     stats: ChannelStats,
 }
@@ -50,22 +50,22 @@ pub struct ChannelInfo {
 pub enum ChannelType {
     /// Unbounded channel (unlimited capacity)
     Unbounded,
-    
+
     /// Bounded channel (fixed capacity)
     Bounded(usize),
-    
+
     /// Synchronous channel (zero capacity, direct handoff)
     Sync,
-    
+
     /// Broadcast channel (multiple receivers)
     Broadcast(usize),
-    
+
     /// Multiple producer, single consumer
     Mpsc,
-    
+
     /// Single producer, multiple consumer
     Spmc,
-    
+
     /// Multiple producer, multiple consumer
     Mpmc,
 }
@@ -91,10 +91,10 @@ pub struct Channel<T> {
 pub struct ChannelSender<T> {
     /// Internal sender implementation
     inner: SenderImpl<T>,
-    
+
     /// Sender ID
     id: usize,
-    
+
     /// Channel name
     channel_name: String,
 }
@@ -110,7 +110,7 @@ pub struct ChannelReceiver<T> {
 enum SenderImpl<T> {
     /// Standard MPSC sender
     Mpsc(mpsc::Sender<T>),
-    
+
     /// Bounded sender
     Bounded(Arc<Mutex<BoundedChannelState<T>>>),
 }
@@ -120,7 +120,7 @@ enum SenderImpl<T> {
 enum ReceiverImpl<T> {
     /// Standard MPSC receiver
     Mpsc(mpsc::Receiver<T>),
-    
+
     /// Bounded receiver
     Bounded(Arc<Mutex<BoundedChannelState<T>>>, Arc<Condvar>),
 }
@@ -132,8 +132,6 @@ struct BoundedChannelState<T> {
     capacity: usize,
     closed: bool,
 }
-
-
 
 /// Channel metrics
 #[derive(Debug, Default)]
@@ -152,13 +150,13 @@ pub struct ChannelMetrics {
 pub enum SendError<T> {
     /// Channel is full
     Full(T),
-    
+
     /// Channel is closed
     Closed(T),
-    
+
     /// Send timeout
     Timeout(T),
-    
+
     /// Receiver disconnected
     Disconnected(T),
 }
@@ -168,13 +166,13 @@ pub enum SendError<T> {
 pub enum ReceiveError {
     /// Channel is empty
     Empty,
-    
+
     /// Channel is closed and empty
     Closed,
-    
+
     /// Receive timeout
     Timeout,
-    
+
     /// Sender disconnected
     Disconnected,
 }
@@ -192,7 +190,7 @@ impl ChannelRegistry {
             stats: ChannelStats::default(),
         }
     }
-    
+
     /// Create a new unbounded channel
     pub fn create_unbounded<T: Send + 'static>(
         &mut self,
@@ -206,19 +204,19 @@ impl ChannelRegistry {
                 previous_location: crate::error::SourceLocation::unknown(),
             });
         }
-        
+
         let (sender, receiver) = mpsc::channel();
-        
+
         let channel_sender = ChannelSender {
             inner: SenderImpl::Mpsc(sender),
             id: 0,
             channel_name: name.clone(),
         };
-        
+
         let channel_receiver = ChannelReceiver {
             inner: ReceiverImpl::Mpsc(receiver),
         };
-        
+
         let info = ChannelInfo {
             name: name.clone(),
             channel_type: ChannelType::Unbounded,
@@ -228,13 +226,13 @@ impl ChannelRegistry {
             sender_count: 1,
             receiver_count: 1,
         };
-        
+
         self.channels.insert(name, info);
         self.stats.total_channels += 1;
-        
+
         Ok((channel_sender, channel_receiver))
     }
-    
+
     /// Create a new bounded channel
     pub fn create_bounded<T: Send + 'static>(
         &mut self,
@@ -249,25 +247,25 @@ impl ChannelRegistry {
                 previous_location: crate::error::SourceLocation::unknown(),
             });
         }
-        
+
         let state = Arc::new(Mutex::new(BoundedChannelState {
             buffer: std::collections::VecDeque::with_capacity(capacity),
             capacity,
             closed: false,
         }));
-        
+
         let condvar = Arc::new(Condvar::new());
-        
+
         let channel_sender = ChannelSender {
             inner: SenderImpl::Bounded(state.clone()),
             id: 0,
             channel_name: name.clone(),
         };
-        
+
         let channel_receiver = ChannelReceiver {
             inner: ReceiverImpl::Bounded(state, condvar),
         };
-        
+
         let info = ChannelInfo {
             name: name.clone(),
             channel_type: ChannelType::Bounded(capacity),
@@ -277,34 +275,32 @@ impl ChannelRegistry {
             sender_count: 1,
             receiver_count: 1,
         };
-        
+
         self.channels.insert(name, info);
         self.stats.total_channels += 1;
-        
+
         Ok((channel_sender, channel_receiver))
     }
-    
-    
-    
+
     /// Get channel information
     pub fn get_channel_info(&self, name: &str) -> Option<&ChannelInfo> {
         self.channels.get(name)
     }
-    
+
     /// Get channel statistics
     pub fn stats(&self) -> &ChannelStats {
         &self.stats
     }
-    
+
     /// Update message statistics
     pub fn record_message_sent(&mut self) {
         self.stats.total_messages_sent += 1;
     }
-    
+
     pub fn record_message_received(&mut self) {
         self.stats.total_messages_received += 1;
     }
-    
+
     pub fn record_message_dropped(&mut self) {
         self.stats.total_messages_dropped += 1;
     }
@@ -314,9 +310,9 @@ impl<T> ChannelSender<T> {
     /// Send a message
     pub fn send(&self, message: T) -> SendResult<T> {
         match &self.inner {
-            SenderImpl::Mpsc(sender) => {
-                sender.send(message).map_err(|mpsc::SendError(msg)| SendError::Disconnected(msg))
-            }
+            SenderImpl::Mpsc(sender) => sender
+                .send(message)
+                .map_err(|mpsc::SendError(msg)| SendError::Disconnected(msg)),
             SenderImpl::Bounded(state) => {
                 let mut state = state.lock().unwrap();
                 if state.closed {
@@ -330,12 +326,12 @@ impl<T> ChannelSender<T> {
             }
         }
     }
-    
+
     /// Try to send a message without blocking
     pub fn try_send(&self, message: T) -> SendResult<T> {
         self.send(message) // For now, same as send
     }
-    
+
     /// Send a message with timeout
     pub fn send_timeout(&self, message: T, _timeout: Duration) -> SendResult<T> {
         // For now, same as send - timeout logic would be more complex
@@ -347,9 +343,7 @@ impl<T> ChannelReceiver<T> {
     /// Receive a message (blocking)
     pub fn recv(&self) -> ReceiveResult<T> {
         match &self.inner {
-            ReceiverImpl::Mpsc(receiver) => {
-                receiver.recv().map_err(|_| ReceiveError::Disconnected)
-            }
+            ReceiverImpl::Mpsc(receiver) => receiver.recv().map_err(|_| ReceiveError::Disconnected),
             ReceiverImpl::Bounded(state, _condvar) => {
                 let mut state = state.lock().unwrap();
                 if let Some(message) = state.buffer.pop_front() {
@@ -362,31 +356,27 @@ impl<T> ChannelReceiver<T> {
             }
         }
     }
-    
+
     /// Try to receive a message without blocking
     pub fn try_recv(&self) -> ReceiveResult<T> {
         match &self.inner {
-            ReceiverImpl::Mpsc(receiver) => {
-                match receiver.try_recv() {
-                    Ok(message) => Ok(message),
-                    Err(mpsc::TryRecvError::Empty) => Err(ReceiveError::Empty),
-                    Err(mpsc::TryRecvError::Disconnected) => Err(ReceiveError::Disconnected),
-                }
-            }
+            ReceiverImpl::Mpsc(receiver) => match receiver.try_recv() {
+                Ok(message) => Ok(message),
+                Err(mpsc::TryRecvError::Empty) => Err(ReceiveError::Empty),
+                Err(mpsc::TryRecvError::Disconnected) => Err(ReceiveError::Disconnected),
+            },
             _ => self.recv(), // For now, same as recv
         }
     }
-    
+
     /// Receive a message with timeout
     pub fn recv_timeout(&self, timeout: Duration) -> ReceiveResult<T> {
         match &self.inner {
-            ReceiverImpl::Mpsc(receiver) => {
-                match receiver.recv_timeout(timeout) {
-                    Ok(message) => Ok(message),
-                    Err(mpsc::RecvTimeoutError::Timeout) => Err(ReceiveError::Timeout),
-                    Err(mpsc::RecvTimeoutError::Disconnected) => Err(ReceiveError::Disconnected),
-                }
-            }
+            ReceiverImpl::Mpsc(receiver) => match receiver.recv_timeout(timeout) {
+                Ok(message) => Ok(message),
+                Err(mpsc::RecvTimeoutError::Timeout) => Err(ReceiveError::Timeout),
+                Err(mpsc::RecvTimeoutError::Disconnected) => Err(ReceiveError::Disconnected),
+            },
             _ => self.recv(), // For now, same as recv
         }
     }
@@ -418,110 +408,116 @@ impl Default for ChannelRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Type;
     use crate::ast::PrimitiveType;
-    
+    use crate::types::Type;
+
     #[test]
     fn test_channel_registry_creation() {
         let registry = ChannelRegistry::new();
         assert_eq!(registry.stats.total_channels, 0);
     }
-    
+
     #[test]
     fn test_unbounded_channel_creation() {
         let mut registry = ChannelRegistry::new();
-        
+
         let result = registry.create_unbounded::<String>(
             "test_channel".to_string(),
             Type::primitive(PrimitiveType::String),
         );
-        
+
         assert!(result.is_ok());
         assert_eq!(registry.stats.total_channels, 1);
-        
+
         let info = registry.get_channel_info("test_channel");
         assert!(info.is_some());
         assert_eq!(info.unwrap().channel_type, ChannelType::Unbounded);
     }
-    
+
     #[test]
     fn test_bounded_channel_creation() {
         let mut registry = ChannelRegistry::new();
-        
+
         let result = registry.create_bounded::<i32>(
             "bounded_channel".to_string(),
             Type::primitive(PrimitiveType::Integer),
             10,
         );
-        
+
         assert!(result.is_ok());
         assert_eq!(registry.stats.total_channels, 1);
-        
+
         let info = registry.get_channel_info("bounded_channel");
         assert!(info.is_some());
         assert_eq!(info.unwrap().channel_type, ChannelType::Bounded(10));
         assert_eq!(info.unwrap().capacity, Some(10));
     }
-    
+
     #[test]
     fn test_message_sending_receiving() {
         let mut registry = ChannelRegistry::new();
-        
-        let (sender, receiver) = registry.create_unbounded::<String>(
-            "test_channel".to_string(),
-            Type::primitive(PrimitiveType::String),
-        ).unwrap();
-        
+
+        let (sender, receiver) = registry
+            .create_unbounded::<String>(
+                "test_channel".to_string(),
+                Type::primitive(PrimitiveType::String),
+            )
+            .unwrap();
+
         // Send a message
         assert!(sender.send("Hello, World!".to_string()).is_ok());
-        
+
         // Receive the message
         let received = receiver.recv();
         assert!(received.is_ok());
         assert_eq!(received.unwrap(), "Hello, World!");
     }
-    
+
     #[test]
     fn test_bounded_channel_capacity() {
         let mut registry = ChannelRegistry::new();
-        
-        let (sender, _receiver) = registry.create_bounded::<i32>(
-            "small_channel".to_string(),
-            Type::primitive(PrimitiveType::Integer),
-            2,
-        ).unwrap();
-        
+
+        let (sender, _receiver) = registry
+            .create_bounded::<i32>(
+                "small_channel".to_string(),
+                Type::primitive(PrimitiveType::Integer),
+                2,
+            )
+            .unwrap();
+
         // Should be able to send up to capacity
         assert!(sender.send(1).is_ok());
         assert!(sender.send(2).is_ok());
-        
+
         // Should fail when full (depending on implementation)
         // Note: This test might pass if the implementation doesn't block immediately
     }
-    
+
     #[test]
     fn test_channel_sender_cloning() {
         let mut registry = ChannelRegistry::new();
-        
-        let (sender, _receiver) = registry.create_unbounded::<String>(
-            "clone_test".to_string(),
-            Type::primitive(PrimitiveType::String),
-        ).unwrap();
-        
+
+        let (sender, _receiver) = registry
+            .create_unbounded::<String>(
+                "clone_test".to_string(),
+                Type::primitive(PrimitiveType::String),
+            )
+            .unwrap();
+
         let sender_clone = sender.clone();
         assert_eq!(sender.channel_name, sender_clone.channel_name);
     }
-    
+
     #[test]
     fn test_duplicate_channel_names() {
         let mut registry = ChannelRegistry::new();
-        
+
         let result1 = registry.create_unbounded::<String>(
             "duplicate".to_string(),
             Type::primitive(PrimitiveType::String),
         );
         assert!(result1.is_ok());
-        
+
         let result2 = registry.create_unbounded::<String>(
             "duplicate".to_string(),
             Type::primitive(PrimitiveType::String),

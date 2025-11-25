@@ -13,12 +13,12 @@
 // limitations under the License.
 
 //! Error Enhancement Module
-//! 
+//!
 //! Converts traditional compiler errors into structured, LLM-friendly errors
 //! with auto-fix suggestions and enhanced context.
 
-use crate::error::{CompilerError, SemanticError, TypeError, ParseError, SourceLocation};
 use crate::error::structured::*;
+use crate::error::{CompilerError, ParseError, SemanticError, SourceLocation, TypeError};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -27,13 +27,13 @@ use std::path::Path;
 pub struct ErrorEnhancer {
     /// Error code generator
     code_generator: ErrorCodeGenerator,
-    
+
     /// Pattern matcher for common errors
     patterns: ErrorPatternMatcher,
-    
+
     /// Source file cache for snippets
     source_cache: HashMap<String, Vec<String>>,
-    
+
     /// Configuration
     config: ErrorEnhancerConfig,
 }
@@ -71,7 +71,7 @@ impl ErrorEnhancer {
             config,
         }
     }
-    
+
     /// Enhance a compiler error
     pub fn enhance_error(&mut self, error: &CompilerError) -> StructuredError {
         match error {
@@ -81,19 +81,19 @@ impl ErrorEnhancer {
             _ => self.enhance_generic_error(error),
         }
     }
-    
+
     /// Enhance a parse error
     fn enhance_parse_error(&mut self, error: &ParseError) -> StructuredError {
         let code = self.code_generator.generate("PARSE");
         let location = self.create_location(&error.location);
-        
+
         let mut builder = StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
             .location(location)
             .message(error.message.clone())
             .explanation(self.explain_parse_error(error));
-        
+
         // Add fixes based on error pattern
         if self.config.generate_fixes {
             let fixes = self.patterns.suggest_parse_fixes(error);
@@ -101,35 +101,36 @@ impl ErrorEnhancer {
                 builder = builder.add_fix(fix);
             }
         }
-        
+
         // Add learning hints
         if self.config.include_learning_hints {
-            builder = builder.add_learning_hint(
-                "Check parentheses balance and S-expression syntax".to_string()
-            );
+            builder = builder
+                .add_learning_hint("Check parentheses balance and S-expression syntax".to_string());
         }
-        
-        builder.build().unwrap_or_else(|_| {
-            panic!("Failed to build structured error")
-        })
+
+        builder
+            .build()
+            .unwrap_or_else(|_| panic!("Failed to build structured error"))
     }
-    
+
     /// Enhance a type error
     fn enhance_type_error(&mut self, error: &TypeError) -> StructuredError {
         let code = self.code_generator.generate("TYPE");
         let location = self.create_location(&error.location);
-        
+
         let mut builder = StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
             .location(location)
-            .message(format!("Type mismatch: expected {}, found {}", 
-                error.expected, error.found))
+            .message(format!(
+                "Type mismatch: expected {}, found {}",
+                error.expected, error.found
+            ))
             .explanation(format!(
                 "The expression has type '{}' but type '{}' was expected in this context",
                 error.found, error.expected
             ));
-        
+
         // Generate type conversion fixes
         if self.config.generate_fixes {
             let fixes = self.generate_type_conversion_fixes(&error.expected, &error.found);
@@ -137,7 +138,7 @@ impl ErrorEnhancer {
                 builder = builder.add_fix(fix);
             }
         }
-        
+
         // Add pattern suggestion for common type errors
         if error.expected == "Boolean" && error.found.contains("Integer") {
             builder = builder.suggested_pattern("comparison_expression".to_string());
@@ -145,99 +146,118 @@ impl ErrorEnhancer {
                 "Use comparison operators (PREDICATE_EQUALS, PREDICATE_GREATER_THAN, etc.) to create Boolean expressions".to_string()
             );
         }
-        
+
         builder.build().unwrap()
     }
-    
+
     /// Enhance a semantic error
     fn enhance_semantic_error(&mut self, error: &SemanticError) -> StructuredError {
         let code = self.code_generator.generate("SEM");
-        
+
         match error {
             SemanticError::UndefinedSymbol { symbol, location } => {
                 self.enhance_undefined_symbol(code, symbol, location)
             }
-            SemanticError::TypeMismatch { expected, found, location } => {
-                self.enhance_type_mismatch_semantic(code, expected, found, location)
-            }
+            SemanticError::TypeMismatch {
+                expected,
+                found,
+                location,
+            } => self.enhance_type_mismatch_semantic(code, expected, found, location),
             SemanticError::UseBeforeInitialization { variable, location } => {
                 self.enhance_uninitialized_use(code, variable, location)
             }
             SemanticError::AssignToImmutable { variable, location } => {
                 self.enhance_immutable_assign(code, variable, location)
             }
-            SemanticError::InvalidContract { contract_type, reason, location } => {
-                self.enhance_contract_error(code, contract_type, reason, location)
-            }
+            SemanticError::InvalidContract {
+                contract_type,
+                reason,
+                location,
+            } => self.enhance_contract_error(code, contract_type, reason, location),
             _ => self.enhance_generic_semantic_error(code, error),
         }
     }
-    
+
     /// Enhance undefined symbol error
-    fn enhance_undefined_symbol(&mut self, code: String, symbol: &str, location: &SourceLocation) -> StructuredError {
+    fn enhance_undefined_symbol(
+        &mut self,
+        code: String,
+        symbol: &str,
+        location: &SourceLocation,
+    ) -> StructuredError {
         let loc = self.create_location(location);
-        
+
         let mut builder = StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
             .location(loc)
             .message(format!("Undefined symbol '{}'", symbol))
-            .explanation(format!("The symbol '{}' has not been declared in the current scope", symbol));
-        
+            .explanation(format!(
+                "The symbol '{}' has not been declared in the current scope",
+                symbol
+            ));
+
         // Generate fix suggestions
         if self.config.generate_fixes {
             // Suggest variable declaration
             builder = builder.add_fix(FixSuggestion {
                 description: format!("Declare variable '{}' before use", symbol),
                 confidence: 0.9,
-                modifications: vec![
-                    CodeModification::AddCode {
-                        before_line: Some(location.line),
-                        after_line: None,
-                        code: format!("(DECLARE_VARIABLE (NAME \"{}\") (TYPE INTEGER) (MUTABLE TRUE))", symbol),
-                        indent_level: 1,
-                    }
-                ],
+                modifications: vec![CodeModification::AddCode {
+                    before_line: Some(location.line),
+                    after_line: None,
+                    code: format!(
+                        "(DECLARE_VARIABLE (NAME \"{}\") (TYPE INTEGER) (MUTABLE TRUE))",
+                        symbol
+                    ),
+                    indent_level: 1,
+                }],
                 example: None,
                 category: FixCategory::Addition,
             });
-            
+
             // Suggest parameter addition if in function
             builder = builder.add_fix(FixSuggestion {
                 description: format!("Add '{}' as a function parameter", symbol),
                 confidence: 0.7,
                 modifications: vec![],
-                example: Some(format!("(ACCEPTS_PARAMETER (NAME \"{}\") (TYPE <type>))", symbol)),
+                example: Some(format!(
+                    "(ACCEPTS_PARAMETER (NAME \"{}\") (TYPE <type>))",
+                    symbol
+                )),
                 category: FixCategory::Addition,
             });
-            
+
             // Check for typos and suggest corrections
             if let Some(similar) = self.find_similar_symbol(symbol) {
                 builder = builder.add_fix(FixSuggestion {
                     description: format!("Did you mean '{}'?", similar),
                     confidence: 0.8,
-                    modifications: vec![
-                        CodeModification::ReplaceCode {
-                            start_line: location.line,
-                            start_column: location.column,
-                            end_line: location.line,
-                            end_column: location.column + symbol.len(),
-                            new_code: similar.clone(),
-                        }
-                    ],
+                    modifications: vec![CodeModification::ReplaceCode {
+                        start_line: location.line,
+                        start_column: location.column,
+                        end_line: location.line,
+                        end_column: location.column + symbol.len(),
+                        new_code: similar.clone(),
+                    }],
                     example: None,
                     category: FixCategory::Correction,
                 });
             }
         }
-        
+
         builder.build().unwrap()
     }
-    
+
     /// Enhance uninitialized use error
-    fn enhance_uninitialized_use(&mut self, code: String, variable: &str, location: &SourceLocation) -> StructuredError {
+    fn enhance_uninitialized_use(
+        &mut self,
+        code: String,
+        variable: &str,
+        location: &SourceLocation,
+    ) -> StructuredError {
         let loc = self.create_location(location);
-        
+
         StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
@@ -258,11 +278,16 @@ impl ErrorEnhancer {
             .build()
             .unwrap()
     }
-    
+
     /// Enhance immutable assignment error
-    fn enhance_immutable_assign(&mut self, code: String, variable: &str, location: &SourceLocation) -> StructuredError {
+    fn enhance_immutable_assign(
+        &mut self,
+        code: String,
+        variable: &str,
+        location: &SourceLocation,
+    ) -> StructuredError {
         let loc = self.create_location(location);
-        
+
         StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
@@ -294,18 +319,24 @@ impl ErrorEnhancer {
             .build()
             .unwrap()
     }
-    
+
     /// Enhance contract error
-    fn enhance_contract_error(&mut self, code: String, contract_type: &str, reason: &str, location: &SourceLocation) -> StructuredError {
+    fn enhance_contract_error(
+        &mut self,
+        code: String,
+        contract_type: &str,
+        reason: &str,
+        location: &SourceLocation,
+    ) -> StructuredError {
         let loc = self.create_location(location);
-        
+
         let mut builder = StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
             .location(loc)
             .message(format!("Invalid {} contract", contract_type))
             .explanation(reason.to_string());
-        
+
         // Add contract-specific fixes
         match contract_type {
             "precondition" => {
@@ -313,7 +344,10 @@ impl ErrorEnhancer {
                     description: "Add PROOF_HINT to explain the precondition".to_string(),
                     confidence: 0.8,
                     modifications: vec![],
-                    example: Some("(PROOF_HINT \"Explanation of why this condition is necessary\")".to_string()),
+                    example: Some(
+                        "(PROOF_HINT \"Explanation of why this condition is necessary\")"
+                            .to_string(),
+                    ),
                     category: FixCategory::Addition,
                 });
             }
@@ -328,26 +362,28 @@ impl ErrorEnhancer {
             }
             _ => {}
         }
-        
+
         builder
-            .add_learning_hint("Contracts must be verifiable at compile time or runtime".to_string())
+            .add_learning_hint(
+                "Contracts must be verifiable at compile time or runtime".to_string(),
+            )
             .build()
             .unwrap()
     }
-    
+
     /// Create enhanced location with code snippet
     fn create_location(&mut self, source_loc: &SourceLocation) -> ErrorLocation {
         let mut location = ErrorLocation::from(source_loc);
-        
+
         if self.config.include_snippets {
             if let Some(snippet) = self.create_code_snippet(source_loc) {
                 location.code_snippet = Some(snippet);
             }
         }
-        
+
         location
     }
-    
+
     /// Create code snippet around error
     fn create_code_snippet(&mut self, location: &SourceLocation) -> Option<CodeSnippet> {
         // Load source file if not cached
@@ -357,14 +393,16 @@ impl ErrorEnhancer {
                 self.source_cache.insert(location.file.clone(), lines);
             }
         }
-        
+
         // Get lines from cache
         let lines = self.source_cache.get(&location.file)?;
-        
+
         // Calculate snippet range
-        let start_line = location.line.saturating_sub(self.config.snippet_context_lines);
+        let start_line = location
+            .line
+            .saturating_sub(self.config.snippet_context_lines);
         let end_line = (location.line + self.config.snippet_context_lines).min(lines.len());
-        
+
         // Extract snippet lines
         let mut snippet_lines = Vec::new();
         for line_num in start_line..=end_line {
@@ -372,7 +410,7 @@ impl ErrorEnhancer {
                 snippet_lines.push((line_num, lines[line_num - 1].clone()));
             }
         }
-        
+
         // Create highlight for error location
         let highlights = vec![HighlightRange {
             start_line: location.line,
@@ -381,17 +419,17 @@ impl ErrorEnhancer {
             end_column: location.column + 10, // Approximate
             style: HighlightStyle::Error,
         }];
-        
+
         Some(CodeSnippet {
             lines: snippet_lines,
             highlights,
         })
     }
-    
+
     /// Generate type conversion fixes
     fn generate_type_conversion_fixes(&self, expected: &str, found: &str) -> Vec<FixSuggestion> {
         let mut fixes = Vec::new();
-        
+
         // Integer to Float conversion
         if expected == "Float" && found == "Integer" {
             fixes.push(FixSuggestion {
@@ -402,19 +440,21 @@ impl ErrorEnhancer {
                 category: FixCategory::Correction,
             });
         }
-        
+
         // String to Integer/Float parsing
         if found == "String" && (expected == "Integer" || expected == "Float") {
             fixes.push(FixSuggestion {
                 description: format!("Parse string to {}", expected.to_lowercase()),
                 confidence: 0.8,
                 modifications: vec![],
-                example: Some(format!("(CALL_FUNCTION (NAME \"parse_{}\") (ARGUMENT value))", 
-                    expected.to_lowercase())),
+                example: Some(format!(
+                    "(CALL_FUNCTION (NAME \"parse_{}\") (ARGUMENT value))",
+                    expected.to_lowercase()
+                )),
                 category: FixCategory::Correction,
             });
         }
-        
+
         // Null handling
         if found.contains("Null") {
             fixes.push(FixSuggestion {
@@ -425,10 +465,10 @@ impl ErrorEnhancer {
                 category: FixCategory::Safety,
             });
         }
-        
+
         fixes
     }
-    
+
     /// Find similar symbol names (for typo correction)
     fn find_similar_symbol(&self, symbol: &str) -> Option<String> {
         // In a real implementation, this would check the symbol table
@@ -440,53 +480,68 @@ impl ErrorEnhancer {
             ("retrn", "return"),
             ("fucntion", "function"),
         ];
-        
+
         for (typo, correct) in common_symbols {
             if symbol == typo {
                 return Some(correct.to_string());
             }
         }
-        
+
         None
     }
-    
+
     /// Explain parse error in detail
     fn explain_parse_error(&self, error: &ParseError) -> String {
         if error.message.contains("expected ')'") {
-            "S-expressions must have balanced parentheses. Each opening '(' needs a matching ')'".to_string()
+            "S-expressions must have balanced parentheses. Each opening '(' needs a matching ')'"
+                .to_string()
         } else if error.message.contains("unexpected token") {
-            "The parser encountered a token that doesn't fit the expected syntax pattern".to_string()
+            "The parser encountered a token that doesn't fit the expected syntax pattern"
+                .to_string()
         } else {
             "The source code doesn't match AetherScript's S-expression syntax".to_string()
         }
     }
-    
+
     /// Enhance type mismatch from semantic analysis
-    fn enhance_type_mismatch_semantic(&mut self, code: String, expected: &str, found: &str, location: &SourceLocation) -> StructuredError {
+    fn enhance_type_mismatch_semantic(
+        &mut self,
+        code: String,
+        expected: &str,
+        found: &str,
+        location: &SourceLocation,
+    ) -> StructuredError {
         let loc = self.create_location(location);
-        
+
         let mut builder = StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
             .location(loc)
-            .message(format!("Type mismatch: expected {}, found {}", expected, found))
+            .message(format!(
+                "Type mismatch: expected {}, found {}",
+                expected, found
+            ))
             .explanation(format!(
                 "The expression has type '{}' but type '{}' was required in this context",
                 found, expected
             ));
-        
+
         if self.config.generate_fixes {
             let fixes = self.generate_type_conversion_fixes(expected, found);
             for fix in fixes {
                 builder = builder.add_fix(fix);
             }
         }
-        
+
         builder.build().unwrap()
     }
-    
+
     /// Enhance generic semantic error
-    fn enhance_generic_semantic_error(&mut self, code: String, error: &SemanticError) -> StructuredError {
+    fn enhance_generic_semantic_error(
+        &mut self,
+        code: String,
+        error: &SemanticError,
+    ) -> StructuredError {
         let location = match error {
             SemanticError::DuplicateDefinition { location, .. } => location,
             SemanticError::InvalidType { location, .. } => location,
@@ -494,9 +549,9 @@ impl ErrorEnhancer {
             SemanticError::InvalidOperation { location, .. } => location,
             _ => &SourceLocation::unknown(),
         };
-        
+
         let loc = self.create_location(location);
-        
+
         StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
@@ -506,11 +561,11 @@ impl ErrorEnhancer {
             .build()
             .unwrap()
     }
-    
+
     /// Enhance generic compiler error
     fn enhance_generic_error(&mut self, error: &CompilerError) -> StructuredError {
         let code = self.code_generator.generate("GEN");
-        
+
         StructuredErrorBuilder::new()
             .error_code(code)
             .severity(ErrorSeverity::Error)
@@ -542,52 +597,48 @@ struct ParseErrorPattern {
 impl ErrorPatternMatcher {
     fn new() -> Self {
         let mut parse_patterns = Vec::new();
-        
+
         // Missing closing parenthesis
         parse_patterns.push(ParseErrorPattern {
             matcher: |e| e.message.contains("expected ')'"),
-            fixes: |e| vec![
-                FixSuggestion {
+            fixes: |e| {
+                vec![FixSuggestion {
                     description: "Add missing closing parenthesis".to_string(),
                     confidence: 0.9,
-                    modifications: vec![
-                        CodeModification::AddCode {
-                            before_line: None,
-                            after_line: Some(e.location.line),
-                            code: ")".to_string(),
-                            indent_level: 0,
-                        }
-                    ],
+                    modifications: vec![CodeModification::AddCode {
+                        before_line: None,
+                        after_line: Some(e.location.line),
+                        code: ")".to_string(),
+                        indent_level: 0,
+                    }],
                     example: None,
                     category: FixCategory::Correction,
-                }
-            ],
+                }]
+            },
         });
-        
+
         // Missing opening parenthesis
         parse_patterns.push(ParseErrorPattern {
             matcher: |e| e.message.contains("unexpected") && e.message.contains("expected '('"),
-            fixes: |e| vec![
-                FixSuggestion {
+            fixes: |e| {
+                vec![FixSuggestion {
                     description: "Add missing opening parenthesis".to_string(),
                     confidence: 0.9,
-                    modifications: vec![
-                        CodeModification::AddCode {
-                            before_line: Some(e.location.line),
-                            after_line: None,
-                            code: "(".to_string(),
-                            indent_level: 0,
-                        }
-                    ],
+                    modifications: vec![CodeModification::AddCode {
+                        before_line: Some(e.location.line),
+                        after_line: None,
+                        code: "(".to_string(),
+                        indent_level: 0,
+                    }],
                     example: None,
                     category: FixCategory::Correction,
-                }
-            ],
+                }]
+            },
         });
-        
+
         Self { parse_patterns }
     }
-    
+
     fn suggest_parse_fixes(&self, error: &ParseError) -> Vec<FixSuggestion> {
         for pattern in &self.parse_patterns {
             if (pattern.matcher)(error) {
@@ -601,11 +652,11 @@ impl ErrorPatternMatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_error_enhancement() {
         let mut enhancer = ErrorEnhancer::new(ErrorEnhancerConfig::default());
-        
+
         let semantic_error = SemanticError::UndefinedSymbol {
             symbol: "foo".to_string(),
             location: SourceLocation {
@@ -615,18 +666,18 @@ mod tests {
                 offset: 0,
             },
         };
-        
+
         let structured = enhancer.enhance_error(&CompilerError::SemanticError(semantic_error));
-        
+
         assert!(structured.error_code.starts_with("SEM-"));
         assert_eq!(structured.message, "Undefined symbol 'foo'");
         assert!(!structured.fix_suggestions.is_empty());
     }
-    
+
     #[test]
     fn test_type_error_enhancement() {
         let mut enhancer = ErrorEnhancer::new(ErrorEnhancerConfig::default());
-        
+
         let type_error = TypeError {
             expected: "Float".to_string(),
             found: "Integer".to_string(),
@@ -637,15 +688,18 @@ mod tests {
                 offset: 0,
             },
         };
-        
+
         let structured = enhancer.enhance_error(&CompilerError::TypeError(type_error));
-        
+
         assert!(structured.error_code.starts_with("TYPE-"));
         assert!(structured.message.contains("Type mismatch"));
-        
+
         // Should have type conversion fix
-        let has_cast_fix = structured.fix_suggestions.iter()
-            .any(|fix| fix.example.as_ref().map_or(false, |ex| ex.contains("CAST_TO_TYPE")));
+        let has_cast_fix = structured.fix_suggestions.iter().any(|fix| {
+            fix.example
+                .as_ref()
+                .map_or(false, |ex| ex.contains("CAST_TO_TYPE"))
+        });
         assert!(has_cast_fix);
     }
 }

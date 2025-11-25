@@ -17,8 +17,8 @@
 //! Generates comprehensive code examples covering language features,
 //! standard library usage, and common programming patterns.
 
+use crate::docs::{DocConfig, Example};
 use crate::error::SemanticError;
-use crate::docs::{Example, DocConfig};
 use std::collections::HashMap;
 
 /// Example manager for generating and organizing code examples
@@ -33,16 +33,16 @@ pub struct ExampleManager {
 pub struct ExampleCategory {
     /// Category name
     pub name: String,
-    
+
     /// Category description
     pub description: String,
-    
+
     /// Category examples
     pub examples: Vec<String>,
-    
+
     /// Category difficulty level
     pub difficulty: ExampleDifficulty,
-    
+
     /// Prerequisites
     pub prerequisites: Vec<String>,
 }
@@ -61,16 +61,16 @@ pub enum ExampleDifficulty {
 pub struct ExampleTemplates {
     /// Basic syntax examples
     pub syntax: Vec<ExampleTemplate>,
-    
+
     /// Data structure examples
     pub data_structures: Vec<ExampleTemplate>,
-    
+
     /// Algorithm examples
     pub algorithms: Vec<ExampleTemplate>,
-    
+
     /// Standard library examples
     pub stdlib: Vec<ExampleTemplate>,
-    
+
     /// Advanced feature examples
     pub advanced: Vec<ExampleTemplate>,
 }
@@ -80,22 +80,22 @@ pub struct ExampleTemplates {
 pub struct ExampleTemplate {
     /// Template name
     pub name: String,
-    
+
     /// Template description
     pub description: String,
-    
+
     /// Code template
     pub code_template: String,
-    
+
     /// Expected output template
     pub output_template: Option<String>,
-    
+
     /// Template variables
     pub variables: Vec<TemplateVariable>,
-    
+
     /// Build instructions
     pub build_instructions: Option<String>,
-    
+
     /// Tags
     pub tags: Vec<String>,
 }
@@ -105,13 +105,13 @@ pub struct ExampleTemplate {
 pub struct TemplateVariable {
     /// Variable name
     pub name: String,
-    
+
     /// Variable type
     pub var_type: VariableType,
-    
+
     /// Default value
     pub default_value: String,
-    
+
     /// Description
     pub description: String,
 }
@@ -131,37 +131,37 @@ impl ExampleManager {
     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
         let categories = Self::create_example_categories();
         let templates = Self::create_example_templates();
-        
+
         Ok(Self {
             examples: Vec::new(),
         })
     }
-    
+
     /// Generate all examples
     pub fn generate_examples(&mut self) -> Result<Vec<Example>, SemanticError> {
         self.examples.clear();
-        
+
         // Generate basic syntax examples
         self.generate_syntax_examples()?;
-        
+
         // Generate data structure examples
         self.generate_data_structure_examples()?;
-        
+
         // Generate algorithm examples
         self.generate_algorithm_examples()?;
-        
+
         // Generate standard library examples
         self.generate_stdlib_examples()?;
-        
+
         // Generate advanced feature examples
         self.generate_advanced_examples()?;
-        
+
         // Generate real-world application examples
         self.generate_application_examples()?;
-        
+
         Ok(self.examples.clone())
     }
-    
+
     /// Generate basic syntax examples
     pub fn generate_syntax_examples(&mut self) -> Result<(), SemanticError> {
         // Hello World example
@@ -170,13 +170,14 @@ impl ExampleManager {
             description: "A simple hello world program in AetherScript".to_string(),
             category: "Basic Syntax".to_string(),
             source_code: r#";;; Hello World in AetherScript
-(println "Hello, World!")"#.to_string(),
+(println "Hello, World!")"#
+                .to_string(),
             expected_output: Some("Hello, World!".to_string()),
             dependencies: vec![],
             build_instructions: Some("aether run hello_world.aether".to_string()),
             tags: vec!["basic".to_string(), "output".to_string()],
         });
-        
+
         // Variables and data types
         self.examples.push(Example {
             name: "Variables and Types".to_string(),
@@ -193,21 +194,30 @@ impl ExampleManager {
 (println "Age:" age)
 (println "Height:" height)
 (println "Student?" is-student)
-(println "Hobbies:" hobbies)"#.to_string(),
-            expected_output: Some(r#"Name: Alice
+(println "Hobbies:" hobbies)"#
+                .to_string(),
+            expected_output: Some(
+                r#"Name: Alice
 Age: 30
 Height: 5.6
 Student? true
-Hobbies: ["reading" "coding" "gaming"]"#.to_string()),
+Hobbies: ["reading" "coding" "gaming"]"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run variables.aether".to_string()),
-            tags: vec!["variables".to_string(), "types".to_string(), "basic".to_string()],
+            tags: vec![
+                "variables".to_string(),
+                "types".to_string(),
+                "basic".to_string(),
+            ],
         });
-        
+
         // Functions
         self.examples.push(Example {
             name: "Functions".to_string(),
-            description: "Defining and calling functions with parameters and return values".to_string(),
+            description: "Defining and calling functions with parameters and return values"
+                .to_string(),
             category: "Basic Syntax".to_string(),
             source_code: r#";;; Function definitions and calls
 (defn greet [name]
@@ -226,15 +236,23 @@ Hobbies: ["reading" "coding" "gaming"]"#.to_string()),
 
 (println (greet "World"))
 (println "5 + 3 =" (add 5 3))
-(println "5! =" (factorial 5))"#.to_string(),
-            expected_output: Some(r#"Hello, World!
+(println "5! =" (factorial 5))"#
+                .to_string(),
+            expected_output: Some(
+                r#"Hello, World!
 5 + 3 = 8
-5! = 120"#.to_string()),
+5! = 120"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run functions.aether".to_string()),
-            tags: vec!["functions".to_string(), "recursion".to_string(), "basic".to_string()],
+            tags: vec![
+                "functions".to_string(),
+                "recursion".to_string(),
+                "basic".to_string(),
+            ],
         });
-        
+
         // Control flow
         self.examples.push(Example {
             name: "Control Flow".to_string(),
@@ -267,8 +285,10 @@ Hobbies: ["reading" "coding" "gaming"]"#.to_string()),
 (println (classify-number 0))
 
 (count-down 5)
-(println "Sum 1-10:" (sum-range 1 10))"#.to_string(),
-            expected_output: Some(r#"positive
+(println "Sum 1-10:" (sum-range 1 10))"#
+                .to_string(),
+            expected_output: Some(
+                r#"positive
 negative
 zero
 5
@@ -276,15 +296,21 @@ zero
 3
 2
 1
-Sum 1-10: 55"#.to_string()),
+Sum 1-10: 55"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run control_flow.aether".to_string()),
-            tags: vec!["control-flow".to_string(), "loops".to_string(), "conditionals".to_string()],
+            tags: vec![
+                "control-flow".to_string(),
+                "loops".to_string(),
+                "conditionals".to_string(),
+            ],
         });
-        
+
         Ok(())
     }
-    
+
     /// Generate data structure examples
     pub fn generate_data_structure_examples(&mut self) -> Result<(), SemanticError> {
         // Lists and vectors
@@ -315,8 +341,10 @@ Sum 1-10: 55"#.to_string()),
 
 ;;; List comprehension
 (def squares (map #(* % %) (range 1 6)))
-(println "Squares 1-5:" squares)"#.to_string(),
-            expected_output: Some(r#"Numbers: [1 2 3 4 5]
+(println "Squares 1-5:" squares)"#
+                .to_string(),
+            expected_output: Some(
+                r#"Numbers: [1 2 3 4 5]
 First number: 1
 Last number: 5
 Rest: [2 3 4 5]
@@ -324,12 +352,18 @@ With 0 prepended: [0 1 2 3 4 5]
 Doubled: [2 4 6 8 10]
 Even numbers: [2 4]
 Sum: 15
-Squares 1-5: [1 4 9 16 25]"#.to_string()),
+Squares 1-5: [1 4 9 16 25]"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run lists.aether".to_string()),
-            tags: vec!["lists".to_string(), "collections".to_string(), "functional".to_string()],
+            tags: vec![
+                "lists".to_string(),
+                "collections".to_string(),
+                "functional".to_string(),
+            ],
         });
-        
+
         // Maps and dictionaries
         self.examples.push(Example {
             name: "Working with Maps".to_string(),
@@ -377,7 +411,7 @@ First employee: Alice"#.to_string()),
             build_instructions: Some("aether run maps.aether".to_string()),
             tags: vec!["maps".to_string(), "dictionaries".to_string(), "key-value".to_string()],
         });
-        
+
         // Sets
         self.examples.push(Example {
             name: "Working with Sets".to_string(),
@@ -411,8 +445,10 @@ First employee: Alice"#.to_string()),
 (def reduced-set (disj set1 1 2))
 
 (println "Extended:" extended-set)
-(println "Reduced:" reduced-set)"#.to_string(),
-            expected_output: Some(r#"Set1: #{1 2 3 4 5}
+(println "Reduced:" reduced-set)"#
+                .to_string(),
+            expected_output: Some(
+                r#"Set1: #{1 2 3 4 5}
 Set2: #{4 5 6 7 8}
 Contains 3? true
 Unique from list: #{1 2 3 4}
@@ -420,15 +456,21 @@ Union: #{1 2 3 4 5 6 7 8}
 Intersection: #{4 5}
 Difference: #{1 2 3}
 Extended: #{1 2 3 4 5 6 7}
-Reduced: #{3 4 5}"#.to_string()),
+Reduced: #{3 4 5}"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run sets.aether".to_string()),
-            tags: vec!["sets".to_string(), "collections".to_string(), "unique".to_string()],
+            tags: vec![
+                "sets".to_string(),
+                "collections".to_string(),
+                "unique".to_string(),
+            ],
         });
-        
+
         Ok(())
     }
-    
+
     /// Generate algorithm examples
     pub fn generate_algorithm_examples(&mut self) -> Result<(), SemanticError> {
         // Sorting algorithms
@@ -494,16 +536,24 @@ Reduced: #{3 4 5}"#.to_string()),
 (println "Original:" test-data)
 (println "Bubble sort:" (bubble-sort test-data))
 (println "Quick sort:" (quick-sort test-data))
-(println "Merge sort:" (merge-sort test-data))"#.to_string(),
-            expected_output: Some(r#"Original: [64 34 25 12 22 11 90]
+(println "Merge sort:" (merge-sort test-data))"#
+                .to_string(),
+            expected_output: Some(
+                r#"Original: [64 34 25 12 22 11 90]
 Bubble sort: [11 12 22 25 34 64 90]
 Quick sort: [11 12 22 25 34 64 90]
-Merge sort: [11 12 22 25 34 64 90]"#.to_string()),
+Merge sort: [11 12 22 25 34 64 90]"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run sorting.aether".to_string()),
-            tags: vec!["algorithms".to_string(), "sorting".to_string(), "performance".to_string()],
+            tags: vec![
+                "algorithms".to_string(),
+                "sorting".to_string(),
+                "performance".to_string(),
+            ],
         });
-        
+
         // Search algorithms
         self.examples.push(Example {
             name: "Search Algorithms".to_string(),
@@ -566,8 +616,10 @@ Merge sort: [11 12 22 25 34 64 90]"#.to_string()),
 (def missing-target 50)
 (println "\nSearching for missing element:" missing-target)
 (println "Linear search result:" (linear-search sorted-data missing-target))
-(println "Binary search result:" (binary-search sorted-data missing-target))"#.to_string(),
-            expected_output: Some(r#"Array: [11 12 22 25 34 64 90]
+(println "Binary search result:" (binary-search sorted-data missing-target))"#
+                .to_string(),
+            expected_output: Some(
+                r#"Array: [11 12 22 25 34 64 90]
 Target: 25
 Linear search result: 3
 Binary search result: 3
@@ -575,15 +627,21 @@ Interpolation search result: 3
 
 Searching for missing element: 50
 Linear search result: -1
-Binary search result: -1"#.to_string()),
+Binary search result: -1"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run searching.aether".to_string()),
-            tags: vec!["algorithms".to_string(), "searching".to_string(), "binary-search".to_string()],
+            tags: vec![
+                "algorithms".to_string(),
+                "searching".to_string(),
+                "binary-search".to_string(),
+            ],
         });
-        
+
         Ok(())
     }
-    
+
     /// Generate standard library examples
     pub fn generate_stdlib_examples(&mut self) -> Result<(), SemanticError> {
         // String manipulation
@@ -631,8 +689,10 @@ Binary search result: -1"#.to_string()),
 ;;; Regular expressions
 (def email "user@example.com")
 (def email-pattern #"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
-(println "Valid email?" (re-matches email-pattern email))"#.to_string(),
-            expected_output: Some(r#"Original: Hello, AetherScript World!
+(println "Valid email?" (re-matches email-pattern email))"#
+                .to_string(),
+            expected_output: Some(
+                r#"Original: Hello, AetherScript World!
 Length: 24
 Uppercase: HELLO, AETHERSCRIPT WORLD!
 Lowercase: hello, aetherscript world!
@@ -644,12 +704,18 @@ Joined with '-': The-quick-brown-fox
 Replaced: Hello, AetherScript Universe!
 Trimmed: trim me
 Formatted: Name: Alice, Age: 30
-Valid email? true"#.to_string()),
+Valid email? true"#
+                    .to_string(),
+            ),
             dependencies: vec!["aether.string".to_string()],
             build_instructions: Some("aether run string_ops.aether".to_string()),
-            tags: vec!["strings".to_string(), "stdlib".to_string(), "text-processing".to_string()],
+            tags: vec![
+                "strings".to_string(),
+                "stdlib".to_string(),
+                "text-processing".to_string(),
+            ],
         });
-        
+
         // File I/O
         self.examples.push(Example {
             name: "File Input/Output".to_string(),
@@ -706,8 +772,10 @@ Valid email? true"#.to_string()),
   (doseq [row csv-data]
     (.write-line writer (str/join "," row))))
 
-(println "CSV data written to data.csv")"#.to_string(),
-            expected_output: Some(r#"Data written to example.txt
+(println "CSV data written to data.csv")"#
+                .to_string(),
+            expected_output: Some(
+                r#"Data written to example.txt
 File contents:
    Line 1
    Line 2
@@ -724,15 +792,17 @@ Filename: file.txt
 Extension: txt
 File size: 21 bytes
 Last modified: 2024-01-15T10:30:00Z
-CSV data written to data.csv"#.to_string()),
+CSV data written to data.csv"#
+                    .to_string(),
+            ),
             dependencies: vec!["aether.io".to_string(), "aether.string".to_string()],
             build_instructions: Some("aether run file_io.aether".to_string()),
             tags: vec!["io".to_string(), "files".to_string(), "stdlib".to_string()],
         });
-        
+
         Ok(())
     }
-    
+
     /// Generate advanced feature examples
     pub fn generate_advanced_examples(&mut self) -> Result<(), SemanticError> {
         // Concurrency example
@@ -813,8 +883,10 @@ CSV data written to data.csv"#.to_string()),
     (println result)
     (recur)))
 
-(async/<!! (async/timeout 500))"#.to_string(),
-            expected_output: Some(r#"Producing: 1
+(async/<!! (async/timeout 500))"#
+                .to_string(),
+            expected_output: Some(
+                r#"Producing: 1
 Consumer-1 consumed: 1
 Producing: 2
 Consumer-2 consumed: 2
@@ -828,12 +900,19 @@ Result: 10
 Result: 12
 Result: 14
 Result: 16
-Result: 18"#.to_string()),
+Result: 18"#
+                    .to_string(),
+            ),
             dependencies: vec!["aether.async".to_string()],
             build_instructions: Some("aether run concurrency.aether".to_string()),
-            tags: vec!["concurrency".to_string(), "channels".to_string(), "async".to_string(), "advanced".to_string()],
+            tags: vec![
+                "concurrency".to_string(),
+                "channels".to_string(),
+                "async".to_string(),
+                "advanced".to_string(),
+            ],
         });
-        
+
         // Metaprogramming example
         self.examples.push(Example {
             name: "Metaprogramming with Macros".to_string(),
@@ -929,8 +1008,10 @@ Result: 18"#.to_string()),
 
 (println (describe-number 0))
 (println (describe-number 1))
-(println (describe-number 5))"#.to_string(),
-            expected_output: Some(r#"x is not greater than 10
+(println (describe-number 5))"#
+                .to_string(),
+            expected_output: Some(
+                r#"x is not greater than 10
 x is 5
 [ info ] This will be printed with extra info
 [ error ] This is an error message
@@ -942,15 +1023,22 @@ Execution time: 2.5 ms
 499999500000
 zero
 one
-many"#.to_string()),
+many"#
+                    .to_string(),
+            ),
             dependencies: vec![],
             build_instructions: Some("aether run metaprogramming.aether".to_string()),
-            tags: vec!["macros".to_string(), "metaprogramming".to_string(), "code-generation".to_string(), "advanced".to_string()],
+            tags: vec![
+                "macros".to_string(),
+                "metaprogramming".to_string(),
+                "code-generation".to_string(),
+                "advanced".to_string(),
+            ],
         });
-        
+
         Ok(())
     }
-    
+
     /// Generate real-world application examples
     pub fn generate_application_examples(&mut self) -> Result<(), SemanticError> {
         // Web server example
@@ -1067,77 +1155,109 @@ many"#.to_string()),
   (http/get "http://localhost:8080/")
   (http/get "http://localhost:8080/api/hello?name=Alice")
   (http/get "http://localhost:8080/api/time")
-  (http/get "http://localhost:8080/api/users"))"#.to_string(),
-            expected_output: Some(r#"Starting server on port 8080...
+  (http/get "http://localhost:8080/api/users"))"#
+                .to_string(),
+            expected_output: Some(
+                r#"Starting server on port 8080...
 Server started! Visit http://localhost:8080
 GET / - 200 (5ms)
 GET /api/hello - 200 (2ms)
 GET /api/time - 200 (1ms)
-GET /api/users - 200 (3ms)"#.to_string()),
-            dependencies: vec!["aether.http".to_string(), "aether.json".to_string(), "aether.string".to_string()],
+GET /api/users - 200 (3ms)"#
+                    .to_string(),
+            ),
+            dependencies: vec![
+                "aether.http".to_string(),
+                "aether.json".to_string(),
+                "aether.string".to_string(),
+            ],
             build_instructions: Some("aether run web_server.aether".to_string()),
-            tags: vec!["web".to_string(), "http".to_string(), "server".to_string(), "api".to_string(), "application".to_string()],
+            tags: vec![
+                "web".to_string(),
+                "http".to_string(),
+                "server".to_string(),
+                "api".to_string(),
+                "application".to_string(),
+            ],
         });
-        
+
         Ok(())
     }
-    
+
     // Helper methods
-    
+
     fn create_example_categories() -> HashMap<String, ExampleCategory> {
         let mut categories = HashMap::new();
-        
-        categories.insert("Basic Syntax".to_string(), ExampleCategory {
-            name: "Basic Syntax".to_string(),
-            description: "Fundamental language constructs and syntax".to_string(),
-            examples: vec![],
-            difficulty: ExampleDifficulty::Beginner,
-            prerequisites: vec![],
-        });
-        
-        categories.insert("Data Structures".to_string(), ExampleCategory {
-            name: "Data Structures".to_string(),
-            description: "Working with collections and data structures".to_string(),
-            examples: vec![],
-            difficulty: ExampleDifficulty::Intermediate,
-            prerequisites: vec!["Basic Syntax".to_string()],
-        });
-        
-        categories.insert("Algorithms".to_string(), ExampleCategory {
-            name: "Algorithms".to_string(),
-            description: "Common algorithms and problem-solving patterns".to_string(),
-            examples: vec![],
-            difficulty: ExampleDifficulty::Intermediate,
-            prerequisites: vec!["Basic Syntax".to_string(), "Data Structures".to_string()],
-        });
-        
-        categories.insert("Standard Library".to_string(), ExampleCategory {
-            name: "Standard Library".to_string(),
-            description: "Using standard library functions and modules".to_string(),
-            examples: vec![],
-            difficulty: ExampleDifficulty::Intermediate,
-            prerequisites: vec!["Basic Syntax".to_string()],
-        });
-        
-        categories.insert("Advanced Features".to_string(), ExampleCategory {
-            name: "Advanced Features".to_string(),
-            description: "Advanced language features and patterns".to_string(),
-            examples: vec![],
-            difficulty: ExampleDifficulty::Advanced,
-            prerequisites: vec!["Basic Syntax".to_string(), "Data Structures".to_string()],
-        });
-        
-        categories.insert("Applications".to_string(), ExampleCategory {
-            name: "Applications".to_string(),
-            description: "Real-world application examples".to_string(),
-            examples: vec![],
-            difficulty: ExampleDifficulty::Advanced,
-            prerequisites: vec!["Standard Library".to_string()],
-        });
-        
+
+        categories.insert(
+            "Basic Syntax".to_string(),
+            ExampleCategory {
+                name: "Basic Syntax".to_string(),
+                description: "Fundamental language constructs and syntax".to_string(),
+                examples: vec![],
+                difficulty: ExampleDifficulty::Beginner,
+                prerequisites: vec![],
+            },
+        );
+
+        categories.insert(
+            "Data Structures".to_string(),
+            ExampleCategory {
+                name: "Data Structures".to_string(),
+                description: "Working with collections and data structures".to_string(),
+                examples: vec![],
+                difficulty: ExampleDifficulty::Intermediate,
+                prerequisites: vec!["Basic Syntax".to_string()],
+            },
+        );
+
+        categories.insert(
+            "Algorithms".to_string(),
+            ExampleCategory {
+                name: "Algorithms".to_string(),
+                description: "Common algorithms and problem-solving patterns".to_string(),
+                examples: vec![],
+                difficulty: ExampleDifficulty::Intermediate,
+                prerequisites: vec!["Basic Syntax".to_string(), "Data Structures".to_string()],
+            },
+        );
+
+        categories.insert(
+            "Standard Library".to_string(),
+            ExampleCategory {
+                name: "Standard Library".to_string(),
+                description: "Using standard library functions and modules".to_string(),
+                examples: vec![],
+                difficulty: ExampleDifficulty::Intermediate,
+                prerequisites: vec!["Basic Syntax".to_string()],
+            },
+        );
+
+        categories.insert(
+            "Advanced Features".to_string(),
+            ExampleCategory {
+                name: "Advanced Features".to_string(),
+                description: "Advanced language features and patterns".to_string(),
+                examples: vec![],
+                difficulty: ExampleDifficulty::Advanced,
+                prerequisites: vec!["Basic Syntax".to_string(), "Data Structures".to_string()],
+            },
+        );
+
+        categories.insert(
+            "Applications".to_string(),
+            ExampleCategory {
+                name: "Applications".to_string(),
+                description: "Real-world application examples".to_string(),
+                examples: vec![],
+                difficulty: ExampleDifficulty::Advanced,
+                prerequisites: vec!["Standard Library".to_string()],
+            },
+        );
+
         categories
     }
-    
+
     fn create_example_templates() -> ExampleTemplates {
         ExampleTemplates {
             syntax: vec![],
@@ -1152,50 +1272,52 @@ GET /api/users - 200 (3ms)"#.to_string()),
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_example_manager_creation() {
         let config = DocConfig::default();
         let mut manager = ExampleManager::new(&config).unwrap();
-        
+
         // Generate examples after creation
         manager.generate_examples().unwrap();
-        
+
         assert!(!manager.examples.is_empty());
     }
-    
+
     #[test]
     fn test_example_categories() {
         let categories = ExampleManager::create_example_categories();
-        
+
         assert_eq!(categories.len(), 6);
         assert!(categories.contains_key("Basic Syntax"));
         assert!(categories.contains_key("Data Structures"));
         assert!(categories.contains_key("Algorithms"));
     }
-    
+
     #[test]
     fn test_syntax_examples_generation() {
         let config = DocConfig::default();
         let mut manager = ExampleManager::new(&config).unwrap();
-        
+
         manager.generate_syntax_examples().unwrap();
-        
-        let syntax_examples: Vec<_> = manager.examples.iter()
+
+        let syntax_examples: Vec<_> = manager
+            .examples
+            .iter()
             .filter(|e| e.category == "Basic Syntax")
             .collect();
-        
+
         assert!(!syntax_examples.is_empty());
         assert!(syntax_examples.iter().any(|e| e.name == "Hello World"));
     }
-    
+
     #[test]
     fn test_example_difficulty_levels() {
         let beginner = ExampleDifficulty::Beginner;
         let intermediate = ExampleDifficulty::Intermediate;
         let advanced = ExampleDifficulty::Advanced;
         let expert = ExampleDifficulty::Expert;
-        
+
         assert!(matches!(beginner, ExampleDifficulty::Beginner));
         assert!(matches!(intermediate, ExampleDifficulty::Intermediate));
         assert!(matches!(advanced, ExampleDifficulty::Advanced));

@@ -13,15 +13,15 @@
 // limitations under the License.
 
 //! AST to MIR lowering module
-//! 
+//!
 //! Converts the high-level AST representation into MIR form
 
 use crate::ast::{self, PrimitiveType};
-use crate::mir::*;
-use crate::mir::Builder;
-use crate::types::{Type, TypeDefinition};
-use crate::symbols::{SymbolTable, SymbolKind};
 use crate::error::{SemanticError, SourceLocation};
+use crate::mir::Builder;
+use crate::mir::*;
+use crate::symbols::{SymbolKind, SymbolTable};
+use crate::types::{Type, TypeDefinition};
 use std::collections::HashMap;
 
 /// Loop context for tracking break/continue targets
@@ -39,25 +39,25 @@ struct LoopContext {
 pub struct LoweringContext {
     /// MIR builder
     builder: Builder,
-    
+
     /// Variable name to local ID mapping
     var_map: HashMap<String, LocalId>,
-    
+
     /// Variable name to type mapping for type inference
     var_types: HashMap<String, Type>,
-    
+
     /// Current module being lowered
     current_module: Option<String>,
-    
+
     /// Generated MIR program
     program: Program,
-    
+
     /// Return value local for current function
     return_local: Option<LocalId>,
-    
+
     /// Stack of loop contexts for break/continue
     loop_stack: Vec<LoopContext>,
-    
+
     /// Symbol table from semantic analysis
     symbol_table: Option<SymbolTable>,
 }
@@ -80,54 +80,54 @@ impl LoweringContext {
             symbol_table: None,
         }
     }
-    
+
     /// Create a new lowering context with a symbol table
     pub fn with_symbol_table(symbol_table: SymbolTable) -> Self {
         let mut ctx = Self::new();
         ctx.symbol_table = Some(symbol_table);
         ctx
     }
-    
+
     /// Lower an AST program to MIR
     pub fn lower_program(&mut self, ast_program: &ast::Program) -> Result<Program, SemanticError> {
         // Copy type definitions from symbol table if available
         if let Some(ref symbol_table) = self.symbol_table {
             self.program.type_definitions = symbol_table.get_type_definitions().clone();
         }
-        
+
         for module in &ast_program.modules {
             self.lower_module(module)?;
         }
-        
+
         Ok(self.program.clone())
     }
-    
+
     /// Lower a module
     fn lower_module(&mut self, module: &ast::Module) -> Result<(), SemanticError> {
         self.current_module = Some(module.name.name.clone());
-        
+
         // Lower constants
         for constant in &module.constant_declarations {
             self.lower_constant(constant)?;
         }
-        
+
         // Lower external functions
         for ext_func in &module.external_functions {
             self.lower_external_function(ext_func)?;
         }
-        
+
         // Lower functions
         for function in &module.function_definitions {
             self.lower_function(function)?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Lower a constant declaration
     fn lower_constant(&mut self, constant: &ast::ConstantDeclaration) -> Result<(), SemanticError> {
         let const_value = self.evaluate_constant_expression(&constant.value)?;
-        
+
         self.program.global_constants.insert(
             constant.name.name.clone(),
             Constant {
@@ -135,17 +135,20 @@ impl LoweringContext {
                 value: const_value,
             },
         );
-        
+
         Ok(())
     }
-    
+
     /// Lower an external function
-    fn lower_external_function(&mut self, ext_func: &ast::ExternalFunction) -> Result<(), SemanticError> {
+    fn lower_external_function(
+        &mut self,
+        ext_func: &ast::ExternalFunction,
+    ) -> Result<(), SemanticError> {
         let mut param_types = Vec::new();
         for param in &ext_func.parameters {
             param_types.push(self.ast_type_to_mir_type(&param.param_type)?);
         }
-        
+
         self.program.external_functions.insert(
             ext_func.name.name.clone(),
             ExternalFunction {
@@ -156,15 +159,15 @@ impl LoweringContext {
                 variadic: ext_func.variadic,
             },
         );
-        
+
         Ok(())
     }
-    
+
     /// Lower a function definition
     fn lower_function(&mut self, function: &ast::Function) -> Result<(), SemanticError> {
         self.var_map.clear();
         self.var_types.clear();
-        
+
         // Extract parameter info
         let mut params = Vec::new();
         for param in &function.parameters {
@@ -173,35 +176,42 @@ impl LoweringContext {
             // Also track parameter types for type inference
             self.var_types.insert(param.name.name.clone(), param_type);
         }
-        
+
         let return_type = self.ast_type_to_mir_type(&function.return_type)?;
-        
+
         // Start building the function
-        self.builder.start_function(function.name.name.clone(), params, return_type.clone());
-        
+        self.builder
+            .start_function(function.name.name.clone(), params, return_type.clone());
+
         // Create a local for the return value if not void
         let return_local = match &return_type {
             Type::Primitive(ast::PrimitiveType::Void) => None,
             _ => {
                 let local_id = self.builder.new_local(return_type.clone(), false);
-                self.builder.push_statement(Statement::StorageLive(local_id));
+                self.builder
+                    .push_statement(Statement::StorageLive(local_id));
                 Some(local_id)
             }
         };
         self.return_local = return_local;
-        
+
         // Map parameters to locals
         // The builder has already created locals for parameters, so we need to map
         // AST parameter names to the local IDs created by the builder
         if let Some(current_func) = &self.builder.current_function {
-            for (ast_param, mir_param) in function.parameters.iter().zip(current_func.parameters.iter()) {
-                self.var_map.insert(ast_param.name.name.clone(), mir_param.local_id);
+            for (ast_param, mir_param) in function
+                .parameters
+                .iter()
+                .zip(current_func.parameters.iter())
+            {
+                self.var_map
+                    .insert(ast_param.name.name.clone(), mir_param.local_id);
             }
         }
-        
+
         // Lower function body
         self.lower_block(&function.body)?;
-        
+
         // Add implicit return if needed
         if let Some(func) = &self.builder.current_function {
             if let Some(block_id) = self.builder.current_block {
@@ -212,29 +222,31 @@ impl LoweringContext {
                 }
             }
         }
-        
+
         // Finish and add to program
         let mut mir_function = self.builder.finish_function();
         mir_function.return_local = self.return_local;
-        self.program.functions.insert(function.name.name.clone(), mir_function);
-        
+        self.program
+            .functions
+            .insert(function.name.name.clone(), mir_function);
+
         Ok(())
     }
-    
+
     /// Lower a block
     fn lower_block(&mut self, block: &ast::Block) -> Result<(), SemanticError> {
         let _scope = self.builder.push_scope();
-        
+
         eprintln!("Lowering block with {} statements", block.statements.len());
         for (i, statement) in block.statements.iter().enumerate() {
             eprintln!("Lowering statement {}: {:?}", i, statement);
             self.lower_statement(statement)?;
         }
-        
+
         self.builder.pop_scope();
         Ok(())
     }
-    
+
     /// Lower a statement
     fn lower_statement(&mut self, statement: &ast::Statement) -> Result<(), SemanticError> {
         match statement {
@@ -249,14 +261,15 @@ impl LoweringContext {
                 let ty = self.ast_type_to_mir_type(type_spec)?;
                 let is_mutable = matches!(mutability, ast::Mutability::Mutable);
                 let local_id = self.builder.new_local(ty.clone(), is_mutable);
-                
+
                 // Emit StorageLive
-                self.builder.push_statement(Statement::StorageLive(local_id));
-                
+                self.builder
+                    .push_statement(Statement::StorageLive(local_id));
+
                 // Store variable mapping and type
                 self.var_map.insert(name.name.clone(), local_id);
                 self.var_types.insert(name.name.clone(), ty.clone());
-                
+
                 // Initialize if value provided
                 if let Some(init_expr) = initial_value {
                     let init_value = self.lower_expression(init_expr)?;
@@ -273,17 +286,23 @@ impl LoweringContext {
                     });
                 }
             }
-            
-            ast::Statement::Assignment { target, value, source_location } => {
+
+            ast::Statement::Assignment {
+                target,
+                value,
+                source_location,
+            } => {
                 match target {
                     ast::AssignmentTarget::MapValue { map, key } => {
                         // For map value assignments, we need to call map_insert
                         let map_op = self.lower_expression(map)?;
                         let key_op = self.lower_expression(key)?;
                         let value_op = self.lower_expression(value)?;
-                        
+
                         // Call map_insert
-                        let result_local = self.builder.new_local(Type::primitive(PrimitiveType::Void), false);
+                        let result_local = self
+                            .builder
+                            .new_local(Type::primitive(PrimitiveType::Void), false);
                         self.builder.push_statement(Statement::Assign {
                             place: Place {
                                 local: result_local,
@@ -306,7 +325,7 @@ impl LoweringContext {
                         // For other assignment targets, use the normal path
                         let place = self.lower_assignment_target(target)?;
                         let rvalue = self.lower_expression_to_rvalue(value)?;
-                        
+
                         self.builder.push_statement(Statement::Assign {
                             place,
                             rvalue,
@@ -318,7 +337,7 @@ impl LoweringContext {
                     }
                 }
             }
-            
+
             ast::Statement::Return { value, .. } => {
                 if let Some(return_expr) = value {
                     if let Some(return_local) = self.return_local {
@@ -341,16 +360,30 @@ impl LoweringContext {
                 }
                 self.builder.set_terminator(Terminator::Return);
             }
-            
-            ast::Statement::If { condition, then_block, else_ifs, else_block, .. } => {
+
+            ast::Statement::If {
+                condition,
+                then_block,
+                else_ifs,
+                else_block,
+                ..
+            } => {
                 self.lower_if_statement(condition, then_block, else_ifs, else_block)?;
             }
-            
-            ast::Statement::WhileLoop { condition, body, label, .. } => {
+
+            ast::Statement::WhileLoop {
+                condition,
+                body,
+                label,
+                ..
+            } => {
                 self.lower_while_loop(condition, body, label)?;
             }
-            
-            ast::Statement::FunctionCall { call, source_location } => {
+
+            ast::Statement::FunctionCall {
+                call,
+                source_location,
+            } => {
                 // Function calls as statements - we still need to emit the call
                 // even if we ignore the return value
                 eprintln!("Lowering FunctionCall statement: {:?}", call);
@@ -358,45 +391,98 @@ impl LoweringContext {
                 eprintln!("Function call lowered successfully");
                 // The function call has already been emitted as an assignment in lower_function_call
             }
-            
-            ast::Statement::FixedIterationLoop { counter, from_value, to_value, step_value, inclusive, body, label, .. } => {
-                self.lower_fixed_iteration_loop(counter, from_value, to_value, step_value, *inclusive, body, label)?;
+
+            ast::Statement::FixedIterationLoop {
+                counter,
+                from_value,
+                to_value,
+                step_value,
+                inclusive,
+                body,
+                label,
+                ..
+            } => {
+                self.lower_fixed_iteration_loop(
+                    counter, from_value, to_value, step_value, *inclusive, body, label,
+                )?;
             }
-            
-            ast::Statement::Break { target_label, source_location } => {
+
+            ast::Statement::Break {
+                target_label,
+                source_location,
+            } => {
                 let target_block = self.find_break_target(target_label)?;
-                self.builder.set_terminator(Terminator::Goto { target: target_block });
+                self.builder.set_terminator(Terminator::Goto {
+                    target: target_block,
+                });
                 // Create a new block for any subsequent dead code
                 let dead_block = self.builder.new_block();
                 self.builder.switch_to_block(dead_block);
             }
-            
-            ast::Statement::Continue { target_label, source_location } => {
+
+            ast::Statement::Continue {
+                target_label,
+                source_location,
+            } => {
                 let target_block = self.find_continue_target(target_label)?;
-                self.builder.set_terminator(Terminator::Goto { target: target_block });
+                self.builder.set_terminator(Terminator::Goto {
+                    target: target_block,
+                });
                 // Create a new block for any subsequent dead code
                 let dead_block = self.builder.new_block();
                 self.builder.switch_to_block(dead_block);
             }
-            
-            ast::Statement::TryBlock { protected_block, catch_clauses, finally_block, source_location } => {
-                self.lower_try_block(protected_block, catch_clauses, finally_block, source_location)?;
+
+            ast::Statement::TryBlock {
+                protected_block,
+                catch_clauses,
+                finally_block,
+                source_location,
+            } => {
+                self.lower_try_block(
+                    protected_block,
+                    catch_clauses,
+                    finally_block,
+                    source_location,
+                )?;
             }
-            
-            ast::Statement::Throw { exception, source_location } => {
+
+            ast::Statement::Throw {
+                exception,
+                source_location,
+            } => {
                 self.lower_throw_statement(exception, source_location)?;
             }
-            
-            ast::Statement::ForEachLoop { collection, element_binding, element_type, index_binding, body, label, source_location } => {
-                self.lower_for_each_loop(collection, element_binding, element_type, index_binding, body, label, source_location)?;
+
+            ast::Statement::ForEachLoop {
+                collection,
+                element_binding,
+                element_type,
+                index_binding,
+                body,
+                label,
+                source_location,
+            } => {
+                self.lower_for_each_loop(
+                    collection,
+                    element_binding,
+                    element_type,
+                    index_binding,
+                    body,
+                    label,
+                    source_location,
+                )?;
             }
-            
-            ast::Statement::Expression { expr, source_location } => {
+
+            ast::Statement::Expression {
+                expr,
+                source_location,
+            } => {
                 // Lower the expression - the result is discarded
                 let _ = self.lower_expression(expr)?;
                 // Expression statements are evaluated for their side effects only
             }
-            
+
             _ => {
                 // TODO: Implement other statement types
                 return Err(SemanticError::UnsupportedFeature {
@@ -405,10 +491,10 @@ impl LoweringContext {
                 });
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Lower an if statement
     fn lower_if_statement(
         &mut self,
@@ -418,11 +504,11 @@ impl LoweringContext {
         else_block: &Option<ast::Block>,
     ) -> Result<(), SemanticError> {
         let condition_op = self.lower_expression(condition)?;
-        
+
         let then_bb = self.builder.new_block();
         let else_bb = self.builder.new_block();
         let end_bb = self.builder.new_block();
-        
+
         // Branch on condition
         self.builder.set_terminator(Terminator::SwitchInt {
             discriminant: condition_op,
@@ -433,12 +519,13 @@ impl LoweringContext {
                 otherwise: else_bb,
             },
         });
-        
+
         // Then block
         self.builder.switch_to_block(then_bb);
         self.lower_block(then_block)?;
-        self.builder.set_terminator(Terminator::Goto { target: end_bb });
-        
+        self.builder
+            .set_terminator(Terminator::Goto { target: end_bb });
+
         // Else block (including else-ifs)
         self.builder.switch_to_block(else_bb);
         if !else_ifs.is_empty() || else_block.is_some() {
@@ -447,14 +534,15 @@ impl LoweringContext {
                 self.lower_block(else_block)?;
             }
         }
-        self.builder.set_terminator(Terminator::Goto { target: end_bb });
-        
+        self.builder
+            .set_terminator(Terminator::Goto { target: end_bb });
+
         // Continue at end block
         self.builder.switch_to_block(end_bb);
-        
+
         Ok(())
     }
-    
+
     /// Lower a while loop
     fn lower_while_loop(
         &mut self,
@@ -465,17 +553,18 @@ impl LoweringContext {
         let loop_head = self.builder.new_block();
         let loop_body = self.builder.new_block();
         let loop_end = self.builder.new_block();
-        
+
         // Push loop context for break/continue
         self.loop_stack.push(LoopContext {
             label: label.as_ref().map(|id| id.name.clone()),
             continue_block: loop_head,
             break_block: loop_end,
         });
-        
+
         // Jump to loop head
-        self.builder.set_terminator(Terminator::Goto { target: loop_head });
-        
+        self.builder
+            .set_terminator(Terminator::Goto { target: loop_head });
+
         // Loop head: check condition
         self.builder.switch_to_block(loop_head);
         let condition_op = self.lower_expression(condition)?;
@@ -488,23 +577,27 @@ impl LoweringContext {
                 otherwise: loop_end,
             },
         });
-        
+
         // Loop body
         self.builder.switch_to_block(loop_body);
         self.lower_block(body)?;
-        self.builder.set_terminator(Terminator::Goto { target: loop_head });
-        
+        self.builder
+            .set_terminator(Terminator::Goto { target: loop_head });
+
         // Pop loop context
         self.loop_stack.pop();
-        
+
         // Continue after loop
         self.builder.switch_to_block(loop_end);
-        
+
         Ok(())
     }
-    
+
     /// Find the break target for the given label (or innermost loop if None)
-    fn find_break_target(&self, target_label: &Option<ast::Identifier>) -> Result<BasicBlockId, SemanticError> {
+    fn find_break_target(
+        &self,
+        target_label: &Option<ast::Identifier>,
+    ) -> Result<BasicBlockId, SemanticError> {
         if let Some(label) = target_label {
             // Find the loop with the matching label
             for context in self.loop_stack.iter().rev() {
@@ -518,7 +611,8 @@ impl LoweringContext {
             })
         } else {
             // Break from the innermost loop
-            self.loop_stack.last()
+            self.loop_stack
+                .last()
                 .map(|context| context.break_block)
                 .ok_or_else(|| SemanticError::UnsupportedFeature {
                     feature: "break statement outside of loop".to_string(),
@@ -526,9 +620,12 @@ impl LoweringContext {
                 })
         }
     }
-    
+
     /// Find the continue target for the given label (or innermost loop if None)
-    fn find_continue_target(&self, target_label: &Option<ast::Identifier>) -> Result<BasicBlockId, SemanticError> {
+    fn find_continue_target(
+        &self,
+        target_label: &Option<ast::Identifier>,
+    ) -> Result<BasicBlockId, SemanticError> {
         if let Some(label) = target_label {
             // Find the loop with the matching label
             for context in self.loop_stack.iter().rev() {
@@ -542,7 +639,8 @@ impl LoweringContext {
             })
         } else {
             // Continue from the innermost loop
-            self.loop_stack.last()
+            self.loop_stack
+                .last()
                 .map(|context| context.continue_block)
                 .ok_or_else(|| SemanticError::UnsupportedFeature {
                     feature: "continue statement outside of loop".to_string(),
@@ -550,7 +648,7 @@ impl LoweringContext {
                 })
         }
     }
-    
+
     /// Lower a fixed iteration loop (FOR loop)
     fn lower_fixed_iteration_loop(
         &mut self,
@@ -565,9 +663,10 @@ impl LoweringContext {
         // Create the counter variable
         let counter_type = Type::primitive(PrimitiveType::Integer);
         let counter_local = self.builder.new_local(counter_type.clone(), true);
-        self.builder.push_statement(Statement::StorageLive(counter_local));
+        self.builder
+            .push_statement(Statement::StorageLive(counter_local));
         self.var_map.insert(counter.name.clone(), counter_local);
-        
+
         // Initialize counter with from_value
         let from_op = self.lower_expression(from_value)?;
         self.builder.push_statement(Statement::Assign {
@@ -581,7 +680,7 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Evaluate to_value once
         let to_op = self.lower_expression(to_value)?;
         let to_local = self.builder.new_local(counter_type.clone(), false);
@@ -596,7 +695,7 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Evaluate step value (default to 1)
         let step_op = if let Some(step_expr) = step_value {
             self.lower_expression(step_expr)?
@@ -618,26 +717,29 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Create loop blocks
         let loop_head = self.builder.new_block();
         let loop_body = self.builder.new_block();
         let loop_increment = self.builder.new_block();
         let loop_end = self.builder.new_block();
-        
+
         // Push loop context for break/continue
         self.loop_stack.push(LoopContext {
             label: label.as_ref().map(|id| id.name.clone()),
             continue_block: loop_increment,
             break_block: loop_end,
         });
-        
+
         // Jump to loop head
-        self.builder.set_terminator(Terminator::Goto { target: loop_head });
-        
+        self.builder
+            .set_terminator(Terminator::Goto { target: loop_head });
+
         // Loop head: check if counter <= to_value (or < if not inclusive)
         self.builder.switch_to_block(loop_head);
-        let condition_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+        let condition_local = self
+            .builder
+            .new_local(Type::primitive(PrimitiveType::Boolean), false);
         let comparison_op = if inclusive { BinOp::Le } else { BinOp::Lt };
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -660,7 +762,7 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         self.builder.set_terminator(Terminator::SwitchInt {
             discriminant: Operand::Copy(Place {
                 local: condition_local,
@@ -673,12 +775,14 @@ impl LoweringContext {
                 otherwise: loop_end,
             },
         });
-        
+
         // Loop body
         self.builder.switch_to_block(loop_body);
         self.lower_block(body)?;
-        self.builder.set_terminator(Terminator::Goto { target: loop_increment });
-        
+        self.builder.set_terminator(Terminator::Goto {
+            target: loop_increment,
+        });
+
         // Increment block
         self.builder.switch_to_block(loop_increment);
         let increment_local = self.builder.new_local(counter_type, false);
@@ -717,60 +821,52 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
-        self.builder.set_terminator(Terminator::Goto { target: loop_head });
-        
+
+        self.builder
+            .set_terminator(Terminator::Goto { target: loop_head });
+
         // Pop loop context
         self.loop_stack.pop();
-        
+
         // Continue after loop
         self.builder.switch_to_block(loop_end);
-        
+
         // Clean up counter variable
-        self.builder.push_statement(Statement::StorageDead(counter_local));
+        self.builder
+            .push_statement(Statement::StorageDead(counter_local));
         self.var_map.remove(&counter.name);
-        
+
         Ok(())
     }
-    
+
     /// Lower an expression to an operand
     fn lower_expression(&mut self, expr: &ast::Expression) -> Result<Operand, SemanticError> {
         match expr {
-            ast::Expression::IntegerLiteral { value, .. } => {
-                Ok(Operand::Constant(Constant {
-                    ty: Type::primitive(PrimitiveType::Integer),
-                    value: ConstantValue::Integer(*value as i128),
-                }))
-            }
-            
-            ast::Expression::FloatLiteral { value, .. } => {
-                Ok(Operand::Constant(Constant {
-                    ty: Type::primitive(PrimitiveType::Float),
-                    value: ConstantValue::Float(*value),
-                }))
-            }
-            
-            ast::Expression::BooleanLiteral { value, .. } => {
-                Ok(Operand::Constant(Constant {
-                    ty: Type::primitive(PrimitiveType::Boolean),
-                    value: ConstantValue::Bool(*value),
-                }))
-            }
-            
-            ast::Expression::StringLiteral { value, .. } => {
-                Ok(Operand::Constant(Constant {
-                    ty: Type::primitive(PrimitiveType::String),
-                    value: ConstantValue::String(value.clone()),
-                }))
-            }
-            
-            ast::Expression::CharacterLiteral { value, .. } => {
-                Ok(Operand::Constant(Constant {
-                    ty: Type::primitive(PrimitiveType::Char),
-                    value: ConstantValue::Char(*value),
-                }))
-            }
-            
+            ast::Expression::IntegerLiteral { value, .. } => Ok(Operand::Constant(Constant {
+                ty: Type::primitive(PrimitiveType::Integer),
+                value: ConstantValue::Integer(*value as i128),
+            })),
+
+            ast::Expression::FloatLiteral { value, .. } => Ok(Operand::Constant(Constant {
+                ty: Type::primitive(PrimitiveType::Float),
+                value: ConstantValue::Float(*value),
+            })),
+
+            ast::Expression::BooleanLiteral { value, .. } => Ok(Operand::Constant(Constant {
+                ty: Type::primitive(PrimitiveType::Boolean),
+                value: ConstantValue::Bool(*value),
+            })),
+
+            ast::Expression::StringLiteral { value, .. } => Ok(Operand::Constant(Constant {
+                ty: Type::primitive(PrimitiveType::String),
+                value: ConstantValue::String(value.clone()),
+            })),
+
+            ast::Expression::CharacterLiteral { value, .. } => Ok(Operand::Constant(Constant {
+                ty: Type::primitive(PrimitiveType::Char),
+                value: ConstantValue::Char(*value),
+            })),
+
             ast::Expression::Variable { name, .. } => {
                 // First check local variables
                 if let Some(&local_id) = self.var_map.get(&name.name) {
@@ -788,140 +884,199 @@ impl LoweringContext {
                     })
                 }
             }
-            
-            ast::Expression::Add { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Add, left, right, source_location)
-            }
-            
-            ast::Expression::Subtract { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Sub, left, right, source_location)
-            }
-            
-            ast::Expression::Multiply { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Mul, left, right, source_location)
-            }
-            
-            ast::Expression::Divide { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Div, left, right, source_location)
-            }
-            
-            ast::Expression::Modulo { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Rem, left, right, source_location)
-            }
-            
-            ast::Expression::Equals { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Eq, left, right, source_location)
-            }
-            
-            ast::Expression::NotEquals { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Ne, left, right, source_location)
-            }
-            
-            ast::Expression::LessThan { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Lt, left, right, source_location)
-            }
-            
-            ast::Expression::GreaterThan { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Gt, left, right, source_location)
-            }
-            
-            ast::Expression::LessThanOrEqual { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Le, left, right, source_location)
-            }
-            
-            ast::Expression::GreaterThanOrEqual { left, right, source_location } => {
-                self.lower_binary_op(BinOp::Ge, left, right, source_location)
-            }
-            
-            ast::Expression::FunctionCall { call, source_location } => {
-                self.lower_function_call(call, source_location)
-            }
-            
-            ast::Expression::StringConcat { operands, source_location } => {
-                self.lower_string_concat(operands, source_location)
-            }
-            
-            ast::Expression::StringLength { string, source_location } => {
-                self.lower_string_length(string, source_location)
-            }
-            
-            ast::Expression::StringCharAt { string, index, source_location } => {
-                self.lower_string_char_at(string, index, source_location)
-            }
-            
-            ast::Expression::Substring { string, start_index, length, source_location } => {
-                self.lower_substring(string, start_index, length, source_location)
-            }
-            
-            ast::Expression::StringEquals { left, right, source_location } => {
-                self.lower_string_equals(left, right, source_location)
-            }
-            
-            ast::Expression::StringContains { haystack, needle, source_location } => {
-                self.lower_string_contains(haystack, needle, source_location)
-            }
-            
-            ast::Expression::ArrayLiteral { element_type, elements, source_location } => {
-                self.lower_array_literal(element_type, elements, source_location)
-            }
-            
-            ast::Expression::ArrayAccess { array, index, source_location } => {
-                self.lower_array_access(array, index, source_location)
-            }
-            
-            ast::Expression::ArrayLength { array, source_location } => {
-                self.lower_array_length(array, source_location)
-            }
-            
-            ast::Expression::StructConstruct { type_name, field_values, source_location } => {
-                self.lower_struct_construct(type_name, field_values, source_location)
-            }
-            
-            ast::Expression::FieldAccess { instance, field_name, source_location } => {
-                self.lower_field_access(instance, field_name, source_location)
-            }
-            
-            ast::Expression::EnumVariant { enum_name, variant_name, value, source_location } => {
-                self.lower_enum_variant(enum_name, variant_name, value, source_location)
-            }
-            
-            ast::Expression::Match { value, cases, source_location } => {
-                self.lower_match_expression(value, cases, source_location)
-            }
-            
-            ast::Expression::TypeCast { value, target_type, failure_behavior: _, source_location } => {
-                self.lower_type_cast(value, target_type, source_location)
-            }
-            
-            ast::Expression::AddressOf { operand, source_location } => {
-                self.lower_address_of(operand, source_location)
-            }
-            
-            ast::Expression::Dereference { pointer, source_location } => {
-                self.lower_dereference(pointer, source_location)
-            }
-            
-            ast::Expression::PointerArithmetic { pointer, offset, operation, source_location } => {
-                self.lower_pointer_arithmetic(pointer, offset, operation, source_location)
-            }
-            
-            ast::Expression::MapLiteral { key_type, value_type, entries, source_location } => {
-                self.lower_map_literal(key_type, value_type, entries, source_location)
-            }
-            
-            ast::Expression::MapAccess { map, key, source_location } => {
-                self.lower_map_access(map, key, source_location)
-            }
-            
-            _ => {
-                Err(SemanticError::UnsupportedFeature {
-                    feature: "Expression type not yet implemented in MIR lowering".to_string(),
-                    location: SourceLocation::unknown(),
-                })
-            }
+
+            ast::Expression::Add {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Add, left, right, source_location),
+
+            ast::Expression::Subtract {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Sub, left, right, source_location),
+
+            ast::Expression::Multiply {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Mul, left, right, source_location),
+
+            ast::Expression::Divide {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Div, left, right, source_location),
+
+            ast::Expression::Modulo {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Rem, left, right, source_location),
+
+            ast::Expression::Equals {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Eq, left, right, source_location),
+
+            ast::Expression::NotEquals {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Ne, left, right, source_location),
+
+            ast::Expression::LessThan {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Lt, left, right, source_location),
+
+            ast::Expression::GreaterThan {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Gt, left, right, source_location),
+
+            ast::Expression::LessThanOrEqual {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Le, left, right, source_location),
+
+            ast::Expression::GreaterThanOrEqual {
+                left,
+                right,
+                source_location,
+            } => self.lower_binary_op(BinOp::Ge, left, right, source_location),
+
+            ast::Expression::FunctionCall {
+                call,
+                source_location,
+            } => self.lower_function_call(call, source_location),
+
+            ast::Expression::StringConcat {
+                operands,
+                source_location,
+            } => self.lower_string_concat(operands, source_location),
+
+            ast::Expression::StringLength {
+                string,
+                source_location,
+            } => self.lower_string_length(string, source_location),
+
+            ast::Expression::StringCharAt {
+                string,
+                index,
+                source_location,
+            } => self.lower_string_char_at(string, index, source_location),
+
+            ast::Expression::Substring {
+                string,
+                start_index,
+                length,
+                source_location,
+            } => self.lower_substring(string, start_index, length, source_location),
+
+            ast::Expression::StringEquals {
+                left,
+                right,
+                source_location,
+            } => self.lower_string_equals(left, right, source_location),
+
+            ast::Expression::StringContains {
+                haystack,
+                needle,
+                source_location,
+            } => self.lower_string_contains(haystack, needle, source_location),
+
+            ast::Expression::ArrayLiteral {
+                element_type,
+                elements,
+                source_location,
+            } => self.lower_array_literal(element_type, elements, source_location),
+
+            ast::Expression::ArrayAccess {
+                array,
+                index,
+                source_location,
+            } => self.lower_array_access(array, index, source_location),
+
+            ast::Expression::ArrayLength {
+                array,
+                source_location,
+            } => self.lower_array_length(array, source_location),
+
+            ast::Expression::StructConstruct {
+                type_name,
+                field_values,
+                source_location,
+            } => self.lower_struct_construct(type_name, field_values, source_location),
+
+            ast::Expression::FieldAccess {
+                instance,
+                field_name,
+                source_location,
+            } => self.lower_field_access(instance, field_name, source_location),
+
+            ast::Expression::EnumVariant {
+                enum_name,
+                variant_name,
+                value,
+                source_location,
+            } => self.lower_enum_variant(enum_name, variant_name, value, source_location),
+
+            ast::Expression::Match {
+                value,
+                cases,
+                source_location,
+            } => self.lower_match_expression(value, cases, source_location),
+
+            ast::Expression::TypeCast {
+                value,
+                target_type,
+                failure_behavior: _,
+                source_location,
+            } => self.lower_type_cast(value, target_type, source_location),
+
+            ast::Expression::AddressOf {
+                operand,
+                source_location,
+            } => self.lower_address_of(operand, source_location),
+
+            ast::Expression::Dereference {
+                pointer,
+                source_location,
+            } => self.lower_dereference(pointer, source_location),
+
+            ast::Expression::PointerArithmetic {
+                pointer,
+                offset,
+                operation,
+                source_location,
+            } => self.lower_pointer_arithmetic(pointer, offset, operation, source_location),
+
+            ast::Expression::MapLiteral {
+                key_type,
+                value_type,
+                entries,
+                source_location,
+            } => self.lower_map_literal(key_type, value_type, entries, source_location),
+
+            ast::Expression::MapAccess {
+                map,
+                key,
+                source_location,
+            } => self.lower_map_access(map, key, source_location),
+
+            _ => Err(SemanticError::UnsupportedFeature {
+                feature: "Expression type not yet implemented in MIR lowering".to_string(),
+                location: SourceLocation::unknown(),
+            }),
         }
     }
-    
+
     /// Lower a binary operation
     fn lower_binary_op(
         &mut self,
@@ -932,18 +1087,19 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let left_op = self.lower_expression(left)?;
         let right_op = self.lower_expression(right)?;
-        
+
         // Try to infer operand types
         let left_type = self.infer_operand_type(&left_op)?;
         let right_type = self.infer_operand_type(&right_op)?;
-        
+
         // Determine result type based on operation and operand types
         let result_type = match op {
             BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem | BinOp::Mod => {
                 // Numeric operations - result type follows operand types
                 // If either operand is float, result is float
-                if matches!(left_type, Type::Primitive(PrimitiveType::Float)) ||
-                   matches!(right_type, Type::Primitive(PrimitiveType::Float)) {
+                if matches!(left_type, Type::Primitive(PrimitiveType::Float))
+                    || matches!(right_type, Type::Primitive(PrimitiveType::Float))
+                {
                     Type::primitive(PrimitiveType::Float)
                 } else {
                     Type::primitive(PrimitiveType::Integer)
@@ -952,9 +1108,7 @@ impl LoweringContext {
             BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
                 Type::primitive(PrimitiveType::Boolean)
             }
-            BinOp::And | BinOp::Or => {
-                Type::primitive(PrimitiveType::Boolean)
-            }
+            BinOp::And | BinOp::Or => Type::primitive(PrimitiveType::Boolean),
             BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::Shl | BinOp::Shr => {
                 // Bitwise operations always return integer
                 Type::primitive(PrimitiveType::Integer)
@@ -964,10 +1118,10 @@ impl LoweringContext {
                 left_type
             }
         };
-        
+
         // Create temporary for result
         let result_local = self.builder.new_local(result_type, false);
-        
+
         // Emit assignment
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -984,13 +1138,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower a function call
     fn lower_function_call(
         &mut self,
@@ -1009,42 +1163,52 @@ impl LoweringContext {
             }
         };
         eprintln!("lower_function_call: function name = {}", function_name);
-        
+
         // Lower arguments
         let mut arg_operands = Vec::new();
         for arg in &call.arguments {
             let arg_operand = self.lower_expression(&arg.value)?;
             arg_operands.push(arg_operand);
         }
-        
+
         // Lower variadic arguments (for functions like printf)
         for arg_expr in &call.variadic_arguments {
             let arg_operand = self.lower_expression(arg_expr)?;
             arg_operands.push(arg_operand);
         }
-        
+
         // Create function reference operand using the function name
         // We'll store the function name as a string constant for now
         // Skip validation for built-in functions
         let is_builtin = function_name == "printf";
-        
+
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String(function_name.clone()),
         });
-        
+
         // Determine the return type of the function
-        let result_type = if let Some(ext_func) = self.program.external_functions.get(function_name) {
+        let result_type = if let Some(ext_func) = self.program.external_functions.get(function_name)
+        {
             // External function - use its declared return type
-            eprintln!("lower_function_call: found external function {} with return type {:?}", function_name, ext_func.return_type);
+            eprintln!(
+                "lower_function_call: found external function {} with return type {:?}",
+                function_name, ext_func.return_type
+            );
             ext_func.return_type.clone()
         } else if let Some(func) = self.program.functions.get(function_name) {
             // Regular function - use its declared return type
-            eprintln!("lower_function_call: found regular function {} with return type {:?}", function_name, func.return_type);
+            eprintln!(
+                "lower_function_call: found regular function {} with return type {:?}",
+                function_name, func.return_type
+            );
             func.return_type.clone()
         } else if is_builtin {
             // Built-in function - for now assume integer
-            eprintln!("lower_function_call: built-in function {}, assuming integer return", function_name);
+            eprintln!(
+                "lower_function_call: built-in function {}, assuming integer return",
+                function_name
+            );
             Type::primitive(ast::PrimitiveType::Integer)
         } else {
             // Try to look up in symbol table if available
@@ -1075,9 +1239,9 @@ impl LoweringContext {
                 Type::primitive(ast::PrimitiveType::Integer)
             }
         };
-        
+
         let result_local = self.builder.new_local(result_type, false);
-        
+
         // Emit call assignment
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1093,21 +1257,27 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower an expression to an rvalue
-    fn lower_expression_to_rvalue(&mut self, expr: &ast::Expression) -> Result<Rvalue, SemanticError> {
+    fn lower_expression_to_rvalue(
+        &mut self,
+        expr: &ast::Expression,
+    ) -> Result<Rvalue, SemanticError> {
         let operand = self.lower_expression(expr)?;
         Ok(Rvalue::Use(operand))
     }
-    
+
     /// Lower an assignment target
-    fn lower_assignment_target(&mut self, target: &ast::AssignmentTarget) -> Result<Place, SemanticError> {
+    fn lower_assignment_target(
+        &mut self,
+        target: &ast::AssignmentTarget,
+    ) -> Result<Place, SemanticError> {
         match target {
             ast::AssignmentTarget::Variable { name } => {
                 if let Some(&local_id) = self.var_map.get(&name.name) {
@@ -1130,80 +1300,85 @@ impl LoweringContext {
                     location: SourceLocation::unknown(),
                 })
             }
-            _ => {
-                Err(SemanticError::UnsupportedFeature {
-                    feature: "Assignment target not yet implemented".to_string(),
-                    location: SourceLocation::unknown(),
-                })
-            }
+            _ => Err(SemanticError::UnsupportedFeature {
+                feature: "Assignment target not yet implemented".to_string(),
+                location: SourceLocation::unknown(),
+            }),
         }
     }
-    
+
     /// Evaluate a constant expression
-    fn evaluate_constant_expression(&self, expr: &ast::Expression) -> Result<ConstantValue, SemanticError> {
+    fn evaluate_constant_expression(
+        &self,
+        expr: &ast::Expression,
+    ) -> Result<ConstantValue, SemanticError> {
         match expr {
             ast::Expression::IntegerLiteral { value, .. } => {
                 Ok(ConstantValue::Integer(*value as i128))
             }
-            ast::Expression::FloatLiteral { value, .. } => {
-                Ok(ConstantValue::Float(*value))
-            }
-            ast::Expression::BooleanLiteral { value, .. } => {
-                Ok(ConstantValue::Bool(*value))
-            }
+            ast::Expression::FloatLiteral { value, .. } => Ok(ConstantValue::Float(*value)),
+            ast::Expression::BooleanLiteral { value, .. } => Ok(ConstantValue::Bool(*value)),
             ast::Expression::StringLiteral { value, .. } => {
                 Ok(ConstantValue::String(value.clone()))
             }
-            ast::Expression::CharacterLiteral { value, .. } => {
-                Ok(ConstantValue::Char(*value))
-            }
-            _ => {
-                Err(SemanticError::InvalidType {
-                    type_name: "constant".to_string(),
-                    reason: "Expression is not a compile-time constant".to_string(),
-                    location: SourceLocation::unknown(),
-                })
-            }
+            ast::Expression::CharacterLiteral { value, .. } => Ok(ConstantValue::Char(*value)),
+            _ => Err(SemanticError::InvalidType {
+                type_name: "constant".to_string(),
+                reason: "Expression is not a compile-time constant".to_string(),
+                location: SourceLocation::unknown(),
+            }),
         }
     }
-    
+
     /// Convert AST type to MIR type
     fn ast_type_to_mir_type(&self, ast_type: &ast::TypeSpecifier) -> Result<Type, SemanticError> {
         match ast_type {
-            ast::TypeSpecifier::Primitive { type_name, .. } => {
-                Ok(Type::primitive(*type_name))
-            }
+            ast::TypeSpecifier::Primitive { type_name, .. } => Ok(Type::primitive(*type_name)),
             ast::TypeSpecifier::Named { name, .. } => {
                 Ok(Type::named(name.name.clone(), self.current_module.clone()))
             }
-            ast::TypeSpecifier::Array { element_type, size: _, .. } => {
+            ast::TypeSpecifier::Array {
+                element_type,
+                size: _,
+                ..
+            } => {
                 let elem_type = self.ast_type_to_mir_type(element_type)?;
                 // TODO: Handle array size properly
                 Ok(Type::array(elem_type, None))
             }
-            ast::TypeSpecifier::Pointer { target_type, is_mutable, .. } => {
+            ast::TypeSpecifier::Pointer {
+                target_type,
+                is_mutable,
+                ..
+            } => {
                 let target = self.ast_type_to_mir_type(target_type)?;
                 Ok(Type::pointer(target, *is_mutable))
             }
-            ast::TypeSpecifier::Map { key_type, value_type, .. } => {
+            ast::TypeSpecifier::Map {
+                key_type,
+                value_type,
+                ..
+            } => {
                 let key_ty = self.ast_type_to_mir_type(key_type)?;
                 let value_ty = self.ast_type_to_mir_type(value_type)?;
                 Ok(Type::map(key_ty, value_ty))
             }
-            ast::TypeSpecifier::Owned { base_type, ownership: _, .. } => {
+            ast::TypeSpecifier::Owned {
+                base_type,
+                ownership: _,
+                ..
+            } => {
                 // For now, treat owned types as their base type in MIR
                 // The ownership information is already tracked in the semantic layer
                 self.ast_type_to_mir_type(base_type)
             }
-            _ => {
-                Err(SemanticError::UnsupportedFeature {
-                    feature: format!("Type {:?} not yet supported in MIR", ast_type),
-                    location: SourceLocation::unknown(),
-                })
-            }
+            _ => Err(SemanticError::UnsupportedFeature {
+                feature: format!("Type {:?} not yet supported in MIR", ast_type),
+                location: SourceLocation::unknown(),
+            }),
         }
     }
-    
+
     /// Convert calling convention
     fn convert_calling_convention(&self, cc: &ast::CallingConvention) -> CallingConvention {
         match cc {
@@ -1212,7 +1387,7 @@ impl LoweringContext {
             _ => CallingConvention::Rust,
         }
     }
-    
+
     /// Lower string concatenation
     fn lower_string_concat(
         &mut self,
@@ -1227,26 +1402,28 @@ impl LoweringContext {
                 location: source_location.clone(),
             });
         }
-        
+
         // Lower all operands
         let mut lowered_operands = Vec::new();
         for operand in operands {
             lowered_operands.push(self.lower_expression(operand)?);
         }
-        
+
         // Chain multiple concatenations if more than 2 operands
         let mut result_operand = lowered_operands[0].clone();
-        
+
         for i in 1..lowered_operands.len() {
             // Create function reference operand for string_concat
             let func_operand = Operand::Constant(Constant {
                 ty: Type::primitive(ast::PrimitiveType::String),
                 value: ConstantValue::String("string_concat".to_string()),
             });
-            
+
             // Create temporary for result
-            let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::String), false);
-            
+            let result_local = self
+                .builder
+                .new_local(Type::primitive(ast::PrimitiveType::String), false);
+
             // Emit call assignment for this pair
             self.builder.push_statement(Statement::Assign {
                 place: Place {
@@ -1262,17 +1439,17 @@ impl LoweringContext {
                     scope: 0,
                 },
             });
-            
+
             // Update result for next iteration
             result_operand = Operand::Copy(Place {
                 local: result_local,
                 projection: vec![],
             });
         }
-        
+
         Ok(result_operand)
     }
-    
+
     /// Lower string length
     fn lower_string_length(
         &mut self,
@@ -1280,16 +1457,18 @@ impl LoweringContext {
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
         let string_operand = self.lower_expression(string)?;
-        
+
         // Create function reference operand for string_length
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("string_length".to_string()),
         });
-        
+
         // Create temporary for result
-        let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
-        
+        let result_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+
         // Emit call assignment
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1305,13 +1484,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower string character access
     fn lower_string_char_at(
         &mut self,
@@ -1321,16 +1500,18 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let string_operand = self.lower_expression(string)?;
         let index_operand = self.lower_expression(index)?;
-        
+
         // Create function reference operand for string_char_at
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("string_char_at".to_string()),
         });
-        
+
         // Create temporary for result
-        let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Char), false);
-        
+        let result_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Char), false);
+
         // Emit call assignment
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1346,13 +1527,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower substring
     fn lower_substring(
         &mut self,
@@ -1364,16 +1545,18 @@ impl LoweringContext {
         let string_operand = self.lower_expression(string)?;
         let start_operand = self.lower_expression(start)?;
         let length_operand = self.lower_expression(length)?;
-        
+
         // Create function reference operand for string_substring
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("string_substring".to_string()),
         });
-        
+
         // Create temporary for result
-        let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::String), false);
-        
+        let result_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::String), false);
+
         // Emit call assignment
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1389,13 +1572,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower string equals
     fn lower_string_equals(
         &mut self,
@@ -1405,16 +1588,18 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let left_operand = self.lower_expression(left)?;
         let right_operand = self.lower_expression(right)?;
-        
+
         // Create function reference operand for string_compare
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("string_compare".to_string()),
         });
-        
+
         // Create temporary for comparison result
-        let compare_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
-        
+        let compare_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+
         // Emit call assignment
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1430,16 +1615,18 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Create temporary for equality result
-        let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
-        
+        let result_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
+
         // Compare result with 0 (equal strings return 0)
         let zero_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::Integer),
             value: ConstantValue::Integer(0),
         });
-        
+
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: result_local,
@@ -1458,13 +1645,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower string contains
     fn lower_string_contains(
         &mut self,
@@ -1474,16 +1661,18 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let string_operand = self.lower_expression(haystack)?;
         let substring_operand = self.lower_expression(needle)?;
-        
+
         // Create function reference operand for string_find
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("string_find".to_string()),
         });
-        
+
         // Create temporary for find result
-        let find_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
-        
+        let find_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+
         // Emit call assignment
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1499,16 +1688,18 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Create temporary for contains result
-        let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
-        
+        let result_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
+
         // Check if find result is not -1 (found)
         let neg_one_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::Integer),
             value: ConstantValue::Integer(-1),
         });
-        
+
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: result_local,
@@ -1527,13 +1718,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower an array literal expression
     fn lower_array_literal(
         &mut self,
@@ -1546,19 +1737,19 @@ impl LoweringContext {
             ty: Type::primitive(ast::PrimitiveType::Integer),
             value: ConstantValue::Integer(elements.len() as i128),
         });
-        
+
         // Call array_create(count)
         let array_create_func = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("array_create".to_string()),
         });
-        
+
         let element_mir_type = self.ast_type_to_mir_type(element_type)?;
         let array_local = self.builder.new_local(
             Type::array(element_mir_type, None), // Correct array type
-            false
+            false,
         );
-        
+
         // Create the array
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1574,31 +1765,30 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Now set each element using array_set
         let array_set_func = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("array_set".to_string()),
         });
-        
+
         for (i, element) in elements.iter().enumerate() {
             let element_operand = self.lower_expression(element)?;
             let index_operand = Operand::Constant(Constant {
                 ty: Type::primitive(ast::PrimitiveType::Integer),
                 value: ConstantValue::Integer(i as i128),
             });
-            
+
             let array_operand = Operand::Copy(Place {
                 local: array_local,
                 projection: vec![],
             });
-            
+
             // Call array_set(array, index, value)
-            let temp_local = self.builder.new_local(
-                Type::primitive(ast::PrimitiveType::Void),
-                false
-            );
-            
+            let temp_local = self
+                .builder
+                .new_local(Type::primitive(ast::PrimitiveType::Void), false);
+
             self.builder.push_statement(Statement::Assign {
                 place: Place {
                     local: temp_local,
@@ -1614,14 +1804,14 @@ impl LoweringContext {
                 },
             });
         }
-        
+
         // Return the array
         Ok(Operand::Copy(Place {
             local: array_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower an array access expression
     fn lower_array_access(
         &mut self,
@@ -1632,19 +1822,19 @@ impl LoweringContext {
         // Lower the array and index expressions
         let array_operand = self.lower_expression(array)?;
         let index_operand = self.lower_expression(index)?;
-        
+
         // Create function reference for array_get
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("array_get".to_string()),
         });
-        
+
         // Create temporary for result
         let result_local = self.builder.new_local(
             Type::primitive(ast::PrimitiveType::Integer), // TODO: Use proper element type
-            false
+            false,
         );
-        
+
         // Emit call to array_get
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1660,13 +1850,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower an array length expression
     fn lower_array_length(
         &mut self,
@@ -1675,19 +1865,18 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Lower the array expression
         let array_operand = self.lower_expression(array)?;
-        
+
         // Create function reference for array_length
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String("array_length".to_string()),
         });
-        
+
         // Create temporary for result
-        let result_local = self.builder.new_local(
-            Type::primitive(ast::PrimitiveType::Integer),
-            false
-        );
-        
+        let result_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+
         // Emit call to array_length
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1703,13 +1892,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower a struct construction expression
     fn lower_struct_construct(
         &mut self,
@@ -1719,42 +1908,46 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Create the struct type
         let struct_type = Type::named(type_name.name.clone(), self.current_module.clone());
-        
+
         // Create a temporary for the struct
         let struct_local = self.builder.new_local(struct_type.clone(), false);
-        
+
         // For now, we'll use a simplified approach - treat struct as an aggregate
         // In a real implementation, we'd need to:
         // 1. Allocate memory for the struct
         // 2. Initialize each field
-        
+
         // Look up the struct definition to get the correct field order
-        let type_def = self.symbol_table.as_ref()
+        let type_def = self
+            .symbol_table
+            .as_ref()
             .and_then(|st| st.lookup_type_definition(&type_name.name))
             .ok_or_else(|| SemanticError::UndefinedSymbol {
                 symbol: type_name.name.clone(),
                 location: source_location.clone(),
             })?;
-        
+
         let field_order: Vec<String> = match type_def {
             TypeDefinition::Struct { fields, .. } => {
                 // Preserve declaration order from the struct definition
                 fields.iter().map(|(name, _)| name.clone()).collect()
             }
-            _ => return Err(SemanticError::TypeMismatch {
-                expected: "struct type".to_string(),
-                found: "non-struct type".to_string(),
-                location: source_location.clone(),
-            }),
+            _ => {
+                return Err(SemanticError::TypeMismatch {
+                    expected: "struct type".to_string(),
+                    found: "non-struct type".to_string(),
+                    location: source_location.clone(),
+                })
+            }
         };
-        
+
         // Create a map from field name to operand
         let mut field_value_map = HashMap::new();
         for field_value in field_values {
             let value_operand = self.lower_expression(&field_value.value)?;
             field_value_map.insert(field_value.field_name.name.clone(), value_operand);
         }
-        
+
         // Build operands in the correct order
         let mut field_operands = Vec::new();
         for field_name in &field_order {
@@ -1768,7 +1961,7 @@ impl LoweringContext {
                 });
             }
         }
-        
+
         // Use aggregate initialization
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -1784,13 +1977,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Move(Place {
             local: struct_local,
             projection: vec![],
         }))
     }
-    
+
     /// Get the type of a place
     fn get_type_of_place(&self, place: &Place) -> Result<Type, SemanticError> {
         // Start with the type of the local
@@ -1815,7 +2008,7 @@ impl LoweringContext {
                 location: SourceLocation::unknown(),
             });
         };
-        
+
         // Apply projections
         let mut current_type = local_type;
         for projection in &place.projection {
@@ -1833,22 +2026,18 @@ impl LoweringContext {
                 }
             }
         }
-        
+
         Ok(current_type)
     }
-    
+
     /// Infer the type of an operand
     fn infer_operand_type(&self, operand: &Operand) -> Result<Type, SemanticError> {
         match operand {
-            Operand::Copy(place) | Operand::Move(place) => {
-                self.get_type_of_place(place)
-            }
-            Operand::Constant(constant) => {
-                Ok(constant.ty.clone())
-            }
+            Operand::Copy(place) | Operand::Move(place) => self.get_type_of_place(place),
+            Operand::Constant(constant) => Ok(constant.ty.clone()),
         }
     }
-    
+
     /// Lower a field access expression
     fn lower_field_access(
         &mut self,
@@ -1858,7 +2047,7 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Lower the instance expression
         let instance_operand = self.lower_expression(instance)?;
-        
+
         // Convert to a place if it's not already
         let instance_place = match instance_operand {
             Operand::Copy(place) | Operand::Move(place) => place,
@@ -1870,27 +2059,29 @@ impl LoweringContext {
                 });
             }
         };
-        
+
         // Get the type of the instance to look up field information
         let instance_type = self.get_type_of_place(&instance_place)?;
-        
+
         // Look up field index and type from the struct definition
         let (field_idx, field_type) = match &instance_type {
             Type::Named { name, .. } => {
                 // Look up the struct definition
-                let type_def = self.symbol_table.as_ref()
+                let type_def = self
+                    .symbol_table
+                    .as_ref()
                     .and_then(|st| st.lookup_type_definition(name))
                     .ok_or_else(|| SemanticError::UndefinedSymbol {
                         symbol: name.clone(),
                         location: source_location.clone(),
                     })?;
-                
+
                 match type_def {
                     TypeDefinition::Struct { fields, .. } => {
                         // Find the field index by iterating through fields in declaration order
                         let mut field_index = None;
                         let mut field_ty = None;
-                        
+
                         // Fields are now stored in declaration order (Vec)
                         for (idx, (fname, ftype)) in fields.iter().enumerate() {
                             if fname == &field_name.name {
@@ -1899,29 +2090,35 @@ impl LoweringContext {
                                 break;
                             }
                         }
-                        
+
                         match (field_index, field_ty) {
                             (Some(idx), Some(ty)) => (idx, ty),
-                            _ => return Err(SemanticError::UndefinedSymbol {
-                                symbol: format!("{}.{}", name, field_name.name),
-                                location: source_location.clone(),
-                            }),
+                            _ => {
+                                return Err(SemanticError::UndefinedSymbol {
+                                    symbol: format!("{}.{}", name, field_name.name),
+                                    location: source_location.clone(),
+                                })
+                            }
                         }
                     }
-                    _ => return Err(SemanticError::TypeMismatch {
-                        expected: "struct type".to_string(),
-                        found: "non-struct type".to_string(),
-                        location: source_location.clone(),
-                    }),
+                    _ => {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: "struct type".to_string(),
+                            found: "non-struct type".to_string(),
+                            location: source_location.clone(),
+                        })
+                    }
                 }
             }
-            _ => return Err(SemanticError::TypeMismatch {
-                expected: "named struct type".to_string(),
-                found: instance_type.to_string(),
-                location: source_location.clone(),
-            }),
+            _ => {
+                return Err(SemanticError::TypeMismatch {
+                    expected: "named struct type".to_string(),
+                    found: instance_type.to_string(),
+                    location: source_location.clone(),
+                })
+            }
         };
-        
+
         let field_place = Place {
             local: instance_place.local,
             projection: {
@@ -1933,10 +2130,10 @@ impl LoweringContext {
                 proj
             },
         };
-        
+
         Ok(Operand::Copy(field_place))
     }
-    
+
     /// Lower enum variant construction with known type
     fn lower_enum_variant_with_type(
         &mut self,
@@ -1951,26 +2148,23 @@ impl LoweringContext {
         } else {
             vec![]
         };
-        
+
         // Create the enum variant as an aggregate
         let result_local = self.builder.new_local(
             Type::Named {
                 name: enum_type_name.to_string(),
                 module: self.current_module.clone(),
             },
-            false
+            false,
         );
-        
+
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: result_local,
                 projection: vec![],
             },
             rvalue: Rvalue::Aggregate {
-                kind: AggregateKind::Enum(
-                    enum_type_name.to_string(),
-                    variant_name.name.clone()
-                ),
+                kind: AggregateKind::Enum(enum_type_name.to_string(), variant_name.name.clone()),
                 operands,
             },
             source_info: SourceInfo {
@@ -1978,13 +2172,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Move(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower enum variant construction
     fn lower_enum_variant(
         &mut self,
@@ -2010,10 +2204,12 @@ impl LoweringContext {
                 }
                 match found_type_name {
                     Some(type_name) => type_name,
-                    None => return Err(SemanticError::UndefinedSymbol {
-                        symbol: variant_name.name.clone(),
-                        location: source_location.clone(),
-                    }),
+                    None => {
+                        return Err(SemanticError::UndefinedSymbol {
+                            symbol: variant_name.name.clone(),
+                            location: source_location.clone(),
+                        })
+                    }
                 }
             } else {
                 return Err(SemanticError::InternalError {
@@ -2024,11 +2220,11 @@ impl LoweringContext {
         } else {
             enum_name.name.clone()
         };
-        
+
         // Use the helper function
         self.lower_enum_variant_with_type(&enum_type_name, variant_name, value, source_location)
     }
-    
+
     /// Lower match expression
     fn lower_match_expression(
         &mut self,
@@ -2038,10 +2234,12 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Lower the value being matched
         let discriminant_op = self.lower_expression(value)?;
-        
+
         // Get the discriminant of the enum
-        let discriminant_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
-        
+        let discriminant_local = self
+            .builder
+            .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+
         // Create a place from the operand for discriminant
         let value_place = match &discriminant_op {
             Operand::Copy(place) | Operand::Move(place) => place.clone(),
@@ -2067,7 +2265,7 @@ impl LoweringContext {
                 }
             }
         };
-        
+
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: discriminant_local,
@@ -2079,11 +2277,11 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Create blocks for each case and the join block
         let mut case_blocks = Vec::new();
         let join_block = self.builder.new_block();
-        
+
         // Create result temporary - infer type from first case
         let result_type = if let Some(first_case) = cases.first() {
             self.get_expression_type(&first_case.body)?
@@ -2091,22 +2289,24 @@ impl LoweringContext {
             Type::primitive(ast::PrimitiveType::Void)
         };
         let result_local = self.builder.new_local(result_type, false);
-        
+
         // Get the enum type name from the value's type
         let enum_type = self.get_expression_type(value)?;
         let enum_name = match &enum_type {
             Type::Named { name, .. } => name.clone(),
-            _ => return Err(SemanticError::TypeMismatch {
-                expected: "enum type".to_string(),
-                found: enum_type.to_string(),
-                location: source_location.clone(),
-            }),
+            _ => {
+                return Err(SemanticError::TypeMismatch {
+                    expected: "enum type".to_string(),
+                    found: enum_type.to_string(),
+                    location: source_location.clone(),
+                })
+            }
         };
-        
+
         // Create blocks for each case with proper discriminant values
         for case in cases.iter() {
             let case_block = self.builder.new_block();
-            
+
             // Get the variant discriminant
             let discriminant = match &case.pattern {
                 ast::Pattern::EnumVariant { variant_name, .. } => {
@@ -2116,16 +2316,23 @@ impl LoweringContext {
                             match type_def {
                                 TypeDefinition::Enum { variants, .. } => {
                                     // Find the variant and get its discriminant
-                                    variants.iter()
+                                    variants
+                                        .iter()
                                         .find(|v| v.name == variant_name.name)
                                         .map(|v| v.discriminant as u128)
                                         .unwrap_or_else(|| {
-                                            eprintln!("WARNING: Variant {} not found in enum {}, using 0", variant_name.name, enum_name);
+                                            eprintln!(
+                                                "WARNING: Variant {} not found in enum {}, using 0",
+                                                variant_name.name, enum_name
+                                            );
                                             0
                                         })
                                 }
                                 _ => {
-                                    eprintln!("WARNING: Type {} is not an enum, using 0", enum_name);
+                                    eprintln!(
+                                        "WARNING: Type {} is not an enum, using 0",
+                                        enum_name
+                                    );
                                     0
                                 }
                             }
@@ -2145,17 +2352,20 @@ impl LoweringContext {
                 }
                 _ => 0, // For wildcard patterns
             };
-            
-            eprintln!("MIR: Case for variant {} has discriminant {}", 
+
+            eprintln!(
+                "MIR: Case for variant {} has discriminant {}",
                 match case.pattern {
-                    ast::Pattern::EnumVariant { ref variant_name, .. } => &variant_name.name,
+                    ast::Pattern::EnumVariant {
+                        ref variant_name, ..
+                    } => &variant_name.name,
                     _ => "wildcard",
                 },
                 discriminant
             );
             case_blocks.push((discriminant, case_block));
         }
-        
+
         // Emit switch terminator
         self.builder.set_terminator(Terminator::SwitchInt {
             discriminant: Operand::Copy(Place {
@@ -2169,17 +2379,17 @@ impl LoweringContext {
                 otherwise: join_block, // TODO: Handle exhaustiveness
             },
         });
-        
+
         // Lower each case
         for ((variant_idx, case_block), case) in case_blocks.iter().zip(cases.iter()) {
             self.builder.switch_to_block(*case_block);
-            
+
             // Extract pattern bindings from the enum value
             self.lower_pattern_bindings(&case.pattern, &value_place, *variant_idx)?;
-            
+
             // Lower the case body with bindings in scope
             let case_value = self.lower_expression(&case.body)?;
-            
+
             // Assign to result
             self.builder.push_statement(Statement::Assign {
                 place: Place {
@@ -2192,22 +2402,21 @@ impl LoweringContext {
                     scope: 0,
                 },
             });
-            
+
             // Jump to join block
-            self.builder.set_terminator(Terminator::Goto {
-                target: join_block,
-            });
+            self.builder
+                .set_terminator(Terminator::Goto { target: join_block });
         }
-        
+
         // Continue in join block
         self.builder.switch_to_block(join_block);
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower pattern bindings
     fn lower_pattern_bindings(
         &mut self,
@@ -2216,7 +2425,13 @@ impl LoweringContext {
         _variant_idx: u128,
     ) -> Result<(), SemanticError> {
         match pattern {
-            ast::Pattern::EnumVariant { enum_name: _, variant_name, binding, nested_pattern, source_location: _ } => {
+            ast::Pattern::EnumVariant {
+                enum_name: _,
+                variant_name,
+                binding,
+                nested_pattern,
+                source_location: _,
+            } => {
                 // Handle nested pattern
                 if let Some(ref nested_pat) = nested_pattern {
                     // For nested patterns, we need to extract the data and then match on it
@@ -2226,33 +2441,37 @@ impl LoweringContext {
                         if let Some(enum_type) = self.get_enum_variant_type(variant_name) {
                             enum_type
                         } else {
-                            eprintln!("MIR: Could not determine type for variant {}", variant_name.name);
+                            eprintln!(
+                                "MIR: Could not determine type for variant {}",
+                                variant_name.name
+                            );
                             Type::Error
                         }
                     } else {
                         Type::Error
                     };
-                    
+
                     // Create a place for the extracted data
                     let data_place = Place {
                         local: value_place.local,
-                        projection: vec![
-                            PlaceElem::Field {
-                                field: 1, // Data is at field 1 (after discriminant)
-                                ty: data_type.clone(),
-                            }
-                        ],
+                        projection: vec![PlaceElem::Field {
+                            field: 1, // Data is at field 1 (after discriminant)
+                            ty: data_type.clone(),
+                        }],
                     };
-                    
+
                     // For nested enum patterns, we need to check the inner discriminant
                     match nested_pat.as_ref() {
-                        ast::Pattern::EnumVariant { variant_name: inner_variant, binding: inner_binding, .. } => {
+                        ast::Pattern::EnumVariant {
+                            variant_name: inner_variant,
+                            binding: inner_binding,
+                            ..
+                        } => {
                             // Get the discriminant of the inner enum
-                            let inner_discriminant_local = self.builder.new_local(
-                                Type::primitive(ast::PrimitiveType::Integer), 
-                                false
-                            );
-                            
+                            let inner_discriminant_local = self
+                                .builder
+                                .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+
                             self.builder.push_statement(Statement::Assign {
                                 place: Place {
                                     local: inner_discriminant_local,
@@ -2264,7 +2483,7 @@ impl LoweringContext {
                                     scope: 0,
                                 },
                             });
-                            
+
                             // For now, we'll just handle the binding if it exists
                             // Full nested matching would require generating additional switch statements
                             if let Some(inner_bind) = inner_binding {
@@ -2277,20 +2496,24 @@ impl LoweringContext {
                                             ty: data_type.clone(),
                                         },
                                         PlaceElem::Field {
-                                            field: 1, // Inner data (after inner discriminant)
+                                            field: 1,                                         // Inner data (after inner discriminant)
                                             ty: Type::primitive(ast::PrimitiveType::Integer), // TODO: Get actual type
-                                        }
+                                        },
                                     ],
                                 };
-                                
+
                                 // Create a local for the inner binding
-                                let inner_binding_type = Type::primitive(ast::PrimitiveType::Integer); // TODO: Get actual type
-                                let inner_binding_local = self.builder.new_local(inner_binding_type.clone(), false);
-                                
+                                let inner_binding_type =
+                                    Type::primitive(ast::PrimitiveType::Integer); // TODO: Get actual type
+                                let inner_binding_local =
+                                    self.builder.new_local(inner_binding_type.clone(), false);
+
                                 // Add to var_map and var_types
-                                self.var_map.insert(inner_bind.name.clone(), inner_binding_local);
-                                self.var_types.insert(inner_bind.name.clone(), inner_binding_type.clone());
-                                
+                                self.var_map
+                                    .insert(inner_bind.name.clone(), inner_binding_local);
+                                self.var_types
+                                    .insert(inner_bind.name.clone(), inner_binding_type.clone());
+
                                 // Copy the inner data to the binding
                                 self.builder.push_statement(Statement::Assign {
                                     place: Place {
@@ -2303,8 +2526,11 @@ impl LoweringContext {
                                         scope: 0,
                                     },
                                 });
-                                
-                                eprintln!("MIR: Created binding {} for nested pattern", inner_bind.name);
+
+                                eprintln!(
+                                    "MIR: Created binding {} for nested pattern",
+                                    inner_bind.name
+                                );
                             }
                         }
                         _ => {
@@ -2312,77 +2538,93 @@ impl LoweringContext {
                         }
                     }
                 }
-                
+
                 // If there's a binding (and no nested pattern), extract the enum variant's associated data
                 if let Some(binding_name) = binding {
                     if nested_pattern.is_none() {
-                    // Get the type of the associated data from symbol table
-                    let binding_type = if let Some(st) = &self.symbol_table {
-                        eprintln!("MIR: Looking up binding {} in symbol table", binding_name.name);
-                        // Look up the binding in the symbol table
-                        if let Some(symbol) = st.lookup_symbol(&binding_name.name) {
-                            eprintln!("MIR: Found symbol {} with type {:?}", binding_name.name, symbol.symbol_type);
-                            match &symbol.kind {
-                                SymbolKind::Variable | SymbolKind::Parameter => symbol.symbol_type.clone(),
-                                _ => {
-                                    eprintln!("MIR: Symbol {} has wrong kind: {:?}", binding_name.name, symbol.kind);
-                                    Type::Error
+                        // Get the type of the associated data from symbol table
+                        let binding_type = if let Some(st) = &self.symbol_table {
+                            eprintln!(
+                                "MIR: Looking up binding {} in symbol table",
+                                binding_name.name
+                            );
+                            // Look up the binding in the symbol table
+                            if let Some(symbol) = st.lookup_symbol(&binding_name.name) {
+                                eprintln!(
+                                    "MIR: Found symbol {} with type {:?}",
+                                    binding_name.name, symbol.symbol_type
+                                );
+                                match &symbol.kind {
+                                    SymbolKind::Variable | SymbolKind::Parameter => {
+                                        symbol.symbol_type.clone()
+                                    }
+                                    _ => {
+                                        eprintln!(
+                                            "MIR: Symbol {} has wrong kind: {:?}",
+                                            binding_name.name, symbol.kind
+                                        );
+                                        Type::Error
+                                    }
+                                }
+                            } else {
+                                eprintln!(
+                                    "MIR: Symbol {} not found in symbol table",
+                                    binding_name.name
+                                );
+                                // Try to infer the type from the enum variant
+                                // For now, use Integer for Ok variant, String for Error variant
+                                match variant_name.name.as_str() {
+                                    "Ok" => Type::primitive(ast::PrimitiveType::Integer),
+                                    "Error" => Type::primitive(ast::PrimitiveType::String),
+                                    _ => Type::Error,
                                 }
                             }
                         } else {
-                            eprintln!("MIR: Symbol {} not found in symbol table", binding_name.name);
-                            // Try to infer the type from the enum variant
-                            // For now, use Integer for Ok variant, String for Error variant
-                            match variant_name.name.as_str() {
-                                "Ok" => Type::primitive(ast::PrimitiveType::Integer),
-                                "Error" => Type::primitive(ast::PrimitiveType::String),
-                                _ => Type::Error,
-                            }
-                        }
-                    } else {
-                        eprintln!("MIR: No symbol table available");
-                        Type::Error
-                    };
-                    
-                    // Create a local for the binding
-                    let binding_local = self.builder.new_local(binding_type.clone(), false);
-                    
-                    // Add to var_map and var_types so it can be referenced in the case body
-                    self.var_map.insert(binding_name.name.clone(), binding_local);
-                    self.var_types.insert(binding_name.name.clone(), binding_type.clone());
-                    
-                    // Generate code to extract the associated data
-                    // The enum layout is: [discriminant: i32][data: variant data]
-                    // We need to offset by the discriminant size (4 bytes) to get to the data
-                    
-                    // For now, we'll use a simplified approach - cast the data area to the binding type
-                    // In a real implementation, we'd need to properly handle the enum variant's data layout
-                    
-                    // Create a projection to access the data field
-                    let data_place = Place {
-                        local: value_place.local,
-                        projection: vec![
-                            PlaceElem::Field {
+                            eprintln!("MIR: No symbol table available");
+                            Type::Error
+                        };
+
+                        // Create a local for the binding
+                        let binding_local = self.builder.new_local(binding_type.clone(), false);
+
+                        // Add to var_map and var_types so it can be referenced in the case body
+                        self.var_map
+                            .insert(binding_name.name.clone(), binding_local);
+                        self.var_types
+                            .insert(binding_name.name.clone(), binding_type.clone());
+
+                        // Generate code to extract the associated data
+                        // The enum layout is: [discriminant: i32][data: variant data]
+                        // We need to offset by the discriminant size (4 bytes) to get to the data
+
+                        // For now, we'll use a simplified approach - cast the data area to the binding type
+                        // In a real implementation, we'd need to properly handle the enum variant's data layout
+
+                        // Create a projection to access the data field
+                        let data_place = Place {
+                            local: value_place.local,
+                            projection: vec![PlaceElem::Field {
                                 field: 1, // Field 1 is the data area (field 0 is discriminant)
                                 ty: binding_type,
-                            }
-                        ],
-                    };
-                    
-                    // Copy the data to the binding local
-                    eprintln!("MIR: Creating binding {} with type {:?} as local {}", 
-                             binding_name.name, &data_place.projection[0], binding_local);
-                    self.builder.push_statement(Statement::Assign {
-                        place: Place {
-                            local: binding_local,
-                            projection: vec![],
-                        },
-                        rvalue: Rvalue::Use(Operand::Copy(data_place)),
-                        source_info: SourceInfo {
-                            span: binding_name.source_location.clone(),
-                            scope: 0,
-                        },
-                    });
+                            }],
+                        };
+
+                        // Copy the data to the binding local
+                        eprintln!(
+                            "MIR: Creating binding {} with type {:?} as local {}",
+                            binding_name.name, &data_place.projection[0], binding_local
+                        );
+                        self.builder.push_statement(Statement::Assign {
+                            place: Place {
+                                local: binding_local,
+                                projection: vec![],
+                            },
+                            rvalue: Rvalue::Use(Operand::Copy(data_place)),
+                            source_info: SourceInfo {
+                                span: binding_name.source_location.clone(),
+                                scope: 0,
+                            },
+                        });
                     }
                 }
             }
@@ -2393,7 +2635,9 @@ impl LoweringContext {
                     let binding_type = if let Some(st) = &self.symbol_table {
                         if let Some(symbol) = st.lookup_symbol(&binding_name.name) {
                             match &symbol.kind {
-                                SymbolKind::Variable | SymbolKind::Parameter => symbol.symbol_type.clone(),
+                                SymbolKind::Variable | SymbolKind::Parameter => {
+                                    symbol.symbol_type.clone()
+                                }
                                 _ => Type::Error,
                             }
                         } else {
@@ -2402,12 +2646,14 @@ impl LoweringContext {
                     } else {
                         Type::Error
                     };
-                    
+
                     // Create a local for the binding
                     let binding_local = self.builder.new_local(binding_type.clone(), false);
-                    self.var_map.insert(binding_name.name.clone(), binding_local);
-                    self.var_types.insert(binding_name.name.clone(), binding_type);
-                    
+                    self.var_map
+                        .insert(binding_name.name.clone(), binding_local);
+                    self.var_types
+                        .insert(binding_name.name.clone(), binding_type);
+
                     // Copy the entire value
                     self.builder.push_statement(Statement::Assign {
                         place: Place {
@@ -2426,10 +2672,10 @@ impl LoweringContext {
                 // Literal patterns don't create bindings
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Get the type of an enum variant's associated data
     fn get_enum_variant_type(&self, variant_name: &ast::Identifier) -> Option<Type> {
         if let Some(st) = &self.symbol_table {
@@ -2446,18 +2692,28 @@ impl LoweringContext {
         }
         None
     }
-    
+
     /// Get the type of an expression
     fn get_expression_type(&self, expr: &ast::Expression) -> Result<Type, SemanticError> {
         // If we have a symbol table with type information, use it
         if let Some(st) = &self.symbol_table {
             // For now, we'll do basic type inference
             match expr {
-                ast::Expression::IntegerLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Integer)),
-                ast::Expression::FloatLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Float)),
-                ast::Expression::BooleanLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Boolean)),
-                ast::Expression::StringLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::String)),
-                ast::Expression::CharacterLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Char)),
+                ast::Expression::IntegerLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Integer))
+                }
+                ast::Expression::FloatLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Float))
+                }
+                ast::Expression::BooleanLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Boolean))
+                }
+                ast::Expression::StringLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::String))
+                }
+                ast::Expression::CharacterLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Char))
+                }
                 ast::Expression::Variable { name, .. } => {
                     // First check local var_types mapping
                     if let Some(var_type) = self.var_types.get(&name.name) {
@@ -2468,12 +2724,10 @@ impl LoweringContext {
                         Ok(Type::primitive(ast::PrimitiveType::Integer)) // Default
                     }
                 }
-                ast::Expression::EnumVariant { enum_name, .. } => {
-                    Ok(Type::Named {
-                        name: enum_name.name.clone(),
-                        module: self.current_module.clone(),
-                    })
-                }
+                ast::Expression::EnumVariant { enum_name, .. } => Ok(Type::Named {
+                    name: enum_name.name.clone(),
+                    module: self.current_module.clone(),
+                }),
                 ast::Expression::FunctionCall { call, .. } => {
                     // Handle built-in functions
                     if let ast::FunctionReference::Local { name } = &call.function_reference {
@@ -2493,11 +2747,21 @@ impl LoweringContext {
         } else {
             // Without symbol table, use basic inference
             match expr {
-                ast::Expression::IntegerLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Integer)),
-                ast::Expression::FloatLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Float)),
-                ast::Expression::BooleanLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Boolean)),
-                ast::Expression::StringLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::String)),
-                ast::Expression::CharacterLiteral { .. } => Ok(Type::primitive(ast::PrimitiveType::Char)),
+                ast::Expression::IntegerLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Integer))
+                }
+                ast::Expression::FloatLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Float))
+                }
+                ast::Expression::BooleanLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Boolean))
+                }
+                ast::Expression::StringLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::String))
+                }
+                ast::Expression::CharacterLiteral { .. } => {
+                    Ok(Type::primitive(ast::PrimitiveType::Char))
+                }
                 ast::Expression::Variable { name, .. } => {
                     // Check local var_types mapping
                     if let Some(var_type) = self.var_types.get(&name.name) {
@@ -2510,7 +2774,7 @@ impl LoweringContext {
             }
         }
     }
-    
+
     /// Lower type cast expression
     fn lower_type_cast(
         &mut self,
@@ -2519,16 +2783,16 @@ impl LoweringContext {
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
         let operand = self.lower_expression(value)?;
-        
+
         // Convert AST type to MIR type
         let target_ty = self.ast_type_to_mir_type(target_type)?;
-        
+
         // Create temporary for result
         let result_local = self.builder.new_local(target_ty.clone(), false);
-        
+
         // Determine cast kind
         let cast_kind = CastKind::Numeric; // TODO: Determine proper cast kind based on types
-        
+
         // Emit cast
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -2545,13 +2809,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower a try-catch-finally block
     fn lower_try_block(
         &mut self,
@@ -2565,38 +2829,38 @@ impl LoweringContext {
         // 1. Set up exception landing pads
         // 2. Track exception propagation
         // 3. Generate cleanup code
-        
+
         // Lower the protected block
         self.lower_block(protected_block)?;
-        
+
         // For now, we'll just lower catch blocks as unreachable code
         // In a real implementation, these would be jumped to on exceptions
         for catch_clause in catch_clauses {
             let catch_block = self.builder.new_block();
             self.builder.switch_to_block(catch_block);
-            
+
             // TODO: Add exception binding variable to scope
             if let Some(_binding) = &catch_clause.binding_variable {
                 // Would bind the exception value here
             }
-            
+
             self.lower_block(&catch_clause.handler_block)?;
         }
-        
+
         // Lower finally block if present
         if let Some(finally) = finally_block {
             let finally_block_id = self.builder.new_block();
             self.builder.switch_to_block(finally_block_id);
             self.lower_block(finally)?;
         }
-        
+
         // Continue with normal control flow
         let continue_block = self.builder.new_block();
         self.builder.switch_to_block(continue_block);
-        
+
         Ok(())
     }
-    
+
     /// Lower a throw statement
     fn lower_throw_statement(
         &mut self,
@@ -2605,10 +2869,12 @@ impl LoweringContext {
     ) -> Result<(), SemanticError> {
         // Lower the exception expression
         let exception_value = self.lower_expression(exception)?;
-        
+
         // For now, we'll just generate an unreachable terminator
         // In a real implementation, this would unwind the stack
-        let exception_local = self.builder.new_local(Type::primitive(PrimitiveType::Integer), false);
+        let exception_local = self
+            .builder
+            .new_local(Type::primitive(PrimitiveType::Integer), false);
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: exception_local,
@@ -2620,17 +2886,17 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Mark this as a terminating statement
         self.builder.set_terminator(Terminator::Unreachable);
-        
+
         // Create a new block for any subsequent dead code
         let dead_block = self.builder.new_block();
         self.builder.switch_to_block(dead_block);
-        
+
         Ok(())
     }
-    
+
     /// Lower a for-each loop
     fn lower_for_each_loop(
         &mut self,
@@ -2644,18 +2910,22 @@ impl LoweringContext {
     ) -> Result<(), SemanticError> {
         // Lower the collection expression
         let collection_operand = self.lower_expression(collection)?;
-        
+
         // Get the element type
         let elem_type = self.ast_type_to_mir_type(element_type)?;
-        
+
         // Create locals for the loop
-        let index_local = self.builder.new_local(Type::primitive(PrimitiveType::Integer), false);
+        let index_local = self
+            .builder
+            .new_local(Type::primitive(PrimitiveType::Integer), false);
         let element_local = self.builder.new_local(elem_type.clone(), false);
         let collection_local = match collection_operand {
             Operand::Copy(place) | Operand::Move(place) => place.local,
             Operand::Constant(_) => {
                 // If it's a constant, we need to store it in a local
-                let local = self.builder.new_local(Type::array(elem_type.clone(), None), false);
+                let local = self
+                    .builder
+                    .new_local(Type::array(elem_type.clone(), None), false);
                 self.builder.push_statement(Statement::Assign {
                     place: Place {
                         local,
@@ -2670,17 +2940,22 @@ impl LoweringContext {
                 local
             }
         };
-        
+
         // Store element binding
-        self.var_map.insert(element_binding.name.clone(), element_local);
-        self.var_types.insert(element_binding.name.clone(), elem_type.clone());
-        
+        self.var_map
+            .insert(element_binding.name.clone(), element_local);
+        self.var_types
+            .insert(element_binding.name.clone(), elem_type.clone());
+
         // Store index binding if present
         if let Some(idx_binding) = index_binding {
             self.var_map.insert(idx_binding.name.clone(), index_local);
-            self.var_types.insert(idx_binding.name.clone(), Type::primitive(PrimitiveType::Integer));
+            self.var_types.insert(
+                idx_binding.name.clone(),
+                Type::primitive(PrimitiveType::Integer),
+            );
         }
-        
+
         // Initialize index to 0
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -2696,20 +2971,23 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Create loop blocks
         let loop_head = self.builder.new_block();
         let loop_body = self.builder.new_block();
         let loop_end = self.builder.new_block();
-        
+
         // Jump to loop head
-        self.builder.set_terminator(Terminator::Goto { target: loop_head });
-        
+        self.builder
+            .set_terminator(Terminator::Goto { target: loop_head });
+
         // Loop head: check if index < array length
         self.builder.switch_to_block(loop_head);
-        
+
         // Get array length
-        let length_local = self.builder.new_local(Type::primitive(PrimitiveType::Integer), false);
+        let length_local = self
+            .builder
+            .new_local(Type::primitive(PrimitiveType::Integer), false);
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: length_local,
@@ -2730,9 +3008,11 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Compare index < length
-        let cmp_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+        let cmp_local = self
+            .builder
+            .new_local(Type::primitive(PrimitiveType::Boolean), false);
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: cmp_local,
@@ -2754,7 +3034,7 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Branch on condition
         self.builder.set_terminator(Terminator::SwitchInt {
             discriminant: Operand::Copy(Place {
@@ -2768,10 +3048,10 @@ impl LoweringContext {
                 otherwise: loop_end,
             },
         });
-        
+
         // Loop body
         self.builder.switch_to_block(loop_body);
-        
+
         // Get element at current index
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -2799,10 +3079,10 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Lower the loop body
         self.lower_block(body)?;
-        
+
         // Increment index
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -2825,13 +3105,14 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Jump back to loop head
-        self.builder.set_terminator(Terminator::Goto { target: loop_head });
-        
+        self.builder
+            .set_terminator(Terminator::Goto { target: loop_head });
+
         // Continue after loop
         self.builder.switch_to_block(loop_end);
-        
+
         // Clean up variable mappings
         self.var_map.remove(&element_binding.name);
         self.var_types.remove(&element_binding.name);
@@ -2839,10 +3120,10 @@ impl LoweringContext {
             self.var_map.remove(&idx_binding.name);
             self.var_types.remove(&idx_binding.name);
         }
-        
+
         Ok(())
     }
-    
+
     /// Lower address-of operation
     fn lower_address_of(
         &mut self,
@@ -2851,7 +3132,7 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Get the place of the operand
         let operand_op = self.lower_expression(operand)?;
-        
+
         // Convert operand to place
         let place = match operand_op {
             Operand::Copy(place) | Operand::Move(place) => place,
@@ -2863,14 +3144,14 @@ impl LoweringContext {
                 });
             }
         };
-        
+
         // Get the type of the operand
         let operand_type = self.get_expression_type(operand)?;
         let ptr_type = Type::pointer(operand_type, false);
-        
+
         // Create temporary for the address
         let addr_local = self.builder.new_local(ptr_type, false);
-        
+
         // Emit address-of operation
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -2886,13 +3167,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: addr_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower dereference operation
     fn lower_dereference(
         &mut self,
@@ -2900,7 +3181,7 @@ impl LoweringContext {
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
         let pointer_op = self.lower_expression(pointer)?;
-        
+
         // Get the place of the pointer
         let pointer_place = match pointer_op {
             Operand::Copy(place) | Operand::Move(place) => place,
@@ -2912,7 +3193,7 @@ impl LoweringContext {
                 });
             }
         };
-        
+
         // Get the target type
         let pointer_type = self.get_expression_type(pointer)?;
         let target_type = match pointer_type {
@@ -2925,19 +3206,16 @@ impl LoweringContext {
                 });
             }
         };
-        
+
         // Create a place with dereference projection
         let deref_place = Place {
             local: pointer_place.local,
-            projection: vec![
-                pointer_place.projection.clone(),
-                vec![PlaceElem::Deref],
-            ].concat(),
+            projection: vec![pointer_place.projection.clone(), vec![PlaceElem::Deref]].concat(),
         };
-        
+
         Ok(Operand::Copy(deref_place))
     }
-    
+
     /// Lower pointer arithmetic
     fn lower_pointer_arithmetic(
         &mut self,
@@ -2948,34 +3226,36 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let pointer_op = self.lower_expression(pointer)?;
         let offset_op = self.lower_expression(offset)?;
-        
+
         // Get pointer type
         let pointer_type = self.get_expression_type(pointer)?;
-        
+
         // Create temporary for result
         let result_local = self.builder.new_local(pointer_type.clone(), false);
-        
+
         // Determine the operation
         let bin_op = match operation {
             ast::PointerOp::Add => BinOp::Offset,
             ast::PointerOp::Subtract => {
                 // For subtraction, we need to negate the offset first
-                let neg_offset_local = self.builder.new_local(Type::primitive(PrimitiveType::Integer), false);
+                let neg_offset_local = self
+                    .builder
+                    .new_local(Type::primitive(PrimitiveType::Integer), false);
                 self.builder.push_statement(Statement::Assign {
                     place: Place {
                         local: neg_offset_local,
                         projection: vec![],
                     },
-                    rvalue: Rvalue::UnaryOp { 
-                        op: UnOp::Neg, 
-                        operand: offset_op.clone() 
+                    rvalue: Rvalue::UnaryOp {
+                        op: UnOp::Neg,
+                        operand: offset_op.clone(),
                     },
                     source_info: SourceInfo {
                         span: source_location.clone(),
                         scope: 0,
                     },
                 });
-                
+
                 // Use the negated offset
                 self.builder.push_statement(Statement::Assign {
                     place: Place {
@@ -2995,14 +3275,14 @@ impl LoweringContext {
                         scope: 0,
                     },
                 });
-                
+
                 return Ok(Operand::Copy(Place {
                     local: result_local,
                     projection: vec![],
                 }));
             }
         };
-        
+
         // Emit pointer offset operation
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -3019,13 +3299,13 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower map literal
     fn lower_map_literal(
         &mut self,
@@ -3038,10 +3318,10 @@ impl LoweringContext {
         let key_mir_type = self.ast_type_to_mir_type(key_type)?;
         let value_mir_type = self.ast_type_to_mir_type(value_type)?;
         let map_type = Type::map(key_mir_type, value_mir_type);
-        
+
         // Create a new map
         let map_local = self.builder.new_local(map_type, false);
-        
+
         // Call map_new runtime function
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -3060,14 +3340,16 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         // Insert each entry
         for entry in entries {
             let key_op = self.lower_expression(&entry.key)?;
             let value_op = self.lower_expression(&entry.value)?;
-            
+
             // Call map_insert
-            let _result_local = self.builder.new_local(Type::primitive(PrimitiveType::Void), false);
+            let _result_local = self
+                .builder
+                .new_local(Type::primitive(PrimitiveType::Void), false);
             self.builder.push_statement(Statement::Assign {
                 place: Place {
                     local: _result_local,
@@ -3093,13 +3375,13 @@ impl LoweringContext {
                 },
             });
         }
-        
+
         Ok(Operand::Copy(Place {
             local: map_local,
             projection: vec![],
         }))
     }
-    
+
     /// Lower map access
     fn lower_map_access(
         &mut self,
@@ -3109,7 +3391,7 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let map_op = self.lower_expression(map)?;
         let key_op = self.lower_expression(key)?;
-        
+
         // Get the value type from the map type
         let map_type = self.get_expression_type(map)?;
         let value_type = match map_type {
@@ -3122,10 +3404,10 @@ impl LoweringContext {
                 });
             }
         };
-        
+
         // Create temporary for result
         let result_local = self.builder.new_local(value_type, false);
-        
+
         // Call map_get
         self.builder.push_statement(Statement::Assign {
             place: Place {
@@ -3144,7 +3426,7 @@ impl LoweringContext {
                 scope: 0,
             },
         });
-        
+
         Ok(Operand::Copy(Place {
             local: result_local,
             projection: vec![],
@@ -3165,7 +3447,10 @@ pub fn lower_ast_to_mir(ast_program: &ast::Program) -> Result<Program, SemanticE
 }
 
 /// Lower an AST program to MIR with symbol table information
-pub fn lower_ast_to_mir_with_symbols(ast_program: &ast::Program, symbol_table: SymbolTable) -> Result<Program, SemanticError> {
+pub fn lower_ast_to_mir_with_symbols(
+    ast_program: &ast::Program,
+    symbol_table: SymbolTable,
+) -> Result<Program, SemanticError> {
     let mut context = LoweringContext::with_symbol_table(symbol_table);
     context.lower_program(ast_program)
 }
@@ -3173,13 +3458,13 @@ pub fn lower_ast_to_mir_with_symbols(ast_program: &ast::Program, symbol_table: S
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{self, Identifier};
     use crate::ast::PrimitiveType;
-    
+    use crate::ast::{self, Identifier};
+
     #[test]
     fn test_simple_function_lowering() {
         let mut ctx = LoweringContext::new();
-        
+
         // Create a simple AST function
         let ast_func = ast::Function {
             name: Identifier::new("test".to_string(), SourceLocation::unknown()),
@@ -3202,23 +3487,22 @@ mod tests {
                 may_block: None,
             },
             body: ast::Block {
-                statements: vec![
-                    ast::Statement::Return {
-                        value: Some(Box::new(ast::Expression::IntegerLiteral {
-                            value: 42,
-                            source_location: SourceLocation::unknown(),
-                        })),
+                statements: vec![ast::Statement::Return {
+                    value: Some(Box::new(ast::Expression::IntegerLiteral {
+                        value: 42,
                         source_location: SourceLocation::unknown(),
-                    },
-                ],
+                    })),
+                    source_location: SourceLocation::unknown(),
+                }],
                 source_location: SourceLocation::unknown(),
             },
             export_info: None,
             source_location: SourceLocation::unknown(),
         };
-        
-        ctx.lower_function(&ast_func).expect("Lowering should succeed");
-        
+
+        ctx.lower_function(&ast_func)
+            .expect("Lowering should succeed");
+
         assert!(ctx.program.functions.contains_key("test"));
         let mir_func = &ctx.program.functions["test"];
         assert_eq!(mir_func.name, "test");

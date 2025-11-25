@@ -18,15 +18,12 @@
 #[path = "../utils/mod.rs"]
 mod utils;
 
-use utils::{
-    compiler_wrapper::TestCompiler,
-    assertions::*,
-};
+use utils::{assertions::*, compiler_wrapper::TestCompiler};
 
 #[test]
 fn test_basic_resource_scope() {
     let compiler = TestCompiler::new("basic_resource_scope");
-    
+
     let source = r#"
 (DEFINE_MODULE basic_resource_scope
   (DEFINE_FUNCTION
@@ -69,10 +66,10 @@ fn test_basic_resource_scope() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "basic_resource_scope.aether");
     assert_compilation_success(&result, "Basic resource scope compilation");
-    
+
     // Check that resource management code was generated
     if let Some(compilation_result) = result.success() {
         // Should have no warnings about resource leaks
@@ -85,7 +82,7 @@ fn test_basic_resource_scope() {
 #[test]
 fn test_nested_resource_scopes() {
     let compiler = TestCompiler::new("nested_resource_scopes");
-    
+
     let source = r#"
 (DEFINE_MODULE nested_resource_scopes
   (DEFINE_FUNCTION
@@ -150,7 +147,7 @@ fn test_nested_resource_scopes() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "nested_resource_scopes.aether");
     assert_compilation_success(&result, "Nested resource scopes compilation");
 }
@@ -158,7 +155,7 @@ fn test_nested_resource_scopes() {
 #[test]
 fn test_resource_leak_detection() {
     let compiler = TestCompiler::new("resource_leak_detection");
-    
+
     let source = r#"
 (DEFINE_MODULE resource_leak_detection
   (DEFINE_FUNCTION
@@ -184,9 +181,9 @@ fn test_resource_leak_detection() {
       (RETURN_VALUE (VARIABLE_REFERENCE "content"))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "resource_leak_detection.aether");
-    
+
     // Should either fail compilation or warn about resource leak
     if result.is_success() {
         assert_warning_contains(&result, "resource leak", "Resource leak warning");
@@ -198,7 +195,7 @@ fn test_resource_leak_detection() {
 #[test]
 fn test_resource_cleanup_ordering() {
     let compiler = TestCompiler::new("resource_cleanup_ordering");
-    
+
     let source = r#"
 (DEFINE_MODULE resource_cleanup_ordering
   (DEFINE_FUNCTION
@@ -246,7 +243,7 @@ fn test_resource_cleanup_ordering() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "resource_cleanup_ordering.aether");
     assert_compilation_success(&result, "Resource cleanup ordering");
 }
@@ -254,7 +251,7 @@ fn test_resource_cleanup_ordering() {
 #[test]
 fn test_resource_contract_validation() {
     let compiler = TestCompiler::new("resource_contracts");
-    
+
     let source = r#"
 (DEFINE_MODULE resource_contracts
   (DEFINE_FUNCTION
@@ -314,7 +311,7 @@ fn test_resource_contract_validation() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "resource_contracts.aether");
     assert_compilation_success(&result, "Resource contract validation");
 }
@@ -322,7 +319,7 @@ fn test_resource_contract_validation() {
 #[test]
 fn test_exception_safe_resource_management() {
     let compiler = TestCompiler::new("exception_safe_resources");
-    
+
     let source = r#"
 (DEFINE_MODULE exception_safe_resources
   (DEFINE_FUNCTION
@@ -385,7 +382,7 @@ fn test_exception_safe_resource_management() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "exception_safe_resources.aether");
     assert_compilation_success(&result, "Exception-safe resource management");
 }
@@ -393,7 +390,7 @@ fn test_exception_safe_resource_management() {
 #[test]
 fn test_resource_usage_analysis() {
     let compiler = TestCompiler::new("resource_usage_analysis");
-    
+
     let source = r#"
 (DEFINE_MODULE resource_usage_analysis
   (DEFINE_FUNCTION
@@ -447,10 +444,10 @@ fn test_resource_usage_analysis() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "resource_usage_analysis.aether");
     assert_compilation_success(&result, "Resource usage analysis");
-    
+
     // Should have performance and resource usage information
     if let Some(compilation_result) = result.success() {
         // Look for resource analysis warnings/info

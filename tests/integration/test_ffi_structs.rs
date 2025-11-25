@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Integration tests for FFI struct passing
-//! 
+//!
 //! Tests that verify correct struct layout, alignment, and passing
 //! between Aether and C code.
 
@@ -113,7 +113,7 @@ fn test_basic_struct_passing() {
     // Write test program
     let test_file = PathBuf::from("test_basic_struct.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -122,24 +122,27 @@ fn test_basic_struct_passing() {
         .arg("test_basic_struct")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_basic_struct")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success(), "Test program failed");
     let stdout = String::from_utf8_lossy(&run_output.stdout);
-    
+
     // Verify output
     assert!(stdout.contains("Distance: 5"));
     assert!(stdout.contains("Sum: (3"));
     assert!(stdout.contains("Scaled: (4"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_basic_struct").ok();
@@ -230,7 +233,7 @@ fn test_nested_struct_passing() {
     // Write test program
     let test_file = PathBuf::from("test_nested_struct.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -239,24 +242,27 @@ fn test_nested_struct_passing() {
         .arg("test_nested_struct")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_nested_struct")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success(), "Test program failed");
     let stdout = String::from_utf8_lossy(&run_output.stdout);
-    
+
     // Verify output
     assert!(stdout.contains("Area: 50"));
     assert!(stdout.contains("Expanded top-left: (-1"));
     assert!(stdout.contains("Expanded size: 12"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_nested_struct").ok();
@@ -334,7 +340,7 @@ fn test_struct_with_small_fields() {
     // Write test program
     let test_file = PathBuf::from("test_struct_alignment.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -343,25 +349,28 @@ fn test_struct_with_small_fields() {
         .arg("test_struct_alignment")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_struct_alignment")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success(), "Test program failed");
     let stdout = String::from_utf8_lossy(&run_output.stdout);
-    
+
     // Verify output - blending red and blue should give purple
     assert!(stdout.contains("R=127") || stdout.contains("R=128")); // Allow for rounding
     assert!(stdout.contains("G=0"));
     assert!(stdout.contains("B=127") || stdout.contains("B=128"));
     assert!(stdout.contains("A=255"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_struct_alignment").ok();
@@ -437,7 +446,7 @@ fn test_struct_with_string_field() {
     // Write test program
     let test_file = PathBuf::from("test_struct_string.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
     let output = Command::new("target/release/aether-compiler")
         .arg("compile")
@@ -446,22 +455,25 @@ fn test_struct_with_string_field() {
         .arg("test_struct_string")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
+
     // Run the program
     let run_output = Command::new("./test_struct_string")
         .output()
         .expect("Failed to run compiled program");
-    
+
     assert!(run_output.status.success(), "Test program failed");
     let stdout = String::from_utf8_lossy(&run_output.stdout);
-    
+
     // Verify output
     assert!(stdout.contains("Person: Alice, age 30, height 165.5"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_struct_string").ok();

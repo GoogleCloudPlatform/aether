@@ -13,19 +13,18 @@
 // limitations under the License.
 
 //! Documentation parser for extracting docs from source code
-//! 
+//!
 //! Parses AetherScript source files to extract documentation comments,
 //! function signatures, type definitions, and other API information.
 
-use crate::error::SemanticError;
 use crate::docs::{
-    ModuleDoc, FunctionDoc, TypeDoc, DocConfig,
-    Visibility, SourceLocation, ItemSummary, ItemKind, FunctionSignature,
-    ParameterDoc, TypeReference, TypeParameterDoc, TypeKind, FieldDoc,
-    VariantDoc, CodeExample, ExampleType
+    CodeExample, DocConfig, ExampleType, FieldDoc, FunctionDoc, FunctionSignature, ItemKind,
+    ItemSummary, ModuleDoc, ParameterDoc, SourceLocation, TypeDoc, TypeKind, TypeParameterDoc,
+    TypeReference, VariantDoc, Visibility,
 };
-use std::path::PathBuf;
+use crate::error::SemanticError;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// Documentation parser
 #[derive(Debug)]
@@ -38,7 +37,7 @@ pub struct MarkdownParser;
 pub struct DocParser {
     /// Source code parser
     source_parser: SourceParser,
-    
+
     /// Markdown parser for doc comments
     markdown_parser: MarkdownParser,
 }
@@ -48,22 +47,22 @@ pub struct DocParser {
 pub struct ParsedDoc {
     /// Raw documentation text
     pub raw_docs: String,
-    
+
     /// Parsed description
     pub description: Option<String>,
-    
+
     /// Code examples
     pub examples: Vec<CodeExample>,
-    
+
     /// Parameters (for functions)
     pub param_docs: HashMap<String, String>,
-    
+
     /// Return documentation
     pub return_doc: Option<String>,
-    
+
     /// Tags and metadata
     pub tags: HashMap<String, String>,
-    
+
     /// See also references
     pub see_also: Vec<String>,
 }
@@ -80,37 +79,36 @@ pub struct CommentParser {
 pub struct CommentPatterns {
     /// Line comment prefix (e.g., "//")
     pub line: String,
-    
+
     /// Block comment start (e.g., "/*")
     pub block_start: String,
-    
+
     /// Block comment end (e.g., "*/")
     pub block_end: String,
-    
+
     /// Documentation comment prefix (e.g., "///")
     pub doc_line: String,
-    
+
     /// Documentation block comment start (e.g., "/**")
     pub doc_block_start: String,
 }
 
 /// Signature parser for extracting function and type signatures
 #[derive(Debug)]
-pub struct SignatureParser {
-}
+pub struct SignatureParser {}
 
 /// Parsing context
 #[derive(Debug, Clone)]
 pub struct ParseContext {
     /// Current module path
     pub module_path: String,
-    
+
     /// Current visibility scope
     pub visibility_scope: Visibility,
-    
+
     /// Type parameters in scope
     pub type_parameters: Vec<String>,
-    
+
     /// Generic constraints
     pub constraints: HashMap<String, Vec<String>>,
 }
@@ -120,10 +118,10 @@ pub struct ParseContext {
 pub struct ExtractionResult {
     /// Extracted modules
     pub modules: Vec<ModuleDoc>,
-    
+
     /// Extraction warnings
     pub warnings: Vec<String>,
-    
+
     /// Extraction errors
     pub errors: Vec<String>,
 }
@@ -133,48 +131,55 @@ impl DocParser {
     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
         let comment_parser = CommentParser::new();
         let signature_parser = SignatureParser::new();
-        
+
         Ok(Self {
             source_parser: SourceParser,
             markdown_parser: MarkdownParser,
         })
     }
-    
+
     /// Parse a directory for documentation
     pub fn parse_directory(&mut self, dir: &PathBuf) -> Result<Vec<ModuleDoc>, SemanticError> {
         let mut modules = Vec::new();
-        
+
         // Find all AetherScript source files
         let source_files = self.find_source_files(dir)?;
-        
+
         for file_path in source_files {
             match self.parse_file(&file_path) {
                 Ok(mut file_modules) => {
                     modules.append(&mut file_modules);
                 }
                 Err(e) => {
-                    eprintln!("Warning: Failed to parse file {}: {}", file_path.display(), e);
+                    eprintln!(
+                        "Warning: Failed to parse file {}: {}",
+                        file_path.display(),
+                        e
+                    );
                 }
             }
         }
-        
+
         Ok(modules)
     }
-    
+
     /// Parse a single file for documentation
     pub fn parse_file(&mut self, file_path: &PathBuf) -> Result<Vec<ModuleDoc>, SemanticError> {
-        let content = std::fs::read_to_string(file_path)
-            .map_err(|e| SemanticError::Internal {
-                message: format!("Failed to read file {}: {}", file_path.display(), e),
-            })?;
-        
+        let content = std::fs::read_to_string(file_path).map_err(|e| SemanticError::Internal {
+            message: format!("Failed to read file {}: {}", file_path.display(), e),
+        })?;
+
         self.parse_content(&content, file_path)
     }
-    
+
     /// Parse content string for documentation
-    pub fn parse_content(&mut self, content: &str, file_path: &PathBuf) -> Result<Vec<ModuleDoc>, SemanticError> {
+    pub fn parse_content(
+        &mut self,
+        content: &str,
+        file_path: &PathBuf,
+    ) -> Result<Vec<ModuleDoc>, SemanticError> {
         let mut modules = Vec::new();
-        
+
         // Initialize parsing context
         let module_name = self.extract_module_name(file_path);
         let mut context = ParseContext {
@@ -183,10 +188,10 @@ impl DocParser {
             type_parameters: Vec::new(),
             constraints: HashMap::new(),
         };
-        
+
         // Parse the content into tokens/AST nodes (simplified)
         let items = self.parse_top_level_items(content)?;
-        
+
         // Extract documentation for each item
         let mut module_doc = ModuleDoc {
             name: module_name.clone(),
@@ -204,29 +209,34 @@ impl DocParser {
             items: Vec::new(),
             examples: Vec::new(),
         };
-        
+
         // Extract module-level documentation
         if let Some(module_docs) = self.extract_module_documentation(content)? {
             module_doc.docs = module_docs.raw_docs;
             module_doc.description = module_docs.description;
             module_doc.examples = module_docs.examples;
         }
-        
+
         // Process each top-level item
         for item in items {
             let item_summary = self.process_item(item, &mut context)?;
             module_doc.items.push(item_summary);
         }
-        
+
         modules.push(module_doc);
         Ok(modules)
     }
-    
+
     /// Extract documentation for a specific function
-    pub fn extract_function_doc(&mut self, function_source: &str, file_path: &PathBuf, line: usize) -> Result<FunctionDoc, SemanticError> {
+    pub fn extract_function_doc(
+        &mut self,
+        function_source: &str,
+        file_path: &PathBuf,
+        line: usize,
+    ) -> Result<FunctionDoc, SemanticError> {
         let parsed_doc = self.parse_documentation(function_source)?;
         let signature = self.parse_function_signature(function_source)?;
-        
+
         Ok(FunctionDoc {
             name: signature.name.clone(),
             path: format!("{}::{}", self.get_current_module_path(), signature.name),
@@ -240,7 +250,9 @@ impl DocParser {
                 column: 1,
                 span: function_source.len(),
             },
-            parameters: parsed_doc.param_docs.into_iter()
+            parameters: parsed_doc
+                .param_docs
+                .into_iter()
                 .map(|(name, desc)| ParameterDoc {
                     name,
                     param_type: TypeReference {
@@ -259,12 +271,17 @@ impl DocParser {
             related: vec![],
         })
     }
-    
+
     /// Extract documentation for a specific type
-    pub fn extract_type_doc(&mut self, type_source: &str, file_path: &PathBuf, line: usize) -> Result<TypeDoc, SemanticError> {
+    pub fn extract_type_doc(
+        &mut self,
+        type_source: &str,
+        file_path: &PathBuf,
+        line: usize,
+    ) -> Result<TypeDoc, SemanticError> {
         let parsed_doc = self.parse_documentation(type_source)?;
         let type_info = self.parse_type_definition(type_source)?;
-        
+
         Ok(TypeDoc {
             name: type_info.name.clone(),
             path: format!("{}::{}", self.get_current_module_path(), type_info.name),
@@ -286,28 +303,27 @@ impl DocParser {
             examples: parsed_doc.examples,
         })
     }
-    
+
     // Helper methods
-    
+
     fn find_source_files(&self, dir: &PathBuf) -> Result<Vec<PathBuf>, SemanticError> {
         let mut files = Vec::new();
-        
+
         if !dir.is_dir() {
             return Ok(files);
         }
-        
-        let entries = std::fs::read_dir(dir)
-            .map_err(|e| SemanticError::Internal {
-                message: format!("Failed to read directory {}: {}", dir.display(), e),
-            })?;
-        
+
+        let entries = std::fs::read_dir(dir).map_err(|e| SemanticError::Internal {
+            message: format!("Failed to read directory {}: {}", dir.display(), e),
+        })?;
+
         for entry in entries {
             let entry = entry.map_err(|e| SemanticError::Internal {
                 message: format!("Failed to read directory entry: {}", e),
             })?;
-            
+
             let path = entry.path();
-            
+
             if path.is_file() {
                 if let Some(extension) = path.extension() {
                     if extension == "aether" || extension == "ae" {
@@ -320,33 +336,36 @@ impl DocParser {
                 files.append(&mut subfiles);
             }
         }
-        
+
         Ok(files)
     }
-    
+
     fn extract_module_name(&self, file_path: &PathBuf) -> String {
-        file_path.file_stem()
+        file_path
+            .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string()
     }
-    
+
     fn parse_top_level_items(&self, content: &str) -> Result<Vec<ParsedItem>, SemanticError> {
         // Simplified parsing - in real implementation would use proper lexer/parser
         let mut items = Vec::new();
-        
+
         let lines: Vec<&str> = content.lines().collect();
         let mut i = 0;
-        
+
         while i < lines.len() {
             let line = lines[i].trim();
-            
+
             if line.starts_with("(defn ") || line.starts_with("(fn ") {
                 // Function definition
                 items.push(ParsedItem {
                     item_type: ItemType::Function,
                     name: self.extract_function_name(line),
-                    doc_comment: self.extract_preceding_comments(&lines, i).unwrap_or_default(),
+                    doc_comment: self
+                        .extract_preceding_comments(&lines, i)
+                        .unwrap_or_default(),
                     location: SourceLocation {
                         file: PathBuf::new(),
                         line: i + 1,
@@ -359,7 +378,9 @@ impl DocParser {
                 items.push(ParsedItem {
                     item_type: ItemType::Struct,
                     name: self.extract_type_name(line),
-                    doc_comment: self.extract_preceding_comments(&lines, i).unwrap_or_default(),
+                    doc_comment: self
+                        .extract_preceding_comments(&lines, i)
+                        .unwrap_or_default(),
                     location: SourceLocation {
                         file: PathBuf::new(),
                         line: i + 1,
@@ -372,7 +393,9 @@ impl DocParser {
                 items.push(ParsedItem {
                     item_type: ItemType::Constant,
                     name: self.extract_constant_name(line),
-                    doc_comment: self.extract_preceding_comments(&lines, i).unwrap_or_default(),
+                    doc_comment: self
+                        .extract_preceding_comments(&lines, i)
+                        .unwrap_or_default(),
                     location: SourceLocation {
                         file: PathBuf::new(),
                         line: i + 1,
@@ -381,18 +404,21 @@ impl DocParser {
                     },
                 });
             }
-            
+
             i += 1;
         }
-        
+
         Ok(items)
     }
-    
-    fn extract_module_documentation(&mut self, content: &str) -> Result<Option<ParsedDoc>, SemanticError> {
+
+    fn extract_module_documentation(
+        &mut self,
+        content: &str,
+    ) -> Result<Option<ParsedDoc>, SemanticError> {
         // Look for module-level documentation at the top of the file
         let lines: Vec<&str> = content.lines().collect();
         let mut doc_lines = Vec::new();
-        
+
         for line in lines {
             let trimmed = line.trim();
             if trimmed.starts_with(";;;") || trimmed.starts_with("//!") {
@@ -401,17 +427,21 @@ impl DocParser {
                 break; // Stop at first non-comment, non-empty line
             }
         }
-        
+
         if doc_lines.is_empty() {
             return Ok(None);
         }
-        
+
         let doc_text = doc_lines.join("\n");
         let parsed_doc = self.parse_documentation(&doc_text)?;
         Ok(Some(parsed_doc))
     }
-    
-    fn process_item(&mut self, item: ParsedItem, _context: &mut ParseContext) -> Result<ItemSummary, SemanticError> {
+
+    fn process_item(
+        &mut self,
+        item: ParsedItem,
+        _context: &mut ParseContext,
+    ) -> Result<ItemSummary, SemanticError> {
         let kind = match item.item_type {
             ItemType::Function => ItemKind::Function,
             ItemType::Struct => ItemKind::Struct,
@@ -423,14 +453,13 @@ impl DocParser {
             ItemType::TypeAlias => ItemKind::Type,
             ItemType::Import => ItemKind::Module,
         };
-        
+
         let description = if !item.doc_comment.is_empty() {
-            self.parse_documentation(&item.doc_comment)?
-                .description
+            self.parse_documentation(&item.doc_comment)?.description
         } else {
             None
         };
-        
+
         Ok(ItemSummary {
             name: item.name,
             kind,
@@ -438,16 +467,16 @@ impl DocParser {
             visibility: Visibility::Public, // Would be determined from actual parsing
         })
     }
-    
+
     fn extract_preceding_comments(&self, lines: &[&str], index: usize) -> Option<String> {
         let mut comment_lines = Vec::new();
         let mut i = index;
-        
+
         // Look backwards for comment lines
         while i > 0 {
             i -= 1;
             let line = lines[i].trim();
-            
+
             if line.starts_with(";;;") || line.starts_with("//") {
                 comment_lines.insert(0, line);
             } else if line.is_empty() {
@@ -456,14 +485,14 @@ impl DocParser {
                 break; // Stop at non-comment line
             }
         }
-        
+
         if comment_lines.is_empty() {
             None
         } else {
             Some(comment_lines.join("\n"))
         }
     }
-    
+
     fn extract_function_name(&self, line: &str) -> String {
         // Extract function name from definition line
         // Simplified implementation
@@ -475,7 +504,7 @@ impl DocParser {
         }
         "unknown".to_string()
     }
-    
+
     fn extract_type_name(&self, line: &str) -> String {
         // Extract type name from definition line
         // Simplified implementation
@@ -487,7 +516,7 @@ impl DocParser {
         }
         "unknown".to_string()
     }
-    
+
     fn extract_constant_name(&self, line: &str) -> String {
         // Extract constant name from definition line
         // Simplified implementation
@@ -499,11 +528,11 @@ impl DocParser {
         }
         "unknown".to_string()
     }
-    
+
     fn get_current_module_path(&self) -> String {
         "unknown".to_string()
     }
-    
+
     fn parse_documentation(&self, raw_docs: &str) -> Result<ParsedDoc, SemanticError> {
         let mut description = None;
         let mut examples = Vec::new();
@@ -511,14 +540,14 @@ impl DocParser {
         let mut return_doc = None;
         let mut tags = HashMap::new();
         let mut see_also = Vec::new();
-        
+
         let lines: Vec<&str> = raw_docs.lines().collect();
         let mut current_section = DocSection::Description;
         let mut current_param = None;
-        
+
         for line in lines {
             let trimmed = line.trim();
-            
+
             // Check for section markers
             if trimmed.starts_with("@param") || trimmed.starts_with(":param") {
                 if let Some(param_match) = trimmed.split_whitespace().nth(1) {
@@ -539,12 +568,12 @@ impl DocParser {
                 // Generic tag
                 if let Some(tag_end) = trimmed.find(' ') {
                     let tag = trimmed[1..tag_end].to_string();
-                    let value = trimmed[tag_end+1..].to_string();
+                    let value = trimmed[tag_end + 1..].to_string();
                     tags.insert(tag, value);
                 }
                 continue;
             }
-            
+
             // Add content to appropriate section
             match current_section {
                 DocSection::Description => {
@@ -560,7 +589,9 @@ impl DocParser {
                 }
                 DocSection::Parameter => {
                     if let Some(ref param_name) = current_param {
-                        let entry = param_docs.entry(param_name.clone()).or_insert(String::new());
+                        let entry = param_docs
+                            .entry(param_name.clone())
+                            .or_insert(String::new());
                         if !entry.is_empty() {
                             entry.push('\n');
                         }
@@ -609,7 +640,7 @@ impl DocParser {
                 }
             }
         }
-        
+
         Ok(ParsedDoc {
             raw_docs: raw_docs.to_string(),
             description,
@@ -620,10 +651,11 @@ impl DocParser {
             see_also,
         })
     }
-    
+
     fn parse_function_signature(&self, source: &str) -> Result<FunctionSignature, SemanticError> {
         // Simple signature parsing - in a real implementation this would be more sophisticated
-        let name = source.lines()
+        let name = source
+            .lines()
             .find(|line| line.contains("fn ") || line.contains("def "))
             .and_then(|line| {
                 line.split_whitespace()
@@ -633,7 +665,7 @@ impl DocParser {
             })
             .unwrap_or("unknown")
             .to_string();
-        
+
         Ok(FunctionSignature {
             name,
             type_parameters: Vec::new(),
@@ -643,11 +675,14 @@ impl DocParser {
             is_unsafe: false,
         })
     }
-    
+
     fn parse_type_definition(&self, source: &str) -> Result<TypeInfo, SemanticError> {
         // Simple type parsing - in a real implementation this would be more sophisticated
-        let name = source.lines()
-            .find(|line| line.contains("struct ") || line.contains("enum ") || line.contains("type "))
+        let name = source
+            .lines()
+            .find(|line| {
+                line.contains("struct ") || line.contains("enum ") || line.contains("type ")
+            })
             .and_then(|line| {
                 line.split_whitespace()
                     .skip_while(|&w| w != "struct" && w != "enum" && w != "type")
@@ -655,7 +690,7 @@ impl DocParser {
             })
             .unwrap_or("unknown")
             .to_string();
-        
+
         let kind = if source.contains("struct ") {
             TypeKind::Struct
         } else if source.contains("enum ") {
@@ -663,7 +698,7 @@ impl DocParser {
         } else {
             TypeKind::TypeAlias
         };
-        
+
         Ok(TypeInfo {
             name,
             kind,
@@ -679,13 +714,13 @@ impl DocParser {
 struct ParsedItem {
     /// Item type
     item_type: ItemType,
-    
+
     /// Item name
     name: String,
-    
+
     /// Raw documentation comment
     doc_comment: String,
-    
+
     /// Source location
     location: SourceLocation,
 }
@@ -709,16 +744,16 @@ enum ItemType {
 struct TypeInfo {
     /// Type name
     name: String,
-    
+
     /// Type kind
     kind: TypeKind,
-    
+
     /// Type parameters
     type_parameters: Vec<TypeParameterDoc>,
-    
+
     /// Fields (for structs)
     fields: Vec<FieldDoc>,
-    
+
     /// Variants (for enums)
     variants: Vec<VariantDoc>,
 }
@@ -735,7 +770,7 @@ impl CommentParser {
             },
         }
     }
-    
+
     fn parse_documentation(&self, raw_docs: &str) -> Result<ParsedDoc, SemanticError> {
         let mut description = None;
         let mut examples = Vec::new();
@@ -743,24 +778,31 @@ impl CommentParser {
         let mut return_doc = None;
         let mut tags = HashMap::new();
         let mut see_also = Vec::new();
-        
+
         let lines: Vec<&str> = raw_docs.lines().collect();
         let mut current_section = DocSection::Description;
         let mut current_content: Vec<String> = Vec::new();
-        
+
         for line in lines {
             let cleaned_line = self.clean_comment_line(line);
-            
+
             if let Some(tag) = self.extract_tag(&cleaned_line) {
                 // Process previous section
-                self.finalize_section(&mut current_section, &current_content, 
-                    &mut description, &mut examples, &mut param_docs, 
-                    &mut return_doc, &mut tags, &mut see_also)?;
-                
+                self.finalize_section(
+                    &mut current_section,
+                    &current_content,
+                    &mut description,
+                    &mut examples,
+                    &mut param_docs,
+                    &mut return_doc,
+                    &mut tags,
+                    &mut see_also,
+                )?;
+
                 // Start new section
                 current_content.clear();
                 current_section = self.tag_to_section(&tag);
-                
+
                 if let Some(content) = cleaned_line.strip_prefix(&format!("{}{}", "@", tag)) {
                     current_content.push(content.trim().to_string());
                 }
@@ -768,12 +810,19 @@ impl CommentParser {
                 current_content.push(cleaned_line);
             }
         }
-        
+
         // Process final section
-        self.finalize_section(&mut current_section, &current_content, 
-            &mut description, &mut examples, &mut param_docs, 
-            &mut return_doc, &mut tags, &mut see_also)?;
-        
+        self.finalize_section(
+            &mut current_section,
+            &current_content,
+            &mut description,
+            &mut examples,
+            &mut param_docs,
+            &mut return_doc,
+            &mut tags,
+            &mut see_also,
+        )?;
+
         Ok(ParsedDoc {
             raw_docs: raw_docs.to_string(),
             description,
@@ -784,10 +833,10 @@ impl CommentParser {
             see_also,
         })
     }
-    
+
     fn clean_comment_line(&self, line: &str) -> String {
         let trimmed = line.trim();
-        
+
         // Remove comment prefixes
         if let Some(rest) = trimmed.strip_prefix(&self.patterns.line) {
             rest.trim().to_string()
@@ -797,7 +846,7 @@ impl CommentParser {
             trimmed.to_string()
         }
     }
-    
+
     fn extract_tag(&self, line: &str) -> Option<String> {
         if line.starts_with("@") {
             if let Some(space_pos) = line.find(' ') {
@@ -809,7 +858,7 @@ impl CommentParser {
             None
         }
     }
-    
+
     fn tag_to_section(&self, tag: &str) -> DocSection {
         match tag {
             "param" | "parameter" => DocSection::Parameter,
@@ -819,20 +868,23 @@ impl CommentParser {
             _ => DocSection::Tag(tag.to_string()),
         }
     }
-    
-    fn finalize_section(&self, section: &mut DocSection, content: &[String],
-                       description: &mut Option<String>,
-                       examples: &mut Vec<CodeExample>,
-                       param_docs: &mut HashMap<String, String>,
-                       return_doc: &mut Option<String>,
-                       tags: &mut HashMap<String, String>,
-                       see_also: &mut Vec<String>) -> Result<(), SemanticError> {
-        
+
+    fn finalize_section(
+        &self,
+        section: &mut DocSection,
+        content: &[String],
+        description: &mut Option<String>,
+        examples: &mut Vec<CodeExample>,
+        param_docs: &mut HashMap<String, String>,
+        return_doc: &mut Option<String>,
+        tags: &mut HashMap<String, String>,
+        see_also: &mut Vec<String>,
+    ) -> Result<(), SemanticError> {
         let content_text = content.join("\n").trim().to_string();
         if content_text.is_empty() {
             return Ok(());
         }
-        
+
         match section {
             DocSection::Description => {
                 *description = Some(content_text);
@@ -865,7 +917,7 @@ impl CommentParser {
                 tags.insert(tag_name.clone(), content_text);
             }
         }
-        
+
         Ok(())
     }
 }
@@ -885,13 +937,13 @@ impl SignatureParser {
     fn new() -> Self {
         Self {}
     }
-    
+
     fn parse_function_signature(&self, source: &str) -> Result<FunctionSignature, SemanticError> {
         // Simplified function signature parsing
         // In real implementation, would use proper parser
-        
+
         let name = self.extract_function_name(source);
-        
+
         Ok(FunctionSignature {
             name,
             type_parameters: vec![],
@@ -901,11 +953,11 @@ impl SignatureParser {
             is_unsafe: false,
         })
     }
-    
+
     fn parse_type_definition(&self, source: &str) -> Result<TypeInfo, SemanticError> {
         // Simplified type parsing
         let name = self.extract_type_name(source);
-        
+
         Ok(TypeInfo {
             name,
             kind: TypeKind::Struct, // Would be determined from actual parsing
@@ -914,7 +966,7 @@ impl SignatureParser {
             variants: vec![],
         })
     }
-    
+
     fn extract_function_name(&self, source: &str) -> String {
         // Simplified function name extraction
         if let Some(start) = source.find("(defn ") {
@@ -925,7 +977,7 @@ impl SignatureParser {
         }
         "unknown".to_string()
     }
-    
+
     fn extract_type_name(&self, source: &str) -> String {
         // Simplified type name extraction
         if let Some(start) = source.find("(deftype ") {
@@ -941,42 +993,42 @@ impl SignatureParser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_comment_parser() {
         let parser = CommentParser::new();
         let docs = ";;; A simple function\n;;; @param x The input value\n;;; @return The result";
-        
+
         let parsed = parser.parse_documentation(docs).unwrap();
         assert_eq!(parsed.description, Some("A simple function".to_string()));
         assert!(parsed.param_docs.contains_key("x"));
         assert!(parsed.return_doc.is_some());
     }
-    
+
     #[test]
     fn test_function_name_extraction() {
         let parser = SignatureParser::new();
         let source = "(defn add [x y] (+ x y))";
-        
+
         let name = parser.extract_function_name(source);
         assert_eq!(name, "add");
     }
-    
+
     #[test]
     fn test_source_file_discovery() {
         let config = DocConfig::default();
         let mut parser = DocParser::new(&config).unwrap();
-        
+
         // Would test with actual filesystem in real implementation
         // let files = parser.find_source_files(&PathBuf::from("test_sources")).unwrap();
         // assert!(!files.is_empty());
     }
-    
+
     #[test]
     fn test_module_name_extraction() {
         let config = DocConfig::default();
         let parser = DocParser::new(&config).unwrap();
-        
+
         let path = PathBuf::from("src/test_module.aether");
         let name = parser.extract_module_name(&path);
         assert_eq!(name, "test_module");

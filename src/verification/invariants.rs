@@ -14,19 +14,19 @@
 
 //! Loop invariants and global invariants for verification
 
+use super::contracts::Expression;
 use crate::error::SourceLocation;
 use crate::mir::BasicBlockId;
-use super::contracts::Expression;
 
 /// Loop invariant specification
 #[derive(Debug, Clone)]
 pub struct LoopInvariant {
     /// The loop header block
     pub loop_header: BasicBlockId,
-    
+
     /// Invariant conditions
     pub conditions: Vec<InvariantCondition>,
-    
+
     /// Loop variant (for termination)
     pub variant: Option<LoopVariant>,
 }
@@ -36,10 +36,10 @@ pub struct LoopInvariant {
 pub struct InvariantCondition {
     /// Condition name/label
     pub name: String,
-    
+
     /// The invariant expression
     pub expression: Expression,
-    
+
     /// Source location
     pub location: SourceLocation,
 }
@@ -49,7 +49,7 @@ pub struct InvariantCondition {
 pub struct LoopVariant {
     /// The variant expression (must decrease)
     pub expression: Expression,
-    
+
     /// Lower bound (usually 0)
     pub lower_bound: Expression,
 }
@@ -59,13 +59,13 @@ pub struct LoopVariant {
 pub struct GlobalInvariant {
     /// Invariant name
     pub name: String,
-    
+
     /// The invariant expression
     pub expression: Expression,
-    
+
     /// When this invariant is active
     pub scope: InvariantScope,
-    
+
     /// Source location
     pub location: SourceLocation,
 }
@@ -75,13 +75,13 @@ pub struct GlobalInvariant {
 pub enum InvariantScope {
     /// Always active
     Always,
-    
+
     /// Active within a specific function
     Function(String),
-    
+
     /// Active within a module
     Module(String),
-    
+
     /// Active when a condition holds
     Conditional(Expression),
 }
@@ -95,7 +95,7 @@ impl LoopInvariant {
             variant: None,
         }
     }
-    
+
     /// Add an invariant condition
     pub fn add_condition(&mut self, name: String, expr: Expression, location: SourceLocation) {
         self.conditions.push(InvariantCondition {
@@ -104,7 +104,7 @@ impl LoopInvariant {
             location,
         });
     }
-    
+
     /// Set the loop variant
     pub fn set_variant(&mut self, expr: Expression, lower_bound: Expression) {
         self.variant = Some(LoopVariant {
@@ -112,7 +112,7 @@ impl LoopInvariant {
             lower_bound,
         });
     }
-    
+
     /// Check if this invariant has a variant (for termination checking)
     pub fn has_variant(&self) -> bool {
         self.variant.is_some()
@@ -121,7 +121,12 @@ impl LoopInvariant {
 
 impl GlobalInvariant {
     /// Create a new global invariant
-    pub fn new(name: String, expr: Expression, scope: InvariantScope, location: SourceLocation) -> Self {
+    pub fn new(
+        name: String,
+        expr: Expression,
+        scope: InvariantScope,
+        location: SourceLocation,
+    ) -> Self {
         Self {
             name,
             expression: expr,
@@ -129,7 +134,7 @@ impl GlobalInvariant {
             location,
         }
     }
-    
+
     /// Check if this invariant applies in a given context
     pub fn applies_in_function(&self, function_name: &str) -> bool {
         match &self.scope {
@@ -147,7 +152,7 @@ pub fn extract_loop_invariants(_function: &crate::mir::Function) -> Vec<LoopInva
     // 1. Identify loop headers in the CFG
     // 2. Look for invariant annotations in the source
     // 3. Possibly infer simple invariants automatically
-    
+
     // For now, return empty vec
     Vec::new()
 }
@@ -156,7 +161,7 @@ pub fn extract_loop_invariants(_function: &crate::mir::Function) -> Vec<LoopInva
 pub mod patterns {
     use super::*;
     use crate::verification::contracts::{BinaryOp, ConstantValue};
-    
+
     /// Create an array bounds invariant: 0 <= index < length
     pub fn array_bounds(index_var: &str, length_expr: Expression) -> Expression {
         Expression::BinaryOp {
@@ -173,7 +178,7 @@ pub mod patterns {
             }),
         }
     }
-    
+
     /// Create a non-null invariant
     pub fn non_null(var: &str) -> Expression {
         Expression::BinaryOp {
@@ -182,7 +187,7 @@ pub mod patterns {
             right: Box::new(Expression::Constant(ConstantValue::Null)),
         }
     }
-    
+
     /// Create a range invariant: low <= var <= high
     pub fn in_range(var: &str, low: i64, high: i64) -> Expression {
         Expression::BinaryOp {
@@ -203,13 +208,13 @@ pub mod patterns {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::patterns;
-    
+    use super::*;
+
     #[test]
     fn test_loop_invariant() {
         let mut inv = LoopInvariant::new(0);
-        
+
         // Add invariant: i >= 0
         inv.add_condition(
             "non_negative".to_string(),
@@ -217,15 +222,15 @@ mod tests {
                 op: crate::verification::contracts::BinaryOp::Ge,
                 left: Box::new(Expression::Variable("i".to_string())),
                 right: Box::new(Expression::Constant(
-                    crate::verification::contracts::ConstantValue::Integer(0)
+                    crate::verification::contracts::ConstantValue::Integer(0),
                 )),
             },
             SourceLocation::unknown(),
         );
-        
+
         assert_eq!(inv.conditions.len(), 1);
         assert!(!inv.has_variant());
-        
+
         // Add variant: n - i
         inv.set_variant(
             Expression::BinaryOp {
@@ -235,17 +240,17 @@ mod tests {
             },
             Expression::Constant(crate::verification::contracts::ConstantValue::Integer(0)),
         );
-        
+
         assert!(inv.has_variant());
     }
-    
+
     #[test]
     fn test_array_bounds_pattern() {
         let bounds = patterns::array_bounds(
             "i",
             Expression::Length(Box::new(Expression::Variable("arr".to_string()))),
         );
-        
+
         assert_eq!(bounds.to_string(), "((0 <= i) && (i < len(arr)))");
     }
 }
