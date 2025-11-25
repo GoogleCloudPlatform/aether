@@ -17,9 +17,11 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    AssignmentTarget, Block, CallingConvention, ElseIf, EnumVariant, Expression, ExternalFunction,
-    Function, FunctionMetadata, Identifier, ImportStatement, Module, Mutability, OwnershipKind,
-    Parameter, PassingMode, PrimitiveType, Program, Statement, StructField, TypeDefinition, TypeSpecifier,
+    Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode, ElseIf,
+    EnumVariant, Expression, ExternalFunction, Function, FunctionCall as AstFunctionCall,
+    FunctionMetadata, FunctionReference, Identifier, ImportStatement, LambdaBody, MatchCase,
+    Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
+    Statement, StructField, TypeDefinition, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -171,6 +173,85 @@ impl Parser {
         self.errors.push(error);
     }
 
+    /// Check if there are any collected errors
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    /// Take all collected errors, leaving the list empty
+    pub fn take_errors(&mut self) -> Vec<ParserError> {
+        std::mem::take(&mut self.errors)
+    }
+
+    // ==================== ERROR RECOVERY ====================
+
+    /// Synchronize to a safe recovery point after an error
+    /// Skips tokens until we find a statement boundary or declaration start
+    fn synchronize(&mut self) {
+        self.advance();
+
+        while !self.is_at_end() {
+            // If we just passed a semicolon, we're at a statement boundary
+            if matches!(self.previous().token_type, TokenType::Semicolon) {
+                return;
+            }
+
+            // If we see a keyword that starts a declaration, stop here
+            match &self.peek().token_type {
+                TokenType::Keyword(kw) => match kw {
+                    Keyword::Func
+                    | Keyword::Struct
+                    | Keyword::Enum
+                    | Keyword::Let
+                    | Keyword::Const
+                    | Keyword::Import
+                    | Keyword::Module
+                    | Keyword::When
+                    | Keyword::While
+                    | Keyword::Return => return,
+                    _ => {}
+                },
+                TokenType::At => return, // Annotation starts a new declaration
+                TokenType::RightBrace => return, // End of block
+                _ => {}
+            }
+
+            self.advance();
+        }
+    }
+
+    /// Synchronize to the end of a block (closing brace or EOF)
+    fn synchronize_to_block_end(&mut self) {
+        let mut brace_depth = 1;
+
+        while !self.is_at_end() && brace_depth > 0 {
+            match &self.peek().token_type {
+                TokenType::LeftBrace => brace_depth += 1,
+                TokenType::RightBrace => brace_depth -= 1,
+                _ => {}
+            }
+            if brace_depth > 0 {
+                self.advance();
+            }
+        }
+    }
+
+    /// Synchronize to the next module-level item
+    fn synchronize_to_module_item(&mut self) {
+        while !self.is_at_end() {
+            match &self.peek().token_type {
+                TokenType::Keyword(kw) => match kw {
+                    Keyword::Func | Keyword::Struct | Keyword::Enum | Keyword::Import => return,
+                    _ => {}
+                },
+                TokenType::At => return, // Annotation
+                TokenType::RightBrace => return, // End of module
+                _ => {}
+            }
+            self.advance();
+        }
+    }
+
     /// Get the current position
     pub fn current_position(&self) -> usize {
         self.position
@@ -179,6 +260,82 @@ impl Parser {
     /// Get the current location for error reporting
     pub fn current_location(&self) -> SourceLocation {
         self.peek().location.clone()
+    }
+
+    // ==================== ERROR HELPERS ====================
+
+    /// Create a syntax error with a helpful message and optional suggestion
+    fn syntax_error(&self, message: &str, suggestion: Option<&str>) -> ParserError {
+        ParserError::SyntaxError {
+            message: message.to_string(),
+            location: self.current_location(),
+            suggestion: suggestion.map(|s| s.to_string()),
+        }
+    }
+
+    /// Create an error for a missing semicolon
+    fn missing_semicolon_error(&self) -> ParserError {
+        self.syntax_error(
+            "Missing semicolon",
+            Some("Add ';' at the end of the statement"),
+        )
+    }
+
+    /// Create an error for a missing type annotation
+    fn missing_type_error(&self, context: &str) -> ParserError {
+        self.syntax_error(
+            &format!("Missing type annotation in {}", context),
+            Some("Add a type annotation like ': Int' or ': String'"),
+        )
+    }
+
+    /// Create a contextual unexpected token error with suggestions
+    fn unexpected_token_error(&self, context: &str) -> ParserError {
+        let token = &self.peek().token_type;
+        let (message, suggestion) = match token {
+            TokenType::Semicolon => (
+                format!("Unexpected semicolon in {}", context),
+                Some("Remove the extra semicolon or check your syntax"),
+            ),
+            TokenType::RightBrace => (
+                format!("Unexpected '}}' in {}", context),
+                Some("Check for missing statements or unbalanced braces"),
+            ),
+            TokenType::RightParen => (
+                format!("Unexpected ')' in {}", context),
+                Some("Check for missing expressions or unbalanced parentheses"),
+            ),
+            TokenType::Keyword(kw) => (
+                format!("Unexpected keyword '{:?}' in {}", kw, context),
+                Some("Keywords cannot be used here. Did you forget a semicolon?"),
+            ),
+            TokenType::Eof => (
+                format!("Unexpected end of file in {}", context),
+                Some("Check for unclosed braces or missing code"),
+            ),
+            _ => (
+                format!("Unexpected token {:?} in {}", token, context),
+                None,
+            ),
+        };
+
+        ParserError::SyntaxError {
+            message,
+            location: self.current_location(),
+            suggestion: suggestion.map(|s| s.to_string()),
+        }
+    }
+
+    /// Get a description of what kind of expression was expected
+    fn expected_expression_hint(&self) -> &'static str {
+        match &self.peek().token_type {
+            TokenType::RightParen => "expression before ')'",
+            TokenType::RightBracket => "expression before ']'",
+            TokenType::RightBrace => "expression before '}'",
+            TokenType::Semicolon => "expression before ';'",
+            TokenType::Comma => "expression before ','",
+            _ => "expression",
+        }
     }
 
     // ==================== PARSING METHODS ====================
@@ -199,6 +356,84 @@ impl Parser {
         })
     }
 
+    /// Parse a module with full error recovery, returning both the result and all errors
+    /// This is useful for IDE/editor integration where you want to report all errors
+    pub fn parse_module_with_recovery(&mut self) -> (Option<Module>, Vec<ParserError>) {
+        let start_location = self.current_location();
+
+        // Expect 'module' keyword
+        if let Err(e) = self.expect_keyword(Keyword::Module, "expected 'module'") {
+            return (None, vec![e]);
+        }
+
+        // Parse module name
+        let name = match self.parse_identifier() {
+            Ok(n) => n,
+            Err(e) => return (None, vec![e]),
+        };
+
+        let mut imports = Vec::new();
+        let mut function_definitions = Vec::new();
+        let mut external_functions = Vec::new();
+        let mut type_definitions = Vec::new();
+
+        // Support both "module name;" (file-scoped) and "module name { }" (inline)
+        if self.check(&TokenType::Semicolon) {
+            self.advance();
+
+            while !self.is_at_end() {
+                if let Err(e) = self.parse_module_item(
+                    &mut imports,
+                    &mut function_definitions,
+                    &mut external_functions,
+                    &mut type_definitions,
+                ) {
+                    self.add_error(e);
+                    self.synchronize_to_module_item();
+                }
+            }
+        } else if self.check(&TokenType::LeftBrace) {
+            self.advance();
+
+            while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+                if let Err(e) = self.parse_module_item(
+                    &mut imports,
+                    &mut function_definitions,
+                    &mut external_functions,
+                    &mut type_definitions,
+                ) {
+                    self.add_error(e);
+                    self.synchronize_to_module_item();
+                }
+            }
+
+            if let Err(e) = self.expect(&TokenType::RightBrace, "expected '}' to close module") {
+                self.add_error(e);
+            }
+        } else {
+            self.add_error(ParserError::UnexpectedToken {
+                expected: "';' or '{' after module name".to_string(),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.current_location(),
+            });
+        }
+
+        let module = Module {
+            name,
+            intent: None,
+            imports,
+            exports: Vec::new(),
+            type_definitions,
+            constant_declarations: Vec::new(),
+            function_definitions,
+            external_functions,
+            source_location: start_location,
+        };
+
+        let errors = self.take_errors();
+        (Some(module), errors)
+    }
+
     /// Parse a module definition
     /// Grammar: "module" IDENTIFIER "{" module_item* "}"
     pub fn parse_module(&mut self) -> Result<Module, ParserError> {
@@ -212,19 +447,25 @@ impl Parser {
 
         // Parse module items (imports, functions, structs, etc.)
         let mut imports = Vec::new();
+        let mut function_definitions = Vec::new();
+        let mut external_functions = Vec::new();
+        let mut type_definitions = Vec::new();
 
         // Support both "module name;" (file-scoped) and "module name { }" (inline)
         if self.check(&TokenType::Semicolon) {
             // File-scoped module: "module name;" followed by items at top level
             self.advance(); // consume semicolon
 
-            // Parse remaining items until EOF
+            // Parse remaining items until EOF with error recovery
             while !self.is_at_end() {
-                if self.check_keyword(Keyword::Import) {
-                    imports.push(self.parse_import()?);
-                } else {
-                    // Stop at unknown items for now
-                    break;
+                if let Err(e) = self.parse_module_item(
+                    &mut imports,
+                    &mut function_definitions,
+                    &mut external_functions,
+                    &mut type_definitions,
+                ) {
+                    self.add_error(e);
+                    self.synchronize_to_module_item();
                 }
             }
         } else if self.check(&TokenType::LeftBrace) {
@@ -232,10 +473,14 @@ impl Parser {
             self.advance(); // consume '{'
 
             while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
-                if self.check_keyword(Keyword::Import) {
-                    imports.push(self.parse_import()?);
-                } else {
-                    break;
+                if let Err(e) = self.parse_module_item(
+                    &mut imports,
+                    &mut function_definitions,
+                    &mut external_functions,
+                    &mut type_definitions,
+                ) {
+                    self.add_error(e);
+                    self.synchronize_to_module_item();
                 }
             }
 
@@ -249,17 +494,69 @@ impl Parser {
             });
         }
 
+        // If we collected errors during parsing, return the first one
+        // (the module is still partially parsed)
+        if let Some(first_error) = self.errors.first() {
+            return Err(first_error.clone());
+        }
+
         Ok(Module {
             name,
             intent: None,
             imports,
             exports: Vec::new(),
-            type_definitions: Vec::new(),
+            type_definitions,
             constant_declarations: Vec::new(),
-            function_definitions: Vec::new(),
-            external_functions: Vec::new(),
+            function_definitions,
+            external_functions,
             source_location: start_location,
         })
+    }
+
+    /// Parse a single module item (import, function, struct, enum, extern)
+    fn parse_module_item(
+        &mut self,
+        imports: &mut Vec<ImportStatement>,
+        function_definitions: &mut Vec<Function>,
+        external_functions: &mut Vec<ExternalFunction>,
+        type_definitions: &mut Vec<TypeDefinition>,
+    ) -> Result<(), ParserError> {
+        // Check for annotation (could be @extern)
+        if self.check(&TokenType::At) {
+            let annotation = self.parse_annotation()?;
+
+            // Check if this is @extern followed by func
+            if annotation.name == "extern" && self.check_keyword(Keyword::Func) {
+                external_functions.push(self.parse_external_function(annotation)?);
+            } else if self.check_keyword(Keyword::Func) {
+                // Annotated function - parse but ignore annotation for now
+                // (AST Function struct doesn't have annotations field)
+                let func = self.parse_function()?;
+                function_definitions.push(func);
+            } else {
+                return Err(ParserError::UnexpectedToken {
+                    expected: "func after annotation".to_string(),
+                    found: format!("{:?}", self.peek().token_type),
+                    location: self.current_location(),
+                });
+            }
+        } else if self.check_keyword(Keyword::Import) {
+            imports.push(self.parse_import()?);
+        } else if self.check_keyword(Keyword::Func) {
+            function_definitions.push(self.parse_function()?);
+        } else if self.check_keyword(Keyword::Struct) {
+            type_definitions.push(self.parse_struct()?);
+        } else if self.check_keyword(Keyword::Enum) {
+            type_definitions.push(self.parse_enum()?);
+        } else {
+            return Err(ParserError::UnexpectedToken {
+                expected: "import, func, struct, enum, or annotation".to_string(),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.current_location(),
+            });
+        }
+
+        Ok(())
     }
 
     /// Parse an import statement
@@ -1168,6 +1465,48 @@ impl Parser {
         })
     }
 
+    /// Parse a for loop
+    /// Grammar: "for" identifier "in" expression block
+    pub fn parse_for_loop(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::For, "expected 'for'")?;
+
+        // Parse the element binding (loop variable)
+        let element_binding = self.parse_identifier()?;
+
+        // Optional type annotation: for x: T in ...
+        let element_type = if self.check(&TokenType::Colon) {
+            self.advance();
+            Box::new(self.parse_type()?)
+        } else {
+            // Default to Integer type (should be inferred later by type checker)
+            Box::new(TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
+                source_location: start_location.clone(),
+            })
+        };
+
+        // Expect 'in' keyword
+        self.expect_keyword(Keyword::In, "expected 'in' after loop variable")?;
+
+        // Parse the collection/iterable expression
+        let collection = Box::new(self.parse_expression()?);
+
+        // Parse the loop body
+        let body = self.parse_block()?;
+
+        Ok(Statement::ForEachLoop {
+            collection,
+            element_binding,
+            element_type,
+            index_binding: None,
+            body,
+            label: None,
+            source_location: start_location,
+        })
+    }
+
     /// Parse a break statement
     /// Grammar: "break" ";"
     pub fn parse_break_statement(&mut self) -> Result<Statement, ParserError> {
@@ -1211,6 +1550,9 @@ impl Parser {
         if self.check_keyword(Keyword::While) {
             return self.parse_while_loop();
         }
+        if self.check_keyword(Keyword::For) {
+            return self.parse_for_loop();
+        }
         if self.check_keyword(Keyword::Break) {
             return self.parse_break_statement();
         }
@@ -1252,14 +1594,24 @@ impl Parser {
             return self.parse_braced_expression();
         }
 
-        // Integer literal
+        // Prefix range expression: ..end or ..=end
+        if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
+            return self.parse_range_expression(None, start_location);
+        }
+
+        // Integer literal (with range check)
         if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
             let value = *value;
             self.advance();
-            return Ok(Expression::IntegerLiteral {
+            let expr = Expression::IntegerLiteral {
                 value,
-                source_location: start_location,
-            });
+                source_location: start_location.clone(),
+            };
+            // Check for range: integer..end or integer..=end
+            if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
+                return self.parse_range_expression(Some(expr), start_location);
+            }
+            return Ok(expr);
         }
 
         // Float literal
@@ -1314,9 +1666,59 @@ impl Parser {
                 source_location: start_location.clone(),
             };
 
-            // Handle postfix operators: [index] and .field
+            // Handle postfix operators: (args), [index], and .field
             loop {
-                if self.check(&TokenType::LeftBracket) {
+                if self.check(&TokenType::LeftParen) {
+                    // Function call: expr(args)
+                    self.advance(); // consume '('
+                    let mut arg_exprs = Vec::new();
+
+                    if !self.check(&TokenType::RightParen) {
+                        arg_exprs.push(self.parse_expression()?);
+                        while self.check(&TokenType::Comma) {
+                            self.advance(); // consume ','
+                            arg_exprs.push(self.parse_expression()?);
+                        }
+                    }
+                    self.expect(&TokenType::RightParen, "expected ')'")?;
+
+                    // Extract function name from variable expression
+                    let function_name = match &expr {
+                        Expression::Variable { name, .. } => name.clone(),
+                        _ => {
+                            return Err(ParserError::UnexpectedToken {
+                                expected: "function name".to_string(),
+                                found: "complex expression".to_string(),
+                                location: start_location.clone(),
+                            });
+                        }
+                    };
+
+                    // Convert expressions to Argument structs with placeholder names
+                    let arguments: Vec<Argument> = arg_exprs
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, e)| Argument {
+                            parameter_name: Identifier::new(
+                                format!("arg_{}", i),
+                                start_location.clone(),
+                            ),
+                            value: Box::new(e),
+                            source_location: start_location.clone(),
+                        })
+                        .collect();
+
+                    expr = Expression::FunctionCall {
+                        call: AstFunctionCall {
+                            function_reference: FunctionReference::Local {
+                                name: function_name,
+                            },
+                            arguments,
+                            variadic_arguments: Vec::new(),
+                        },
+                        source_location: start_location.clone(),
+                    };
+                } else if self.check(&TokenType::LeftBracket) {
                     // Array indexing: expr[index]
                     self.advance(); // consume '['
                     let index = self.parse_expression()?;
@@ -1327,23 +1729,68 @@ impl Parser {
                         source_location: start_location.clone(),
                     };
                 } else if self.check(&TokenType::Dot) {
-                    // Field access: expr.field
+                    // Field access or method call: expr.field or expr.method(args)
                     self.advance(); // consume '.'
-                    if let TokenType::Identifier(field_name) = &self.peek().token_type {
-                        let field_name = field_name.clone();
-                        let field_loc = self.current_location();
+                    if let TokenType::Identifier(member_name) = &self.peek().token_type {
+                        let member_name = member_name.clone();
+                        let member_loc = self.current_location();
                         self.advance();
-                        expr = Expression::FieldAccess {
-                            instance: Box::new(expr),
-                            field_name: Identifier {
-                                name: field_name,
-                                source_location: field_loc,
-                            },
-                            source_location: start_location.clone(),
-                        };
+
+                        // Check if this is a method call (followed by '(')
+                        if self.check(&TokenType::LeftParen) {
+                            // Method call: expr.method(args)
+                            self.advance(); // consume '('
+                            let mut arg_exprs = Vec::new();
+
+                            if !self.check(&TokenType::RightParen) {
+                                // Parse first argument
+                                arg_exprs.push(self.parse_expression()?);
+
+                                // Parse remaining arguments
+                                while self.check(&TokenType::Comma) {
+                                    self.advance(); // consume ','
+                                    arg_exprs.push(self.parse_expression()?);
+                                }
+                            }
+                            self.expect(&TokenType::RightParen, "expected ')' after method arguments")?;
+
+                            // Convert expressions to Argument structs
+                            let arguments: Vec<Argument> = arg_exprs
+                                .into_iter()
+                                .enumerate()
+                                .map(|(i, e)| Argument {
+                                    parameter_name: Identifier::new(
+                                        format!("arg_{}", i),
+                                        start_location.clone(),
+                                    ),
+                                    value: Box::new(e),
+                                    source_location: start_location.clone(),
+                                })
+                                .collect();
+
+                            expr = Expression::MethodCall {
+                                receiver: Box::new(expr),
+                                method_name: Identifier {
+                                    name: member_name,
+                                    source_location: member_loc,
+                                },
+                                arguments,
+                                source_location: start_location.clone(),
+                            };
+                        } else {
+                            // Field access: expr.field
+                            expr = Expression::FieldAccess {
+                                instance: Box::new(expr),
+                                field_name: Identifier {
+                                    name: member_name,
+                                    source_location: member_loc,
+                                },
+                                source_location: start_location.clone(),
+                            };
+                        }
                     } else {
                         return Err(ParserError::UnexpectedToken {
-                            expected: "field name".to_string(),
+                            expected: "field name or method name".to_string(),
                             found: format!("{:?}", self.peek().token_type),
                             location: self.current_location(),
                         });
@@ -1354,6 +1801,25 @@ impl Parser {
             }
 
             return Ok(expr);
+        }
+
+        // Closure with capture list: [captures](params) => body
+        if self.check(&TokenType::LeftBracket) {
+            let captures = self.parse_capture_list()?;
+            // After capture list, we must have parameters in parens
+            if !self.check(&TokenType::LeftParen) {
+                return Err(ParserError::SyntaxError {
+                    message: "expected '(' after capture list".to_string(),
+                    location: self.current_location(),
+                    suggestion: Some("use [captures](params) => body syntax".to_string()),
+                });
+            }
+            return self.parse_paren_expr_or_lambda_with_captures(captures);
+        }
+
+        // Parenthesized expression or lambda
+        if self.check(&TokenType::LeftParen) {
+            return self.parse_paren_expr_or_lambda();
         }
 
         Err(ParserError::UnexpectedToken {
@@ -1451,9 +1917,59 @@ impl Parser {
                 source_location: start_location.clone(),
             };
 
-            // Handle postfix operators: [index] and .field
+            // Handle postfix operators: (args), [index], and .field
             loop {
-                if self.check(&TokenType::LeftBracket) {
+                if self.check(&TokenType::LeftParen) {
+                    // Function call: expr(args)
+                    self.advance(); // consume '('
+                    let mut arg_exprs = Vec::new();
+
+                    if !self.check(&TokenType::RightParen) {
+                        arg_exprs.push(self.parse_expression()?);
+                        while self.check(&TokenType::Comma) {
+                            self.advance(); // consume ','
+                            arg_exprs.push(self.parse_expression()?);
+                        }
+                    }
+                    self.expect(&TokenType::RightParen, "expected ')'")?;
+
+                    // Extract function name from variable expression
+                    let function_name = match &expr {
+                        Expression::Variable { name, .. } => name.clone(),
+                        _ => {
+                            return Err(ParserError::UnexpectedToken {
+                                expected: "function name".to_string(),
+                                found: "complex expression".to_string(),
+                                location: start_location.clone(),
+                            });
+                        }
+                    };
+
+                    // Convert expressions to Argument structs with placeholder names
+                    let arguments: Vec<Argument> = arg_exprs
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, e)| Argument {
+                            parameter_name: Identifier::new(
+                                format!("arg_{}", i),
+                                start_location.clone(),
+                            ),
+                            value: Box::new(e),
+                            source_location: start_location.clone(),
+                        })
+                        .collect();
+
+                    expr = Expression::FunctionCall {
+                        call: AstFunctionCall {
+                            function_reference: FunctionReference::Local {
+                                name: function_name,
+                            },
+                            arguments,
+                            variadic_arguments: Vec::new(),
+                        },
+                        source_location: start_location.clone(),
+                    };
+                } else if self.check(&TokenType::LeftBracket) {
                     // Array indexing: expr[index]
                     self.advance(); // consume '['
                     let index = self.parse_expression()?;
@@ -1464,23 +1980,68 @@ impl Parser {
                         source_location: start_location.clone(),
                     };
                 } else if self.check(&TokenType::Dot) {
-                    // Field access: expr.field
+                    // Field access or method call: expr.field or expr.method(args)
                     self.advance(); // consume '.'
-                    if let TokenType::Identifier(field_name) = &self.peek().token_type {
-                        let field_name = field_name.clone();
-                        let field_loc = self.current_location();
+                    if let TokenType::Identifier(member_name) = &self.peek().token_type {
+                        let member_name = member_name.clone();
+                        let member_loc = self.current_location();
                         self.advance();
-                        expr = Expression::FieldAccess {
-                            instance: Box::new(expr),
-                            field_name: Identifier {
-                                name: field_name,
-                                source_location: field_loc,
-                            },
-                            source_location: start_location.clone(),
-                        };
+
+                        // Check if this is a method call (followed by '(')
+                        if self.check(&TokenType::LeftParen) {
+                            // Method call: expr.method(args)
+                            self.advance(); // consume '('
+                            let mut arg_exprs = Vec::new();
+
+                            if !self.check(&TokenType::RightParen) {
+                                // Parse first argument
+                                arg_exprs.push(self.parse_expression()?);
+
+                                // Parse remaining arguments
+                                while self.check(&TokenType::Comma) {
+                                    self.advance(); // consume ','
+                                    arg_exprs.push(self.parse_expression()?);
+                                }
+                            }
+                            self.expect(&TokenType::RightParen, "expected ')' after method arguments")?;
+
+                            // Convert expressions to Argument structs
+                            let arguments: Vec<Argument> = arg_exprs
+                                .into_iter()
+                                .enumerate()
+                                .map(|(i, e)| Argument {
+                                    parameter_name: Identifier::new(
+                                        format!("arg_{}", i),
+                                        start_location.clone(),
+                                    ),
+                                    value: Box::new(e),
+                                    source_location: start_location.clone(),
+                                })
+                                .collect();
+
+                            expr = Expression::MethodCall {
+                                receiver: Box::new(expr),
+                                method_name: Identifier {
+                                    name: member_name,
+                                    source_location: member_loc,
+                                },
+                                arguments,
+                                source_location: start_location.clone(),
+                            };
+                        } else {
+                            // Field access: expr.field
+                            expr = Expression::FieldAccess {
+                                instance: Box::new(expr),
+                                field_name: Identifier {
+                                    name: member_name,
+                                    source_location: member_loc,
+                                },
+                                source_location: start_location.clone(),
+                            };
+                        }
                     } else {
                         return Err(ParserError::UnexpectedToken {
-                            expected: "field name".to_string(),
+                            expected: "field name or method name".to_string(),
                             found: format!("{:?}", self.peek().token_type),
                             location: self.current_location(),
                         });
@@ -1493,13 +2054,489 @@ impl Parser {
             return Ok(expr);
         }
 
+        // Match expression
+        if self.check_keyword(Keyword::Match) {
+            return self.parse_match_expression();
+        }
+
         // Nested braced expression
         if self.peek().token_type == TokenType::LeftBrace {
             return self.parse_braced_expression();
         }
 
+        // Parenthesized expression or lambda
+        if self.check(&TokenType::LeftParen) {
+            return self.parse_paren_expr_or_lambda();
+        }
+
         Err(ParserError::UnexpectedToken {
             expected: "primary expression".to_string(),
+            found: format!("{:?}", self.peek().token_type),
+            location: start_location,
+        })
+    }
+
+    /// Parse either a parenthesized expression or a lambda (without captures)
+    /// Grammar: "(" expression ")" | "(" params ")" [":" type] "=>" body
+    fn parse_paren_expr_or_lambda(&mut self) -> Result<Expression, ParserError> {
+        self.parse_paren_expr_or_lambda_with_captures(Vec::new())
+    }
+
+    /// Parse either a parenthesized expression or a lambda with optional captures
+    /// Grammar: "(" expression ")" | "(" params ")" [":" type] "=>" body
+    fn parse_paren_expr_or_lambda_with_captures(
+        &mut self,
+        captures: Vec<Capture>,
+    ) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        self.expect(&TokenType::LeftParen, "expected '('")?;
+
+        // Check for empty parens - must be a zero-parameter lambda
+        if self.check(&TokenType::RightParen) {
+            self.advance(); // consume ')'
+            return self.parse_lambda_after_params(captures, vec![], start_location);
+        }
+
+        // Try to determine if this is a lambda or parenthesized expression
+        // Lambda params look like: identifier [: type] [, ...]
+        // We need to look ahead to see if this is a param list or expression
+        if self.is_lambda_param_start() {
+            // Parse as lambda parameters
+            let params = self.parse_lambda_params()?;
+            self.expect(&TokenType::RightParen, "expected ')' after lambda parameters")?;
+            return self.parse_lambda_after_params(captures, params, start_location);
+        }
+
+        // If we have captures but this doesn't look like a lambda, that's an error
+        if !captures.is_empty() {
+            return Err(ParserError::SyntaxError {
+                message: "capture list must be followed by lambda parameters".to_string(),
+                location: start_location,
+                suggestion: Some("use [captures](params) => body syntax".to_string()),
+            });
+        }
+
+        // Parse as parenthesized expression
+        let inner = self.parse_expression()?;
+        self.expect(&TokenType::RightParen, "expected ')'")?;
+        Ok(inner)
+    }
+
+    /// Check if the current position looks like the start of a lambda parameter
+    fn is_lambda_param_start(&self) -> bool {
+        // Lambda parameter starts with identifier followed by `:` (type annotation)
+        // or identifier followed by `,` or `)`
+        // Regular expressions can also start with identifier, so we need to look ahead
+        if let TokenType::Identifier(_) = &self.peek().token_type {
+            // Check what follows the identifier
+            if let Some(next) = self.tokens.get(self.position + 1) {
+                match &next.token_type {
+                    // identifier: type - definitely a lambda param
+                    TokenType::Colon => return true,
+                    // identifier, or identifier) followed by => - lambda
+                    TokenType::Comma | TokenType::RightParen => {
+                        // Look further to see if there's a `=>` after the `)`
+                        let mut depth = 1;
+                        let mut i = self.position + 1;
+                        while i < self.tokens.len() {
+                            match &self.tokens[i].token_type {
+                                TokenType::LeftParen => depth += 1,
+                                TokenType::RightParen => {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        // Check if => follows
+                                        if i + 1 < self.tokens.len() {
+                                            if matches!(
+                                                self.tokens[i + 1].token_type,
+                                                TokenType::FatArrow
+                                            ) {
+                                                return true;
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                                _ => {}
+                            }
+                            i += 1;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        false
+    }
+
+    /// Parse lambda parameters (without parentheses)
+    fn parse_lambda_params(&mut self) -> Result<Vec<Parameter>, ParserError> {
+        let mut params = Vec::new();
+
+        loop {
+            let param_loc = self.current_location();
+
+            // Parse parameter name
+            let name = self.parse_identifier()?;
+
+            // Optional type annotation
+            let param_type = if self.check(&TokenType::Colon) {
+                self.advance();
+                Box::new(self.parse_type()?)
+            } else {
+                // Inferred type - use Integer as placeholder
+                Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    source_location: param_loc.clone(),
+                })
+            };
+
+            params.push(Parameter {
+                name,
+                param_type,
+                intent: None,
+                constraint: None,
+                passing_mode: PassingMode::ByValue,
+                source_location: param_loc,
+            });
+
+            if !self.check(&TokenType::Comma) {
+                break;
+            }
+            self.advance(); // consume ','
+        }
+
+        Ok(params)
+    }
+
+    /// Parse the rest of a lambda after parameters have been parsed
+    fn parse_lambda_after_params(
+        &mut self,
+        captures: Vec<Capture>,
+        parameters: Vec<Parameter>,
+        start_location: SourceLocation,
+    ) -> Result<Expression, ParserError> {
+        // Optional return type: -> Type
+        let return_type = if self.check(&TokenType::Arrow) {
+            self.advance();
+            Some(Box::new(self.parse_type()?))
+        } else {
+            None
+        };
+
+        // Expect => for lambda body
+        self.expect(&TokenType::FatArrow, "expected '=>' for lambda body")?;
+
+        // Parse body - either a block or a single expression
+        let body = if self.check(&TokenType::LeftBrace) {
+            LambdaBody::Block(self.parse_block()?)
+        } else {
+            LambdaBody::Expression(Box::new(self.parse_expression()?))
+        };
+
+        Ok(Expression::Lambda {
+            captures,
+            parameters,
+            return_type,
+            body,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a capture list: [x, &y, &mut z]
+    /// Returns a vector of captures
+    fn parse_capture_list(&mut self) -> Result<Vec<Capture>, ParserError> {
+        let mut captures = Vec::new();
+
+        // Expect opening bracket
+        self.expect(&TokenType::LeftBracket, "expected '[' to start capture list")?;
+
+        // Parse captures until we see ]
+        while !self.check(&TokenType::RightBracket) {
+            let capture_location = self.current_location();
+
+            // Check for capture mode prefix
+            let mode = if self.check(&TokenType::Ampersand) {
+                self.advance();
+                // Check for &mut
+                if self.check_keyword(Keyword::Mut) {
+                    self.advance();
+                    CaptureMode::ByMutableReference
+                } else {
+                    CaptureMode::ByReference
+                }
+            } else {
+                CaptureMode::ByValue
+            };
+
+            // Parse the identifier
+            let name = self.parse_identifier()?;
+
+            captures.push(Capture {
+                name,
+                mode,
+                source_location: capture_location,
+            });
+
+            // Expect comma or end
+            if !self.check(&TokenType::RightBracket) {
+                self.expect(&TokenType::Comma, "expected ',' between captures")?;
+            }
+        }
+
+        // Expect closing bracket
+        self.expect(&TokenType::RightBracket, "expected ']' to end capture list")?;
+
+        Ok(captures)
+    }
+
+    /// Parse a range expression: start..end or start..=end
+    /// Called with optional start expression; parses .. or ..= and optional end
+    fn parse_range_expression(
+        &mut self,
+        start: Option<Expression>,
+        start_location: SourceLocation,
+    ) -> Result<Expression, ParserError> {
+        // Determine if inclusive (..=) or exclusive (..)
+        let inclusive = if self.check(&TokenType::DotDotEqual) {
+            self.advance();
+            true
+        } else if self.check(&TokenType::DotDot) {
+            self.advance();
+            false
+        } else {
+            return Err(ParserError::UnexpectedToken {
+                expected: "'..' or '..='".to_string(),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.current_location(),
+            });
+        };
+
+        // Parse optional end expression
+        // End is present if followed by a primary expression (not operator, delimiter, etc.)
+        let end = if self.is_range_end_start() {
+            Some(Box::new(self.parse_range_operand()?))
+        } else {
+            None
+        };
+
+        Ok(Expression::Range {
+            start: start.map(Box::new),
+            end,
+            inclusive,
+            source_location: start_location,
+        })
+    }
+
+    /// Check if the current token could start a range end expression
+    fn is_range_end_start(&self) -> bool {
+        matches!(
+            &self.peek().token_type,
+            TokenType::IntegerLiteral(_)
+                | TokenType::FloatLiteral(_)
+                | TokenType::Identifier(_)
+                | TokenType::LeftParen
+                | TokenType::LeftBrace
+        )
+    }
+
+    /// Parse a simple expression suitable for range operand
+    fn parse_range_operand(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        // Integer literal
+        if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::IntegerLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Identifier
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let name = name.clone();
+            self.advance();
+            return Ok(Expression::Variable {
+                name: Identifier {
+                    name,
+                    source_location: start_location.clone(),
+                },
+                source_location: start_location,
+            });
+        }
+
+        // Parenthesized expression
+        if self.check(&TokenType::LeftParen) {
+            return self.parse_paren_expr_or_lambda();
+        }
+
+        // Braced expression
+        if self.check(&TokenType::LeftBrace) {
+            return self.parse_braced_expression();
+        }
+
+        Err(ParserError::UnexpectedToken {
+            expected: "range end value".to_string(),
+            found: format!("{:?}", self.peek().token_type),
+            location: start_location,
+        })
+    }
+
+    /// Parse a match expression
+    /// Grammar: "match" expression "{" match_arm* "}"
+    fn parse_match_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        // Consume 'match' keyword
+        self.expect_keyword(Keyword::Match, "expected 'match'")?;
+
+        // Parse the value being matched
+        let value = Box::new(self.parse_expression()?);
+
+        // Expect opening brace
+        self.expect(&TokenType::LeftBrace, "expected '{' after match value")?;
+
+        // Parse match arms
+        let mut cases = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            cases.push(self.parse_match_arm()?);
+
+            // Optional comma between arms
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            }
+        }
+
+        // Expect closing brace
+        self.expect(&TokenType::RightBrace, "expected '}' to close match")?;
+
+        Ok(Expression::Match {
+            value,
+            cases,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a match arm
+    /// Grammar: pattern "=>" expression
+    fn parse_match_arm(&mut self) -> Result<MatchCase, ParserError> {
+        let start_location = self.current_location();
+
+        // Parse the pattern
+        let pattern = self.parse_pattern()?;
+
+        // Expect '=>'
+        self.expect(&TokenType::FatArrow, "expected '=>' after pattern")?;
+
+        // Parse the body expression
+        let body = Box::new(self.parse_expression()?);
+
+        Ok(MatchCase {
+            pattern,
+            body,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a pattern for match expressions
+    /// Grammar: "_" | identifier | literal | enum_variant
+    fn parse_pattern(&mut self) -> Result<Pattern, ParserError> {
+        let start_location = self.current_location();
+
+        // Wildcard pattern: "_"
+        if self.check(&TokenType::Underscore) {
+            self.advance();
+            return Ok(Pattern::Wildcard {
+                binding: None,
+                source_location: start_location,
+            });
+        }
+
+        // Identifier pattern (could be variable binding or enum variant)
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let name = name.clone();
+            self.advance();
+
+            // Check if this is an enum variant pattern: Name(binding) or Name binding
+            if self.check(&TokenType::LeftParen) {
+                // Enum variant with parenthesized binding: Some(x)
+                self.advance(); // consume '('
+
+                let binding = if !self.check(&TokenType::RightParen) {
+                    Some(self.parse_identifier()?)
+                } else {
+                    None
+                };
+
+                self.expect(&TokenType::RightParen, "expected ')'")?;
+
+                return Ok(Pattern::EnumVariant {
+                    enum_name: None,
+                    variant_name: Identifier::new(name, start_location.clone()),
+                    binding,
+                    nested_pattern: None,
+                    source_location: start_location,
+                });
+            } else if let TokenType::Identifier(_) = &self.peek().token_type {
+                // Enum variant with space binding: Some x
+                let binding = Some(self.parse_identifier()?);
+
+                return Ok(Pattern::EnumVariant {
+                    enum_name: None,
+                    variant_name: Identifier::new(name, start_location.clone()),
+                    binding,
+                    nested_pattern: None,
+                    source_location: start_location,
+                });
+            }
+
+            // Simple variable binding pattern
+            return Ok(Pattern::Wildcard {
+                binding: Some(Identifier::new(name, start_location.clone())),
+                source_location: start_location,
+            });
+        }
+
+        // Literal patterns
+        if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Pattern::Literal {
+                value: Box::new(Expression::IntegerLiteral {
+                    value,
+                    source_location: start_location.clone(),
+                }),
+                source_location: start_location,
+            });
+        }
+
+        if let TokenType::StringLiteral(value) = &self.peek().token_type {
+            let value = value.clone();
+            self.advance();
+            return Ok(Pattern::Literal {
+                value: Box::new(Expression::StringLiteral {
+                    value,
+                    source_location: start_location.clone(),
+                }),
+                source_location: start_location,
+            });
+        }
+
+        if let TokenType::BoolLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Pattern::Literal {
+                value: Box::new(Expression::BooleanLiteral {
+                    value,
+                    source_location: start_location.clone(),
+                }),
+                source_location: start_location,
+            });
+        }
+
+        Err(ParserError::UnexpectedToken {
+            expected: "pattern (_, identifier, or literal)".to_string(),
             found: format!("{:?}", self.peek().token_type),
             location: start_location,
         })
@@ -3690,5 +4727,1199 @@ func read_only(data: &Data) -> Int {
         let ext_func = result.unwrap();
         assert_eq!(ext_func.name.name, "puts");
         assert_eq!(ext_func.library, "libc");
+    }
+
+    // ==================== ERROR RECOVERY TESTS ====================
+
+    #[test]
+    fn test_error_recovery_unexpected_token() {
+        // Simple error: unexpected token at module level
+        let source = r#"
+module test;
+
+123;
+
+func good() -> Int {
+    return 0;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let (result, errors) = parser.parse_module_with_recovery();
+
+        // Should have parsed something
+        assert!(result.is_some());
+        let module = result.unwrap();
+
+        // Should have at least one error
+        assert!(!errors.is_empty(), "Should have collected errors");
+
+        // The good function should still be parsed
+        assert!(module.function_definitions.len() >= 1);
+        assert!(module.function_definitions.iter().any(|f| f.name.name == "good"));
+    }
+
+    #[test]
+    fn test_error_recovery_with_valid_first_function() {
+        // First function valid, second has extra tokens
+        let source = r#"
+module test;
+
+func first() -> Int {
+    return 1;
+}
+
+struct;
+
+func third() -> Int {
+    return 3;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let (result, errors) = parser.parse_module_with_recovery();
+
+        assert!(result.is_some());
+        // Should have errors from the incomplete struct
+        assert!(!errors.is_empty());
+
+        let module = result.unwrap();
+        let func_names: Vec<_> = module.function_definitions.iter()
+            .map(|f| f.name.name.as_str())
+            .collect();
+
+        // First function should definitely be parsed
+        assert!(func_names.contains(&"first"), "Should have parsed 'first'");
+    }
+
+    #[test]
+    fn test_synchronize_simple() {
+        // Test synchronization with simple invalid token
+        let source = r#"
+module test;
+
+999;
+
+func valid() -> Int {
+    return 42;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let (result, errors) = parser.parse_module_with_recovery();
+
+        assert!(result.is_some());
+        assert!(!errors.is_empty());
+
+        // The valid function should be parsed after recovery
+        let module = result.unwrap();
+        assert!(module.function_definitions.iter().any(|f| f.name.name == "valid"));
+    }
+
+    #[test]
+    fn test_error_recovery_inline_module() {
+        // Test recovery in inline module syntax
+        let source = r#"
+module test {
+    func good() -> Int {
+        return 1;
+    }
+
+    123;
+
+    func also_good() -> Int {
+        return 2;
+    }
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let (result, errors) = parser.parse_module_with_recovery();
+
+        assert!(result.is_some());
+        // Should have errors from the invalid token
+        assert!(!errors.is_empty());
+
+        let module = result.unwrap();
+        // Should have parsed the good functions
+        assert!(module.function_definitions.len() >= 1);
+    }
+
+    #[test]
+    fn test_synchronization_methods() {
+        // Test that synchronization skips to the next declaration
+        let source = r#"
+module test;
+
+456;
+
+func next_item() -> Int {
+    return 0;
+}
+"#;
+        let mut parser = parser_from_source(source);
+
+        // Skip the module declaration
+        parser.expect_keyword(Keyword::Module, "").unwrap();
+        parser.parse_identifier().unwrap();
+        parser.expect(&TokenType::Semicolon, "").unwrap();
+
+        // Synchronize should skip the invalid token and stop at 'func'
+        parser.synchronize_to_module_item();
+
+        // Should now be at 'func' keyword
+        assert!(parser.check_keyword(Keyword::Func));
+    }
+
+    #[test]
+    fn test_has_errors_and_take_errors() {
+        let source = "module test;";
+        let mut parser = parser_from_source(source);
+
+        assert!(!parser.has_errors());
+
+        parser.add_error(ParserError::UnexpectedEof {
+            expected: "test".to_string(),
+        });
+
+        assert!(parser.has_errors());
+        assert_eq!(parser.errors().len(), 1);
+
+        let taken = parser.take_errors();
+        assert_eq!(taken.len(), 1);
+        assert!(!parser.has_errors());
+    }
+
+    // ==================== MATCH EXPRESSION TESTS ====================
+
+    #[test]
+    fn test_match_simple() {
+        let source = r#"match x { 1 => 10, 2 => 20, _ => 0 }"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 3);
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    #[test]
+    fn test_match_with_variable_binding() {
+        let source = r#"match value { x => x }"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 1);
+            // x is a variable binding pattern
+            assert!(matches!(cases[0].pattern, Pattern::Wildcard { .. }));
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    #[test]
+    fn test_match_with_enum_variant() {
+        let source = r#"match opt { Some(x) => x, None => 0 }"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 2);
+            // First case: Some(x)
+            if let Pattern::EnumVariant { variant_name, binding, .. } = &cases[0].pattern {
+                assert_eq!(variant_name.name, "Some");
+                assert!(binding.is_some());
+            } else {
+                panic!("Expected EnumVariant pattern");
+            }
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    #[test]
+    fn test_match_with_literal_patterns() {
+        let source = r#"match s { "hello" => 1, "world" => 2, _ => 0 }"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 3);
+            // First two should be literal patterns
+            assert!(matches!(cases[0].pattern, Pattern::Literal { .. }));
+            assert!(matches!(cases[1].pattern, Pattern::Literal { .. }));
+            // Last should be wildcard
+            assert!(matches!(cases[2].pattern, Pattern::Wildcard { binding: None, .. }));
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    #[test]
+    fn test_match_with_bool_patterns() {
+        let source = r#"match flag { true => 1, false => 0 }"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 2);
+            assert!(matches!(cases[0].pattern, Pattern::Literal { .. }));
+            assert!(matches!(cases[1].pattern, Pattern::Literal { .. }));
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    #[test]
+    fn test_fat_arrow_token() {
+        let source = "=>";
+        let mut lexer = crate::lexer::v2::Lexer::new(source, "test".to_string());
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[0].token_type, TokenType::FatArrow));
+    }
+
+    #[test]
+    fn test_underscore_token() {
+        let source = "_";
+        let mut lexer = crate::lexer::v2::Lexer::new(source, "test".to_string());
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[0].token_type, TokenType::Underscore));
+    }
+
+    #[test]
+    fn test_underscore_in_identifier() {
+        let source = "_foo";
+        let mut lexer = crate::lexer::v2::Lexer::new(source, "test".to_string());
+        let tokens = lexer.tokenize().unwrap();
+        // _foo should be an identifier, not underscore
+        assert!(matches!(tokens[0].token_type, TokenType::Identifier(_)));
+    }
+
+    // ==================== For Loop Tests ====================
+
+    #[test]
+    fn test_for_loop_simple() {
+        let source = "for x in items { }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop {
+            element_binding,
+            collection,
+            ..
+        } = stmt
+        {
+            assert_eq!(element_binding.name, "x");
+            assert!(matches!(*collection, Expression::Variable { .. }));
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_for_loop_with_type_annotation() {
+        let source = "for x: Int in numbers { }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop {
+            element_binding,
+            element_type,
+            ..
+        } = stmt
+        {
+            assert_eq!(element_binding.name, "x");
+            assert!(matches!(
+                *element_type,
+                TypeSpecifier::Primitive { .. } | TypeSpecifier::Named { .. }
+            ));
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_for_loop_with_body() {
+        let source = "for item in list { let x = item; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop { body, .. } = stmt {
+            assert_eq!(body.statements.len(), 1);
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_for_loop_in_statement() {
+        let source = "for i in items { break; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_statement();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let stmt = result.unwrap();
+        assert!(matches!(stmt, Statement::ForEachLoop { .. }));
+    }
+
+    #[test]
+    fn test_for_loop_with_function_call_collection() {
+        let source = "for x in get_items() { }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop { collection, .. } = stmt {
+            assert!(matches!(*collection, Expression::FunctionCall { .. }));
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_for_loop_nested() {
+        let source = "for i in outer { for j in inner { } }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop { body, .. } = stmt {
+            assert_eq!(body.statements.len(), 1);
+            assert!(matches!(body.statements[0], Statement::ForEachLoop { .. }));
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    // ==================== Lambda Tests ====================
+
+    #[test]
+    fn test_lambda_zero_params() {
+        let source = "() => 42";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda {
+            parameters, body, ..
+        } = expr
+        {
+            assert_eq!(parameters.len(), 0);
+            assert!(matches!(body, LambdaBody::Expression(_)));
+        } else {
+            panic!("Expected Lambda expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_lambda_single_param_typed() {
+        let source = "(x: Int) => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda {
+            parameters, body, ..
+        } = expr
+        {
+            assert_eq!(parameters.len(), 1);
+            assert_eq!(parameters[0].name.name, "x");
+            assert!(matches!(body, LambdaBody::Expression(_)));
+        } else {
+            panic!("Expected Lambda expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_lambda_multiple_params() {
+        // Expression body with a simple identifier
+        let source = "(x: Int, y: Int) => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda {
+            parameters, body, ..
+        } = expr
+        {
+            assert_eq!(parameters.len(), 2);
+            assert_eq!(parameters[0].name.name, "x");
+            assert_eq!(parameters[1].name.name, "y");
+            assert!(matches!(body, LambdaBody::Expression(_)));
+        } else {
+            panic!("Expected Lambda expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_lambda_with_block_body() {
+        let source = "(x: Int) => { let y = x; return y; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { body, .. } = expr {
+            assert!(matches!(body, LambdaBody::Block(_)));
+            if let LambdaBody::Block(block) = body {
+                assert_eq!(block.statements.len(), 2);
+            }
+        } else {
+            panic!("Expected Lambda expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_lambda_with_return_type() {
+        let source = "(x: Int) -> Int => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { return_type, .. } = expr {
+            assert!(return_type.is_some());
+        } else {
+            panic!("Expected Lambda expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_parenthesized_expression() {
+        // (42) should be parsed as a parenthesized expression, not a lambda
+        let source = "(42)";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        assert!(
+            matches!(expr, Expression::IntegerLiteral { value: 42, .. }),
+            "Expected IntegerLiteral, got {:?}",
+            expr
+        );
+    }
+
+    #[test]
+    fn test_parenthesized_binary_expression() {
+        let source = "({a + b})";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        // The inner expression should be an Add
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::Add { .. }));
+    }
+
+    // ==================== Method Call Tests ====================
+
+    #[test]
+    fn test_method_call_no_args() {
+        let source = "obj.method()";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::MethodCall {
+            receiver,
+            method_name,
+            arguments,
+            ..
+        } = expr
+        {
+            assert!(matches!(*receiver, Expression::Variable { .. }));
+            assert_eq!(method_name.name, "method");
+            assert_eq!(arguments.len(), 0);
+        } else {
+            panic!("Expected MethodCall expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_method_call_with_args() {
+        let source = "list.push(42)";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::MethodCall {
+            receiver,
+            method_name,
+            arguments,
+            ..
+        } = expr
+        {
+            assert!(matches!(*receiver, Expression::Variable { .. }));
+            assert_eq!(method_name.name, "push");
+            assert_eq!(arguments.len(), 1);
+        } else {
+            panic!("Expected MethodCall expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_method_call_multiple_args() {
+        let source = "map.insert(key, value)";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::MethodCall {
+            method_name,
+            arguments,
+            ..
+        } = expr
+        {
+            assert_eq!(method_name.name, "insert");
+            assert_eq!(arguments.len(), 2);
+        } else {
+            panic!("Expected MethodCall expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_method_call_chained() {
+        let source = "obj.first().second()";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        // Outer call should be second()
+        if let Expression::MethodCall {
+            receiver,
+            method_name,
+            ..
+        } = expr
+        {
+            assert_eq!(method_name.name, "second");
+            // Inner call should be first()
+            if let Expression::MethodCall {
+                method_name: inner_method,
+                ..
+            } = *receiver
+            {
+                assert_eq!(inner_method.name, "first");
+            } else {
+                panic!("Expected inner MethodCall");
+            }
+        } else {
+            panic!("Expected MethodCall expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_field_access_still_works() {
+        let source = "obj.field";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        assert!(
+            matches!(expr, Expression::FieldAccess { .. }),
+            "Expected FieldAccess, got {:?}",
+            expr
+        );
+    }
+
+    #[test]
+    fn test_method_call_on_field() {
+        let source = "obj.field.method()";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::MethodCall {
+            receiver,
+            method_name,
+            ..
+        } = expr
+        {
+            assert_eq!(method_name.name, "method");
+            // Receiver should be a field access
+            assert!(
+                matches!(*receiver, Expression::FieldAccess { .. }),
+                "Expected FieldAccess receiver"
+            );
+        } else {
+            panic!("Expected MethodCall expression, got {:?}", expr);
+        }
+    }
+
+    // ==================== Range Expression Tests ====================
+
+    #[test]
+    fn test_range_exclusive() {
+        let source = "0..10";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Range {
+            start,
+            end,
+            inclusive,
+            ..
+        } = expr
+        {
+            assert!(start.is_some());
+            assert!(end.is_some());
+            assert!(!inclusive);
+        } else {
+            panic!("Expected Range expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_range_inclusive() {
+        let source = "0..=10";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Range {
+            start,
+            end,
+            inclusive,
+            ..
+        } = expr
+        {
+            assert!(start.is_some());
+            assert!(end.is_some());
+            assert!(inclusive);
+        } else {
+            panic!("Expected Range expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_range_prefix() {
+        let source = "..10";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Range {
+            start, end, ..
+        } = expr
+        {
+            assert!(start.is_none());
+            assert!(end.is_some());
+        } else {
+            panic!("Expected Range expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_range_postfix() {
+        let source = "0..";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Range {
+            start, end, ..
+        } = expr
+        {
+            assert!(start.is_some());
+            assert!(end.is_none());
+        } else {
+            panic!("Expected Range expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_dotdot_token() {
+        let source = "..";
+        let mut lexer = crate::lexer::v2::Lexer::new(source, "test".to_string());
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[0].token_type, TokenType::DotDot));
+    }
+
+    #[test]
+    fn test_dotdotequal_token() {
+        let source = "..=";
+        let mut lexer = crate::lexer::v2::Lexer::new(source, "test".to_string());
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(tokens[0].token_type, TokenType::DotDotEqual));
+    }
+
+    // ========== Edge Case Tests ==========
+
+    // Range edge cases
+    #[test]
+    fn test_range_prefix_in_expression() {
+        // Prefix range: ..end directly parsed
+        let source = "..10";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Range { start, end, inclusive, .. } = expr {
+            assert!(start.is_none());
+            assert!(end.is_some());
+            assert!(!inclusive);
+        } else {
+            panic!("Expected Range expression");
+        }
+    }
+
+    #[test]
+    fn test_range_prefix_inclusive() {
+        // Prefix inclusive range: ..=end
+        let source = "..=5";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Range { start, inclusive, .. } = expr {
+            assert!(start.is_none());
+            assert!(inclusive);
+        } else {
+            panic!("Expected Range expression");
+        }
+    }
+
+    #[test]
+    fn test_for_loop_with_range() {
+        // For loop iterating over a range
+        let source = "for i in 0..10 { x = i; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop { collection, .. } = stmt {
+            assert!(matches!(*collection, Expression::Range { .. }));
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_for_loop_with_inclusive_range() {
+        // For loop with inclusive range
+        let source = "for i in 1..=5 { x = i; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop { collection, .. } = stmt {
+            if let Expression::Range { inclusive, .. } = *collection {
+                assert!(inclusive);
+            } else {
+                panic!("Expected Range expression");
+            }
+        }
+    }
+
+    // Lambda edge cases
+    #[test]
+    fn test_lambda_typed_param_direct() {
+        // Lambda with typed parameter, parsed directly
+        let source = "(x: Int) => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Lambda { parameters, .. } = expr {
+            assert_eq!(parameters.len(), 1);
+            assert_eq!(parameters[0].name.name, "x");
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_lambda_untyped_param_direct() {
+        // Lambda with untyped parameter, parsed directly
+        let source = "(x) => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Lambda { parameters, .. } = expr {
+            assert_eq!(parameters.len(), 1);
+            assert_eq!(parameters[0].name.name, "x");
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_lambda_with_block_body_direct() {
+        // Lambda with block body, parsed directly
+        let source = "(x: Int) => { return {x + 1}; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Lambda { body, .. } = expr {
+            assert!(matches!(body, LambdaBody::Block(_)));
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    // Method call edge cases
+    #[test]
+    fn test_method_call_in_braced_expression() {
+        // Method call inside a braced binary expression
+        let source = "{a.len() + b.len()}";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Add { left, right, .. } = expr {
+            assert!(matches!(*left, Expression::MethodCall { .. }));
+            assert!(matches!(*right, Expression::MethodCall { .. }));
+        } else {
+            panic!("Expected Add expression");
+        }
+    }
+
+    #[test]
+    fn test_method_call_deeply_chained() {
+        // Deeply chained method calls - parsed directly
+        let source = "a.first().second().third().fourth()";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        // Should be MethodCall for fourth()
+        if let Expression::MethodCall { method_name, receiver, .. } = expr {
+            assert_eq!(method_name.name, "fourth");
+            // Receiver should be MethodCall for third()
+            assert!(matches!(*receiver, Expression::MethodCall { .. }));
+        } else {
+            panic!("Expected MethodCall expression");
+        }
+    }
+
+    #[test]
+    fn test_method_call_with_expression_arg() {
+        // Method call with braced expression as argument
+        let source = "list.get({i + 1})";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::MethodCall { method_name, arguments, .. } = expr {
+            assert_eq!(method_name.name, "get");
+            assert_eq!(arguments.len(), 1);
+        } else {
+            panic!("Expected MethodCall expression");
+        }
+    }
+
+    // Match expression edge cases
+    #[test]
+    fn test_match_with_bool_result() {
+        // Match expression with bool patterns - parsed directly
+        let source = "match x { 1 => true, _ => false }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 2);
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    #[test]
+    fn test_match_with_multiple_enum_variants() {
+        // Match with multiple enum variant patterns - parsed directly
+        let source = "match opt { Some(x) => x, None => 0 }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 2);
+            // First case: Some(x)
+            assert!(matches!(cases[0].pattern, Pattern::EnumVariant { .. }));
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    // Combined feature tests
+    #[test]
+    fn test_combined_for_range() {
+        // For loop with integer range
+        let source = "for i in 0..10 { x = i; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop { collection, .. } = stmt {
+            assert!(matches!(*collection, Expression::Range { .. }));
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_combined_method_with_lambda() {
+        // Method call with lambda as argument - parsed directly
+        // Note: uses braced expression for lambda body to work with parser
+        let source = "list.map((x) => x)";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::MethodCall { method_name, arguments, .. } = expr {
+            assert_eq!(method_name.name, "map");
+            assert_eq!(arguments.len(), 1);
+            // The argument should be a lambda
+            assert!(matches!(&*arguments[0].value, Expression::Lambda { .. }));
+        } else {
+            panic!("Expected MethodCall expression");
+        }
+    }
+
+    #[test]
+    fn test_combined_match_multiple_cases() {
+        // Match with wildcard and enum patterns
+        let source = "match status { Ok(v) => v, Err(e) => 0, _ => default }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_match_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Match { cases, .. } = expr {
+            assert_eq!(cases.len(), 3);
+        } else {
+            panic!("Expected Match expression");
+        }
+    }
+
+    #[test]
+    fn test_combined_nested_for_range() {
+        // For loop with integer range - verify statement structure
+        let source = "for i in 1..=100 { count = {count + 1}; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_for_loop();
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::ForEachLoop { collection, body, element_binding, .. } = stmt {
+            assert_eq!(element_binding.name, "i");
+            if let Expression::Range { inclusive, .. } = *collection {
+                assert!(inclusive);
+            } else {
+                panic!("Expected Range expression");
+            }
+            assert!(!body.statements.is_empty());
+        } else {
+            panic!("Expected ForEachLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_return_lambda_direct() {
+        // Return statement with lambda value - parsed via return parsing
+        let source = "return (x) => x;";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_return_statement();
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Return { value: Some(expr), .. } = stmt {
+            assert!(matches!(*expr, Expression::Lambda { .. }));
+        } else {
+            panic!("Expected Return statement with Lambda");
+        }
+    }
+
+    #[test]
+    fn test_method_call_result() {
+        // Method call on expression
+        let source = "callbacks.get(0)";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::MethodCall { .. }));
+    }
+
+    #[test]
+    fn test_complex_expression_chain() {
+        // Complex chain: field access + method call + array access
+        let source = "obj.field.method()[0]";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        // Outermost should be array access
+        assert!(matches!(expr, Expression::ArrayAccess { .. }));
+    }
+
+    // ========== Closure Capture Tests ==========
+
+    #[test]
+    fn test_closure_single_capture_by_value() {
+        // Closure with single capture by value
+        let source = "[x](y) => y";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, parameters, .. } = expr {
+            assert_eq!(captures.len(), 1);
+            assert_eq!(captures[0].name.name, "x");
+            assert!(matches!(captures[0].mode, CaptureMode::ByValue));
+            assert_eq!(parameters.len(), 1);
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_closure_single_capture_by_reference() {
+        // Closure with single capture by reference
+        let source = "[&x](y) => y";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, .. } = expr {
+            assert_eq!(captures.len(), 1);
+            assert_eq!(captures[0].name.name, "x");
+            assert!(matches!(captures[0].mode, CaptureMode::ByReference));
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_closure_capture_by_mut_reference() {
+        // Closure with capture by mutable reference
+        let source = "[&mut counter]() => counter";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, parameters, .. } = expr {
+            assert_eq!(captures.len(), 1);
+            assert_eq!(captures[0].name.name, "counter");
+            assert!(matches!(captures[0].mode, CaptureMode::ByMutableReference));
+            assert_eq!(parameters.len(), 0);
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_closure_multiple_captures() {
+        // Closure with multiple captures of different modes
+        let source = "[x, &y, &mut z](a: Int) => a";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, parameters, .. } = expr {
+            assert_eq!(captures.len(), 3);
+            assert_eq!(captures[0].name.name, "x");
+            assert!(matches!(captures[0].mode, CaptureMode::ByValue));
+            assert_eq!(captures[1].name.name, "y");
+            assert!(matches!(captures[1].mode, CaptureMode::ByReference));
+            assert_eq!(captures[2].name.name, "z");
+            assert!(matches!(captures[2].mode, CaptureMode::ByMutableReference));
+            assert_eq!(parameters.len(), 1);
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_closure_empty_captures() {
+        // Closure with empty capture list (explicit no captures)
+        let source = "[](x) => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, parameters, .. } = expr {
+            assert_eq!(captures.len(), 0);
+            assert_eq!(parameters.len(), 1);
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_closure_with_block_body() {
+        // Closure with captures and block body
+        let source = "[total](x: Int) => { return {total + x}; }";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, body, .. } = expr {
+            assert_eq!(captures.len(), 1);
+            assert!(matches!(body, LambdaBody::Block(_)));
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_closure_with_return_type() {
+        // Closure with captures and explicit return type
+        let source = "[state](x: Int) -> Int => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok(), "Error: {:?}", result.err());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, return_type, .. } = expr {
+            assert_eq!(captures.len(), 1);
+            assert!(return_type.is_some());
+        } else {
+            panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_lambda_without_captures_still_works() {
+        // Verify lambdas without captures still work (backward compatibility)
+        let source = "(x: Int) => x";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Lambda { captures, .. } = expr {
+            assert_eq!(captures.len(), 0);
+        } else {
+            panic!("Expected Lambda expression");
+        }
     }
 }

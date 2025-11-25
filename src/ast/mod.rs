@@ -765,6 +765,13 @@ pub enum Expression {
         field_name: Identifier,
         source_location: SourceLocation,
     },
+    /// Method call: receiver.method(args)
+    MethodCall {
+        receiver: Box<Expression>,
+        method_name: Identifier,
+        arguments: Vec<Argument>,
+        source_location: SourceLocation,
+    },
     ArrayAccess {
         array: Box<Expression>,
         index: Box<Expression>,
@@ -828,6 +835,53 @@ pub enum Expression {
         value: Option<Box<Expression>>,
         source_location: SourceLocation,
     },
+
+    // Lambda/closure expression
+    Lambda {
+        /// Captured variables from enclosing scope
+        captures: Vec<Capture>,
+        parameters: Vec<Parameter>,
+        return_type: Option<Box<TypeSpecifier>>,
+        body: LambdaBody,
+        source_location: SourceLocation,
+    },
+
+    /// Range expression: start..end or start..=end
+    Range {
+        start: Option<Box<Expression>>,
+        end: Option<Box<Expression>>,
+        inclusive: bool,
+        source_location: SourceLocation,
+    },
+}
+
+/// Lambda body - either a single expression or a block
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LambdaBody {
+    Expression(Box<Expression>),
+    Block(Block),
+}
+
+/// Capture mode for closure captures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CaptureMode {
+    /// Capture by value (copy)
+    ByValue,
+    /// Capture by reference (borrow)
+    ByReference,
+    /// Capture by mutable reference
+    ByMutableReference,
+}
+
+/// A single capture in a closure capture list
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Capture {
+    /// The name of the captured variable
+    pub name: Identifier,
+    /// How the variable is captured
+    pub mode: CaptureMode,
+    /// Source location
+    pub source_location: SourceLocation,
 }
 
 /// Cast failure behavior

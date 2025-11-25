@@ -130,3 +130,8 @@ perf.data.old
 tags
 TAGS
 .tags
+# Claude Code
+.claude/
+
+# Compiled binaries
+hello_v2

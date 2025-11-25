@@ -1,13 +1,13 @@
 # Project Status
 
 ## Last Updated
-2025-11-24
+2025-11-25
 
 ## Project Status
-In Progress - Phase 2: V2 Parser
+Complete - V2 Syntax with Advanced Features
 
 ## Current Phase
-Phase 2: V2 Parser Implementation
+Phase 4 Complete: Additional V2 Syntax Features
 
 ## Completed Tasks
 - [x] Task 1.1: Define V2 Token Types (44 tests passing)
@@ -30,12 +30,12 @@ Phase 2: V2 Parser Implementation
 - [x] Task 2.15: Implement Enum Parsing (152 tests passing)
 
 ## Current Task
-Phase 3 Complete - Pipeline Integration
+All Core V2 Features Complete
 
 ## Next Actions
-1. Test full compilation with V2 syntax end-to-end
-2. Add error recovery mechanisms
-3. Consider additional V2 syntax features (match, for, lambdas)
+1. Improve error messages with more context
+2. Add documentation for V2 syntax
+3. Consider additional semantic analysis for V2 parser
 
 ## Blockers
 None
@@ -77,3 +77,68 @@ None
 - Added `parse_program()` method to V2 parser
 - Updated ast and tokens commands to support both syntax versions
 - **Phase 3 Complete!** Pipeline fully supports V1 and V2 syntax
+- **End-to-End Testing Session:**
+  - Fixed `parse_module()` to parse all module items (functions, structs, enums) after module declaration
+  - Added function call parsing in postfix expressions `identifier(args)`
+  - Fixed FunctionCall expression to use proper AST structure with `AstFunctionCall`, `FunctionReference::Local`, and `Argument` types
+  - Created test file `examples/hello_v2.aes` demonstrating V2 syntax
+  - Successfully compiled and executed V2 program: `add(10, 20)` returns 30
+  - All 658 tests passing
+- **Error Recovery Implementation:**
+  - Added synchronization methods: `synchronize()`, `synchronize_to_block_end()`, `synchronize_to_module_item()`
+  - Added `parse_module_with_recovery()` for IDE/editor integration (returns partial results + all errors)
+  - Added `has_errors()`, `take_errors()` helper methods
+  - Added `ParserError::SyntaxError` variant with suggestion field
+  - Added contextual error helpers: `syntax_error()`, `missing_semicolon_error()`, `missing_type_error()`, `unexpected_token_error()`
+  - Updated error reporter to display suggestions as hints
+  - Added 6 error recovery tests (170 V2 parser tests, 664 total tests)
+- **Additional V2 Syntax Features:**
+  - Implemented match expressions with pattern matching (8 tests)
+    - Wildcard patterns (`_`)
+    - Enum variant patterns (`Some(x)`)
+    - Literal patterns (integers, booleans)
+    - Variable binding patterns
+    - Added `FatArrow` (=>) and `Underscore` (_) tokens
+  - Implemented for-each loops (6 tests)
+    - Syntax: `for item in collection { }`
+    - Optional type annotations: `for x: Int in items { }`
+    - Nested loops supported
+  - Implemented lambda expressions (5 tests)
+    - Zero-param lambdas: `() => expr`
+    - Typed params: `(x: Int, y: Int) => expr`
+    - Return type annotation: `(x: Int) -> Int => expr`
+    - Expression body: `(x) => x`
+    - Block body: `(x) => { statements }`
+    - Added `LambdaBody` enum to AST
+  - Implemented parenthesized expressions (2 tests)
+  - Implemented method call syntax (6 tests)
+    - Basic: `obj.method()`
+    - With args: `obj.method(arg1, arg2)`
+    - Chained: `obj.first().second()`
+    - Field + method: `obj.field.method()`
+    - Added `MethodCall` variant to Expression enum
+  - Implemented range expressions (6 tests)
+    - Exclusive: `0..10`
+    - Inclusive: `0..=10`
+    - Prefix: `..10`
+    - Postfix: `0..`
+    - Added `DotDot` (..) and `DotDotEqual` (..=) tokens
+    - Added `Range` variant to Expression enum
+  - **Edge Case Test Coverage** (19 new tests, 716 total)
+    - Range edge cases: prefix ranges, inclusive prefix, for loops with ranges
+    - Lambda edge cases: typed/untyped params, block bodies
+    - Method call edge cases: braced expressions, deep chaining, expression args
+    - Match edge cases: bool results, multiple enum variants, three-case match
+    - Combined feature tests: for+range, method+lambda, return lambda
+  - **Closure Captures Implementation** (8 new tests, 724 total)
+    - Added `Capture` struct and `CaptureMode` enum to AST
+    - Added `captures` field to Lambda expression
+    - Syntax: `[captures](params) => body`
+    - Capture modes:
+      - By value: `[x]` - captures x by copy
+      - By reference: `[&x]` - captures x by reference
+      - By mutable reference: `[&mut x]` - captures x by mutable reference
+    - Multiple captures: `[x, &y, &mut z](params) => body`
+    - Empty capture list: `[](params) => body`
+    - Added `parse_capture_list()` method to parser
+  - All 724 tests passing

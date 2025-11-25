@@ -32,12 +32,16 @@ pub enum TokenType {
     RightBracket, // ]
 
     // Punctuation
-    Semicolon, // ;
-    Colon,     // :
-    Comma,     // ,
-    Dot,       // .
-    Arrow,     // ->
-    At,        // @
+    Semicolon,  // ;
+    Colon,      // :
+    Comma,      // ,
+    Dot,        // .
+    DotDot,     // ..
+    DotDotEqual, // ..=
+    Arrow,      // ->
+    FatArrow,   // =>
+    At,         // @
+    Underscore, // _
 
     // Operators - Arithmetic
     Plus,    // +
@@ -529,6 +533,11 @@ impl Lexer {
             }
         }
 
+        // Check for underscore wildcard pattern
+        if identifier == "_" {
+            return Token::new(TokenType::Underscore, start_location, identifier);
+        }
+
         // Check if it's a keyword
         let token_type = if let Some(keyword) = self.keywords.get(&identifier) {
             // Special handling for true/false/nil
@@ -605,7 +614,17 @@ impl Lexer {
             }
             Some('.') => {
                 self.advance();
-                Ok(Token::new(TokenType::Dot, location, ".".to_string()))
+                if self.current_char == Some('.') {
+                    self.advance();
+                    if self.current_char == Some('=') {
+                        self.advance();
+                        Ok(Token::new(TokenType::DotDotEqual, location, "..=".to_string()))
+                    } else {
+                        Ok(Token::new(TokenType::DotDot, location, "..".to_string()))
+                    }
+                } else {
+                    Ok(Token::new(TokenType::Dot, location, ".".to_string()))
+                }
             }
             Some('@') => {
                 self.advance();
@@ -649,12 +668,15 @@ impl Lexer {
                 }
             }
 
-            // Equal or EqualEqual
+            // Equal, EqualEqual, or FatArrow
             Some('=') => {
                 self.advance();
                 if self.current_char == Some('=') {
                     self.advance();
                     Ok(Token::new(TokenType::EqualEqual, location, "==".to_string()))
+                } else if self.current_char == Some('>') {
+                    self.advance();
+                    Ok(Token::new(TokenType::FatArrow, location, "=>".to_string()))
                 } else {
                     Ok(Token::new(TokenType::Equal, location, "=".to_string()))
                 }

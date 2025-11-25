@@ -163,6 +163,13 @@ pub enum ParserError {
         #[from]
         source: LexerError,
     },
+
+    #[error("{message} at {location}")]
+    SyntaxError {
+        message: String,
+        location: SourceLocation,
+        suggestion: Option<String>,
+    },
 }
 
 /// Semantic analysis errors
