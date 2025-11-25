@@ -16,5 +16,5 @@ func main() -> Int {
     let flag: Bool = true;
     let pi: Float = 3.14159;
 
-    return sum;
+    return 0;
 }
