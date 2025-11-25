@@ -119,7 +119,7 @@ impl Lexer {
             // Enumeration and pattern matching keywords
             "VARIANTS", "VARIANT", "HOLDS", "MATCH_EXPRESSION", "CASE",
             // Type keywords
-            "INTEGER", "INTEGER64", "FLOAT", "STRING", "CHAR", "BOOLEAN", "VOID", "ARRAY_OF_TYPE", 
+            "INTEGER", "FLOAT", "STRING", "CHAR", "BOOLEAN", "VOID", "ARRAY_OF_TYPE", 
             "MAP_FROM_TYPE_TO_TYPE", "POINTER_TO",
             // Function keywords
             "ACCEPTS_PARAMETER", "RETURNS", "BODY", "CALL_FUNCTION", "RETURN_VALUE", "RETURN_VOID",
