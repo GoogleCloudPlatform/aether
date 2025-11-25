@@ -1949,4 +1949,236 @@ mod tests {
         assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
         assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "x"));
     }
+
+    // ==================== INTEGRATION TESTS ====================
+
+    #[test]
+    fn test_lexer_integration_hello_world() {
+        let source = r#"
+module Hello {
+    func main() -> Void {
+        print("Hello, World!");
+    }
+}
+"#;
+        let mut lexer = Lexer::new(source, "hello.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // module Hello { func main ( ) -> Void { print ( "Hello, World!" ) ; } } EOF
+        // Verify key tokens are present
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Module)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "Hello"));
+        assert!(matches!(tokens[2].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[3].token_type, TokenType::Keyword(Keyword::Func)));
+        assert!(matches!(tokens[4].token_type, TokenType::Identifier(ref s) if s == "main"));
+
+        // Find the string literal
+        let has_hello_world = tokens.iter().any(|t| {
+            matches!(&t.token_type, TokenType::StringLiteral(s) if s == "Hello, World!")
+        });
+        assert!(has_hello_world);
+    }
+
+    #[test]
+    fn test_lexer_integration_function_with_params() {
+        let source = r#"
+/// Adds two integers
+func add(a: Int, b: Int) -> Int {
+    return {a + b};
+}
+"#;
+        let mut lexer = Lexer::new(source, "add.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // Verify function structure
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Func)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "add"));
+        assert!(matches!(tokens[2].token_type, TokenType::LeftParen));
+        assert!(matches!(tokens[3].token_type, TokenType::Identifier(ref s) if s == "a"));
+        assert!(matches!(tokens[4].token_type, TokenType::Colon));
+        assert!(matches!(tokens[5].token_type, TokenType::Keyword(Keyword::Int)));
+        assert!(matches!(tokens[6].token_type, TokenType::Comma));
+        assert!(matches!(tokens[7].token_type, TokenType::Identifier(ref s) if s == "b"));
+
+        // Find the return keyword and braced expression
+        let has_return = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Return)));
+        assert!(has_return);
+    }
+
+    #[test]
+    fn test_lexer_integration_when_statement() {
+        let source = r#"
+func grade(score: Int) -> String {
+    when {
+        case ({score >= 90}): return "A";
+        case ({score >= 80}): return "B";
+        else: return "F";
+    }
+}
+"#;
+        let mut lexer = Lexer::new(source, "grade.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // Verify when block structure
+        let has_when = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::When)));
+        let has_case = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Case)));
+        let has_else = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Else)));
+
+        assert!(has_when);
+        assert!(has_case);
+        assert!(has_else);
+
+        // Verify comparison operators are present
+        let has_gte = tokens.iter().any(|t| matches!(t.token_type, TokenType::GreaterEqual));
+        assert!(has_gte);
+    }
+
+    #[test]
+    fn test_lexer_integration_for_loop() {
+        let source = r#"
+func sum_to(n: Int) -> Int {
+    let mut total: Int = 0;
+    for i in range(from: 0, to: n) {
+        total = {total + i};
+    }
+    return total;
+}
+"#;
+        let mut lexer = Lexer::new(source, "sum.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // Verify for loop structure
+        let has_for = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::For)));
+        let has_in = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::In)));
+        let has_range = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Range)));
+        let has_mut = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Mut)));
+
+        assert!(has_for);
+        assert!(has_in);
+        assert!(has_range);
+        assert!(has_mut);
+    }
+
+    #[test]
+    fn test_lexer_integration_struct_definition() {
+        let source = r#"
+struct Point {
+    x: Float;
+    y: Float;
+}
+"#;
+        let mut lexer = Lexer::new(source, "point.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // struct Point { x : Float ; y : Float ; } EOF = 12 tokens
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Struct)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "Point"));
+        assert!(matches!(tokens[2].token_type, TokenType::LeftBrace));
+        assert!(matches!(tokens[3].token_type, TokenType::Identifier(ref s) if s == "x"));
+        assert!(matches!(tokens[4].token_type, TokenType::Colon));
+        assert!(matches!(tokens[5].token_type, TokenType::Keyword(Keyword::Float)));
+        assert!(matches!(tokens[6].token_type, TokenType::Semicolon));
+    }
+
+    #[test]
+    fn test_lexer_integration_extern_function() {
+        let source = r#"
+@extern(library: "libc")
+func malloc(size: SizeT) -> Pointer<Void>;
+"#;
+        let mut lexer = Lexer::new(source, "extern.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // Verify extern function structure
+        assert!(matches!(tokens[0].token_type, TokenType::At));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "extern"));
+        assert!(matches!(tokens[2].token_type, TokenType::LeftParen));
+
+        // Find library string
+        let has_libc = tokens.iter().any(|t| {
+            matches!(&t.token_type, TokenType::StringLiteral(s) if s == "libc")
+        });
+        assert!(has_libc);
+
+        // Verify pointer type tokens
+        let has_pointer = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Pointer)));
+        let has_void = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Void)));
+        let has_sizet = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::SizeT)));
+
+        assert!(has_pointer);
+        assert!(has_void);
+        assert!(has_sizet);
+    }
+
+    #[test]
+    fn test_lexer_integration_error_handling() {
+        let source = r#"
+func divide(a: Int, b: Int) -> Int {
+    try {
+        return {a / b};
+    } catch DivisionError as e {
+        throw e;
+    } finally {
+        cleanup();
+    }
+}
+"#;
+        let mut lexer = Lexer::new(source, "divide.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // Verify error handling keywords
+        let has_try = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Try)));
+        let has_catch = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Catch)));
+        let has_finally = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Finally)));
+        let has_throw = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::Throw)));
+        let has_as = tokens.iter().any(|t| matches!(t.token_type, TokenType::Keyword(Keyword::As)));
+
+        assert!(has_try);
+        assert!(has_catch);
+        assert!(has_finally);
+        assert!(has_throw);
+        assert!(has_as);
+    }
+
+    #[test]
+    fn test_lexer_integration_ownership_types() {
+        let source = r#"
+func process(owned: ^String, borrowed: &Int, shared: ~Resource) -> Void {
+    // ...
+}
+"#;
+        let mut lexer = Lexer::new(source, "ownership.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // Verify ownership sigils
+        let has_caret = tokens.iter().any(|t| matches!(t.token_type, TokenType::Caret));
+        let has_ampersand = tokens.iter().any(|t| matches!(t.token_type, TokenType::Ampersand));
+        let has_tilde = tokens.iter().any(|t| matches!(t.token_type, TokenType::Tilde));
+
+        assert!(has_caret);
+        assert!(has_ampersand);
+        assert!(has_tilde);
+    }
+
+    #[test]
+    fn test_lexer_integration_complex_expressions() {
+        let source = r#"
+let result: Bool = {{x > 0} && {y < 10}} || {!flag};
+"#;
+        let mut lexer = Lexer::new(source, "expr.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // Verify complex expression tokens
+        let has_ampamp = tokens.iter().any(|t| matches!(t.token_type, TokenType::AmpAmp));
+        let has_pipepipe = tokens.iter().any(|t| matches!(t.token_type, TokenType::PipePipe));
+        let has_bang = tokens.iter().any(|t| matches!(t.token_type, TokenType::Bang));
+        let has_greater = tokens.iter().any(|t| matches!(t.token_type, TokenType::Greater));
+        let has_less = tokens.iter().any(|t| matches!(t.token_type, TokenType::Less));
+
+        assert!(has_ampamp);
+        assert!(has_pipepipe);
+        assert!(has_bang);
+        assert!(has_greater);
+        assert!(has_less);
+    }
 }
