@@ -4,10 +4,10 @@
 2025-11-25
 
 ## Project Status
-Complete - V2 Syntax with Advanced Features
+Complete - V2 Syntax Only (V1 Removed)
 
 ## Current Phase
-Phase 4 Complete: Additional V2 Syntax Features
+Phase 5 Complete: V1 Syntax Removal and Examples Planning
 
 ## Completed Tasks
 - [x] Task 1.1: Define V2 Token Types (44 tests passing)
@@ -142,3 +142,12 @@ None
     - Empty capture list: `[](params) => body`
     - Added `parse_capture_list()` method to parser
   - All 724 tests passing
+- **Phase 5: V1 Syntax Removal**
+  - Removed `SyntaxVersion` enum (V1, Auto variants)
+  - Removed `detect_syntax_version()` function from pipeline
+  - Removed `-s/--syntax` CLI argument from all commands
+  - Removed V1 lexer/parser usage from CLI commands
+  - Simplified `parse_source()` to V2-only
+  - Updated tests to V2-only (718 tests passing)
+  - Created examples reorganization plan (`docs/examples-reorganization-plan.md`)
+  - V2 compilation pipeline verified: `hello_v2.aes` compiles and runs correctly

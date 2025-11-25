@@ -13,36 +13,14 @@
 // limitations under the License.
 
 //! AetherScript Compiler CLI
-//! 
+//!
 //! Command-line interface for the AetherScript compiler
 
 use aether::Compiler;
-use aether::pipeline::{CompileOptions, SyntaxVersion};
-use clap::{Parser, Subcommand, ValueEnum};
+use aether::pipeline::CompileOptions;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process;
-
-/// CLI representation of syntax version
-#[derive(Debug, Clone, Copy, ValueEnum, Default)]
-enum SyntaxVersionArg {
-    /// V1: S-expression based syntax (LISP-like)
-    V1,
-    /// V2: Swift/Rust-like syntax
-    V2,
-    /// Auto-detect from file extension or pragma
-    #[default]
-    Auto,
-}
-
-impl From<SyntaxVersionArg> for SyntaxVersion {
-    fn from(arg: SyntaxVersionArg) -> Self {
-        match arg {
-            SyntaxVersionArg::V1 => SyntaxVersion::V1,
-            SyntaxVersionArg::V2 => SyntaxVersion::V2,
-            SyntaxVersionArg::Auto => SyntaxVersion::Auto,
-        }
-    }
-}
 
 /// Format AST for human-readable display
 fn format_ast_for_display(program: &aether::ast::Program) -> String {
@@ -150,46 +128,42 @@ enum Commands {
         /// Input source file(s)
         #[arg(required = true)]
         input: Vec<PathBuf>,
-        
+
         /// Output file name (defaults to first input file name without extension)
         #[arg(short, long)]
         output: Option<PathBuf>,
-        
+
         /// Optimization level (0-3)
         #[arg(short = 'O', long, default_value = "2")]
         optimization: u8,
-        
+
         /// Generate debug information
         #[arg(short, long)]
         debug: bool,
-        
+
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
-        
+
         /// Keep intermediate files
         #[arg(long)]
         keep_intermediates: bool,
-        
+
         /// Generate object file only (don't link)
         #[arg(short = 'c', long)]
         compile_only: bool,
-        
+
         /// Compile as a library (shared object/dylib)
         #[arg(long)]
         library: bool,
-        
+
         /// Additional library search paths
         #[arg(short = 'L', long = "library-path")]
         library_paths: Vec<PathBuf>,
-        
+
         /// Link with library
         #[arg(short = 'l', long = "link")]
         link_libraries: Vec<String>,
-
-        /// Syntax version (v1, v2, or auto)
-        #[arg(short = 's', long, value_enum, default_value = "auto")]
-        syntax: SyntaxVersionArg,
     },
 
     /// Check syntax without generating code
@@ -201,10 +175,6 @@ enum Commands {
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
-
-        /// Syntax version (v1, v2, or auto)
-        #[arg(short = 's', long, value_enum, default_value = "auto")]
-        syntax: SyntaxVersionArg,
     },
 
     /// Run AetherScript program (compile and execute)
@@ -220,10 +190,6 @@ enum Commands {
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
-
-        /// Syntax version (v1, v2, or auto)
-        #[arg(short = 's', long, value_enum, default_value = "auto")]
-        syntax: SyntaxVersionArg,
     },
 
     /// Print AST (Abstract Syntax Tree)
@@ -239,10 +205,6 @@ enum Commands {
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
-
-        /// Syntax version (v1, v2, or auto)
-        #[arg(short = 's', long, value_enum, default_value = "auto")]
-        syntax: SyntaxVersionArg,
     },
 
     /// Print tokens
@@ -258,10 +220,6 @@ enum Commands {
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
-
-        /// Syntax version (v1, v2, or auto)
-        #[arg(short = 's', long, value_enum, default_value = "auto")]
-        syntax: SyntaxVersionArg,
     },
 }
 
@@ -280,7 +238,6 @@ fn main() {
             library,
             library_paths,
             link_libraries,
-            syntax,
         }) => {
             let mut options = CompileOptions::default();
             options.optimization_level = optimization.min(3);
@@ -291,12 +248,11 @@ fn main() {
             options.compile_as_library = library;
             options.library_paths = library_paths;
             options.link_libraries = link_libraries;
-            options.syntax_version = syntax.into();
 
             if let Some(output_path) = output {
                 options.output = Some(output_path);
             }
-            
+
             let compiler = Compiler::with_options(options);
             match compiler.compile_files(&input) {
                 Ok(result) => {
@@ -306,15 +262,14 @@ fn main() {
                     }
                     Ok(result)
                 }
-                Err(e) => Err(e)
+                Err(e) => Err(e),
             }
         }
         
-        Some(Commands::Check { input, verbose, syntax }) => {
+        Some(Commands::Check { input, verbose }) => {
             let mut options = CompileOptions::default();
             options.verbose = verbose || cli.verbose;
             options.debug_info = cli.debug;
-            options.syntax_version = syntax.into();
             // syntax_only still runs semantic analysis, just skips code generation
             options.syntax_only = true;
             
@@ -390,12 +345,11 @@ fn main() {
             }
         }
         
-        Some(Commands::Run { input, args, verbose, syntax }) => {
+        Some(Commands::Run { input, args, verbose }) => {
             // First compile the program
             let mut options = CompileOptions::default();
             options.verbose = verbose;
             options.optimization_level = 2;
-            options.syntax_version = syntax.into();
             
             let compiler = Compiler::with_options(options);
             match compiler.compile_files(&[input]) {
@@ -421,11 +375,9 @@ fn main() {
             }
         }
         
-        Some(Commands::Ast { input, output, verbose: _, syntax }) => {
-            use aether::parser::Parser as ParserV1;
-            use aether::parser::v2::Parser as ParserV2;
-            use aether::lexer::Lexer as LexerV1;
+        Some(Commands::Ast { input, output, verbose: _ }) => {
             use aether::lexer::v2::Lexer as LexerV2;
+            use aether::parser::v2::Parser as ParserV2;
             use std::fs;
 
             let content = match fs::read_to_string(&input) {
@@ -436,63 +388,17 @@ fn main() {
                 }
             };
 
-            // Determine syntax version
-            let version: SyntaxVersion = syntax.into();
-            let effective_version = match version {
-                SyntaxVersion::Auto => {
-                    // Check file extension
-                    match input.extension().and_then(|e| e.to_str()) {
-                        Some("aes") | Some("aether2") => SyntaxVersion::V2,
-                        _ => {
-                            // Check pragma
-                            let first_line = content.lines().next().unwrap_or("");
-                            if first_line.starts_with("// syntax: v2") {
-                                SyntaxVersion::V2
-                            } else {
-                                SyntaxVersion::V1
-                            }
-                        }
-                    }
+            // Parse using V2 parser
+            let mut lexer = LexerV2::new(&content, input.display().to_string());
+            let tokens = match lexer.tokenize() {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("Lexer error: {:?}", e);
+                    process::exit(1);
                 }
-                v => v,
             };
-
-            // Parse based on syntax version
-            let ast = match effective_version {
-                SyntaxVersion::V1 => {
-                    let mut lexer = LexerV1::new(&content, input.display().to_string());
-                    let mut tokens = vec![];
-                    loop {
-                        match lexer.next_token() {
-                            Ok(token) => {
-                                if matches!(token.token_type, aether::lexer::TokenType::Eof) {
-                                    break;
-                                }
-                                tokens.push(token);
-                            }
-                            Err(e) => {
-                                eprintln!("Lexer error: {}", e);
-                                process::exit(1);
-                            }
-                        }
-                    }
-                    let mut parser = ParserV1::new(tokens);
-                    parser.parse_program()
-                }
-                SyntaxVersion::V2 => {
-                    let mut lexer = LexerV2::new(&content, input.display().to_string());
-                    let tokens = match lexer.tokenize() {
-                        Ok(t) => t,
-                        Err(e) => {
-                            eprintln!("V2 Lexer error: {:?}", e);
-                            process::exit(1);
-                        }
-                    };
-                    let mut parser = ParserV2::new(tokens);
-                    parser.parse_program()
-                }
-                SyntaxVersion::Auto => unreachable!(),
-            };
+            let mut parser = ParserV2::new(tokens);
+            let ast = parser.parse_program();
 
             match ast {
                 Ok(ast) => {
@@ -520,8 +426,7 @@ fn main() {
             }
         }
         
-        Some(Commands::Tokens { input, output, verbose: _, syntax }) => {
-            use aether::lexer::Lexer as LexerV1;
+        Some(Commands::Tokens { input, output, verbose: _ }) => {
             use aether::lexer::v2::Lexer as LexerV2;
             use std::fs;
 
@@ -533,95 +438,31 @@ fn main() {
                 }
             };
 
-            // Determine syntax version
-            let version: SyntaxVersion = syntax.into();
-            let effective_version = match version {
-                SyntaxVersion::Auto => {
-                    match input.extension().and_then(|e| e.to_str()) {
-                        Some("aes") | Some("aether2") => SyntaxVersion::V2,
-                        _ => {
-                            let first_line = content.lines().next().unwrap_or("");
-                            if first_line.starts_with("// syntax: v2") {
-                                SyntaxVersion::V2
-                            } else {
-                                SyntaxVersion::V1
-                            }
-                        }
-                    }
-                }
-                v => v,
-            };
-
             let mut token_output = String::new();
-            token_output.push_str(&format!("Tokens for {} (syntax: {:?}):\n", input.display(), effective_version));
+            token_output.push_str(&format!("Tokens for {}:\n", input.display()));
             token_output.push_str("=================\n");
 
-            match effective_version {
-                SyntaxVersion::V1 => {
-                    let mut lexer = LexerV1::new(&content, input.display().to_string());
-                    loop {
-                        match lexer.next_token() {
-                            Ok(token) => {
-                                if matches!(token.token_type, aether::lexer::TokenType::Eof) {
-                                    break;
-                                }
-                                let token_str = match &token.token_type {
-                                    aether::lexer::TokenType::LeftParen => "LeftParen".to_string(),
-                                    aether::lexer::TokenType::RightParen => "RightParen".to_string(),
-                                    aether::lexer::TokenType::Keyword(k) => format!("Keyword(\"{}\")", k),
-                                    aether::lexer::TokenType::Identifier(i) => format!("Identifier(\"{}\")", i),
-                                    aether::lexer::TokenType::Integer(n) => format!("Integer({})", n),
-                                    aether::lexer::TokenType::Float(f) => format!("Float({})", f),
-                                    aether::lexer::TokenType::String(s) => format!("String(\"{}\")", s),
-                                    aether::lexer::TokenType::Character(c) => format!("Character('{}')", c),
-                                    aether::lexer::TokenType::Boolean(b) => format!("Boolean({})", b),
-                                    aether::lexer::TokenType::NullValue => "NullValue".to_string(),
-                                    aether::lexer::TokenType::Caret => "Caret".to_string(),
-                                    aether::lexer::TokenType::Ampersand => "Ampersand".to_string(),
-                                    aether::lexer::TokenType::Tilde => "Tilde".to_string(),
-                                    aether::lexer::TokenType::Comment(c) => format!("Comment(\"{}\")", c),
-                                    aether::lexer::TokenType::Whitespace => "Whitespace".to_string(),
-                                    aether::lexer::TokenType::Eof => "Eof".to_string(),
-                                };
-                                token_output.push_str(&format!("{} at {}:{}\n",
-                                    token_str,
-                                    token.location.line,
-                                    token.location.column
-                                ));
-                            }
-                            Err(e) => {
-                                eprintln!("Lexer error: {}", e);
-                                process::exit(1);
-                            }
+            let mut lexer = LexerV2::new(&content, input.display().to_string());
+            match lexer.tokenize() {
+                Ok(tokens) => {
+                    for token in tokens {
+                        if matches!(token.token_type, aether::lexer::v2::TokenType::Eof) {
+                            break;
                         }
+                        token_output.push_str(&format!(
+                            "{:?} at {}:{}\n",
+                            token.token_type, token.location.line, token.location.column
+                        ));
                     }
                 }
-                SyntaxVersion::V2 => {
-                    let mut lexer = LexerV2::new(&content, input.display().to_string());
-                    match lexer.tokenize() {
-                        Ok(tokens) => {
-                            for token in tokens {
-                                if matches!(token.token_type, aether::lexer::v2::TokenType::Eof) {
-                                    break;
-                                }
-                                token_output.push_str(&format!("{:?} at {}:{}\n",
-                                    token.token_type,
-                                    token.location.line,
-                                    token.location.column
-                                ));
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("V2 Lexer error: {:?}", e);
-                            process::exit(1);
-                        }
-                    }
+                Err(e) => {
+                    eprintln!("Lexer error: {:?}", e);
+                    process::exit(1);
                 }
-                SyntaxVersion::Auto => unreachable!(),
             }
 
             let output_content = token_output;
-            
+
             if let Some(output_dir) = output {
                 let output_path = std::path::Path::new(&output_dir)
                     .join(input.file_stem().unwrap())
@@ -631,7 +472,7 @@ fn main() {
             } else {
                 println!("{}", output_content);
             }
-            
+
             Ok(aether::pipeline::CompilationResult {
                 executable_path: PathBuf::new(),
                 intermediate_files: vec![],
