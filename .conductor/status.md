@@ -30,11 +30,11 @@ Phase 2: V2 Parser Implementation
 - [x] Task 2.15: Implement Enum Parsing (152 tests passing)
 
 ## Current Task
-Phase 2 Complete - Ready for Pipeline Integration
+Phase 3 In Progress - Pipeline Integration
 
 ## Next Actions
-1. Consider Phase 3: Pipeline Integration
-2. Connect V2 parser to semantic analysis
+1. Add CLI flag for syntax version selection
+2. Test full compilation with V2 syntax
 3. Add error recovery mechanisms
 
 ## Blockers
@@ -68,3 +68,8 @@ None
 - Added postfix expression parsing (array access, field access) in expressions
 - Added support for both file-scoped (`module name;`) and inline (`module name {}`) module syntax
 - Added nested braced expression support `{{a + b} * {c - 1}}`
+- **Phase 3: Pipeline Integration Started**
+- Added `SyntaxVersion` enum (V1, V2, Auto)
+- Added syntax version detection by file extension (.aes, .aether2 = V2) and pragma (`// syntax: v2`)
+- Updated pipeline to use appropriate lexer/parser based on syntax version
+- Added 8 pipeline integration tests (658 total tests)

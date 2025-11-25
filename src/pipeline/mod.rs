@@ -16,16 +16,30 @@
 //! 
 //! Integrates all compiler phases from source code to executable
 
-use crate::ast::Program;
+use crate::ast::{Module, Program};
 use crate::error::{CompilerError, SemanticError};
 use crate::lexer::Lexer;
+use crate::lexer::v2 as lexer_v2;
 use crate::llvm_backend::LLVMBackend;
 use crate::mir;
 use crate::optimizations::OptimizationManager;
 use crate::parser::Parser;
+use crate::parser::v2 as parser_v2;
 use crate::profiling::CompilationProfiler;
 use crate::semantic::SemanticAnalyzer;
 use crate::stdlib::StandardLibrary;
+
+/// Syntax version for parsing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SyntaxVersion {
+    /// V1: S-expression based syntax (LISP-like)
+    #[default]
+    V1,
+    /// V2: Swift/Rust-like syntax
+    V2,
+    /// Auto-detect from file extension or pragma
+    Auto,
+}
 
 use inkwell::context::Context;
 use rayon::prelude::*;
@@ -63,6 +77,8 @@ pub struct CompileOptions {
     pub syntax_only: bool,
     /// Compile as a library (shared object/dylib)
     pub compile_as_library: bool,
+    /// Syntax version (V1, V2, or Auto)
+    pub syntax_version: SyntaxVersion,
 }
 
 impl Default for CompileOptions {
@@ -81,6 +97,7 @@ impl Default for CompileOptions {
             emit_object_only: false,
             syntax_only: false,
             compile_as_library: false,
+            syntax_version: SyntaxVersion::default(),
         }
     }
 }
@@ -126,6 +143,71 @@ impl CompilationPipeline {
         }
     }
 
+    /// Detect syntax version from file extension or source pragma
+    fn detect_syntax_version(path: &Path, source: &str) -> SyntaxVersion {
+        // Check file extension first
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            match ext {
+                "aes" | "aether2" => return SyntaxVersion::V2,
+                "aether" | "ae" => {
+                    // Check for pragma in source
+                    let first_line = source.lines().next().unwrap_or("");
+                    if first_line.starts_with("// syntax: v2") || first_line.starts_with("//! syntax: v2") {
+                        return SyntaxVersion::V2;
+                    }
+                    return SyntaxVersion::V1;
+                }
+                _ => {}
+            }
+        }
+
+        // Check for pragma comment at start of file
+        let first_line = source.lines().next().unwrap_or("");
+        if first_line.starts_with("// syntax: v2") || first_line.starts_with("//! syntax: v2") {
+            return SyntaxVersion::V2;
+        }
+        if first_line.starts_with("// syntax: v1") || first_line.starts_with("//! syntax: v1") {
+            return SyntaxVersion::V1;
+        }
+
+        // Default to V1 for backwards compatibility
+        SyntaxVersion::V1
+    }
+
+    /// Parse a single source file with the appropriate parser
+    fn parse_file(&self, path: &Path, source: &str) -> Result<Module, CompilerError> {
+        Self::parse_source(path, source, self.options.syntax_version)
+    }
+
+    /// Parse source code with specified syntax version (static for use in parallel contexts)
+    fn parse_source(path: &Path, source: &str, syntax_version: SyntaxVersion) -> Result<Module, CompilerError> {
+        let filename = path.to_string_lossy().to_string();
+
+        // Determine which syntax version to use
+        let version = match syntax_version {
+            SyntaxVersion::Auto => Self::detect_syntax_version(path, source),
+            v => v,
+        };
+
+        match version {
+            SyntaxVersion::V1 => {
+                // Use V1 lexer and parser (S-expression syntax)
+                let mut lexer = Lexer::new(source, filename);
+                let tokens = lexer.tokenize()?;
+                let mut parser = Parser::new(tokens);
+                parser.parse_module().map_err(CompilerError::from)
+            }
+            SyntaxVersion::V2 => {
+                // Use V2 lexer and parser (Swift/Rust-like syntax)
+                let mut lexer = lexer_v2::Lexer::new(source, filename);
+                let tokens = lexer.tokenize()?; // LexerError -> CompilerError::Lexer via #[from]
+                let mut parser = parser_v2::Parser::new(tokens);
+                parser.parse_module().map_err(CompilerError::from)
+            }
+            SyntaxVersion::Auto => unreachable!("Auto should have been resolved"),
+        }
+    }
+
     /// Compile multiple source files into a single executable
     pub fn compile_files(&mut self, input_files: &[PathBuf]) -> Result<CompilationResult, CompilerError> {
         let start_time = std::time::Instant::now();
@@ -147,6 +229,7 @@ impl CompilationPipeline {
             let _timer = if self.options.enable_profiling { Some(profiler.start_phase("parsing")) } else { None };
             
             // Decide whether to use parallel or sequential parsing
+            let syntax_version = self.options.syntax_version;
             let modules = if self.options.parallel && input_files.len() > 1 {
                 // Parallel parsing
                 let results: Result<Vec<_>, _> = input_files
@@ -157,53 +240,43 @@ impl CompilationPipeline {
                             .map_err(|e| CompilerError::IoError {
                                 message: format!("Failed to read {}: {}", input_file.display(), e),
                             })?;
-                        
+
                         let lines = source.lines().count();
-                        
-                        // Tokenize
-                        let mut lexer = Lexer::new(&source, input_file.to_string_lossy().to_string());
-                        let tokens = lexer.tokenize()?;
-                        
-                        // Parse module
-                        let mut parser = Parser::new(tokens);
-                        let module = parser.parse_module()?;
-                        
-                        Ok::<(crate::ast::Module, usize), CompilerError>((module, lines))
+
+                        // Parse with appropriate syntax version
+                        let module = Self::parse_source(input_file, &source, syntax_version)?;
+
+                        Ok::<(Module, usize), CompilerError>((module, lines))
                     })
                     .collect();
-                
+
                 let parsed_modules = results?;
-                
+
                 // Update stats
                 for (_, lines) in &parsed_modules {
                     stats.lines_of_code += lines;
                 }
-                
+
                 parsed_modules.into_iter().map(|(m, _)| m).collect()
             } else {
                 // Sequential parsing for single file or when parallel is disabled
                 let mut modules = vec![];
-                
+
                 for input_file in input_files {
                     // Read file
                     let source = fs::read_to_string(input_file)
                         .map_err(|e| CompilerError::IoError {
                             message: format!("Failed to read {}: {}", input_file.display(), e),
                         })?;
-                    
+
                     stats.lines_of_code += source.lines().count();
-                    
-                    // Tokenize
-                    let mut lexer = Lexer::new(&source, input_file.to_string_lossy().to_string());
-                    let tokens = lexer.tokenize()?;
-                    
-                    // Parse module
-                    let mut parser = Parser::new(tokens);
-                    let module = parser.parse_module()?;
-                    
+
+                    // Parse with appropriate syntax version
+                    let module = self.parse_file(input_file, &source)?;
+
                     modules.push(module);
                 }
-                
+
                 modules
             };
             
@@ -625,9 +698,158 @@ mod tests {
             optimization_level: 3,
             ..Default::default()
         };
-        
+
         let pipeline = CompilationPipeline::new(opts);
         assert_eq!(pipeline.options.optimization_level, 3);
         assert!(pipeline.options.verbose);
+    }
+
+    #[test]
+    fn test_syntax_version_default() {
+        let opts = CompileOptions::default();
+        assert_eq!(opts.syntax_version, SyntaxVersion::V1);
+    }
+
+    #[test]
+    fn test_detect_syntax_version_by_extension() {
+        use std::path::Path;
+
+        // V2 extensions
+        assert_eq!(
+            CompilationPipeline::detect_syntax_version(Path::new("test.aes"), ""),
+            SyntaxVersion::V2
+        );
+        assert_eq!(
+            CompilationPipeline::detect_syntax_version(Path::new("test.aether2"), ""),
+            SyntaxVersion::V2
+        );
+
+        // V1 extensions (default)
+        assert_eq!(
+            CompilationPipeline::detect_syntax_version(Path::new("test.aether"), ""),
+            SyntaxVersion::V1
+        );
+        assert_eq!(
+            CompilationPipeline::detect_syntax_version(Path::new("test.ae"), ""),
+            SyntaxVersion::V1
+        );
+    }
+
+    #[test]
+    fn test_detect_syntax_version_by_pragma() {
+        use std::path::Path;
+
+        // V2 pragma in .aether file
+        assert_eq!(
+            CompilationPipeline::detect_syntax_version(
+                Path::new("test.aether"),
+                "// syntax: v2\nmodule test;"
+            ),
+            SyntaxVersion::V2
+        );
+
+        // V1 pragma
+        assert_eq!(
+            CompilationPipeline::detect_syntax_version(
+                Path::new("test.aether"),
+                "// syntax: v1\n(module test)"
+            ),
+            SyntaxVersion::V1
+        );
+
+        // V2 pragma with unknown extension
+        assert_eq!(
+            CompilationPipeline::detect_syntax_version(
+                Path::new("test.txt"),
+                "// syntax: v2\nmodule test;"
+            ),
+            SyntaxVersion::V2
+        );
+    }
+
+    #[test]
+    fn test_parse_source_v1() {
+        use std::path::Path;
+
+        let v1_source = r#"
+        (DEFINE_MODULE
+          (NAME 'test')
+          (INTENT "A test module")
+          (CONTENT)
+        )
+        "#;
+        let result = CompilationPipeline::parse_source(
+            Path::new("test.aether"),
+            v1_source,
+            SyntaxVersion::V1,
+        );
+
+        assert!(result.is_ok(), "V1 parse error: {:?}", result.err());
+        let module = result.unwrap();
+        assert_eq!(module.name.name, "test");
+    }
+
+    #[test]
+    fn test_parse_source_v2() {
+        use std::path::Path;
+
+        let v2_source = "module test;";
+        let result = CompilationPipeline::parse_source(
+            Path::new("test.aes"),
+            v2_source,
+            SyntaxVersion::V2,
+        );
+
+        assert!(result.is_ok());
+        let module = result.unwrap();
+        assert_eq!(module.name.name, "test");
+    }
+
+    #[test]
+    fn test_parse_source_auto_v1() {
+        use std::path::Path;
+
+        let v1_source = r#"
+        (DEFINE_MODULE
+          (NAME 'test')
+          (INTENT "A test module")
+          (CONTENT)
+        )
+        "#;
+        let result = CompilationPipeline::parse_source(
+            Path::new("test.aether"),
+            v1_source,
+            SyntaxVersion::Auto,
+        );
+
+        assert!(result.is_ok(), "V1 auto parse error: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_parse_source_auto_v2_by_extension() {
+        use std::path::Path;
+
+        let v2_source = "module test;";
+        let result = CompilationPipeline::parse_source(
+            Path::new("test.aes"),
+            v2_source,
+            SyntaxVersion::Auto,
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_source_auto_v2_by_pragma() {
+        use std::path::Path;
+
+        let v2_source = "// syntax: v2\nmodule test;";
+        let result = CompilationPipeline::parse_source(
+            Path::new("test.aether"),
+            v2_source,
+            SyntaxVersion::Auto,
+        );
+
+        assert!(result.is_ok());
     }
 }
