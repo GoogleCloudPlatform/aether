@@ -18,14 +18,16 @@ Phase 2: V2 Parser Implementation
 - [x] Task 1.6: Implement Full Lexer Integration (126 tests passing)
 - [x] Task 2.1: Implement Parser Skeleton (17 tests passing)
 - [x] Task 2.2: Implement Module Parsing (29 tests passing)
+- [x] Task 2.3: Import Parsing (included in 2.2)
+- [x] Task 2.4: Implement Type Parsing (50 tests passing)
 
 ## Current Task
-Task 2.3: Implement Import Parsing (already done as part of 2.2)
+Task 2.5: Implement Function Parsing (Basic)
 
 ## Next Actions
-1. Continue to Task 2.4: Implement Type Parsing
-2. Parse primitive types (Int, Float, String, Bool, Void)
-3. Parse generic types (Array<T>, Map<K,V>)
+1. Write tests for basic function definitions
+2. Implement parse_function() method
+3. Parse parameters and return types
 
 ## Blockers
 None
@@ -45,3 +47,4 @@ None
 - **Phase 1 (V2 Lexer) Complete!** All 126 tests passing
 - Task 2.1: Created parser skeleton with helper methods (17 tests)
 - Task 2.2: Implemented module and import parsing (12 new tests)
+- Task 2.4: Implemented type parsing with ownership sigils (21 new tests)

@@ -16,7 +16,7 @@
 //!
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
-use crate::ast::{Identifier, ImportStatement, Module};
+use crate::ast::{Identifier, ImportStatement, Module, OwnershipKind, PrimitiveType, TypeSpecifier};
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
 
@@ -244,6 +244,189 @@ impl Parser {
         }
 
         Ok(Identifier::new(parts.join("."), start_location))
+    }
+
+    /// Parse a type specifier
+    /// Grammar: ownership_type | primitive_type | generic_type | named_type
+    pub fn parse_type(&mut self) -> Result<TypeSpecifier, ParserError> {
+        let start_location = self.current_location();
+
+        // Check for ownership sigils first: ^ & ~
+        if self.check(&TokenType::Caret) {
+            self.advance();
+            let base_type = self.parse_type()?;
+            return Ok(TypeSpecifier::Owned {
+                base_type: Box::new(base_type),
+                ownership: OwnershipKind::Owned,
+                source_location: start_location,
+            });
+        }
+
+        if self.check(&TokenType::Ampersand) {
+            self.advance();
+            // Check for &mut
+            if self.check_keyword(Keyword::Mut) {
+                self.advance();
+                let base_type = self.parse_type()?;
+                return Ok(TypeSpecifier::Owned {
+                    base_type: Box::new(base_type),
+                    ownership: OwnershipKind::BorrowedMut,
+                    source_location: start_location,
+                });
+            }
+            let base_type = self.parse_type()?;
+            return Ok(TypeSpecifier::Owned {
+                base_type: Box::new(base_type),
+                ownership: OwnershipKind::Borrowed,
+                source_location: start_location,
+            });
+        }
+
+        if self.check(&TokenType::Tilde) {
+            self.advance();
+            let base_type = self.parse_type()?;
+            return Ok(TypeSpecifier::Owned {
+                base_type: Box::new(base_type),
+                ownership: OwnershipKind::Shared,
+                source_location: start_location,
+            });
+        }
+
+        // Check for primitive types and built-in generic types
+        if let TokenType::Keyword(keyword) = &self.peek().token_type {
+            match keyword {
+                // Primitive types
+                Keyword::Int => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Integer,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Int64 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Integer64,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Float => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Float,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::String_ => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::String,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Bool => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Boolean,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Void => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Void,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::SizeT => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::SizeT,
+                        source_location: start_location,
+                    });
+                }
+
+                // Built-in generic types
+                Keyword::Array => {
+                    self.advance();
+                    self.expect(&TokenType::Less, "expected '<' after Array")?;
+                    let element_type = self.parse_type()?;
+                    self.expect(&TokenType::Greater, "expected '>' to close Array type")?;
+                    return Ok(TypeSpecifier::Array {
+                        element_type: Box::new(element_type),
+                        size: None,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Map => {
+                    self.advance();
+                    self.expect(&TokenType::Less, "expected '<' after Map")?;
+                    let key_type = self.parse_type()?;
+                    self.expect(&TokenType::Comma, "expected ',' between Map key and value types")?;
+                    let value_type = self.parse_type()?;
+                    self.expect(&TokenType::Greater, "expected '>' to close Map type")?;
+                    return Ok(TypeSpecifier::Map {
+                        key_type: Box::new(key_type),
+                        value_type: Box::new(value_type),
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Pointer => {
+                    self.advance();
+                    self.expect(&TokenType::Less, "expected '<' after Pointer")?;
+                    let target_type = self.parse_type()?;
+                    self.expect(&TokenType::Greater, "expected '>' to close Pointer type")?;
+                    return Ok(TypeSpecifier::Pointer {
+                        target_type: Box::new(target_type),
+                        is_mutable: false,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::MutPointer => {
+                    self.advance();
+                    self.expect(&TokenType::Less, "expected '<' after MutPointer")?;
+                    let target_type = self.parse_type()?;
+                    self.expect(&TokenType::Greater, "expected '>' to close MutPointer type")?;
+                    return Ok(TypeSpecifier::Pointer {
+                        target_type: Box::new(target_type),
+                        is_mutable: true,
+                        source_location: start_location,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        // Named type (user-defined) - possibly with generic arguments
+        let name = self.parse_identifier()?;
+
+        // Check for generic type arguments
+        if self.check(&TokenType::Less) {
+            self.advance();
+            let mut type_arguments = Vec::new();
+
+            // Parse first type argument
+            type_arguments.push(Box::new(self.parse_type()?));
+
+            // Parse additional type arguments
+            while self.check(&TokenType::Comma) {
+                self.advance();
+                type_arguments.push(Box::new(self.parse_type()?));
+            }
+
+            self.expect(&TokenType::Greater, "expected '>' to close generic type")?;
+
+            return Ok(TypeSpecifier::Generic {
+                base_type: name,
+                type_arguments,
+                source_location: start_location,
+            });
+        }
+
+        Ok(TypeSpecifier::Named {
+            name,
+            source_location: start_location,
+        })
     }
 
     // ==================== HELPER METHODS ====================
@@ -582,5 +765,279 @@ module Test {
         let module = result.unwrap();
         assert_eq!(module.name.name, "Test");
         assert_eq!(module.imports.len(), 1);
+    }
+
+    // ==================== TYPE PARSING TESTS ====================
+
+    #[test]
+    fn test_parse_type_int() {
+        let mut parser = parser_from_source("Int");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+    }
+
+    #[test]
+    fn test_parse_type_int64() {
+        let mut parser = parser_from_source("Int64");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer64, .. }));
+    }
+
+    #[test]
+    fn test_parse_type_float() {
+        let mut parser = parser_from_source("Float");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Float, .. }));
+    }
+
+    #[test]
+    fn test_parse_type_string() {
+        let mut parser = parser_from_source("String");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
+    }
+
+    #[test]
+    fn test_parse_type_bool() {
+        let mut parser = parser_from_source("Bool");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Boolean, .. }));
+    }
+
+    #[test]
+    fn test_parse_type_void() {
+        let mut parser = parser_from_source("Void");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Void, .. }));
+    }
+
+    #[test]
+    fn test_parse_type_sizet() {
+        let mut parser = parser_from_source("SizeT");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        assert!(matches!(type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::SizeT, .. }));
+    }
+
+    #[test]
+    fn test_parse_type_array() {
+        let mut parser = parser_from_source("Array<Int>");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Array { element_type, .. } = type_spec {
+            assert!(matches!(*element_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        } else {
+            panic!("Expected Array type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_nested_array() {
+        let mut parser = parser_from_source("Array<Array<Int>>");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Array { element_type, .. } = type_spec {
+            assert!(matches!(*element_type, TypeSpecifier::Array { .. }));
+        } else {
+            panic!("Expected nested Array type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_map() {
+        let mut parser = parser_from_source("Map<String, Int>");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Map { key_type, value_type, .. } = type_spec {
+            assert!(matches!(*key_type, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
+            assert!(matches!(*value_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        } else {
+            panic!("Expected Map type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_pointer() {
+        let mut parser = parser_from_source("Pointer<Int>");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Pointer { target_type, is_mutable, .. } = type_spec {
+            assert!(!is_mutable);
+            assert!(matches!(*target_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        } else {
+            panic!("Expected Pointer type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_mut_pointer() {
+        let mut parser = parser_from_source("MutPointer<Void>");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Pointer { target_type, is_mutable, .. } = type_spec {
+            assert!(is_mutable);
+            assert!(matches!(*target_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Void, .. }));
+        } else {
+            panic!("Expected MutPointer type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_owned() {
+        let mut parser = parser_from_source("^String");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+            assert_eq!(ownership, OwnershipKind::Owned);
+            assert!(matches!(*base_type, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
+        } else {
+            panic!("Expected Owned type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_borrowed() {
+        let mut parser = parser_from_source("&Int");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+            assert_eq!(ownership, OwnershipKind::Borrowed);
+            assert!(matches!(*base_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        } else {
+            panic!("Expected Borrowed type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_borrowed_mut() {
+        let mut parser = parser_from_source("&mut Int");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+            assert_eq!(ownership, OwnershipKind::BorrowedMut);
+            assert!(matches!(*base_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+        } else {
+            panic!("Expected BorrowedMut type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_shared() {
+        let mut parser = parser_from_source("~Resource");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+            assert_eq!(ownership, OwnershipKind::Shared);
+            // Resource is a user-defined type
+            assert!(matches!(*base_type, TypeSpecifier::Named { .. }));
+        } else {
+            panic!("Expected Shared type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_named() {
+        let mut parser = parser_from_source("MyCustomType");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Named { name, .. } = type_spec {
+            assert_eq!(name.name, "MyCustomType");
+        } else {
+            panic!("Expected Named type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_generic_named() {
+        let mut parser = parser_from_source("Result<Int, String>");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Generic { base_type, type_arguments, .. } = type_spec {
+            assert_eq!(base_type.name, "Result");
+            assert_eq!(type_arguments.len(), 2);
+        } else {
+            panic!("Expected Generic type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_complex_ownership() {
+        let mut parser = parser_from_source("^Array<&Int>");
+        let result = parser.parse_type();
+
+        assert!(result.is_ok());
+        let type_spec = result.unwrap();
+        if let TypeSpecifier::Owned { ownership, base_type, .. } = type_spec {
+            assert_eq!(ownership, OwnershipKind::Owned);
+            if let TypeSpecifier::Array { element_type, .. } = *base_type {
+                if let TypeSpecifier::Owned { ownership: inner_ownership, .. } = *element_type {
+                    assert_eq!(inner_ownership, OwnershipKind::Borrowed);
+                } else {
+                    panic!("Expected borrowed element type");
+                }
+            } else {
+                panic!("Expected Array base type");
+            }
+        } else {
+            panic!("Expected Owned type");
+        }
+    }
+
+    #[test]
+    fn test_parse_type_error_missing_generic_close() {
+        let mut parser = parser_from_source("Array<Int");
+        let result = parser.parse_type();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_type_error_missing_map_comma() {
+        let mut parser = parser_from_source("Map<String Int>");
+        let result = parser.parse_type();
+
+        assert!(result.is_err());
     }
 }

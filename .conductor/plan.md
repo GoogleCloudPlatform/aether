@@ -225,16 +225,25 @@ Implemented module parsing:
 ---
 
 ### Task 2.4: Implement Type Parsing
-- [ ] **Write Tests**: Add tests for type specifiers
-  - Primitive types: `Int`, `Float`, `String`, `Bool`, `Void`
-  - Generic types: `Array<Int>`, `Map<String, Int>`
-  - Ownership types: `^String`, `&Int`, `~Resource`
+- [x] **Write Tests**: Add tests for type specifiers
+  - Primitive types: `Int`, `Int64`, `Float`, `String`, `Bool`, `Void`, `SizeT`
+  - Generic types: `Array<Int>`, `Map<String, Int>`, nested arrays
+  - Ownership types: `^String`, `&Int`, `&mut Int`, `~Resource`
   - Pointer types: `Pointer<Int>`, `MutPointer<Void>`
-- [ ] **Implement**: Implement `parse_type()` method
-- [ ] **Verify**: Type parsing tests pass
+  - Named types: `MyCustomType`, `Result<Int, String>`
+  - Complex combinations: `^Array<&Int>`
+- [x] **Implement**: Implement `parse_type()` method
+- [x] **Verify**: All 21 type parsing tests pass (50 total)
 
 **Notes:**
 ```
+Implemented type parsing:
+- parse_type(): Main type parsing method with recursive support
+- Ownership sigils: ^ (owned), & (borrowed), &mut, ~ (shared)
+- Primitive types: Int, Int64, Float, String, Bool, Void, SizeT
+- Built-in generics: Array<T>, Map<K,V>, Pointer<T>, MutPointer<T>
+- User-defined types with optional generic arguments
+- Proper error handling for malformed types
 ```
 
 ---
