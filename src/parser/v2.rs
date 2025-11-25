@@ -19,7 +19,7 @@
 use crate::ast::{
     AssignmentTarget, Block, CallingConvention, ElseIf, EnumVariant, Expression, ExternalFunction,
     Function, FunctionMetadata, Identifier, ImportStatement, Module, Mutability, OwnershipKind,
-    Parameter, PassingMode, PrimitiveType, Statement, StructField, TypeDefinition, TypeSpecifier,
+    Parameter, PassingMode, PrimitiveType, Program, Statement, StructField, TypeDefinition, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -182,6 +182,22 @@ impl Parser {
     }
 
     // ==================== PARSING METHODS ====================
+
+    /// Parse a complete program (one or more modules)
+    pub fn parse_program(&mut self) -> Result<Program, ParserError> {
+        let start_location = self.current_location();
+        let mut modules = Vec::new();
+
+        // Parse modules until EOF
+        while !self.is_at_end() {
+            modules.push(self.parse_module()?);
+        }
+
+        Ok(Program {
+            modules,
+            source_location: start_location,
+        })
+    }
 
     /// Parse a module definition
     /// Grammar: "module" IDENTIFIER "{" module_item* "}"

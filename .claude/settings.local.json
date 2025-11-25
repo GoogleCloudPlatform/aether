@@ -8,7 +8,8 @@
       "Bash(cargo clippy:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "Bash(cargo run:*)"
     ]
   },
   "disabledMcpjsonServers": [
