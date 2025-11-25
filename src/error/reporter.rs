@@ -92,6 +92,17 @@ impl DetailedErrorReporter {
                     "error",
                 );
             }
+            ParserError::SyntaxError { message, location, suggestion } => {
+                self.report_error_with_context(
+                    "Syntax error",
+                    message,
+                    location,
+                    "error",
+                );
+                if let Some(hint) = suggestion {
+                    eprintln!("  hint: {}", hint);
+                }
+            }
         }
     }
 

@@ -13,16 +13,16 @@
 // limitations under the License.
 
 //! End-to-end compilation pipeline
-//! 
+//!
 //! Integrates all compiler phases from source code to executable
 
-use crate::ast::Program;
+use crate::ast::{Module, Program};
 use crate::error::{CompilerError, SemanticError};
-use crate::lexer::Lexer;
+use crate::lexer::v2 as lexer_v2;
 use crate::llvm_backend::LLVMBackend;
 use crate::mir;
 use crate::optimizations::OptimizationManager;
-use crate::parser::Parser;
+use crate::parser::v2 as parser_v2;
 use crate::profiling::CompilationProfiler;
 use crate::semantic::SemanticAnalyzer;
 use crate::stdlib::StandardLibrary;
@@ -126,6 +126,22 @@ impl CompilationPipeline {
         }
     }
 
+    /// Parse a single source file using V2 parser
+    fn parse_file(&self, path: &Path, source: &str) -> Result<Module, CompilerError> {
+        Self::parse_source(path, source)
+    }
+
+    /// Parse source code using V2 parser (static for use in parallel contexts)
+    fn parse_source(path: &Path, source: &str) -> Result<Module, CompilerError> {
+        let filename = path.to_string_lossy().to_string();
+
+        // Use V2 lexer and parser (Swift/Rust-like syntax)
+        let mut lexer = lexer_v2::Lexer::new(source, filename);
+        let tokens = lexer.tokenize()?;
+        let mut parser = parser_v2::Parser::new(tokens);
+        parser.parse_module().map_err(CompilerError::from)
+    }
+
     /// Compile multiple source files into a single executable
     pub fn compile_files(&mut self, input_files: &[PathBuf]) -> Result<CompilationResult, CompilerError> {
         let start_time = std::time::Instant::now();
@@ -157,53 +173,43 @@ impl CompilationPipeline {
                             .map_err(|e| CompilerError::IoError {
                                 message: format!("Failed to read {}: {}", input_file.display(), e),
                             })?;
-                        
+
                         let lines = source.lines().count();
-                        
-                        // Tokenize
-                        let mut lexer = Lexer::new(&source, input_file.to_string_lossy().to_string());
-                        let tokens = lexer.tokenize()?;
-                        
-                        // Parse module
-                        let mut parser = Parser::new(tokens);
-                        let module = parser.parse_module()?;
-                        
-                        Ok::<(crate::ast::Module, usize), CompilerError>((module, lines))
+
+                        // Parse with V2 parser
+                        let module = Self::parse_source(input_file, &source)?;
+
+                        Ok::<(Module, usize), CompilerError>((module, lines))
                     })
                     .collect();
-                
+
                 let parsed_modules = results?;
-                
+
                 // Update stats
                 for (_, lines) in &parsed_modules {
                     stats.lines_of_code += lines;
                 }
-                
+
                 parsed_modules.into_iter().map(|(m, _)| m).collect()
             } else {
                 // Sequential parsing for single file or when parallel is disabled
                 let mut modules = vec![];
-                
+
                 for input_file in input_files {
                     // Read file
                     let source = fs::read_to_string(input_file)
                         .map_err(|e| CompilerError::IoError {
                             message: format!("Failed to read {}: {}", input_file.display(), e),
                         })?;
-                    
+
                     stats.lines_of_code += source.lines().count();
-                    
-                    // Tokenize
-                    let mut lexer = Lexer::new(&source, input_file.to_string_lossy().to_string());
-                    let tokens = lexer.tokenize()?;
-                    
-                    // Parse module
-                    let mut parser = Parser::new(tokens);
-                    let module = parser.parse_module()?;
-                    
+
+                    // Parse with appropriate syntax version
+                    let module = self.parse_file(input_file, &source)?;
+
                     modules.push(module);
                 }
-                
+
                 modules
             };
             
@@ -612,7 +618,7 @@ mod tests {
         stats.lines_of_code = 100;
         stats.modules_compiled = 2;
         stats.functions_compiled = 10;
-        
+
         assert_eq!(stats.lines_of_code, 100);
         assert_eq!(stats.modules_compiled, 2);
         assert_eq!(stats.functions_compiled, 10);
@@ -625,9 +631,41 @@ mod tests {
             optimization_level: 3,
             ..Default::default()
         };
-        
+
         let pipeline = CompilationPipeline::new(opts);
         assert_eq!(pipeline.options.optimization_level, 3);
         assert!(pipeline.options.verbose);
+    }
+
+    #[test]
+    fn test_parse_source_v2() {
+        use std::path::Path;
+
+        let v2_source = "module test;";
+        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source);
+
+        assert!(result.is_ok());
+        let module = result.unwrap();
+        assert_eq!(module.name.name, "test");
+    }
+
+    #[test]
+    fn test_parse_source_v2_with_function() {
+        use std::path::Path;
+
+        let v2_source = r#"
+module test;
+
+func add(a: Int, b: Int) -> Int {
+    return {a + b};
+}
+"#;
+        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source);
+
+        assert!(result.is_ok());
+        let module = result.unwrap();
+        assert_eq!(module.name.name, "test");
+        assert_eq!(module.function_definitions.len(), 1);
+        assert_eq!(module.function_definitions[0].name.name, "add");
     }
 }

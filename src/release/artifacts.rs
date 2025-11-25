@@ -1477,7 +1477,11 @@ Released on: {}
 fn generate_license(&self, license_type: &str, format: &DocumentationFormat, output_path: &PathBuf) -> Result<Artifact, SemanticError> {
         println!("Generating license file for: {}", license_type);
 
-        let license_content = include_str!("../../../../LICENSE");
+        // Read LICENSE file from project root at runtime
+        let license_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("LICENSE");
+        let license_content = std::fs::read_to_string(&license_path).map_err(|e| SemanticError::Internal {
+            message: format!("Failed to read LICENSE file: {}", e),
+        })?;
 
         std::fs::write(output_path, license_content.as_bytes()).map_err(|e| SemanticError::Internal {
             message: format!("Failed to write license: {}", e),

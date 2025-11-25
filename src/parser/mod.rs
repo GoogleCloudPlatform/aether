@@ -13,8 +13,10 @@
 // limitations under the License.
 
 //! Parser for AetherScript S-expressions
-//! 
+//!
 //! Converts token stream to Abstract Syntax Tree
+
+pub mod v2;
 
 use crate::ast::*;
 use crate::ast::CastFailureBehavior;

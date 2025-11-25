@@ -1,0 +1,42 @@
+// Match Enums Example
+// Demonstrates pattern matching on enum variants
+
+module match_enums;
+
+enum Message {
+    Quit,
+    Move(Int, Int),
+    Write(Int),
+    ChangeColor(Int, Int, Int),
+}
+
+func process_message(msg: Message) -> Int {
+    match msg {
+        Message::Quit => {
+            return 0;
+        }
+        Message::Move(x, y) => {
+            return {x + y};
+        }
+        Message::Write(len) => {
+            return len;
+        }
+        Message::ChangeColor(r, g, b) => {
+            return {{r + g} + b};
+        }
+    }
+}
+
+func main() -> Int {
+    let m1: Message = Message::Quit;
+    let m2: Message = Message::Move(10, 20);
+    let m3: Message = Message::Write(5);
+    let m4: Message = Message::ChangeColor(255, 128, 64);
+
+    let r1: Int = process_message(m1);
+    let r2: Int = process_message(m2);
+    let r3: Int = process_message(m3);
+    let r4: Int = process_message(m4);
+
+    return r2;
+}

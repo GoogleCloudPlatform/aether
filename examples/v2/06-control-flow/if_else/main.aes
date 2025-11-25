@@ -1,0 +1,40 @@
+// If/Else Example
+// Demonstrates conditional branching with when/else
+
+module if_else;
+
+func abs(n: Int) -> Int {
+    when {n < 0} {
+        return {0 - n};
+    } else {
+        return n;
+    }
+}
+
+func classify(n: Int) -> Int {
+    when {n > 0} {
+        return 1;
+    } else {
+        when {n < 0} {
+            return -1;
+        } else {
+            return 0;
+        }
+    }
+}
+
+func max(a: Int, b: Int) -> Int {
+    when {a > b} {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+func main() -> Int {
+    let a: Int = abs(-5);
+    let sign: Int = classify(-10);
+    let m: Int = max(7, 3);
+
+    return m;
+}

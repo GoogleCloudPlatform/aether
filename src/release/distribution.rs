@@ -33,7 +33,7 @@ pub struct DistributionManager {
     
     /// CDN manager
     cdn_manager: Option<CdnManager>,
-    f
+
     /// Distribution history
     history: Vec<DistributionRecord>,
     

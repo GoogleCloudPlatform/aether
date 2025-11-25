@@ -13,8 +13,10 @@
 // limitations under the License.
 
 //! Lexical analysis for AetherScript
-//! 
+//!
 //! Tokenizes S-expression based AetherScript source code
+
+pub mod v2;
 
 use crate::error::{LexerError, SourceLocation};
 use std::collections::HashMap;
