@@ -30,12 +30,12 @@ Phase 2: V2 Parser Implementation
 - [x] Task 2.15: Implement Enum Parsing (152 tests passing)
 
 ## Current Task
-Phase 3 In Progress - Pipeline Integration
+Phase 3 Complete - Pipeline Integration
 
 ## Next Actions
-1. Add CLI flag for syntax version selection
-2. Test full compilation with V2 syntax
-3. Add error recovery mechanisms
+1. Test full compilation with V2 syntax end-to-end
+2. Add error recovery mechanisms
+3. Consider additional V2 syntax features (match, for, lambdas)
 
 ## Blockers
 None
@@ -73,3 +73,7 @@ None
 - Added syntax version detection by file extension (.aes, .aether2 = V2) and pragma (`// syntax: v2`)
 - Updated pipeline to use appropriate lexer/parser based on syntax version
 - Added 8 pipeline integration tests (658 total tests)
+- Added `--syntax/-s` CLI flag to compile, check, run, ast, and tokens commands
+- Added `parse_program()` method to V2 parser
+- Updated ast and tokens commands to support both syntax versions
+- **Phase 3 Complete!** Pipeline fully supports V1 and V2 syntax
