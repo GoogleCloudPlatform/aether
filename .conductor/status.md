@@ -26,14 +26,15 @@ Phase 2: V2 Parser Implementation
 - [x] Task 2.8: Implement Assignment Parsing (102 tests passing)
 - [x] Task 2.9: Implement Binary Expression Parsing (120 tests passing)
 - [x] Task 2.10: Implement Control Flow Parsing (139 tests passing)
+- [x] Task 2.14: Implement Struct Parsing (146 tests passing)
 
 ## Current Task
-Task 2.11: Integration Testing
+Task 2.15: Implement Enum Parsing
 
 ## Next Actions
-1. Test complete function parsing with bodies
-2. Test module parsing with multiple items
-3. Add more complex integration tests
+1. Write tests for enum definitions
+2. Implement parse_enum()
+3. Support variants with associated types
 
 ## Blockers
 None
@@ -60,3 +61,4 @@ None
 - Task 2.8: Implemented assignment parsing with array/field targets (8 new tests)
 - Task 2.9: Implemented braced binary expressions {a + b} (18 new tests)
 - Task 2.10: Implemented control flow: when, while, return, break, continue, blocks (19 new tests)
+- Task 2.14: Implemented struct parsing (7 new tests)

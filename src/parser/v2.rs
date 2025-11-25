@@ -19,7 +19,7 @@
 use crate::ast::{
     AssignmentTarget, Block, CallingConvention, ElseIf, Expression, ExternalFunction, Function,
     FunctionMetadata, Identifier, ImportStatement, Module, Mutability, OwnershipKind, Parameter,
-    PassingMode, PrimitiveType, Statement, TypeSpecifier,
+    PassingMode, PrimitiveType, Statement, StructField, TypeDefinition, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -783,6 +783,57 @@ impl Parser {
             may_block: false,
             variadic: false,
             ownership_info: None,
+            source_location: start_location,
+        })
+    }
+
+    // ==================== STRUCT PARSING ====================
+
+    /// Parse a struct definition
+    /// Grammar: "struct" IDENTIFIER "{" field* "}"
+    pub fn parse_struct(&mut self) -> Result<TypeDefinition, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Struct, "expected 'struct'")?;
+
+        let name = self.parse_identifier()?;
+
+        self.expect(&TokenType::LeftBrace, "expected '{' after struct name")?;
+
+        let mut fields = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            fields.push(self.parse_struct_field()?);
+        }
+
+        self.expect(&TokenType::RightBrace, "expected '}' to close struct")?;
+
+        Ok(TypeDefinition::Structured {
+            name,
+            intent: None,
+            generic_parameters: vec![],
+            fields,
+            export_as: None,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a struct field
+    /// Grammar: IDENTIFIER ":" type ";"
+    fn parse_struct_field(&mut self) -> Result<StructField, ParserError> {
+        let start_location = self.current_location();
+
+        let name = self.parse_identifier()?;
+
+        self.expect(&TokenType::Colon, "expected ':' after field name")?;
+
+        let field_type = self.parse_type()?;
+
+        self.expect(&TokenType::Semicolon, "expected ';' after field type")?;
+
+        Ok(StructField {
+            name,
+            field_type: Box::new(field_type),
             source_location: start_location,
         })
     }
@@ -3064,5 +3115,94 @@ func calculate(
 
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), Statement::Assignment { .. }));
+    }
+
+    // ==================== Struct Parsing Tests ====================
+
+    #[test]
+    fn test_parse_struct_simple() {
+        let mut parser = parser_from_source("struct Point { x: Float; y: Float; }");
+        let result = parser.parse_struct();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Structured { name, fields, .. } = typedef {
+            assert_eq!(name.name, "Point");
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name.name, "x");
+            assert_eq!(fields[1].name.name, "y");
+        } else {
+            panic!("Expected Structured type");
+        }
+    }
+
+    #[test]
+    fn test_parse_struct_empty() {
+        let mut parser = parser_from_source("struct Empty { }");
+        let result = parser.parse_struct();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Structured { name, fields, .. } = typedef {
+            assert_eq!(name.name, "Empty");
+            assert!(fields.is_empty());
+        } else {
+            panic!("Expected Structured type");
+        }
+    }
+
+    #[test]
+    fn test_parse_struct_single_field() {
+        let mut parser = parser_from_source("struct Wrapper { value: Int; }");
+        let result = parser.parse_struct();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Structured { fields, .. } = typedef {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0].name.name, "value");
+        } else {
+            panic!("Expected Structured type");
+        }
+    }
+
+    #[test]
+    fn test_parse_struct_complex_types() {
+        let mut parser = parser_from_source("struct Data { items: Array<Int>; lookup: Map<String, Int>; }");
+        let result = parser.parse_struct();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Structured { fields, .. } = typedef {
+            assert_eq!(fields.len(), 2);
+            assert!(matches!(*fields[0].field_type, TypeSpecifier::Array { .. }));
+            assert!(matches!(*fields[1].field_type, TypeSpecifier::Map { .. }));
+        } else {
+            panic!("Expected Structured type");
+        }
+    }
+
+    #[test]
+    fn test_parse_struct_error_missing_brace() {
+        let mut parser = parser_from_source("struct Point x: Float; }");
+        let result = parser.parse_struct();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_struct_error_missing_field_type() {
+        let mut parser = parser_from_source("struct Point { x; }");
+        let result = parser.parse_struct();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_struct_error_missing_semicolon() {
+        let mut parser = parser_from_source("struct Point { x: Float }");
+        let result = parser.parse_struct();
+
+        assert!(result.is_err());
     }
 }
