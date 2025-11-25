@@ -17,7 +17,7 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    AssignmentTarget, Block, CallingConvention, Expression, ExternalFunction, Function,
+    AssignmentTarget, Block, CallingConvention, ElseIf, Expression, ExternalFunction, Function,
     FunctionMetadata, Identifier, ImportStatement, Module, Mutability, OwnershipKind, Parameter,
     PassingMode, PrimitiveType, Statement, TypeSpecifier,
 };
@@ -572,37 +572,20 @@ impl Parser {
         })
     }
 
-    /// Parse a block (function body)
+    /// Parse a block of statements
     /// Grammar: "{" statement* "}"
     pub fn parse_block(&mut self) -> Result<Block, ParserError> {
         let start_location = self.current_location();
 
-        // Expect opening brace
         self.expect(&TokenType::LeftBrace, "expected '{' to start block")?;
 
-        // For now, just parse empty blocks or skip to closing brace
-        // Statement parsing will be added in later tasks
-        let statements = Vec::new();
+        let mut statements = Vec::new();
 
-        // Skip any tokens until we find the closing brace
-        // This is temporary - we'll add proper statement parsing later
-        let mut brace_depth = 1;
-        while !self.is_at_end() && brace_depth > 0 {
-            if self.check(&TokenType::LeftBrace) {
-                brace_depth += 1;
-                self.advance();
-            } else if self.check(&TokenType::RightBrace) {
-                brace_depth -= 1;
-                if brace_depth > 0 {
-                    self.advance();
-                }
-            } else {
-                self.advance();
-            }
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            statements.push(self.parse_statement()?);
         }
 
-        // Expect closing brace
-        self.expect(&TokenType::RightBrace, "expected '}' to close block")?;
+        self.expect(&TokenType::RightBrace, "expected '}' to end block")?;
 
         Ok(Block {
             statements,
@@ -945,6 +928,170 @@ impl Parser {
             expected: "assignment target".to_string(),
             found: format!("{:?}", self.peek().token_type),
             location: start_location,
+        })
+    }
+
+    // ==================== CONTROL FLOW PARSING ====================
+
+    /// Parse a return statement
+    /// Grammar: "return" [expression] ";"
+    pub fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Return, "expected 'return'")?;
+
+        // Check for optional return value
+        let value = if !self.check(&TokenType::Semicolon) {
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
+        };
+
+        self.expect(&TokenType::Semicolon, "expected ';' after return statement")?;
+
+        Ok(Statement::Return {
+            value,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a when statement (V2 if/else)
+    /// Grammar: "when" expression block ["else" "when" expression block]* ["else" block]
+    pub fn parse_when_statement(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::When, "expected 'when'")?;
+
+        // Parse condition
+        let condition = self.parse_expression()?;
+
+        // Parse then block
+        let then_block = self.parse_block()?;
+
+        // Parse else-ifs and else
+        let mut else_ifs = Vec::new();
+        let mut else_block = None;
+
+        while self.check_keyword(Keyword::Else) {
+            self.advance(); // consume 'else'
+
+            if self.check_keyword(Keyword::When) {
+                // else when (else if)
+                let else_if_location = self.current_location();
+                self.advance(); // consume 'when'
+
+                let else_if_condition = self.parse_expression()?;
+                let else_if_block = self.parse_block()?;
+
+                else_ifs.push(ElseIf {
+                    condition: Box::new(else_if_condition),
+                    block: else_if_block,
+                    source_location: else_if_location,
+                });
+            } else {
+                // Final else block
+                else_block = Some(self.parse_block()?);
+                break;
+            }
+        }
+
+        Ok(Statement::If {
+            condition: Box::new(condition),
+            then_block,
+            else_ifs,
+            else_block,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a while loop
+    /// Grammar: "while" expression block
+    pub fn parse_while_loop(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::While, "expected 'while'")?;
+
+        let condition = self.parse_expression()?;
+        let body = self.parse_block()?;
+
+        Ok(Statement::WhileLoop {
+            condition: Box::new(condition),
+            invariant: None,
+            body,
+            label: None,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a break statement
+    /// Grammar: "break" ";"
+    pub fn parse_break_statement(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Break, "expected 'break'")?;
+        self.expect(&TokenType::Semicolon, "expected ';' after break")?;
+
+        Ok(Statement::Break {
+            target_label: None,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a continue statement
+    /// Grammar: "continue" ";"
+    pub fn parse_continue_statement(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Continue, "expected 'continue'")?;
+        self.expect(&TokenType::Semicolon, "expected ';' after continue")?;
+
+        Ok(Statement::Continue {
+            target_label: None,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse any statement based on the leading token
+    pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
+        // Check for keywords that start statements
+        if self.check_keyword(Keyword::Let) {
+            return self.parse_variable_declaration();
+        }
+        if self.check_keyword(Keyword::Return) {
+            return self.parse_return_statement();
+        }
+        if self.check_keyword(Keyword::When) {
+            return self.parse_when_statement();
+        }
+        if self.check_keyword(Keyword::While) {
+            return self.parse_while_loop();
+        }
+        if self.check_keyword(Keyword::Break) {
+            return self.parse_break_statement();
+        }
+        if self.check_keyword(Keyword::Continue) {
+            return self.parse_continue_statement();
+        }
+
+        // Otherwise, try to parse as assignment or expression statement
+        // For now, assume identifier at start means assignment
+        if let TokenType::Identifier(_) = &self.peek().token_type {
+            // Look ahead to see if this is an assignment
+            if let Some(next) = self.peek_next() {
+                if matches!(next.token_type, TokenType::Equal | TokenType::LeftBracket | TokenType::Dot) {
+                    return self.parse_assignment();
+                }
+            }
+        }
+
+        // Default: expression statement
+        let start_location = self.current_location();
+        let expr = self.parse_expression()?;
+        self.expect(&TokenType::Semicolon, "expected ';' after expression")?;
+
+        Ok(Statement::Expression {
+            expr: Box::new(expr),
+            source_location: start_location,
         })
     }
 
@@ -2691,5 +2838,231 @@ func calculate(
         let result = parser.parse_expression();
 
         assert!(result.is_err());
+    }
+
+    // ==================== Control Flow Tests ====================
+
+    #[test]
+    fn test_parse_return_with_value() {
+        let mut parser = parser_from_source("return 42;");
+        let result = parser.parse_return_statement();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Return { value, .. } = stmt {
+            assert!(value.is_some());
+            assert!(matches!(*value.unwrap(), Expression::IntegerLiteral { value: 42, .. }));
+        } else {
+            panic!("Expected Return statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_return_without_value() {
+        let mut parser = parser_from_source("return;");
+        let result = parser.parse_return_statement();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Return { value, .. } = stmt {
+            assert!(value.is_none());
+        } else {
+            panic!("Expected Return statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_return_with_expression() {
+        let mut parser = parser_from_source("return {x + y};");
+        let result = parser.parse_return_statement();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Return { value, .. } = stmt {
+            assert!(value.is_some());
+            assert!(matches!(*value.unwrap(), Expression::Add { .. }));
+        } else {
+            panic!("Expected Return statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_when_simple() {
+        let mut parser = parser_from_source("when true { }");
+        let result = parser.parse_when_statement();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::If { condition, else_ifs, else_block, .. } = stmt {
+            assert!(matches!(*condition, Expression::BooleanLiteral { value: true, .. }));
+            assert!(else_ifs.is_empty());
+            assert!(else_block.is_none());
+        } else {
+            panic!("Expected If statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_when_with_else() {
+        let mut parser = parser_from_source("when x { } else { }");
+        let result = parser.parse_when_statement();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::If { else_block, .. } = stmt {
+            assert!(else_block.is_some());
+        } else {
+            panic!("Expected If statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_when_with_else_when() {
+        let mut parser = parser_from_source("when x { } else when y { } else { }");
+        let result = parser.parse_when_statement();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::If { else_ifs, else_block, .. } = stmt {
+            assert_eq!(else_ifs.len(), 1);
+            assert!(else_block.is_some());
+        } else {
+            panic!("Expected If statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_when_with_body() {
+        let mut parser = parser_from_source("when {x > 0} { return x; }");
+        let result = parser.parse_when_statement();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::If { then_block, .. } = stmt {
+            assert_eq!(then_block.statements.len(), 1);
+        } else {
+            panic!("Expected If statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_while_loop() {
+        let mut parser = parser_from_source("while true { }");
+        let result = parser.parse_while_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::WhileLoop { condition, .. } = stmt {
+            assert!(matches!(*condition, Expression::BooleanLiteral { value: true, .. }));
+        } else {
+            panic!("Expected WhileLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_while_with_condition() {
+        let mut parser = parser_from_source("while {i < 10} { }");
+        let result = parser.parse_while_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        assert!(matches!(stmt, Statement::WhileLoop { .. }));
+    }
+
+    #[test]
+    fn test_parse_while_with_body() {
+        let mut parser = parser_from_source("while {x > 0} { x = {x - 1}; }");
+        let result = parser.parse_while_loop();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::WhileLoop { body, .. } = stmt {
+            assert_eq!(body.statements.len(), 1);
+        } else {
+            panic!("Expected WhileLoop statement");
+        }
+    }
+
+    #[test]
+    fn test_parse_break() {
+        let mut parser = parser_from_source("break;");
+        let result = parser.parse_break_statement();
+
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), Statement::Break { .. }));
+    }
+
+    #[test]
+    fn test_parse_continue() {
+        let mut parser = parser_from_source("continue;");
+        let result = parser.parse_continue_statement();
+
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), Statement::Continue { .. }));
+    }
+
+    #[test]
+    fn test_parse_block_empty() {
+        let mut parser = parser_from_source("{ }");
+        let result = parser.parse_block();
+
+        assert!(result.is_ok());
+        let block = result.unwrap();
+        assert!(block.statements.is_empty());
+    }
+
+    #[test]
+    fn test_parse_block_with_statements() {
+        let mut parser = parser_from_source("{ let x: Int = 1; let y: Int = 2; }");
+        let result = parser.parse_block();
+
+        assert!(result.is_ok());
+        let block = result.unwrap();
+        assert_eq!(block.statements.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_statement_let() {
+        let mut parser = parser_from_source("let x: Int = 42;");
+        let result = parser.parse_statement();
+
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), Statement::VariableDeclaration { .. }));
+    }
+
+    #[test]
+    fn test_parse_statement_return() {
+        let mut parser = parser_from_source("return 0;");
+        let result = parser.parse_statement();
+
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), Statement::Return { .. }));
+    }
+
+    #[test]
+    fn test_parse_statement_when() {
+        let mut parser = parser_from_source("when true { }");
+        let result = parser.parse_statement();
+
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), Statement::If { .. }));
+    }
+
+    #[test]
+    fn test_parse_statement_while() {
+        let mut parser = parser_from_source("while true { }");
+        let result = parser.parse_statement();
+
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), Statement::WhileLoop { .. }));
+    }
+
+    #[test]
+    fn test_parse_statement_assignment() {
+        let mut parser = parser_from_source("x = 42;");
+        let result = parser.parse_statement();
+
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), Statement::Assignment { .. }));
     }
 }

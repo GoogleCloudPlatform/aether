@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(cargo build:*)"
+    ]
+  },
+  "disabledMcpjsonServers": [
+    "repocast",
+    "proofcheck"
+  ]
+}

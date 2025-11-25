@@ -25,14 +25,15 @@ Phase 2: V2 Parser Implementation
 - [x] Task 2.7: Implement Variable Declaration Parsing (94 tests passing)
 - [x] Task 2.8: Implement Assignment Parsing (102 tests passing)
 - [x] Task 2.9: Implement Binary Expression Parsing (120 tests passing)
+- [x] Task 2.10: Implement Control Flow Parsing (139 tests passing)
 
 ## Current Task
-Task 2.10: Implement Control Flow Parsing
+Task 2.11: Integration Testing
 
 ## Next Actions
-1. Implement `when` blocks (V2 if/else)
-2. Implement loop statements
-3. Implement return statements
+1. Test complete function parsing with bodies
+2. Test module parsing with multiple items
+3. Add more complex integration tests
 
 ## Blockers
 None
@@ -58,3 +59,4 @@ None
 - Task 2.7: Implemented variable declaration and expression parsing (16 new tests)
 - Task 2.8: Implemented assignment parsing with array/field targets (8 new tests)
 - Task 2.9: Implemented braced binary expressions {a + b} (18 new tests)
+- Task 2.10: Implemented control flow: when, while, return, break, continue, blocks (19 new tests)
