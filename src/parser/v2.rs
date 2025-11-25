@@ -24,6 +24,14 @@ use crate::ast::{
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
 
+/// Internal enum for binary operators during parsing
+#[derive(Debug, Clone, Copy)]
+enum BinaryOp {
+    Add, Subtract, Multiply, Divide, Modulo,
+    Equals, NotEquals, LessThan, LessEqual, GreaterThan, GreaterEqual,
+    And, Or,
+}
+
 /// V2 Parser for AetherScript
 pub struct Parser {
     tokens: Vec<Token>,
@@ -942,10 +950,15 @@ impl Parser {
 
     // ==================== EXPRESSION PARSING ====================
 
-    /// Parse an expression (literals and identifiers for now)
-    /// Binary expressions with braces will be added in Task 2.9+
+    /// Parse an expression
+    /// Supports: literals, identifiers, braced binary expressions `{a + b}`
     pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
         let start_location = self.current_location();
+
+        // Braced binary expression: {left op right}
+        if self.check(&TokenType::LeftBrace) {
+            return self.parse_braced_expression();
+        }
 
         // Integer literal
         if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
@@ -1015,6 +1028,209 @@ impl Parser {
             found: format!("{:?}", self.peek().token_type),
             location: start_location,
         })
+    }
+
+    /// Parse a braced binary expression: `{left op right}`
+    /// V2 syntax requires binary operations to be wrapped in braces
+    fn parse_braced_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect(&TokenType::LeftBrace, "expected '{'")?;
+
+        // Parse left operand (must be a primary expression, not another binary)
+        let left = self.parse_primary_expression()?;
+
+        // Parse the binary operator
+        let operator = self.parse_binary_operator()?;
+
+        // Parse right operand
+        let right = self.parse_expression()?;
+
+        self.expect(&TokenType::RightBrace, "expected '}' after binary expression")?;
+
+        // Build the appropriate Expression variant based on operator
+        Ok(self.build_binary_expression(left, operator, right, start_location))
+    }
+
+    /// Parse a primary expression (non-binary): literals, identifiers
+    fn parse_primary_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        // Integer literal
+        if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::IntegerLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Float literal
+        if let TokenType::FloatLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::FloatLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // String literal
+        if let TokenType::StringLiteral(value) = &self.peek().token_type {
+            let value = value.clone();
+            self.advance();
+            return Ok(Expression::StringLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Character literal
+        if let TokenType::CharLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::CharacterLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Boolean literal
+        if let TokenType::BoolLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::BooleanLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Identifier (variable reference)
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let name = name.clone();
+            self.advance();
+            return Ok(Expression::Variable {
+                name: Identifier {
+                    name,
+                    source_location: start_location.clone(),
+                },
+                source_location: start_location,
+            });
+        }
+
+        Err(ParserError::UnexpectedToken {
+            expected: "primary expression".to_string(),
+            found: format!("{:?}", self.peek().token_type),
+            location: start_location,
+        })
+    }
+
+    /// Parse a binary operator token
+    fn parse_binary_operator(&mut self) -> Result<BinaryOp, ParserError> {
+        let location = self.current_location();
+        let token = self.peek();
+
+        let op = match &token.token_type {
+            TokenType::Plus => BinaryOp::Add,
+            TokenType::Minus => BinaryOp::Subtract,
+            TokenType::Star => BinaryOp::Multiply,
+            TokenType::Slash => BinaryOp::Divide,
+            TokenType::Percent => BinaryOp::Modulo,
+            TokenType::EqualEqual => BinaryOp::Equals,
+            TokenType::BangEqual => BinaryOp::NotEquals,
+            TokenType::Less => BinaryOp::LessThan,
+            TokenType::LessEqual => BinaryOp::LessEqual,
+            TokenType::Greater => BinaryOp::GreaterThan,
+            TokenType::GreaterEqual => BinaryOp::GreaterEqual,
+            TokenType::AmpAmp => BinaryOp::And,
+            TokenType::PipePipe => BinaryOp::Or,
+            _ => {
+                return Err(ParserError::UnexpectedToken {
+                    expected: "binary operator".to_string(),
+                    found: format!("{:?}", token.token_type),
+                    location,
+                });
+            }
+        };
+
+        self.advance();
+        Ok(op)
+    }
+
+    /// Build the appropriate Expression variant from operator
+    fn build_binary_expression(
+        &self,
+        left: Expression,
+        op: BinaryOp,
+        right: Expression,
+        source_location: SourceLocation,
+    ) -> Expression {
+        match op {
+            BinaryOp::Add => Expression::Add {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::Subtract => Expression::Subtract {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::Multiply => Expression::Multiply {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::Divide => Expression::Divide {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::Modulo => Expression::Modulo {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::Equals => Expression::Equals {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::NotEquals => Expression::NotEquals {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::LessThan => Expression::LessThan {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::LessEqual => Expression::LessThanOrEqual {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::GreaterThan => Expression::GreaterThan {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::GreaterEqual => Expression::GreaterThanOrEqual {
+                left: Box::new(left),
+                right: Box::new(right),
+                source_location,
+            },
+            BinaryOp::And => Expression::LogicalAnd {
+                operands: vec![left, right],
+                source_location,
+            },
+            BinaryOp::Or => Expression::LogicalOr {
+                operands: vec![left, right],
+                source_location,
+            },
+        }
     }
 
     // ==================== HELPER METHODS ====================
@@ -2281,6 +2497,198 @@ func calculate(
     fn test_parse_assignment_error_missing_value() {
         let mut parser = parser_from_source("x = ;");
         let result = parser.parse_assignment();
+
+        assert!(result.is_err());
+    }
+
+    // ==================== Binary Expression Parsing Tests ====================
+
+    #[test]
+    fn test_parse_binary_add() {
+        let mut parser = parser_from_source("{1 + 2}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Add { left, right, .. } = expr {
+            assert!(matches!(*left, Expression::IntegerLiteral { value: 1, .. }));
+            assert!(matches!(*right, Expression::IntegerLiteral { value: 2, .. }));
+        } else {
+            panic!("Expected Add expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_parse_binary_subtract() {
+        let mut parser = parser_from_source("{10 - 5}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::Subtract { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_multiply() {
+        let mut parser = parser_from_source("{3 * 4}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::Multiply { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_divide() {
+        let mut parser = parser_from_source("{10 / 2}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::Divide { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_modulo() {
+        let mut parser = parser_from_source("{7 % 3}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::Modulo { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_equals() {
+        let mut parser = parser_from_source("{x == y}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::Equals { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_not_equals() {
+        let mut parser = parser_from_source("{a != b}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::NotEquals { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_less_than() {
+        let mut parser = parser_from_source("{x < 10}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::LessThan { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_less_equal() {
+        let mut parser = parser_from_source("{x <= 10}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::LessThanOrEqual { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_greater_than() {
+        let mut parser = parser_from_source("{x > 0}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::GreaterThan { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_greater_equal() {
+        let mut parser = parser_from_source("{x >= 0}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::GreaterThanOrEqual { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_and() {
+        let mut parser = parser_from_source("{a && b}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::LogicalAnd { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_or() {
+        let mut parser = parser_from_source("{a || b}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::LogicalOr { .. }));
+    }
+
+    #[test]
+    fn test_parse_binary_nested() {
+        // {1 + {2 * 3}} - nested binary expressions
+        let mut parser = parser_from_source("{1 + {2 * 3}}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Add { left, right, .. } = expr {
+            assert!(matches!(*left, Expression::IntegerLiteral { value: 1, .. }));
+            assert!(matches!(*right, Expression::Multiply { .. }));
+        } else {
+            panic!("Expected Add with nested Multiply");
+        }
+    }
+
+    #[test]
+    fn test_parse_binary_with_variables() {
+        let mut parser = parser_from_source("{x + y}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::Add { left, right, .. } = expr {
+            assert!(matches!(*left, Expression::Variable { ref name, .. } if name.name == "x"));
+            assert!(matches!(*right, Expression::Variable { ref name, .. } if name.name == "y"));
+        } else {
+            panic!("Expected Add expression");
+        }
+    }
+
+    #[test]
+    fn test_parse_binary_error_missing_close_brace() {
+        let mut parser = parser_from_source("{1 + 2");
+        let result = parser.parse_expression();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_binary_error_missing_operator() {
+        let mut parser = parser_from_source("{1 2}");
+        let result = parser.parse_expression();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_binary_error_missing_right_operand() {
+        let mut parser = parser_from_source("{1 + }");
+        let result = parser.parse_expression();
 
         assert!(result.is_err());
     }
