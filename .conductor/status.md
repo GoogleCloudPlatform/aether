@@ -16,15 +16,16 @@ Phase 2: V2 Parser Implementation
 - [x] Task 1.4: Implement Operator Tokenization (106 tests passing)
 - [x] Task 1.5: Implement Comment Handling (117 tests passing)
 - [x] Task 1.6: Implement Full Lexer Integration (126 tests passing)
-- [x] Task 2.1: Implement Parser Skeleton (18 tests passing)
+- [x] Task 2.1: Implement Parser Skeleton (17 tests passing)
+- [x] Task 2.2: Implement Module Parsing (29 tests passing)
 
 ## Current Task
-Task 2.2: Implement Module Parsing
+Task 2.3: Implement Import Parsing (already done as part of 2.2)
 
 ## Next Actions
-1. Write tests for module parsing
-2. Implement parse_module() method
-3. Test empty module and module with imports
+1. Continue to Task 2.4: Implement Type Parsing
+2. Parse primitive types (Int, Float, String, Bool, Void)
+3. Parse generic types (Array<T>, Map<K,V>)
 
 ## Blockers
 None
@@ -42,4 +43,5 @@ None
 - Task 1.5: Implemented comment handling (// and ///)
 - Task 1.6: Added 9 integration tests for complete V2 code snippets
 - **Phase 1 (V2 Lexer) Complete!** All 126 tests passing
-- Task 2.1: Created parser skeleton with helper methods (18 tests)
+- Task 2.1: Created parser skeleton with helper methods (17 tests)
+- Task 2.2: Implemented module and import parsing (12 new tests)

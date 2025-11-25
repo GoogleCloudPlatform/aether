@@ -189,15 +189,24 @@ Created src/parser/v2.rs with:
 ---
 
 ### Task 2.2: Implement Module Parsing
-- [ ] **Write Tests**: Add tests for module parsing
+- [x] **Write Tests**: Add tests for module parsing
   - Empty module: `module Foo { }`
-  - Module with single function
-  - Module with imports
-- [ ] **Implement**: Implement `parse_module()` method
-- [ ] **Verify**: Module parsing tests pass
+  - Module with single import
+  - Module with multiple imports
+  - Module with dotted imports (e.g., std.io)
+  - Error cases: missing name, braces, semicolons
+- [x] **Implement**: Implement `parse_module()` method
+- [x] **Verify**: All 12 module parsing tests pass (29 total)
 
 **Notes:**
 ```
+Implemented module parsing:
+- parse_module(): Parses "module Name { ... }"
+- parse_import(): Parses "import dotted.name;"
+- parse_identifier(): Parses single identifier
+- parse_dotted_identifier(): Parses dot-separated identifiers
+- Supports multiline modules with comments
+- Proper error messages for missing tokens
 ```
 
 ---
