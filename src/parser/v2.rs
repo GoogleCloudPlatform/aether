@@ -17,9 +17,9 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    Block, CallingConvention, Expression, ExternalFunction, Function, FunctionMetadata, Identifier,
-    ImportStatement, Module, Mutability, OwnershipKind, Parameter, PassingMode, PrimitiveType,
-    Statement, TypeSpecifier,
+    AssignmentTarget, Block, CallingConvention, Expression, ExternalFunction, Function,
+    FunctionMetadata, Identifier, ImportStatement, Module, Mutability, OwnershipKind, Parameter,
+    PassingMode, PrimitiveType, Statement, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -851,6 +851,92 @@ impl Parser {
             initial_value,
             intent: None,
             source_location: start_location,
+        })
+    }
+
+    // ==================== ASSIGNMENT PARSING ====================
+
+    /// Parse an assignment statement
+    /// Grammar: assignment_target "=" expression ";"
+    pub fn parse_assignment(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        // Parse the target (for now, just variable names)
+        let target = self.parse_assignment_target()?;
+
+        // Expect '='
+        self.expect(&TokenType::Equal, "expected '=' in assignment")?;
+
+        // Parse the value expression
+        let value = self.parse_expression()?;
+
+        // Expect semicolon
+        self.expect(&TokenType::Semicolon, "expected ';' after assignment")?;
+
+        Ok(Statement::Assignment {
+            target,
+            value: Box::new(value),
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an assignment target
+    /// For now, supports simple variables. Will expand for array[i], struct.field, etc.
+    fn parse_assignment_target(&mut self) -> Result<AssignmentTarget, ParserError> {
+        let start_location = self.current_location();
+
+        // Simple variable target
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let name = name.clone();
+            self.advance();
+
+            // Check for array index access: name[index]
+            if self.check(&TokenType::LeftBracket) {
+                self.advance();
+                let index = self.parse_expression()?;
+                self.expect(&TokenType::RightBracket, "expected ']' after array index")?;
+
+                return Ok(AssignmentTarget::ArrayElement {
+                    array: Box::new(Expression::Variable {
+                        name: Identifier {
+                            name,
+                            source_location: start_location.clone(),
+                        },
+                        source_location: start_location.clone(),
+                    }),
+                    index: Box::new(index),
+                });
+            }
+
+            // Check for field access: name.field
+            if self.check(&TokenType::Dot) {
+                self.advance();
+                let field_name = self.parse_identifier()?;
+
+                return Ok(AssignmentTarget::StructField {
+                    instance: Box::new(Expression::Variable {
+                        name: Identifier {
+                            name,
+                            source_location: start_location.clone(),
+                        },
+                        source_location: start_location.clone(),
+                    }),
+                    field_name,
+                });
+            }
+
+            return Ok(AssignmentTarget::Variable {
+                name: Identifier {
+                    name,
+                    source_location: start_location,
+                },
+            });
+        }
+
+        Err(ParserError::UnexpectedToken {
+            expected: "assignment target".to_string(),
+            found: format!("{:?}", self.peek().token_type),
+            location: start_location,
         })
     }
 
@@ -2089,5 +2175,113 @@ func calculate(
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert!(matches!(expr, Expression::Variable { ref name, .. } if name.name == "myVar"));
+    }
+
+    // ==================== Assignment Parsing Tests ====================
+
+    #[test]
+    fn test_parse_assignment_simple() {
+        let mut parser = parser_from_source("x = 42;");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Assignment { target, value, .. } = stmt {
+            assert!(matches!(target, AssignmentTarget::Variable { ref name } if name.name == "x"));
+            assert!(matches!(*value, Expression::IntegerLiteral { value: 42, .. }));
+        } else {
+            panic!("Expected Assignment");
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_string_value() {
+        let mut parser = parser_from_source("name = \"hello\";");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Assignment { target, value, .. } = stmt {
+            assert!(matches!(target, AssignmentTarget::Variable { ref name } if name.name == "name"));
+            assert!(matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello"));
+        } else {
+            panic!("Expected Assignment");
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_variable_value() {
+        let mut parser = parser_from_source("y = x;");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Assignment { value, .. } = stmt {
+            assert!(matches!(*value, Expression::Variable { ref name, .. } if name.name == "x"));
+        } else {
+            panic!("Expected Assignment");
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_array_element() {
+        let mut parser = parser_from_source("arr[0] = 42;");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Assignment { target, .. } = stmt {
+            if let AssignmentTarget::ArrayElement { array, index } = target {
+                assert!(matches!(*array, Expression::Variable { ref name, .. } if name.name == "arr"));
+                assert!(matches!(*index, Expression::IntegerLiteral { value: 0, .. }));
+            } else {
+                panic!("Expected ArrayElement target");
+            }
+        } else {
+            panic!("Expected Assignment");
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_struct_field() {
+        let mut parser = parser_from_source("point.x = 10;");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::Assignment { target, .. } = stmt {
+            if let AssignmentTarget::StructField { instance, field_name } = target {
+                assert!(matches!(*instance, Expression::Variable { ref name, .. } if name.name == "point"));
+                assert_eq!(field_name.name, "x");
+            } else {
+                panic!("Expected StructField target");
+            }
+        } else {
+            panic!("Expected Assignment");
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_error_missing_equals() {
+        let mut parser = parser_from_source("x 42;");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_assignment_error_missing_semicolon() {
+        let mut parser = parser_from_source("x = 42");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_assignment_error_missing_value() {
+        let mut parser = parser_from_source("x = ;");
+        let result = parser.parse_assignment();
+
+        assert!(result.is_err());
     }
 }
