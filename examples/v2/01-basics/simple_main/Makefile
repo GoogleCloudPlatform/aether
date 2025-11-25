@@ -1,4 +1,4 @@
-COMPILER = ../../../../target/debug/aether-compiler
+COMPILER = ../../../../target/release/aether-compiler
 SOURCE = main.aes
 OUTPUT = main
 # Use absolute path for runtime or relative from the example dir

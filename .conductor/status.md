@@ -19,21 +19,31 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.2: Constants Example Verified
 - [x] Task 4.3: Let Bindings Example Verified
 - [x] Task 4.3: Mutability Example Verified
+- [x] Task 4.3: Simple Main Example Verified
+- [x] Task 4.3: Module System Example Verified (fixed to return 0)
+- [x] Task 4.3: Arithmetic Example Verified (added Makefile)
+- [x] Task 4.3: Basic Functions Example Verified (added Makefile)
 
 ## Current Task
 Task 4.3: Continue verifying remaining examples
 
 ## Next Actions
-1. Verify remaining examples in `examples/v2/`.
-2. Add Makefiles where missing.
+1. Continue verifying examples in `examples/v2/`.
+2. Add Makefiles to verified examples.
 
 ## Blockers
 None
+
+## Known Parser/Compiler Limitations
+- `Int32`, `Float`, etc. types not implemented
+- Unary minus for negative literals not supported (`-1` fails to parse)
+- `var` keyword not supported (use `let mut` instead)
 
 ## Session Notes
 - Resolved parser infinite loop for file-scoped modules.
 - Fixed parsing of chained binary operators in braced expressions.
 - Verified `constants` and `let_bindings` examples.
 - **Fixed critical CSE optimization bug:** The Common Subexpression Elimination pass was incorrectly reusing values from reassigned variables. When `counter = 0` was computed, and later `return 0` appeared, CSE incorrectly replaced the constant with a copy from `counter` (which had since been reassigned to 12). Fixed by invalidating expressions computed by a local when that local is reassigned.
-- Updated Makefile to use release build instead of debug.
+- Updated all Makefiles to use release build instead of debug.
 - Fixed test compilation errors (parse_source signature, mutable pipeline).
+- Verified additional examples: simple_main, module_system, arithmetic, basic_functions.

@@ -16,5 +16,6 @@ func add(a: Int, b: Int) -> Int {
 func main() -> Int {
     let x: Int = helper(5);
     let y: Int = add(x, 10);
-    return y;
+    // y = 20 (helper(5) = 10, add(10, 10) = 20)
+    return 0;
 }

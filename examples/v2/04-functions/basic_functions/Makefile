@@ -1,7 +1,6 @@
 COMPILER = ../../../../target/release/aether-compiler
 SOURCE = main.aes
 OUTPUT = main
-# Use absolute path for runtime
 RUNTIME_PATH = $(shell pwd)/../../../../runtime/target/release
 
 all: build

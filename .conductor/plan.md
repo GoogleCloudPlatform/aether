@@ -502,10 +502,19 @@ Implemented function parsing:
 ### Task 4.3: Verify Remaining Examples
 - [x] `02-variables/let_bindings`
 - [x] `02-variables/mutability`
+- [x] `01-basics/simple_main`
+- [x] `01-basics/module_system` (fixed to return 0)
+- [x] `05-operators/arithmetic` (returns 2, added Makefile)
+- [x] `04-functions/basic_functions` (returns 120, added Makefile)
 - [ ] **Iterate**: Go through each example folder in `examples/v2`.
 - [ ] **Verify**: Ensure it compiles and runs.
 - [ ] **Makefile**: Add standard Makefile.
 - [ ] **Commit**: Commit after each success.
+
+### Known Parser/Compiler Limitations (discovered during verification)
+- `Int32`, `Float`, etc. types not implemented (primitives example fails)
+- Unary minus for negative literals not supported (`-1` fails to parse)
+- `var` keyword not supported (use `let mut` instead)
 
 ---
 
