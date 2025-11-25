@@ -265,11 +265,7 @@ impl Parser {
                     _ => {}
                 },
                 TokenType::At => return,         // Annotation
-                TokenType::RightBrace => {
-                    eprintln!("DEBUG: synchronize_to_module_item consuming RightBrace");
-                    self.advance();
-                    return;
-                }
+                TokenType::RightBrace => { self.advance(); return; }
                 _ => {}
             }
             self.advance();
@@ -483,7 +479,6 @@ impl Parser {
 
             // Parse remaining items until EOF with error recovery
             while !self.is_at_end() {
-                eprintln!("DEBUG: parse_module loop at token: {:?}", self.peek().token_type);
                 if let Err(e) = self.parse_module_item(
                     &mut imports,
                     &mut function_definitions,
@@ -491,10 +486,8 @@ impl Parser {
                     &mut type_definitions,
                     &mut constant_declarations,
                 ) {
-                    eprintln!("DEBUG: parse_module_item error. Peeking: {:?}", self.peek().token_type);
                     self.add_error(e);
                     self.synchronize_to_module_item();
-                    eprintln!("DEBUG: After synchronize_to_module_item. Peeking: {:?}", self.peek().token_type);
                 }
             }
         } else if self.check(&TokenType::LeftBrace) {

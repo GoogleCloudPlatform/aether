@@ -4,7 +4,7 @@
 module hello_world;
 
 @extern("C")
-func puts(s: Pointer<Char>) -> Int;
+func puts(s: String) -> Int;
 
 func main() -> Int {
     puts("Hello, World!");

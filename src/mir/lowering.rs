@@ -341,14 +341,23 @@ impl LoweringContext {
             ast::Statement::Return { value, .. } => {
                 if let Some(return_expr) = value {
                     if let Some(return_local) = self.return_local {
-                        // Assign the return value to the return local
-                        let return_value = self.lower_expression(return_expr)?;
+                        // Workaround: Explicitly generate Operand::Constant for integer literals
+                        let final_return_operand = if let ast::Expression::IntegerLiteral { value: literal_value, .. } = *return_expr {
+                            Operand::Constant(Constant {
+                                ty: Type::primitive(PrimitiveType::Integer),
+                                value: ConstantValue::Integer(literal_value as i128),
+                            })
+                        } else {
+                            // For non-literal return expressions, use the normal lowering path
+                            self.lower_expression(return_expr)?
+                        };
+
                         self.builder.push_statement(Statement::Assign {
                             place: Place {
                                 local: return_local,
                                 projection: vec![],
                             },
-                            rvalue: Rvalue::Use(return_value),
+                            rvalue: Rvalue::Use(final_return_operand),
                             source_info: SourceInfo {
                                 span: SourceLocation::unknown(),
                                 scope: 0,

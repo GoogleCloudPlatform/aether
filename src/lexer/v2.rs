@@ -130,6 +130,7 @@ pub enum Keyword {
     Int64,
     Float,
     String_,
+    Char,
     Bool,
     Void,
     Array,
@@ -245,6 +246,7 @@ impl Lexer {
         self.keywords.insert("Int64".to_string(), Keyword::Int64);
         self.keywords.insert("Float".to_string(), Keyword::Float);
         self.keywords.insert("String".to_string(), Keyword::String_);
+        self.keywords.insert("Char".to_string(), Keyword::Char);
         self.keywords.insert("Bool".to_string(), Keyword::Bool);
         self.keywords.insert("Void".to_string(), Keyword::Void);
         self.keywords.insert("Array".to_string(), Keyword::Array);

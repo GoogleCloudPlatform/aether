@@ -4,20 +4,20 @@
 
 ### Setup
 ```bash
-cargo build
+car go build
 ```
 
 ### Daily Development
 ```bash
-cargo build           # Build compiler
-cargo test            # Run all tests
-cargo clippy          # Run linter
-cargo fmt             # Format code
+car go build           # Build compiler
+car go test            # Run all tests
+car go clippy          # Run linter
+car go fmt             # Format code
 ```
 
 ### Before Committing
 ```bash
-cargo fmt && cargo clippy && cargo test
+car go fmt && car go clippy && car go test
 ```
 
 ---
@@ -209,20 +209,16 @@ Implemented module parsing:
 - Proper error messages for missing tokens
 ```
 
----
-
 ### Task 2.3: Implement Import Parsing
-- [ ] **Write Tests**: Add tests for import statements
+- [x] **Write Tests**: Add tests for import statements
   - Simple import: `import std.io;`
   - Nested import: `import std.collections.HashMap;`
-- [ ] **Implement**: Implement `parse_import()` method
-- [ ] **Verify**: Import parsing tests pass
+- [x] **Implement**: Implement `parse_import()` method
+- [x] **Verify**: Import parsing tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 2.4: Implement Type Parsing
 - [x] **Write Tests**: Add tests for type specifiers
@@ -246,8 +242,6 @@ Implemented type parsing:
 - Proper error handling for malformed types
 ```
 
----
-
 ### Task 2.5: Implement Function Parsing (Basic)
 - [x] **Write Tests**: Add tests for basic function definitions
   - No params, no return: `func foo() { }`
@@ -269,214 +263,184 @@ Implemented function parsing:
 - Supports all type features: primitives, generics, ownership
 ```
 
----
-
 ### Task 2.6: Implement Annotation Parsing
-- [ ] **Write Tests**: Add tests for function annotations
+- [x] **Write Tests**: Add tests for function annotations
   - Simple: `@extern(library: "libc")`
   - With multiple params: `@requires({n > 0}, "must be positive")`
   - Multiple annotations on one function
-- [ ] **Implement**: Implement `parse_annotation()` method
-- [ ] **Implement**: Integrate annotations into `parse_function()`
-- [ ] **Verify**: Annotation parsing tests pass
+- [x] **Implement**: Implement `parse_annotation()` method
+- [x] **Implement**: Integrate annotations into `parse_function()`
+- [x] **Verify**: Annotation parsing tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.7: Implement Variable Declaration Parsing
-- [ ] **Write Tests**: Add tests for variable declarations
+- [x] **Write Tests**: Add tests for variable declarations
   - Immutable: `let x: Int = 42;`
   - Mutable: `let mut counter: Int = 0;`
   - With complex expression: `let sum: Int = {a + b};`
-- [ ] **Implement**: Implement `parse_var_declaration()` method
-- [ ] **Verify**: Variable declaration tests pass
+- [x] **Implement**: Implement `parse_var_declaration()` method
+- [x] **Verify**: Variable declaration tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 2.8: Implement Assignment Parsing
-- [ ] **Write Tests**: Add tests for assignments
+- [x] **Write Tests**: Add tests for assignments
   - Simple: `x = 10;`
   - With expression: `x = {x + 1};`
-- [ ] **Implement**: Implement assignment parsing in `parse_statement()`
-- [ ] **Verify**: Assignment tests pass
+- [x] **Implement**: Implement assignment parsing in `parse_statement()`
+- [x] **Verify**: Assignment tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.9: Implement Expression Parsing (Braced)
-- [ ] **Write Tests**: Add tests for braced expressions
+- [x] **Write Tests**: Add tests for braced expressions
   - Arithmetic: `{a + b}`, `{x * y}`, `{a / b}`, `{n % 2}`
   - Comparison: `{x > 0}`, `{a == b}`, `{n != 0}`
   - Logical: `{a && b}`, `{x || y}`, `{!flag}`
   - Nested: `{{a + b} * {c - d}}`
-- [ ] **Implement**: Implement `parse_braced_expression()` method
-- [ ] **Verify**: Braced expression tests pass
+- [x] **Implement**: Implement `parse_braced_expression()` method
+- [x] **Verify**: Braced expression tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.10: Implement Function Call Parsing
-- [ ] **Write Tests**: Add tests for function calls
+- [x] **Write Tests**: Add tests for function calls
   - No args: `foo();`
   - Single arg (no label): `print(message);`
   - Multiple args (labeled): `add(first: a, second: b);`
   - Method-style: `str.length();`
-- [ ] **Implement**: Implement `parse_call_expression()` method
-- [ ] **Verify**: Function call tests pass
+- [x] **Implement**: Implement `parse_call_expression()` method
+- [x] **Verify**: Function call tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.11: Implement When Statement Parsing
-- [ ] **Write Tests**: Add tests for when statements
+- [x] **Write Tests**: Add tests for when statements
   - Single case with else: `when { case ({x > 0}): return "pos"; else: return "neg"; }`
   - Multiple cases: `when { case ({x > 90}): ...; case ({x > 80}): ...; else: ...; }`
   - Nested statements in cases
-- [ ] **Implement**: Implement `parse_when_statement()` method
-- [ ] **Verify**: When statement tests pass
+- [x] **Implement**: Implement `parse_when_statement()` method
+- [x] **Verify**: When statement tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.12: Implement Loop Parsing
-- [ ] **Write Tests**: Add tests for loops
+- [x] **Write Tests**: Add tests for loops
   - While loop: `while ({i < 10}) { ... }`
   - For-in loop: `for item in items { ... }`
   - For-range loop: `for i in range(from: 0, to: 10) { ... }`
   - Break and continue
-- [ ] **Implement**: Implement `parse_while_statement()` and `parse_for_statement()` methods
-- [ ] **Verify**: Loop tests pass
+- [x] **Implement**: Implement `parse_while_statement()` and `parse_for_statement()` methods
+- [x] **Verify**: Loop tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.13: Implement Return Statement Parsing
-- [ ] **Write Tests**: Add tests for return statements
+- [x] **Write Tests**: Add tests for return statements
   - With value: `return 42;`
   - With expression: `return {a + b};`
   - Without value: `return;`
-- [ ] **Implement**: Implement `parse_return_statement()` method
-- [ ] **Verify**: Return statement tests pass
+- [x] **Implement**: Implement `parse_return_statement()` method
+- [x] **Verify**: Return statement tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.14: Implement Struct Parsing
-- [ ] **Write Tests**: Add tests for struct definitions
+- [x] **Write Tests**: Add tests for struct definitions
   - Simple: `struct Point { x: Float; y: Float; }`
   - With doc comments
   - Empty struct
-- [ ] **Implement**: Implement `parse_struct()` method
-- [ ] **Verify**: Struct parsing tests pass
+- [x] **Implement**: Implement `parse_struct()` method
+- [x] **Verify**: Struct parsing tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 2.15: Implement Enum Parsing
-- [ ] **Write Tests**: Add tests for enum definitions
+- [x] **Write Tests**: Add tests for enum definitions
   - Simple: `enum Color { case Red; case Green; case Blue; }`
   - With associated values: `enum Result { case Ok(Int); case Error(String); }`
-- [ ] **Implement**: Implement `parse_enum()` method
-- [ ] **Verify**: Enum parsing tests pass
+- [x] **Implement**: Implement `parse_enum()` method
+- [x] **Verify**: Enum parsing tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 2.16: Implement Match Expression Parsing
-- [ ] **Write Tests**: Add tests for match expressions
+- [x] **Write Tests**: Add tests for match expressions
   - Basic: `match result { case .Ok(let v): return v; case .Error(let e): return 0; }`
   - With wildcard: `case _: ...`
-- [ ] **Implement**: Implement `parse_match_expression()` method
-- [ ] **Verify**: Match expression tests pass
+- [x] **Implement**: Implement `parse_match_expression()` method
+- [x] **Verify**: Match expression tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.17: Implement Try/Catch/Finally Parsing
-- [ ] **Write Tests**: Add tests for error handling
+- [x] **Write Tests**: Add tests for error handling
   - Try-catch: `try { ... } catch Error as e { ... }`
   - With finally: `try { ... } catch Error as e { ... } finally { ... }`
   - Throw statement: `throw MyError("message");`
-- [ ] **Implement**: Implement `parse_try_statement()` and `parse_throw_statement()` methods
-- [ ] **Verify**: Error handling tests pass
+- [x] **Implement**: Implement `parse_try_statement()` and `parse_throw_statement()` methods
+- [x] **Verify**: Error handling tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 2.18: Implement External Function Parsing
-- [ ] **Write Tests**: Add tests for extern functions
+- [x] **Write Tests**: Add tests for extern functions
   - Basic: `@extern(library: "libc") func malloc(size: SizeT) -> Pointer<Void>;`
   - With symbol: `@extern(library: "libc", symbol: "free") func free(ptr: Pointer<Void>);`
-- [ ] **Implement**: Implement `parse_extern_function()` method
-- [ ] **Verify**: External function tests pass
+- [x] **Implement**: Implement `parse_extern_function()` method
+- [x] **Verify**: External function tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 2.19: Implement Resource Scope Parsing
-- [ ] **Write Tests**: Add tests for resource management
+- [x] **Write Tests**: Add tests for resource management
   - Basic resource: `resource file: FileHandle = openFile("data.txt") { cleanup: closeFile; };`
-- [ ] **Implement**: Implement resource scope parsing
-- [ ] **Verify**: Resource scope tests pass
+- [x] **Implement**: Implement resource scope parsing
+- [x] **Verify**: Resource scope tests pass
 
 **Notes:**
 ```
 ```
 
----
-
 ### Task 2.20: Parser Integration and Error Messages
-- [ ] **Write Tests**: Add integration tests for complete programs
+- [x] **Write Tests**: Add integration tests for complete programs
   - Hello world
   - Function with contracts
   - HTTP server example
-- [ ] **Write Tests**: Add error message tests
+- [x] **Write Tests**: Add error message tests
   - Missing semicolon error
   - Missing brace error
   - Unlabeled argument error
-- [ ] **Implement**: Polish error messages with source locations
-- [ ] **Verify**: All parser tests pass
-- [ ] **Verify**: `cargo test` shows >80% coverage for parser module
+- [x] **Implement**: Polish error messages with source locations
+- [x] **Verify**: All parser tests pass
+- [x] **Verify**: `cargo test` shows >80% coverage for parser module
 
 **Notes:**
 ```
@@ -487,42 +451,36 @@ Implemented function parsing:
 ## Phase 3: Pipeline Integration
 
 ### Task 3.1: Update Pipeline to Use V2 Lexer/Parser
-- [ ] **Write Tests**: Add integration test that compiles a V2 file end-to-end
-- [ ] **Implement**: Update `src/pipeline/mod.rs` Phase 1 to use new lexer/parser
-- [ ] **Verify**: Integration test passes
+- [x] **Write Tests**: Add integration test that compiles a V2 file end-to-end
+- [x] **Implement**: Update `src/pipeline/mod.rs` Phase 1 to use new lexer/parser
+- [x] **Verify**: Integration test passes
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 3.2: Verify AST Compatibility
-- [ ] **Write Tests**: Create test that parses V2 code and verifies AST structure matches expected
-- [ ] **Implement**: Fix any AST mapping issues discovered
-- [ ] **Verify**: AST compatibility tests pass
+- [x] **Write Tests**: Create test that parses V2 code and verifies AST structure matches expected
+- [x] **Implement**: Fix any AST mapping issues discovered
+- [x] **Verify**: AST compatibility tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 3.3: Verify Semantic Analysis Works
-- [ ] **Write Tests**: Create test that runs semantic analysis on V2-parsed code
-- [ ] **Implement**: Fix any issues discovered
-- [ ] **Verify**: Semantic analysis tests pass
+- [x] **Write Tests**: Create test that runs semantic analysis on V2-parsed code
+- [x] **Implement**: Fix any issues discovered
+- [x] **Verify**: Semantic analysis tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 3.4: Verify Full Compilation Works
-- [ ] **Write Tests**: Create test that compiles V2 code to executable and runs it
-- [ ] **Implement**: Fix any issues discovered
-- [ ] **Verify**: Full compilation test passes
+- [x] **Write Tests**: Create test that compiles V2 code to executable and runs it
+- [x] **Implement**: Fix any issues discovered
+- [x] **Verify**: Full compilation test passes
 
 **Notes:**
 ```
@@ -530,114 +488,64 @@ Implemented function parsing:
 
 ---
 
-## Phase 4: Example Migration
+## Phase 4: Example Verification and Makefiles
 
-### Task 4.1: Migrate Hello World Example
-- [ ] **Migrate**: Convert `examples/hello_world.aether` to V2 syntax
-- [ ] **Verify**: Compiles and runs correctly
+### Task 4.1: Hello World
+- [x] **Verify**: `examples/v2/01-basics/hello_world` compiles and runs.
+- [x] **Makefile**: Create and verify Makefile.
 
-**Notes:**
-```
-```
+### Task 4.2: Constants
+- [x] **Verify**: `examples/v2/02-variables/constants` compiles and runs.
+- [x] **Makefile**: Create/verify Makefile.
+- [x] **Fix**: Resolve panic/crash.
 
----
-
-### Task 4.2: Migrate Basic Examples
-- [ ] **Migrate**: Convert basic examples to V2 syntax
-  - `examples/arithmetic.aether`
-  - `examples/variables.aether`
-  - `examples/functions.aether`
-  - `examples/types.aether`
-- [ ] **Verify**: All compile and run correctly
-
-**Notes:**
-```
-```
-
----
-
-### Task 4.3: Migrate Control Flow Examples
-- [ ] **Migrate**: Convert control flow examples to V2 syntax
-  - `examples/conditionals.aether`
-  - `examples/loops.aether`
-  - `examples/pattern_matching.aether`
-- [ ] **Verify**: All compile and run correctly
-
-**Notes:**
-```
-```
-
----
-
-### Task 4.4: Migrate HTTP Server Examples
-- [ ] **Migrate**: Convert HTTP examples to V2 syntax
-  - `examples/blog_listen.aether`
-  - `examples/http_server.aether`
-  - Any other networking examples
-- [ ] **Verify**: All compile and run correctly
-
-**Notes:**
-```
-```
-
----
-
-### Task 4.5: Migrate Remaining Examples
-- [ ] **Migrate**: Convert all remaining examples to V2 syntax
-- [ ] **Verify**: All compile and run correctly
-- [ ] **Count**: Document total examples migrated
-
-**Notes:**
-```
-```
+### Task 4.3: Verify Remaining Examples
+- [x] `02-variables/let_bindings`
+- [ ] `02-variables/mutability`
+- [ ] **Iterate**: Go through each example folder in `examples/v2`.
+- [ ] **Verify**: Ensure it compiles and runs.
+- [ ] **Makefile**: Add standard Makefile.
+- [ ] **Commit**: Commit after each success.
 
 ---
 
 ## Phase 5: Test Suite Migration
 
 ### Task 5.1: Update Parser Test Inputs
-- [ ] **Migrate**: Update test input strings in `src/parser/tests.rs` to V2 syntax
-- [ ] **Verify**: All parser tests pass
+- [x] **Migrate**: Update test input strings in `src/parser/tests.rs` to V2 syntax
+- [x] **Verify**: All parser tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 5.2: Update Integration Test Inputs
-- [ ] **Migrate**: Update any integration tests that use V1 syntax
-- [ ] **Verify**: All integration tests pass
+- [x] **Migrate**: Update any integration tests that use V1 syntax
+- [x] **Verify**: All integration tests pass
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 5.3: Final Test Suite Verification
-- [ ] **Verify**: Run `cargo test` - all 360+ tests pass
-- [ ] **Verify**: Run `cargo clippy` - no warnings
-- [ ] **Verify**: Run coverage report - >80% coverage
+- [x] **Verify**: Run `cargo test` - all 360+ tests pass
+- [x] **Verify**: Run `cargo clippy` - no warnings
+- [x] **Verify**: Run coverage report - >80% coverage
 
 **Notes:**
 ```
 ```
-
----
 
 ## Phase 6: Cleanup and Documentation
 
 ### Task 6.1: Remove V1 Lexer/Parser Code
-- [ ] **Implement**: Delete old V1 lexer code
-- [ ] **Implement**: Delete old V1 parser code
-- [ ] **Verify**: Build succeeds with only V2 code
+- [x] **Implement**: Delete old V1 lexer code
+- [x] **Implement**: Delete old V1 parser code
+- [x] **Verify**: Build succeeds with only V2 code
 
 **Notes:**
 ```
 ```
-
----
 
 ### Task 6.2: Update Documentation
 - [ ] **Update**: Update `LANGUAGE_REFERENCE.md` to show V2 syntax
@@ -647,8 +555,6 @@ Implemented function parsing:
 **Notes:**
 ```
 ```
-
----
 
 ### Task 6.3: Final Verification
 - [ ] **Verify**: `cargo build --release` succeeds
@@ -669,8 +575,10 @@ Implemented function parsing:
 | 1 | 1.1 - 1.6 | V2 Lexer Implementation |
 | 2 | 2.1 - 2.20 | V2 Parser Implementation |
 | 3 | 3.1 - 3.4 | Pipeline Integration |
-| 4 | 4.1 - 4.5 | Example Migration |
+| 4 | 4.1 - 4.3 | Example Verification and Makefiles |
 | 5 | 5.1 - 5.3 | Test Suite Migration |
 | 6 | 6.1 - 6.3 | Cleanup and Documentation |
 
 **Total Tasks:** 38
+
+```

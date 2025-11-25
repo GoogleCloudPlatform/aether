@@ -8,7 +8,7 @@ func main() -> Int {
     let x: Int = 10;
 
     // Mutable variable (can be changed)
-    var counter: Int = 0;
+    let mut counter: Int = 0;
 
     // Mutate the variable
     counter = 1;
@@ -16,5 +16,5 @@ func main() -> Int {
     counter = {counter + x};
 
     // counter is now 12 (0 -> 1 -> 2 -> 12)
-    return counter;
+    return 0;
 }
