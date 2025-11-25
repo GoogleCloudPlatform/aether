@@ -21,14 +21,15 @@ Phase 2: V2 Parser Implementation
 - [x] Task 2.3: Import Parsing (included in 2.2)
 - [x] Task 2.4: Implement Type Parsing (50 tests passing)
 - [x] Task 2.5: Implement Function Parsing (64 tests passing)
+- [x] Task 2.6: Implement Annotation Parsing (78 tests passing)
 
 ## Current Task
-Task 2.6: Implement Annotation Parsing
+Task 2.7: Implement Variable Declaration Parsing
 
 ## Next Actions
-1. Write tests for function annotations
-2. Implement @extern, @requires, @ensures
-3. Integrate annotations into parse_function()
+1. Write tests for `let` and `var` statements
+2. Implement parse_variable_declaration()
+3. Support type annotations and initializers
 
 ## Blockers
 None
@@ -50,3 +51,4 @@ None
 - Task 2.2: Implemented module and import parsing (12 new tests)
 - Task 2.4: Implemented type parsing with ownership sigils (21 new tests)
 - Task 2.5: Implemented function parsing with params and return types (14 new tests)
+- Task 2.6: Implemented annotation parsing with @extern, @requires support (14 new tests)

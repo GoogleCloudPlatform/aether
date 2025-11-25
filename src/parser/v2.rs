@@ -17,8 +17,8 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    Block, Function, FunctionMetadata, Identifier, ImportStatement, Module, OwnershipKind,
-    Parameter, PassingMode, PrimitiveType, TypeSpecifier,
+    Block, CallingConvention, ExternalFunction, Function, FunctionMetadata, Identifier,
+    ImportStatement, Module, OwnershipKind, Parameter, PassingMode, PrimitiveType, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -28,6 +28,32 @@ pub struct Parser {
     tokens: Vec<Token>,
     position: usize,
     errors: Vec<ParserError>,
+}
+
+/// Parsed annotation (e.g., @extern, @requires)
+#[derive(Debug, Clone)]
+pub struct Annotation {
+    pub name: String,
+    pub arguments: Vec<AnnotationArgument>,
+    pub source_location: SourceLocation,
+}
+
+/// Annotation argument (labeled or unlabeled)
+#[derive(Debug, Clone)]
+pub struct AnnotationArgument {
+    pub label: Option<String>,
+    pub value: AnnotationValue,
+    pub source_location: SourceLocation,
+}
+
+/// Annotation argument value types
+#[derive(Debug, Clone)]
+pub enum AnnotationValue {
+    String(String),
+    Integer(i64),
+    Boolean(bool),
+    Identifier(String),
+    Expression(String, SourceLocation), // Raw expression string for contracts
 }
 
 impl Parser {
@@ -571,6 +597,200 @@ impl Parser {
 
         Ok(Block {
             statements,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an annotation
+    /// Grammar: "@" IDENTIFIER ("(" annotation_args ")")?
+    pub fn parse_annotation(&mut self) -> Result<Annotation, ParserError> {
+        let start_location = self.current_location();
+
+        // Expect '@'
+        self.expect(&TokenType::At, "expected '@'")?;
+
+        // Parse annotation name
+        let name = self.parse_identifier()?;
+
+        // Parse optional arguments
+        let mut arguments = Vec::new();
+        if self.check(&TokenType::LeftParen) {
+            self.advance();
+
+            // Parse arguments until closing paren
+            if !self.check(&TokenType::RightParen) {
+                arguments.push(self.parse_annotation_argument()?);
+
+                while self.check(&TokenType::Comma) {
+                    self.advance();
+                    arguments.push(self.parse_annotation_argument()?);
+                }
+            }
+
+            self.expect(&TokenType::RightParen, "expected ')' after annotation arguments")?;
+        }
+
+        Ok(Annotation {
+            name: name.name,
+            arguments,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an annotation argument (key: value or just value)
+    fn parse_annotation_argument(&mut self) -> Result<AnnotationArgument, ParserError> {
+        let start_location = self.current_location();
+
+        // Check if this is a labeled argument (key: value)
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let name_clone = name.clone();
+            if let Some(next) = self.peek_next() {
+                if matches!(next.token_type, TokenType::Colon) {
+                    // Labeled argument
+                    self.advance(); // consume identifier
+                    self.advance(); // consume colon
+                    let value = self.parse_annotation_value()?;
+                    return Ok(AnnotationArgument {
+                        label: Some(name_clone),
+                        value,
+                        source_location: start_location,
+                    });
+                }
+            }
+        }
+
+        // Unlabeled argument
+        let value = self.parse_annotation_value()?;
+        Ok(AnnotationArgument {
+            label: None,
+            value,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an annotation value (string literal, identifier, or braced expression)
+    fn parse_annotation_value(&mut self) -> Result<AnnotationValue, ParserError> {
+        // String literal
+        if let TokenType::StringLiteral(s) = &self.peek().token_type {
+            let value = s.clone();
+            self.advance();
+            return Ok(AnnotationValue::String(value));
+        }
+
+        // Integer literal
+        if let TokenType::IntegerLiteral(n) = &self.peek().token_type {
+            let value = *n;
+            self.advance();
+            return Ok(AnnotationValue::Integer(value));
+        }
+
+        // Boolean literal
+        if let TokenType::BoolLiteral(b) = &self.peek().token_type {
+            let value = *b;
+            self.advance();
+            return Ok(AnnotationValue::Boolean(value));
+        }
+
+        // Braced expression (for contracts like @requires({n > 0}))
+        if self.check(&TokenType::LeftBrace) {
+            let start = self.current_location();
+            self.advance();
+
+            // Collect tokens until matching brace
+            let mut expr_tokens = String::new();
+            let mut brace_depth = 1;
+
+            while !self.is_at_end() && brace_depth > 0 {
+                if self.check(&TokenType::LeftBrace) {
+                    brace_depth += 1;
+                    expr_tokens.push('{');
+                } else if self.check(&TokenType::RightBrace) {
+                    brace_depth -= 1;
+                    if brace_depth > 0 {
+                        expr_tokens.push('}');
+                    }
+                } else {
+                    expr_tokens.push_str(&self.peek().lexeme);
+                    expr_tokens.push(' ');
+                }
+                if brace_depth > 0 {
+                    self.advance();
+                }
+            }
+
+            self.expect(&TokenType::RightBrace, "expected '}' to close expression")?;
+            return Ok(AnnotationValue::Expression(expr_tokens.trim().to_string(), start));
+        }
+
+        // Identifier
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let value = name.clone();
+            self.advance();
+            return Ok(AnnotationValue::Identifier(value));
+        }
+
+        Err(ParserError::UnexpectedToken {
+            expected: "annotation value".to_string(),
+            found: format!("{:?}", self.peek().token_type),
+            location: self.current_location(),
+        })
+    }
+
+    /// Parse an external function declaration
+    /// Grammar: "@extern" "(" args ")" "func" IDENTIFIER "(" params ")" "->" type ";"
+    pub fn parse_external_function(&mut self, annotation: Annotation) -> Result<ExternalFunction, ParserError> {
+        let start_location = annotation.source_location.clone();
+
+        // Extract library from annotation
+        let library = annotation
+            .arguments
+            .iter()
+            .find(|a| a.label.as_deref() == Some("library"))
+            .and_then(|a| match &a.value {
+                AnnotationValue::String(s) => Some(s.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| "STATIC".to_string());
+
+        // Extract optional symbol
+        let symbol = annotation
+            .arguments
+            .iter()
+            .find(|a| a.label.as_deref() == Some("symbol"))
+            .and_then(|a| match &a.value {
+                AnnotationValue::String(s) => Some(s.clone()),
+                _ => None,
+            });
+
+        // Expect 'func' keyword
+        self.expect_keyword(Keyword::Func, "expected 'func' after @extern annotation")?;
+
+        // Parse function name
+        let name = self.parse_identifier()?;
+
+        // Parse parameters
+        self.expect(&TokenType::LeftParen, "expected '(' after function name")?;
+        let parameters = self.parse_parameters()?;
+        self.expect(&TokenType::RightParen, "expected ')' after parameters")?;
+
+        // Parse return type (required for extern functions)
+        self.expect(&TokenType::Arrow, "expected '->' for extern function return type")?;
+        let return_type = self.parse_type()?;
+
+        // Expect semicolon (no body for extern functions)
+        self.expect(&TokenType::Semicolon, "expected ';' after extern function declaration")?;
+
+        Ok(ExternalFunction {
+            name,
+            library,
+            symbol,
+            parameters,
+            return_type: Box::new(return_type),
+            calling_convention: CallingConvention::C,
+            thread_safe: false,
+            may_block: false,
+            variadic: false,
+            ownership_info: None,
             source_location: start_location,
         })
     }
@@ -1345,5 +1565,177 @@ func calculate(
         assert!(result.is_ok());
         let func = result.unwrap();
         assert!(matches!(*func.return_type, TypeSpecifier::Pointer { is_mutable: false, .. }));
+    }
+
+    // ==================== Annotation Parsing Tests ====================
+
+    #[test]
+    fn test_parse_annotation_simple() {
+        let mut parser = parser_from_source("@test");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "test");
+        assert!(annotation.arguments.is_empty());
+    }
+
+    #[test]
+    fn test_parse_annotation_with_labeled_string_arg() {
+        let mut parser = parser_from_source("@extern(library: \"libc\")");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "extern");
+        assert_eq!(annotation.arguments.len(), 1);
+        assert_eq!(annotation.arguments[0].label, Some("library".to_string()));
+        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::String(s) if s == "libc"));
+    }
+
+    #[test]
+    fn test_parse_annotation_with_multiple_args() {
+        let mut parser = parser_from_source("@extern(library: \"libc\", symbol: \"malloc\")");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "extern");
+        assert_eq!(annotation.arguments.len(), 2);
+        assert_eq!(annotation.arguments[0].label, Some("library".to_string()));
+        assert_eq!(annotation.arguments[1].label, Some("symbol".to_string()));
+        assert!(matches!(&annotation.arguments[1].value, AnnotationValue::String(s) if s == "malloc"));
+    }
+
+    #[test]
+    fn test_parse_annotation_with_braced_expression() {
+        let mut parser = parser_from_source("@requires({n > 0})");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "requires");
+        assert_eq!(annotation.arguments.len(), 1);
+        assert!(annotation.arguments[0].label.is_none());
+        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Expression(expr, _) if expr.contains("n") && expr.contains(">") && expr.contains("0")));
+    }
+
+    #[test]
+    fn test_parse_annotation_with_identifier_value() {
+        let mut parser = parser_from_source("@category(math)");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "category");
+        assert_eq!(annotation.arguments.len(), 1);
+        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Identifier(s) if s == "math"));
+    }
+
+    #[test]
+    fn test_parse_annotation_with_integer_value() {
+        let mut parser = parser_from_source("@priority(10)");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "priority");
+        assert_eq!(annotation.arguments.len(), 1);
+        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Integer(10)));
+    }
+
+    #[test]
+    fn test_parse_annotation_with_boolean_value() {
+        let mut parser = parser_from_source("@deprecated(true)");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "deprecated");
+        assert_eq!(annotation.arguments.len(), 1);
+        assert!(matches!(&annotation.arguments[0].value, AnnotationValue::Boolean(true)));
+    }
+
+    #[test]
+    fn test_parse_annotation_empty_parens() {
+        let mut parser = parser_from_source("@marker()");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_ok());
+        let annotation = result.unwrap();
+        assert_eq!(annotation.name, "marker");
+        assert!(annotation.arguments.is_empty());
+    }
+
+    #[test]
+    fn test_parse_annotation_error_missing_name() {
+        let mut parser = parser_from_source("@()");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_annotation_error_missing_close_paren() {
+        let mut parser = parser_from_source("@test(x: 1");
+        let result = parser.parse_annotation();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_external_function_basic() {
+        let mut parser = parser_from_source("@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>;");
+
+        // First parse the annotation
+        let annotation = parser.parse_annotation().unwrap();
+        assert_eq!(annotation.name, "extern");
+
+        // Then parse the external function
+        let result = parser.parse_external_function(annotation);
+
+        assert!(result.is_ok());
+        let ext_func = result.unwrap();
+        assert_eq!(ext_func.name.name, "malloc");
+        assert_eq!(ext_func.library, "libc");
+        assert_eq!(ext_func.parameters.len(), 1);
+        assert_eq!(ext_func.parameters[0].name.name, "size");
+    }
+
+    #[test]
+    fn test_parse_external_function_with_symbol() {
+        let mut parser = parser_from_source("@extern(library: \"c\", symbol: \"_malloc\") func malloc(size: SizeT) -> Pointer<Void>;");
+
+        let annotation = parser.parse_annotation().unwrap();
+        let result = parser.parse_external_function(annotation);
+
+        assert!(result.is_ok());
+        let ext_func = result.unwrap();
+        assert_eq!(ext_func.name.name, "malloc");
+        assert_eq!(ext_func.library, "c");
+        assert_eq!(ext_func.symbol.as_deref(), Some("_malloc"));
+    }
+
+    #[test]
+    fn test_parse_external_function_multiple_params() {
+        let mut parser = parser_from_source("@extern(library: \"libc\") func memcpy(dest: Pointer<Void>, src: Pointer<Void>, n: SizeT) -> Pointer<Void>;");
+
+        let annotation = parser.parse_annotation().unwrap();
+        let result = parser.parse_external_function(annotation);
+
+        assert!(result.is_ok());
+        let ext_func = result.unwrap();
+        assert_eq!(ext_func.name.name, "memcpy");
+        assert_eq!(ext_func.parameters.len(), 3);
+    }
+
+    #[test]
+    fn test_parse_external_function_error_missing_semicolon() {
+        let mut parser = parser_from_source("@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>");
+
+        let annotation = parser.parse_annotation().unwrap();
+        let result = parser.parse_external_function(annotation);
+
+        assert!(result.is_err());
     }
 }
