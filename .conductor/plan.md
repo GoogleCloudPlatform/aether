@@ -46,20 +46,26 @@ Created src/lexer/v2.rs with:
 ---
 
 ### Task 1.2: Implement Keyword Recognition
-- [ ] **Write Tests**: Add tests for all V2 keywords
+- [x] **Write Tests**: Add tests for all V2 keywords
   - Declaration keywords: `module`, `import`, `func`, `let`, `const`, `struct`, `enum`
   - Modifier keywords: `mut`, `pub`
   - Control flow: `when`, `case`, `else`, `match`, `for`, `while`, `in`, `return`, `break`, `continue`
   - Error handling: `try`, `catch`, `finally`, `throw`
-  - Resource: `resource`, `cleanup`
-  - Types: `Int`, `Int64`, `Float`, `String`, `Bool`, `Void`, `Array`, `Map`, `Pointer`, `MutPointer`
+  - Resource: `resource`, `cleanup`, `guaranteed`
+  - Types: `Int`, `Int64`, `Float`, `String`, `Bool`, `Void`, `Array`, `Map`, `Pointer`, `MutPointer`, `SizeT`
   - Literals: `true`, `false`, `nil`
   - Other: `as`, `range`
-- [ ] **Implement**: Create `Keyword` enum and keyword lookup table
-- [ ] **Verify**: All keyword tests pass
+- [x] **Implement**: Create `Keyword` enum and keyword lookup table with 42 keywords
+- [x] **Verify**: All keyword tests pass (18 new tests, 62 total)
 
 **Notes:**
 ```
+Implemented Lexer struct with:
+- HashMap<String, Keyword> for O(1) keyword lookup
+- initialize_keywords() populates 42 keywords
+- read_identifier() distinguishes keywords from identifiers
+- Special handling for true/false -> BoolLiteral
+- tokenize() produces token stream from input
 ```
 
 ---
