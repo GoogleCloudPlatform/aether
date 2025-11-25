@@ -501,7 +501,7 @@ Implemented function parsing:
 
 ### Task 4.3: Verify Remaining Examples
 - [x] `02-variables/let_bindings`
-- [ ] `02-variables/mutability`
+- [x] `02-variables/mutability`
 - [ ] **Iterate**: Go through each example folder in `examples/v2`.
 - [ ] **Verify**: Ensure it compiles and runs.
 - [ ] **Makefile**: Add standard Makefile.

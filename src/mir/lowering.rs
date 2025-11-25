@@ -341,11 +341,12 @@ impl LoweringContext {
             ast::Statement::Return { value, .. } => {
                 if let Some(return_expr) = value {
                     if let Some(return_local) = self.return_local {
-                        // Workaround: Explicitly generate Operand::Constant for integer literals
-                        let final_return_operand = if let ast::Expression::IntegerLiteral { value: literal_value, .. } = *return_expr {
+                        // Explicitly generate Operand::Constant for integer literals
+                        // to ensure return values aren't affected by CSE
+                        let final_return_operand = if let ast::Expression::IntegerLiteral { value: literal_value, .. } = &**return_expr {
                             Operand::Constant(Constant {
                                 ty: Type::primitive(PrimitiveType::Integer),
-                                value: ConstantValue::Integer(literal_value as i128),
+                                value: ConstantValue::Integer(*literal_value as i128),
                             })
                         } else {
                             // For non-literal return expressions, use the normal lowering path

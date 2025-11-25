@@ -94,7 +94,10 @@ impl CommonSubexpressionEliminationPass {
         for statement in statements.iter_mut() {
             match statement {
                 Statement::Assign { place, rvalue, .. } => {
-                    // Invalidate expressions that use the assigned local
+                    // Invalidate expressions that were computed by the assigned local
+                    // (since the local now has a new value)
+                    available_expressions.retain(|_, &mut computed_by| computed_by != place.local);
+                    // Also invalidate expressions that use the assigned local
                     available_expressions.retain(|expr, _| !expr.uses_local(place.local));
 
                     // Check if this expression is already available

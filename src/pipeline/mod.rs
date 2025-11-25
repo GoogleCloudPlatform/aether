@@ -798,7 +798,7 @@ mod tests {
         use std::path::Path;
 
         let v2_source = "module test;";
-        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source);
+        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source, false);
 
         assert!(result.is_ok());
         let module = result.unwrap();
@@ -816,7 +816,7 @@ func add(a: Int, b: Int) -> Int {
     return {a + b};
 }
 "#;
-        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source);
+        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source, false);
 
         assert!(result.is_ok());
         let module = result.unwrap();
