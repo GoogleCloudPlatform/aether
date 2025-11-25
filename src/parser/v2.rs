@@ -17,8 +17,9 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    Block, CallingConvention, ExternalFunction, Function, FunctionMetadata, Identifier,
-    ImportStatement, Module, OwnershipKind, Parameter, PassingMode, PrimitiveType, TypeSpecifier,
+    Block, CallingConvention, Expression, ExternalFunction, Function, FunctionMetadata, Identifier,
+    ImportStatement, Module, Mutability, OwnershipKind, Parameter, PassingMode, PrimitiveType,
+    Statement, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -792,6 +793,141 @@ impl Parser {
             variadic: false,
             ownership_info: None,
             source_location: start_location,
+        })
+    }
+
+    // ==================== VARIABLE DECLARATION PARSING ====================
+
+    /// Parse a variable declaration
+    /// Grammar: "let" ["mut"] IDENTIFIER [":" type] ["=" expression] ";"
+    pub fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        // Expect 'let' keyword
+        self.expect_keyword(Keyword::Let, "expected 'let'")?;
+
+        // Check for 'mut' keyword
+        let mutability = if self.check_keyword(Keyword::Mut) {
+            self.advance();
+            Mutability::Mutable
+        } else {
+            Mutability::Immutable
+        };
+
+        // Parse variable name
+        let name = self.parse_identifier()?;
+
+        // Parse optional type annotation
+        let type_spec = if self.check(&TokenType::Colon) {
+            self.advance();
+            self.parse_type()?
+        } else {
+            // If no type annotation, we need an initializer to infer type
+            // For now, default to a placeholder type that semantic analysis will resolve
+            TypeSpecifier::Named {
+                name: Identifier {
+                    name: "_inferred".to_string(),
+                    source_location: start_location.clone(),
+                },
+                source_location: start_location.clone(),
+            }
+        };
+
+        // Parse optional initializer
+        let initial_value = if self.check(&TokenType::Equal) {
+            self.advance();
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
+        };
+
+        // Expect semicolon
+        self.expect(&TokenType::Semicolon, "expected ';' after variable declaration")?;
+
+        Ok(Statement::VariableDeclaration {
+            name,
+            type_spec: Box::new(type_spec),
+            mutability,
+            initial_value,
+            intent: None,
+            source_location: start_location,
+        })
+    }
+
+    // ==================== EXPRESSION PARSING ====================
+
+    /// Parse an expression (literals and identifiers for now)
+    /// Binary expressions with braces will be added in Task 2.9+
+    pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        // Integer literal
+        if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::IntegerLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Float literal
+        if let TokenType::FloatLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::FloatLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // String literal
+        if let TokenType::StringLiteral(value) = &self.peek().token_type {
+            let value = value.clone();
+            self.advance();
+            return Ok(Expression::StringLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Character literal
+        if let TokenType::CharLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::CharacterLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Boolean literal
+        if let TokenType::BoolLiteral(value) = &self.peek().token_type {
+            let value = *value;
+            self.advance();
+            return Ok(Expression::BooleanLiteral {
+                value,
+                source_location: start_location,
+            });
+        }
+
+        // Identifier (variable reference)
+        if let TokenType::Identifier(name) = &self.peek().token_type {
+            let name = name.clone();
+            self.advance();
+            return Ok(Expression::Variable {
+                name: Identifier {
+                    name,
+                    source_location: start_location.clone(),
+                },
+                source_location: start_location,
+            });
+        }
+
+        Err(ParserError::UnexpectedToken {
+            expected: "expression".to_string(),
+            found: format!("{:?}", self.peek().token_type),
+            location: start_location,
         })
     }
 
@@ -1737,5 +1873,221 @@ func calculate(
         let result = parser.parse_external_function(annotation);
 
         assert!(result.is_err());
+    }
+
+    // ==================== Variable Declaration Tests ====================
+
+    #[test]
+    fn test_parse_variable_declaration_with_type_and_value() {
+        let mut parser = parser_from_source("let x: Int = 42;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { name, type_spec, mutability, initial_value, .. } = stmt {
+            assert_eq!(name.name, "x");
+            assert!(matches!(*type_spec, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+            assert!(matches!(mutability, Mutability::Immutable));
+            assert!(initial_value.is_some());
+            let value = initial_value.unwrap();
+            assert!(matches!(*value, Expression::IntegerLiteral { value: 42, .. }));
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_mutable() {
+        let mut parser = parser_from_source("let mut counter: Int = 0;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { name, mutability, .. } = stmt {
+            assert_eq!(name.name, "counter");
+            assert!(matches!(mutability, Mutability::Mutable));
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_string_value() {
+        let mut parser = parser_from_source("let name: String = \"hello\";");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { initial_value, .. } = stmt {
+            assert!(initial_value.is_some());
+            let value = initial_value.unwrap();
+            assert!(matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello"));
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_float_value() {
+        let mut parser = parser_from_source("let pi: Float = 3.14;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { initial_value, .. } = stmt {
+            assert!(initial_value.is_some());
+            let value = initial_value.unwrap();
+            assert!(matches!(*value, Expression::FloatLiteral { .. }));
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_bool_value() {
+        let mut parser = parser_from_source("let flag: Bool = true;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { initial_value, .. } = stmt {
+            assert!(initial_value.is_some());
+            let value = initial_value.unwrap();
+            assert!(matches!(*value, Expression::BooleanLiteral { value: true, .. }));
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_char_value() {
+        let mut parser = parser_from_source("let ch: Char = 'a';");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { initial_value, .. } = stmt {
+            assert!(initial_value.is_some());
+            let value = initial_value.unwrap();
+            assert!(matches!(*value, Expression::CharacterLiteral { value: 'a', .. }));
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_no_initializer() {
+        let mut parser = parser_from_source("let x: Int;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { name, initial_value, .. } = stmt {
+            assert_eq!(name.name, "x");
+            assert!(initial_value.is_none());
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_type_inference() {
+        let mut parser = parser_from_source("let x = 42;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { name, type_spec, initial_value, .. } = stmt {
+            assert_eq!(name.name, "x");
+            // Type should be _inferred placeholder
+            assert!(matches!(*type_spec, TypeSpecifier::Named { ref name, .. } if name.name == "_inferred"));
+            assert!(initial_value.is_some());
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_variable_reference() {
+        let mut parser = parser_from_source("let y: Int = x;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_ok());
+        let stmt = result.unwrap();
+        if let Statement::VariableDeclaration { initial_value, .. } = stmt {
+            assert!(initial_value.is_some());
+            let value = initial_value.unwrap();
+            assert!(matches!(*value, Expression::Variable { ref name, .. } if name.name == "x"));
+        } else {
+            panic!("Expected VariableDeclaration");
+        }
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_error_missing_semicolon() {
+        let mut parser = parser_from_source("let x: Int = 42");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_variable_declaration_error_missing_name() {
+        let mut parser = parser_from_source("let : Int = 42;");
+        let result = parser.parse_variable_declaration();
+
+        assert!(result.is_err());
+    }
+
+    // ==================== Expression Parsing Tests ====================
+
+    #[test]
+    fn test_parse_expression_integer() {
+        let mut parser = parser_from_source("42");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::IntegerLiteral { value: 42, .. }));
+    }
+
+    #[test]
+    fn test_parse_expression_float() {
+        let mut parser = parser_from_source("3.14");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::FloatLiteral { .. }));
+    }
+
+    #[test]
+    fn test_parse_expression_string() {
+        let mut parser = parser_from_source("\"hello world\"");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::StringLiteral { ref value, .. } if value == "hello world"));
+    }
+
+    #[test]
+    fn test_parse_expression_boolean() {
+        let mut parser = parser_from_source("true");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::BooleanLiteral { value: true, .. }));
+    }
+
+    #[test]
+    fn test_parse_expression_identifier() {
+        let mut parser = parser_from_source("myVar");
+        let result = parser.parse_expression();
+
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        assert!(matches!(expr, Expression::Variable { ref name, .. } if name.name == "myVar"));
     }
 }

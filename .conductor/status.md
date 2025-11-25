@@ -22,14 +22,15 @@ Phase 2: V2 Parser Implementation
 - [x] Task 2.4: Implement Type Parsing (50 tests passing)
 - [x] Task 2.5: Implement Function Parsing (64 tests passing)
 - [x] Task 2.6: Implement Annotation Parsing (78 tests passing)
+- [x] Task 2.7: Implement Variable Declaration Parsing (94 tests passing)
 
 ## Current Task
-Task 2.7: Implement Variable Declaration Parsing
+Task 2.8: Implement Assignment Parsing
 
 ## Next Actions
-1. Write tests for `let` and `var` statements
-2. Implement parse_variable_declaration()
-3. Support type annotations and initializers
+1. Write tests for assignment statements
+2. Implement parse_assignment()
+3. Support compound assignments (+=, -=, etc.)
 
 ## Blockers
 None
@@ -52,3 +53,4 @@ None
 - Task 2.4: Implemented type parsing with ownership sigils (21 new tests)
 - Task 2.5: Implemented function parsing with params and return types (14 new tests)
 - Task 2.6: Implemented annotation parsing with @extern, @requires support (14 new tests)
+- Task 2.7: Implemented variable declaration and expression parsing (16 new tests)
