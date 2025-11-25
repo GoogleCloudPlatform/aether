@@ -288,6 +288,218 @@ impl Lexer {
         }
     }
 
+    /// Read a number (integer or float)
+    fn read_number(&mut self) -> Result<Token, LexerError> {
+        let start_location = self.current_location();
+        let mut number_str = String::new();
+        let mut is_float = false;
+
+        // Read digits before decimal point
+        while let Some(ch) = self.current_char {
+            if ch.is_ascii_digit() {
+                number_str.push(ch);
+                self.advance();
+            } else if ch == '.' && !is_float && self.peek().is_some_and(|c| c.is_ascii_digit()) {
+                is_float = true;
+                number_str.push(ch);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        if is_float {
+            match number_str.parse::<f64>() {
+                Ok(value) => Ok(Token::new(
+                    TokenType::FloatLiteral(value),
+                    start_location,
+                    number_str,
+                )),
+                Err(_) => Err(LexerError::InvalidNumber {
+                    value: number_str,
+                    location: start_location,
+                }),
+            }
+        } else {
+            match number_str.parse::<i64>() {
+                Ok(value) => Ok(Token::new(
+                    TokenType::IntegerLiteral(value),
+                    start_location,
+                    number_str,
+                )),
+                Err(_) => Err(LexerError::InvalidNumber {
+                    value: number_str,
+                    location: start_location,
+                }),
+            }
+        }
+    }
+
+    /// Read a string literal
+    fn read_string(&mut self) -> Result<Token, LexerError> {
+        let start_location = self.current_location();
+        let mut string_value = String::new();
+        let mut lexeme = String::new();
+
+        // Skip opening quote
+        lexeme.push('"');
+        self.advance();
+
+        while let Some(ch) = self.current_char {
+            if ch == '"' {
+                // End of string
+                lexeme.push(ch);
+                self.advance();
+                return Ok(Token::new(
+                    TokenType::StringLiteral(string_value),
+                    start_location,
+                    lexeme,
+                ));
+            } else if ch == '\\' {
+                // Handle escape sequences
+                lexeme.push(ch);
+                self.advance();
+                match self.current_char {
+                    Some('n') => {
+                        string_value.push('\n');
+                        lexeme.push('n');
+                    }
+                    Some('t') => {
+                        string_value.push('\t');
+                        lexeme.push('t');
+                    }
+                    Some('r') => {
+                        string_value.push('\r');
+                        lexeme.push('r');
+                    }
+                    Some('\\') => {
+                        string_value.push('\\');
+                        lexeme.push('\\');
+                    }
+                    Some('"') => {
+                        string_value.push('"');
+                        lexeme.push('"');
+                    }
+                    Some('0') => {
+                        string_value.push('\0');
+                        lexeme.push('0');
+                    }
+                    Some(other) => {
+                        return Err(LexerError::InvalidEscapeSequence {
+                            sequence: other.to_string(),
+                            location: self.current_location(),
+                        });
+                    }
+                    None => {
+                        return Err(LexerError::UnterminatedString {
+                            location: start_location,
+                        });
+                    }
+                }
+                self.advance();
+            } else if ch == '\n' || ch == '\r' {
+                return Err(LexerError::UnterminatedString {
+                    location: start_location,
+                });
+            } else {
+                string_value.push(ch);
+                lexeme.push(ch);
+                self.advance();
+            }
+        }
+
+        Err(LexerError::UnterminatedString {
+            location: start_location,
+        })
+    }
+
+    /// Read a character literal
+    fn read_char(&mut self) -> Result<Token, LexerError> {
+        let start_location = self.current_location();
+        let mut lexeme = String::new();
+
+        // Skip opening quote
+        lexeme.push('\'');
+        self.advance();
+
+        let char_value = match self.current_char {
+            Some('\\') => {
+                // Handle escape sequences
+                lexeme.push('\\');
+                self.advance();
+                match self.current_char {
+                    Some('n') => {
+                        lexeme.push('n');
+                        self.advance();
+                        '\n'
+                    }
+                    Some('t') => {
+                        lexeme.push('t');
+                        self.advance();
+                        '\t'
+                    }
+                    Some('r') => {
+                        lexeme.push('r');
+                        self.advance();
+                        '\r'
+                    }
+                    Some('\\') => {
+                        lexeme.push('\\');
+                        self.advance();
+                        '\\'
+                    }
+                    Some('\'') => {
+                        lexeme.push('\'');
+                        self.advance();
+                        '\''
+                    }
+                    Some('0') => {
+                        lexeme.push('0');
+                        self.advance();
+                        '\0'
+                    }
+                    Some(other) => {
+                        return Err(LexerError::InvalidEscapeSequence {
+                            sequence: other.to_string(),
+                            location: self.current_location(),
+                        });
+                    }
+                    None => {
+                        return Err(LexerError::UnterminatedString {
+                            location: start_location,
+                        });
+                    }
+                }
+            }
+            Some(ch) if ch != '\'' => {
+                lexeme.push(ch);
+                self.advance();
+                ch
+            }
+            _ => {
+                return Err(LexerError::UnterminatedString {
+                    location: start_location,
+                });
+            }
+        };
+
+        // Expect closing quote
+        match self.current_char {
+            Some('\'') => {
+                lexeme.push('\'');
+                self.advance();
+                Ok(Token::new(
+                    TokenType::CharLiteral(char_value),
+                    start_location,
+                    lexeme,
+                ))
+            }
+            _ => Err(LexerError::UnterminatedString {
+                location: start_location,
+            }),
+        }
+    }
+
     /// Read an identifier or keyword
     fn read_identifier(&mut self) -> Token {
         let start_location = self.current_location();
@@ -329,6 +541,9 @@ impl Lexer {
                 String::new(),
             )),
             Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => Ok(self.read_identifier()),
+            Some(ch) if ch.is_ascii_digit() => self.read_number(),
+            Some('"') => self.read_string(),
+            Some('\'') => self.read_char(),
             Some(ch) => {
                 let location = self.current_location();
                 Err(LexerError::UnexpectedCharacter { character: ch, location })
@@ -954,5 +1169,234 @@ mod tests {
         let lexer = Lexer::new("", "test.aether".to_string());
         // Count total keywords: 7 decl + 2 mod + 10 control + 4 error + 3 resource + 11 types + 3 literals + 2 other = 42
         assert_eq!(lexer.keywords.len(), 42);
+    }
+
+    // ==================== LITERAL TOKENIZATION TESTS ====================
+
+    #[test]
+    fn test_lexer_tokenize_integer_literal() {
+        let mut lexer = Lexer::new("42", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2); // 42 + EOF
+        assert!(matches!(tokens[0].token_type, TokenType::IntegerLiteral(42)));
+        assert_eq!(tokens[0].lexeme, "42");
+    }
+
+    #[test]
+    fn test_lexer_tokenize_integer_zero() {
+        let mut lexer = Lexer::new("0", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::IntegerLiteral(0)));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_large_integer() {
+        let mut lexer = Lexer::new("1000000", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::IntegerLiteral(1000000)));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_float_literal() {
+        let mut lexer = Lexer::new("3.14", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2);
+        if let TokenType::FloatLiteral(f) = tokens[0].token_type {
+            assert!((f - 3.14).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected FloatLiteral");
+        }
+        assert_eq!(tokens[0].lexeme, "3.14");
+    }
+
+    #[test]
+    fn test_lexer_tokenize_float_leading_zero() {
+        let mut lexer = Lexer::new("0.5", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        if let TokenType::FloatLiteral(f) = tokens[0].token_type {
+            assert!((f - 0.5).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected FloatLiteral");
+        }
+    }
+
+    #[test]
+    fn test_lexer_tokenize_multiple_numbers() {
+        let mut lexer = Lexer::new("42 3.14 100", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4);
+        assert!(matches!(tokens[0].token_type, TokenType::IntegerLiteral(42)));
+        if let TokenType::FloatLiteral(f) = tokens[1].token_type {
+            assert!((f - 3.14).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected FloatLiteral");
+        }
+        assert!(matches!(tokens[2].token_type, TokenType::IntegerLiteral(100)));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_string_simple() {
+        let mut lexer = Lexer::new("\"hello\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello"));
+        assert_eq!(tokens[0].lexeme, "\"hello\"");
+    }
+
+    #[test]
+    fn test_lexer_tokenize_string_with_spaces() {
+        let mut lexer = Lexer::new("\"hello world\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello world"));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_string_empty() {
+        let mut lexer = Lexer::new("\"\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s.is_empty()));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_string_escape_newline() {
+        let mut lexer = Lexer::new("\"hello\\nworld\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello\nworld"));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_string_escape_tab() {
+        let mut lexer = Lexer::new("\"hello\\tworld\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello\tworld"));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_string_escape_quote() {
+        let mut lexer = Lexer::new("\"say \\\"hi\\\"\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "say \"hi\""));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_string_escape_backslash() {
+        let mut lexer = Lexer::new("\"path\\\\file\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "path\\file"));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_char_simple() {
+        let mut lexer = Lexer::new("'a'", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 2);
+        assert!(matches!(tokens[0].token_type, TokenType::CharLiteral('a')));
+        assert_eq!(tokens[0].lexeme, "'a'");
+    }
+
+    #[test]
+    fn test_lexer_tokenize_char_escape_newline() {
+        let mut lexer = Lexer::new("'\\n'", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::CharLiteral('\n')));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_char_escape_tab() {
+        let mut lexer = Lexer::new("'\\t'", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::CharLiteral('\t')));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_char_escape_single_quote() {
+        let mut lexer = Lexer::new("'\\''", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::CharLiteral('\'')));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_char_escape_backslash() {
+        let mut lexer = Lexer::new("'\\\\'", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert!(matches!(tokens[0].token_type, TokenType::CharLiteral('\\')));
+    }
+
+    #[test]
+    fn test_lexer_tokenize_mixed_literals() {
+        let mut lexer = Lexer::new("42 \"hello\" 'x' 3.14", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 5);
+        assert!(matches!(tokens[0].token_type, TokenType::IntegerLiteral(42)));
+        assert!(matches!(tokens[1].token_type, TokenType::StringLiteral(ref s) if s == "hello"));
+        assert!(matches!(tokens[2].token_type, TokenType::CharLiteral('x')));
+        if let TokenType::FloatLiteral(f) = tokens[3].token_type {
+            assert!((f - 3.14).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected FloatLiteral");
+        }
+    }
+
+    #[test]
+    fn test_lexer_tokenize_literals_with_keywords() {
+        let mut lexer = Lexer::new("let x 42 \"hello\"", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 5); // let x 42 "hello" EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "x"));
+        assert!(matches!(tokens[2].token_type, TokenType::IntegerLiteral(42)));
+        assert!(matches!(tokens[3].token_type, TokenType::StringLiteral(ref s) if s == "hello"));
+    }
+
+    #[test]
+    fn test_lexer_error_unterminated_string() {
+        let mut lexer = Lexer::new("\"unterminated", "test.aether".to_string());
+        let result = lexer.tokenize();
+
+        assert!(matches!(result, Err(LexerError::UnterminatedString { .. })));
+    }
+
+    #[test]
+    fn test_lexer_error_unterminated_string_newline() {
+        let mut lexer = Lexer::new("\"hello\nworld\"", "test.aether".to_string());
+        let result = lexer.tokenize();
+
+        assert!(matches!(result, Err(LexerError::UnterminatedString { .. })));
+    }
+
+    #[test]
+    fn test_lexer_error_invalid_escape_sequence() {
+        let mut lexer = Lexer::new("\"\\x\"", "test.aether".to_string());
+        let result = lexer.tokenize();
+
+        assert!(matches!(result, Err(LexerError::InvalidEscapeSequence { .. })));
+    }
+
+    #[test]
+    fn test_lexer_error_unterminated_char() {
+        let mut lexer = Lexer::new("'a", "test.aether".to_string());
+        let result = lexer.tokenize();
+
+        assert!(matches!(result, Err(LexerError::UnterminatedString { .. })));
     }
 }

@@ -71,17 +71,22 @@ Implemented Lexer struct with:
 ---
 
 ### Task 1.3: Implement Literal Tokenization
-- [ ] **Write Tests**: Add tests for literal tokenization
-  - Integer literals: `0`, `42`, `-1`, `1000000`
-  - Float literals: `3.14`, `0.5`, `-2.5`
-  - String literals: `"hello"`, `"with\nnewline"`, `"with\"quote"`
-  - Character literals: `'a'`, `'\n'`, `'\''`
-  - Boolean literals: `true`, `false`
-- [ ] **Implement**: Implement `read_number()`, `read_string()`, `read_char()` methods
-- [ ] **Verify**: All literal tests pass
+- [x] **Write Tests**: Add tests for literal tokenization
+  - Integer literals: `0`, `42`, `1000000`
+  - Float literals: `3.14`, `0.5`
+  - String literals: `"hello"`, `"with\nnewline"`, `"with\"quote"`, escape sequences
+  - Character literals: `'a'`, `'\n'`, `'\''`, `'\\'`
+  - Error cases: unterminated strings, invalid escapes
+- [x] **Implement**: Implement `read_number()`, `read_string()`, `read_char()` methods
+- [x] **Verify**: All literal tests pass (24 new tests, 86 total)
 
 **Notes:**
 ```
+Implemented literal tokenization:
+- read_number(): integers and floats with decimal point detection
+- read_string(): double-quoted strings with escape sequences (\n, \t, \r, \\, \", \0)
+- read_char(): single-quoted characters with same escape sequences
+- Error handling for unterminated strings and invalid escapes
 ```
 
 ---
