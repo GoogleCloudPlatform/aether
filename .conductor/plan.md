@@ -249,15 +249,24 @@ Implemented type parsing:
 ---
 
 ### Task 2.5: Implement Function Parsing (Basic)
-- [ ] **Write Tests**: Add tests for basic function definitions
+- [x] **Write Tests**: Add tests for basic function definitions
   - No params, no return: `func foo() { }`
-  - With return type: `func foo() -> Int { return 0; }`
-  - With parameters: `func add(a: Int, b: Int) -> Int { ... }`
-- [ ] **Implement**: Implement `parse_function()` method (without annotations)
-- [ ] **Verify**: Basic function parsing tests pass
+  - With return type: `func foo() -> Int { }`
+  - With parameters: `func add(a: Int, b: Int) -> Int { }`
+  - Complex types, ownership types, pointer returns
+  - Error cases: missing name, parens, body, param types
+- [x] **Implement**: Implement `parse_function()` method (without annotations)
+- [x] **Verify**: All 14 function parsing tests pass (64 total)
 
 **Notes:**
 ```
+Implemented function parsing:
+- parse_function(): Parses "func name(params) -> Type { body }"
+- parse_parameters(): Parses comma-separated parameter list
+- parse_parameter(): Parses "name: Type" parameter
+- parse_block(): Parses "{...}" (skips body content for now)
+- Default return type is Void when not specified
+- Supports all type features: primitives, generics, ownership
 ```
 
 ---

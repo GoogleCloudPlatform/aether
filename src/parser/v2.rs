@@ -16,7 +16,10 @@
 //!
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
-use crate::ast::{Identifier, ImportStatement, Module, OwnershipKind, PrimitiveType, TypeSpecifier};
+use crate::ast::{
+    Block, Function, FunctionMetadata, Identifier, ImportStatement, Module, OwnershipKind,
+    Parameter, PassingMode, PrimitiveType, TypeSpecifier,
+};
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
 
@@ -425,6 +428,149 @@ impl Parser {
 
         Ok(TypeSpecifier::Named {
             name,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a function definition
+    /// Grammar: "func" IDENTIFIER "(" params? ")" ("->" type)? block
+    pub fn parse_function(&mut self) -> Result<Function, ParserError> {
+        let start_location = self.current_location();
+
+        // Expect 'func' keyword
+        self.expect_keyword(Keyword::Func, "expected 'func'")?;
+
+        // Parse function name
+        let name = self.parse_identifier()?;
+
+        // Expect opening parenthesis
+        self.expect(&TokenType::LeftParen, "expected '(' after function name")?;
+
+        // Parse parameters
+        let parameters = self.parse_parameters()?;
+
+        // Expect closing parenthesis
+        self.expect(&TokenType::RightParen, "expected ')' after parameters")?;
+
+        // Parse optional return type
+        let return_type = if self.check(&TokenType::Arrow) {
+            self.advance();
+            self.parse_type()?
+        } else {
+            // Default to Void if no return type specified
+            TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Void,
+                source_location: self.current_location(),
+            }
+        };
+
+        // Parse function body
+        let body = self.parse_block()?;
+
+        Ok(Function {
+            name,
+            intent: None,
+            generic_parameters: Vec::new(),
+            parameters,
+            return_type: Box::new(return_type),
+            metadata: FunctionMetadata {
+                preconditions: Vec::new(),
+                postconditions: Vec::new(),
+                invariants: Vec::new(),
+                algorithm_hint: None,
+                performance_expectation: None,
+                complexity_expectation: None,
+                throws_exceptions: Vec::new(),
+                thread_safe: None,
+                may_block: None,
+            },
+            body,
+            export_info: None,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse function parameters
+    /// Grammar: param ("," param)*
+    /// param: IDENTIFIER ":" type
+    fn parse_parameters(&mut self) -> Result<Vec<Parameter>, ParserError> {
+        let mut parameters = Vec::new();
+
+        // Check for empty parameter list
+        if self.check(&TokenType::RightParen) {
+            return Ok(parameters);
+        }
+
+        // Parse first parameter
+        parameters.push(self.parse_parameter()?);
+
+        // Parse additional parameters
+        while self.check(&TokenType::Comma) {
+            self.advance();
+            parameters.push(self.parse_parameter()?);
+        }
+
+        Ok(parameters)
+    }
+
+    /// Parse a single parameter
+    /// Grammar: IDENTIFIER ":" type
+    fn parse_parameter(&mut self) -> Result<Parameter, ParserError> {
+        let start_location = self.current_location();
+
+        // Parse parameter name
+        let name = self.parse_identifier()?;
+
+        // Expect colon
+        self.expect(&TokenType::Colon, "expected ':' after parameter name")?;
+
+        // Parse parameter type
+        let param_type = self.parse_type()?;
+
+        Ok(Parameter {
+            name,
+            param_type: Box::new(param_type),
+            intent: None,
+            constraint: None,
+            passing_mode: PassingMode::ByValue,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a block (function body)
+    /// Grammar: "{" statement* "}"
+    pub fn parse_block(&mut self) -> Result<Block, ParserError> {
+        let start_location = self.current_location();
+
+        // Expect opening brace
+        self.expect(&TokenType::LeftBrace, "expected '{' to start block")?;
+
+        // For now, just parse empty blocks or skip to closing brace
+        // Statement parsing will be added in later tasks
+        let statements = Vec::new();
+
+        // Skip any tokens until we find the closing brace
+        // This is temporary - we'll add proper statement parsing later
+        let mut brace_depth = 1;
+        while !self.is_at_end() && brace_depth > 0 {
+            if self.check(&TokenType::LeftBrace) {
+                brace_depth += 1;
+                self.advance();
+            } else if self.check(&TokenType::RightBrace) {
+                brace_depth -= 1;
+                if brace_depth > 0 {
+                    self.advance();
+                }
+            } else {
+                self.advance();
+            }
+        }
+
+        // Expect closing brace
+        self.expect(&TokenType::RightBrace, "expected '}' to close block")?;
+
+        Ok(Block {
+            statements,
             source_location: start_location,
         })
     }
@@ -1039,5 +1185,165 @@ module Test {
         let result = parser.parse_type();
 
         assert!(result.is_err());
+    }
+
+    // ==================== FUNCTION PARSING TESTS ====================
+
+    #[test]
+    fn test_parse_function_no_params_no_return() {
+        let mut parser = parser_from_source("func foo() { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "foo");
+        assert!(func.parameters.is_empty());
+        // Default return type should be Void
+        assert!(matches!(*func.return_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Void, .. }));
+    }
+
+    #[test]
+    fn test_parse_function_with_return_type() {
+        let mut parser = parser_from_source("func answer() -> Int { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "answer");
+        assert!(func.parameters.is_empty());
+        assert!(matches!(*func.return_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+    }
+
+    #[test]
+    fn test_parse_function_single_param() {
+        let mut parser = parser_from_source("func greet(name: String) { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "greet");
+        assert_eq!(func.parameters.len(), 1);
+        assert_eq!(func.parameters[0].name.name, "name");
+        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Primitive { type_name: PrimitiveType::String, .. }));
+    }
+
+    #[test]
+    fn test_parse_function_multiple_params() {
+        let mut parser = parser_from_source("func add(a: Int, b: Int) -> Int { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "add");
+        assert_eq!(func.parameters.len(), 2);
+        assert_eq!(func.parameters[0].name.name, "a");
+        assert_eq!(func.parameters[1].name.name, "b");
+        assert!(matches!(*func.return_type, TypeSpecifier::Primitive { type_name: PrimitiveType::Integer, .. }));
+    }
+
+    #[test]
+    fn test_parse_function_complex_types() {
+        let mut parser = parser_from_source("func process(items: Array<Int>, config: Map<String, Int>) -> Bool { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "process");
+        assert_eq!(func.parameters.len(), 2);
+        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Array { .. }));
+        assert!(matches!(*func.parameters[1].param_type, TypeSpecifier::Map { .. }));
+    }
+
+    #[test]
+    fn test_parse_function_ownership_types() {
+        let mut parser = parser_from_source("func transfer(owned: ^String, borrowed: &Int) -> Void { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.parameters.len(), 2);
+        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Owned { ownership: OwnershipKind::Owned, .. }));
+        assert!(matches!(*func.parameters[1].param_type, TypeSpecifier::Owned { ownership: OwnershipKind::Borrowed, .. }));
+    }
+
+    #[test]
+    fn test_parse_function_with_body_content() {
+        // Body content is skipped for now, but structure should parse
+        let mut parser = parser_from_source("func main() { let x = 42; return x; }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "main");
+    }
+
+    #[test]
+    fn test_parse_function_multiline() {
+        let source = r#"
+func calculate(
+    a: Int,
+    b: Int,
+    c: Int
+) -> Int {
+    // body
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "calculate");
+        assert_eq!(func.parameters.len(), 3);
+    }
+
+    #[test]
+    fn test_parse_function_error_missing_name() {
+        let mut parser = parser_from_source("func () { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_function_error_missing_open_paren() {
+        let mut parser = parser_from_source("func foo) { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_function_error_missing_close_paren() {
+        let mut parser = parser_from_source("func foo( { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_function_error_missing_body() {
+        let mut parser = parser_from_source("func foo()");
+        let result = parser.parse_function();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_function_error_missing_param_type() {
+        let mut parser = parser_from_source("func foo(x) { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_function_pointer_return() {
+        let mut parser = parser_from_source("func allocate(size: SizeT) -> Pointer<Void> { }");
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert!(matches!(*func.return_type, TypeSpecifier::Pointer { is_mutable: false, .. }));
     }
 }
