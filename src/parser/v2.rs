@@ -194,24 +194,44 @@ impl Parser {
         // Parse module name
         let name = self.parse_identifier()?;
 
-        // Expect opening brace
-        self.expect(&TokenType::LeftBrace, "expected '{' after module name")?;
-
         // Parse module items (imports, functions, structs, etc.)
         let mut imports = Vec::new();
 
-        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
-            if self.check_keyword(Keyword::Import) {
-                imports.push(self.parse_import()?);
-            } else {
-                // For now, skip unknown items until we implement more parsing
-                // In future tasks we'll add function, struct, enum parsing here
-                break;
-            }
-        }
+        // Support both "module name;" (file-scoped) and "module name { }" (inline)
+        if self.check(&TokenType::Semicolon) {
+            // File-scoped module: "module name;" followed by items at top level
+            self.advance(); // consume semicolon
 
-        // Expect closing brace
-        self.expect(&TokenType::RightBrace, "expected '}' to close module")?;
+            // Parse remaining items until EOF
+            while !self.is_at_end() {
+                if self.check_keyword(Keyword::Import) {
+                    imports.push(self.parse_import()?);
+                } else {
+                    // Stop at unknown items for now
+                    break;
+                }
+            }
+        } else if self.check(&TokenType::LeftBrace) {
+            // Inline module: "module name { items }"
+            self.advance(); // consume '{'
+
+            while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+                if self.check_keyword(Keyword::Import) {
+                    imports.push(self.parse_import()?);
+                } else {
+                    break;
+                }
+            }
+
+            // Expect closing brace
+            self.expect(&TokenType::RightBrace, "expected '}' to close module")?;
+        } else {
+            return Err(ParserError::UnexpectedToken {
+                expected: "';' or '{' after module name".to_string(),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.current_location(),
+            });
+        }
 
         Ok(Module {
             name,
@@ -1266,17 +1286,58 @@ impl Parser {
             });
         }
 
-        // Identifier (variable reference)
+        // Identifier (variable reference) with optional postfix operators
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name = name.clone();
             self.advance();
-            return Ok(Expression::Variable {
+            let mut expr = Expression::Variable {
                 name: Identifier {
                     name,
                     source_location: start_location.clone(),
                 },
-                source_location: start_location,
-            });
+                source_location: start_location.clone(),
+            };
+
+            // Handle postfix operators: [index] and .field
+            loop {
+                if self.check(&TokenType::LeftBracket) {
+                    // Array indexing: expr[index]
+                    self.advance(); // consume '['
+                    let index = self.parse_expression()?;
+                    self.expect(&TokenType::RightBracket, "expected ']'")?;
+                    expr = Expression::ArrayAccess {
+                        array: Box::new(expr),
+                        index: Box::new(index),
+                        source_location: start_location.clone(),
+                    };
+                } else if self.check(&TokenType::Dot) {
+                    // Field access: expr.field
+                    self.advance(); // consume '.'
+                    if let TokenType::Identifier(field_name) = &self.peek().token_type {
+                        let field_name = field_name.clone();
+                        let field_loc = self.current_location();
+                        self.advance();
+                        expr = Expression::FieldAccess {
+                            instance: Box::new(expr),
+                            field_name: Identifier {
+                                name: field_name,
+                                source_location: field_loc,
+                            },
+                            source_location: start_location.clone(),
+                        };
+                    } else {
+                        return Err(ParserError::UnexpectedToken {
+                            expected: "field name".to_string(),
+                            found: format!("{:?}", self.peek().token_type),
+                            location: self.current_location(),
+                        });
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            return Ok(expr);
         }
 
         Err(ParserError::UnexpectedToken {
@@ -1362,17 +1423,63 @@ impl Parser {
             });
         }
 
-        // Identifier (variable reference)
+        // Identifier (variable reference) with optional postfix operators
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name = name.clone();
             self.advance();
-            return Ok(Expression::Variable {
+            let mut expr = Expression::Variable {
                 name: Identifier {
                     name,
                     source_location: start_location.clone(),
                 },
-                source_location: start_location,
-            });
+                source_location: start_location.clone(),
+            };
+
+            // Handle postfix operators: [index] and .field
+            loop {
+                if self.check(&TokenType::LeftBracket) {
+                    // Array indexing: expr[index]
+                    self.advance(); // consume '['
+                    let index = self.parse_expression()?;
+                    self.expect(&TokenType::RightBracket, "expected ']'")?;
+                    expr = Expression::ArrayAccess {
+                        array: Box::new(expr),
+                        index: Box::new(index),
+                        source_location: start_location.clone(),
+                    };
+                } else if self.check(&TokenType::Dot) {
+                    // Field access: expr.field
+                    self.advance(); // consume '.'
+                    if let TokenType::Identifier(field_name) = &self.peek().token_type {
+                        let field_name = field_name.clone();
+                        let field_loc = self.current_location();
+                        self.advance();
+                        expr = Expression::FieldAccess {
+                            instance: Box::new(expr),
+                            field_name: Identifier {
+                                name: field_name,
+                                source_location: field_loc,
+                            },
+                            source_location: start_location.clone(),
+                        };
+                    } else {
+                        return Err(ParserError::UnexpectedToken {
+                            expected: "field name".to_string(),
+                            found: format!("{:?}", self.peek().token_type),
+                            location: self.current_location(),
+                        });
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            return Ok(expr);
+        }
+
+        // Nested braced expression
+        if self.peek().token_type == TokenType::LeftBrace {
+            return self.parse_braced_expression();
         }
 
         Err(ParserError::UnexpectedToken {
@@ -3345,5 +3452,227 @@ func calculate(
         let result = parser.parse_enum();
 
         assert!(result.is_err());
+    }
+
+    // ==================== Integration Tests ====================
+
+    #[test]
+    fn test_integration_function_with_body() {
+        let source = r#"
+func add(a: Int, b: Int) -> Int {
+    let result: Int = {a + b};
+    return result;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "add");
+        assert_eq!(func.parameters.len(), 2);
+        assert_eq!(func.body.statements.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_function_with_control_flow() {
+        let source = r#"
+func abs(n: Int) -> Int {
+    when {n < 0} {
+        return {0 - n};
+    } else {
+        return n;
+    }
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.name.name, "abs");
+        assert_eq!(func.body.statements.len(), 1);
+        assert!(matches!(func.body.statements[0], Statement::If { .. }));
+    }
+
+    #[test]
+    fn test_integration_function_with_loop() {
+        let source = r#"
+func sum(n: Int) -> Int {
+    let mut total: Int = 0;
+    let mut i: Int = 0;
+    while {i < n} {
+        total = {total + i};
+        i = {i + 1};
+    }
+    return total;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.body.statements.len(), 4); // 2 lets + while + return
+    }
+
+    #[test]
+    fn test_integration_struct_and_function() {
+        let struct_source = "struct Point { x: Float; y: Float; }";
+        let mut parser = parser_from_source(struct_source);
+        let struct_result = parser.parse_struct();
+        assert!(struct_result.is_ok());
+
+        let func_source = r#"
+func distance(p: Point) -> Float {
+    return {p.x + p.y};
+}
+"#;
+        let mut parser = parser_from_source(func_source);
+        let func_result = parser.parse_function();
+        assert!(func_result.is_ok(), "Parse error: {:?}", func_result.err());
+    }
+
+    #[test]
+    fn test_integration_nested_control_flow() {
+        let source = r#"
+func classify(n: Int) -> Int {
+    when {n > 0} {
+        when {n > 100} {
+            return 2;
+        } else {
+            return 1;
+        }
+    } else when {n < 0} {
+        return 0;
+    } else {
+        return 0;
+    }
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        if let Statement::If { else_ifs, else_block, .. } = &func.body.statements[0] {
+            assert_eq!(else_ifs.len(), 1);
+            assert!(else_block.is_some());
+        } else {
+            panic!("Expected If statement");
+        }
+    }
+
+    #[test]
+    fn test_integration_module_with_import() {
+        let source = r#"
+module math;
+
+import std.io;
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_module();
+
+        assert!(result.is_ok(), "Parse error: {:?}", result.err());
+        let module = result.unwrap();
+        assert_eq!(module.name.name, "math");
+        assert_eq!(module.imports.len(), 1);
+    }
+
+    #[test]
+    fn test_integration_complex_expressions() {
+        let source = r#"
+func compute(a: Int, b: Int, c: Int) -> Int {
+    let x: Int = {a + b};
+    let y: Int = {x * c};
+    let z: Int = {{a + b} * {c - 1}};
+    return z;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok(), "Parse error: {:?}", result.err());
+        let func = result.unwrap();
+        assert_eq!(func.body.statements.len(), 4);
+    }
+
+    #[test]
+    fn test_integration_array_operations() {
+        let source = r#"
+func process(items: Array<Int>) -> Int {
+    let first: Int = items[0];
+    items[0] = 42;
+    return first;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok(), "Parse error: {:?}", result.err());
+        let func = result.unwrap();
+        assert_eq!(func.body.statements.len(), 3);
+    }
+
+    #[test]
+    fn test_integration_struct_field_access() {
+        let source = r#"
+func swap(p: Point) -> Point {
+    let temp: Float = p.x;
+    p.x = p.y;
+    p.y = temp;
+    return p;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert_eq!(func.body.statements.len(), 4);
+    }
+
+    #[test]
+    fn test_integration_ownership_types() {
+        let source = r#"
+func take_owned(data: ^Data) -> Int {
+    return 0;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Owned { .. }));
+    }
+
+    #[test]
+    fn test_integration_borrowed_types() {
+        let source = r#"
+func read_only(data: &Data) -> Int {
+    return 0;
+}
+"#;
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_function();
+
+        assert!(result.is_ok());
+        let func = result.unwrap();
+        assert!(matches!(*func.parameters[0].param_type, TypeSpecifier::Owned { ownership: OwnershipKind::Borrowed, .. }));
+    }
+
+    #[test]
+    fn test_integration_external_function() {
+        let source = r#"@extern(library: "libc") func puts(s: Pointer<Void>) -> Int;"#;
+        let mut parser = parser_from_source(source);
+
+        let annotation = parser.parse_annotation().unwrap();
+        let result = parser.parse_external_function(annotation);
+
+        assert!(result.is_ok());
+        let ext_func = result.unwrap();
+        assert_eq!(ext_func.name.name, "puts");
+        assert_eq!(ext_func.library, "libc");
     }
 }
