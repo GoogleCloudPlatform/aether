@@ -405,7 +405,15 @@ fn main() {
             match compiler.compile_files(&[input]) {
                 Ok(result) => {
                     // Execute the compiled program
-                    let mut cmd = process::Command::new(&result.executable_path);
+                    // Ensure path is absolute or has ./ prefix for current directory
+                    let exe_path = if result.executable_path.is_absolute() {
+                        result.executable_path.clone()
+                    } else {
+                        std::env::current_dir()
+                            .unwrap_or_default()
+                            .join(&result.executable_path)
+                    };
+                    let mut cmd = process::Command::new(&exe_path);
                     cmd.args(&args);
 
                     match cmd.status() {

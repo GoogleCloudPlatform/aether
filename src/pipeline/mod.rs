@@ -34,6 +34,72 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 // use std::sync::{Arc, Mutex};
 
+/// Find the AetherScript runtime library.
+/// Searches in order:
+/// 1. AETHER_RUNTIME_PATH environment variable
+/// 2. ./runtime/target/release/ relative to current directory
+/// 3. Relative to the compiler executable
+fn find_runtime_library() -> Result<PathBuf, CompilerError> {
+    let lib_name = if cfg!(target_os = "macos") {
+        "libaether_runtime.dylib"
+    } else if cfg!(target_os = "windows") {
+        "aether_runtime.dll"
+    } else {
+        "libaether_runtime.so"
+    };
+
+    // Check environment variable first
+    if let Ok(path) = std::env::var("AETHER_RUNTIME_PATH") {
+        let runtime_path = PathBuf::from(&path);
+        if runtime_path.exists() {
+            return Ok(runtime_path);
+        }
+        // If it's a directory, look for the library inside
+        let lib_path = runtime_path.join(lib_name);
+        if lib_path.exists() {
+            return Ok(lib_path);
+        }
+    }
+
+    // Check relative to current directory
+    let local_path = PathBuf::from("runtime/target/release").join(lib_name);
+    if local_path.exists() {
+        return Ok(local_path);
+    }
+
+    // Check relative to compiler executable
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            // Check in same directory as executable
+            let same_dir = exe_dir.join(lib_name);
+            if same_dir.exists() {
+                return Ok(same_dir);
+            }
+            // Check in lib subdirectory
+            let lib_dir = exe_dir.join("lib").join(lib_name);
+            if lib_dir.exists() {
+                return Ok(lib_dir);
+            }
+            // Check in ../lib relative to executable
+            if let Some(parent) = exe_dir.parent() {
+                let parent_lib = parent.join("lib").join(lib_name);
+                if parent_lib.exists() {
+                    return Ok(parent_lib);
+                }
+            }
+        }
+    }
+
+    Err(CompilerError::IoError {
+        message: format!(
+            "AetherScript runtime library ({}) not found. \
+            Set AETHER_RUNTIME_PATH environment variable or build the runtime with: \
+            cd runtime && cargo build --release",
+            lib_name
+        ),
+    })
+}
+
 /// Compilation options
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
@@ -537,9 +603,8 @@ impl CompilationPipeline {
             cmd.arg(format!("-l{}", lib));
         }
 
-        // Add AetherScript runtime library directly
-        let runtime_lib_path = PathBuf::from("/Users/keithballinger/Desktop/projects/logos/runtime/target/release/libaether_runtime.dylib");
-
+        // Add AetherScript runtime library
+        let runtime_lib_path = find_runtime_library()?;
         cmd.arg(&runtime_lib_path);
 
         // Add standard C library
@@ -650,7 +715,7 @@ impl CompilationPipeline {
         }
 
         // Add AetherScript runtime library
-        let runtime_lib_path = PathBuf::from("/Users/keithballinger/Desktop/projects/logos/runtime/target/release/libaether_runtime.dylib");
+        let runtime_lib_path = find_runtime_library()?;
         cmd.arg(&runtime_lib_path);
 
         // Add standard C library
