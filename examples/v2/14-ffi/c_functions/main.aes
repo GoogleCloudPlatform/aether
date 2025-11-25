@@ -1,0 +1,32 @@
+// C Functions FFI Example
+// Demonstrates calling C standard library functions
+
+module c_functions;
+
+@extern("C")
+func puts(s: Pointer<Char>) -> Int;
+
+@extern("C")
+func printf(format: Pointer<Char>, value: Int) -> Int;
+
+@extern("C")
+func strlen(s: Pointer<Char>) -> Int;
+
+@extern("C")
+func abs(n: Int) -> Int;
+
+func main() -> Int {
+    // Call C puts
+    puts("Hello from AetherScript via puts!");
+
+    // Call C printf with integer
+    printf("The answer is: %d\n", 42);
+
+    // Call C strlen
+    let len: Int = strlen("Hello");
+
+    // Call C abs
+    let absolute: Int = abs(-10);
+
+    return absolute;
+}

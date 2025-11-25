@@ -1,0 +1,15 @@
+// Maps Example
+// Demonstrates hash map usage
+
+module maps;
+
+func main() -> Int {
+    // Map from string keys to integer values
+    let scores: Map<String, Int> = {};
+
+    // Maps would be used with methods like:
+    // scores.insert("Alice", 100);
+    // let score: Int = scores.get("Alice");
+
+    return 0;
+}

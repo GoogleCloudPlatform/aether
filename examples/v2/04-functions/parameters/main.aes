@@ -1,0 +1,32 @@
+// Function Parameters Example
+// Demonstrates different parameter passing styles
+
+module parameters;
+
+// Pass by value (default)
+func double(x: Int) -> Int {
+    return {x * 2};
+}
+
+// Multiple parameters
+func sum_three(a: Int, b: Int, c: Int) -> Int {
+    return {a + b + c};
+}
+
+// Different types
+func mix_types(i: Int, f: Float, b: Bool) -> Int {
+    when b {
+        return i;
+    } else {
+        return 0;
+    }
+}
+
+func main() -> Int {
+    let x: Int = 5;
+    let doubled: Int = double(x);
+    let total: Int = sum_three(1, 2, 3);
+    let result: Int = mix_types(42, 3.14, true);
+
+    return result;
+}

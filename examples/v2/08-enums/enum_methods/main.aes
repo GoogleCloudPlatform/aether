@@ -1,0 +1,48 @@
+// Enum Methods Example
+// Demonstrates functions operating on enums
+
+module enum_methods;
+
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+}
+
+enum Response {
+    Success(Int),
+    Error(Int),
+}
+
+func is_active(s: Status) -> Bool {
+    match s {
+        Status::Active => { return true; }
+        Status::Inactive => { return false; }
+        Status::Pending => { return false; }
+    }
+}
+
+func get_response_code(r: Response) -> Int {
+    match r {
+        Response::Success(code) => { return code; }
+        Response::Error(code) => { return code; }
+    }
+}
+
+func is_success(r: Response) -> Bool {
+    match r {
+        Response::Success(_) => { return true; }
+        Response::Error(_) => { return false; }
+    }
+}
+
+func main() -> Int {
+    let status: Status = Status::Active;
+    let active: Bool = is_active(status);
+
+    let response: Response = Response::Success(200);
+    let code: Int = get_response_code(response);
+    let ok: Bool = is_success(response);
+
+    return code;
+}

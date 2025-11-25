@@ -1,0 +1,34 @@
+// Extern Blocks Example
+// Demonstrates external function declarations
+
+module extern_blocks;
+
+// Math functions from libm
+@extern("C")
+func sqrt(x: Float64) -> Float64;
+
+@extern("C")
+func pow(base: Float64, exp: Float64) -> Float64;
+
+@extern("C")
+func sin(x: Float64) -> Float64;
+
+@extern("C")
+func cos(x: Float64) -> Float64;
+
+// Standard I/O
+@extern("C")
+func puts(s: Pointer<Char>) -> Int;
+
+@extern("C")
+func printf(format: Pointer<Char>, value: Float64) -> Int;
+
+func main() -> Int {
+    puts("Math functions via FFI:");
+
+    // These would work if we had proper float printing
+    let root: Float64 = sqrt(16.0);
+    let power: Float64 = pow(2.0, 10.0);
+
+    return 0;
+}

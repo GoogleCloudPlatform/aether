@@ -1,0 +1,26 @@
+// Arrays Example
+// Demonstrates array creation and access
+
+module arrays;
+
+func sum_array(arr: Array<Int>, len: Int) -> Int {
+    var sum: Int = 0;
+    var i: Int = 0;
+
+    while {i < len} {
+        sum = {sum + arr[i]};
+        i = {i + 1};
+    }
+
+    return sum;
+}
+
+func main() -> Int {
+    let numbers: Array<Int> = [1, 2, 3, 4, 5];
+    let first: Int = numbers[0];
+    let third: Int = numbers[2];
+
+    let total: Int = sum_array(numbers, 5);
+
+    return total;
+}

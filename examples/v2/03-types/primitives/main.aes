@@ -1,0 +1,25 @@
+// Primitive Types Example
+// Demonstrates all primitive types in AetherScript
+
+module primitives;
+
+func main() -> Int {
+    // Integer types
+    let i: Int = 42;
+    let i32: Int32 = 100;
+    let i64: Int64 = 9999999999;
+
+    // Floating point types
+    let f: Float = 3.14;
+    let f32: Float32 = 2.5;
+    let f64: Float64 = 3.141592653589793;
+
+    // Boolean
+    let flag: Bool = true;
+    let done: Bool = false;
+
+    // Character
+    let ch: Char = 'A';
+
+    return i;
+}

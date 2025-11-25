@@ -1,0 +1,8 @@
+// Simple Main Example
+// Minimal AetherScript program
+
+module simple_main;
+
+func main() -> Int {
+    return 0;
+}

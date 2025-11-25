@@ -1,0 +1,32 @@
+// Ownership Example
+// Demonstrates ownership semantics
+
+module ownership;
+
+struct Data {
+    value: Int,
+}
+
+// Takes ownership of the data
+func consume(data: ^Data) -> Int {
+    return data.value;
+}
+
+// Borrows immutably
+func read(data: &Data) -> Int {
+    return data.value;
+}
+
+// Borrows mutably
+func increment(data: &mut Data) -> Void {
+    data.value = {data.value + 1};
+}
+
+func main() -> Int {
+    let d: Data = Data { value: 42 };
+
+    // Read the value (borrow)
+    let v: Int = read(&d);
+
+    return v;
+}

@@ -1,0 +1,40 @@
+// Match Structs Example
+// Demonstrates struct destructuring in match
+
+module match_structs;
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+func classify_point(p: Point) -> Int {
+    match p {
+        Point { x: 0, y: 0 } => {
+            return 0;
+        }
+        Point { x: 0, y } => {
+            return 1;
+        }
+        Point { x, y: 0 } => {
+            return 2;
+        }
+        Point { x, y } => {
+            return 3;
+        }
+    }
+}
+
+func main() -> Int {
+    let origin: Point = Point { x: 0, y: 0 };
+    let on_y_axis: Point = Point { x: 0, y: 5 };
+    let on_x_axis: Point = Point { x: 5, y: 0 };
+    let other: Point = Point { x: 3, y: 4 };
+
+    let c1: Int = classify_point(origin);
+    let c2: Int = classify_point(on_y_axis);
+    let c3: Int = classify_point(on_x_axis);
+    let c4: Int = classify_point(other);
+
+    return c4;
+}

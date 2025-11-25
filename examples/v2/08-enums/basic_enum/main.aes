@@ -1,0 +1,29 @@
+// Basic Enum Example
+// Demonstrates simple enumeration types
+
+module basic_enum;
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+enum Direction {
+    North,
+    South,
+    East,
+    West,
+}
+
+func is_primary_color(c: Color) -> Bool {
+    // All colors in this enum are primary
+    return true;
+}
+
+func main() -> Int {
+    let c: Color = Color::Red;
+    let d: Direction = Direction::North;
+
+    return 0;
+}
