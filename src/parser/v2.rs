@@ -17,9 +17,9 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    AssignmentTarget, Block, CallingConvention, ElseIf, Expression, ExternalFunction, Function,
-    FunctionMetadata, Identifier, ImportStatement, Module, Mutability, OwnershipKind, Parameter,
-    PassingMode, PrimitiveType, Statement, StructField, TypeDefinition, TypeSpecifier,
+    AssignmentTarget, Block, CallingConvention, ElseIf, EnumVariant, Expression, ExternalFunction,
+    Function, FunctionMetadata, Identifier, ImportStatement, Module, Mutability, OwnershipKind,
+    Parameter, PassingMode, PrimitiveType, Statement, StructField, TypeDefinition, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -834,6 +834,64 @@ impl Parser {
         Ok(StructField {
             name,
             field_type: Box::new(field_type),
+            source_location: start_location,
+        })
+    }
+
+    // ==================== ENUM PARSING ====================
+
+    /// Parse an enum definition
+    /// Grammar: "enum" IDENTIFIER "{" ("case" IDENTIFIER ["(" type ")"] ";")* "}"
+    pub fn parse_enum(&mut self) -> Result<TypeDefinition, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Enum, "expected 'enum'")?;
+
+        let name = self.parse_identifier()?;
+
+        self.expect(&TokenType::LeftBrace, "expected '{' after enum name")?;
+
+        let mut variants = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            variants.push(self.parse_enum_variant()?);
+        }
+
+        self.expect(&TokenType::RightBrace, "expected '}' to close enum")?;
+
+        Ok(TypeDefinition::Enumeration {
+            name,
+            intent: None,
+            generic_parameters: vec![],
+            variants,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an enum variant
+    /// Grammar: "case" IDENTIFIER ["(" type ")"] ";"
+    fn parse_enum_variant(&mut self) -> Result<EnumVariant, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Case, "expected 'case'")?;
+
+        let name = self.parse_identifier()?;
+
+        // Parse optional associated type
+        let associated_type = if self.check(&TokenType::LeftParen) {
+            self.advance();
+            let assoc_type = self.parse_type()?;
+            self.expect(&TokenType::RightParen, "expected ')' after associated type")?;
+            Some(Box::new(assoc_type))
+        } else {
+            None
+        };
+
+        self.expect(&TokenType::Semicolon, "expected ';' after enum variant")?;
+
+        Ok(EnumVariant {
+            name,
+            associated_type,
             source_location: start_location,
         })
     }
@@ -3202,6 +3260,89 @@ func calculate(
     fn test_parse_struct_error_missing_semicolon() {
         let mut parser = parser_from_source("struct Point { x: Float }");
         let result = parser.parse_struct();
+
+        assert!(result.is_err());
+    }
+
+    // ==================== Enum Parsing Tests ====================
+
+    #[test]
+    fn test_parse_enum_simple() {
+        let mut parser = parser_from_source("enum Color { case Red; case Green; case Blue; }");
+        let result = parser.parse_enum();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Enumeration { name, variants, .. } = typedef {
+            assert_eq!(name.name, "Color");
+            assert_eq!(variants.len(), 3);
+            assert_eq!(variants[0].name.name, "Red");
+            assert_eq!(variants[1].name.name, "Green");
+            assert_eq!(variants[2].name.name, "Blue");
+        } else {
+            panic!("Expected Enumeration type");
+        }
+    }
+
+    #[test]
+    fn test_parse_enum_empty() {
+        let mut parser = parser_from_source("enum Empty { }");
+        let result = parser.parse_enum();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Enumeration { variants, .. } = typedef {
+            assert!(variants.is_empty());
+        } else {
+            panic!("Expected Enumeration type");
+        }
+    }
+
+    #[test]
+    fn test_parse_enum_with_associated_type() {
+        let mut parser = parser_from_source("enum Result { case Ok(Int); case Error(String); }");
+        let result = parser.parse_enum();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Enumeration { name, variants, .. } = typedef {
+            assert_eq!(name.name, "Result");
+            assert_eq!(variants.len(), 2);
+            assert!(variants[0].associated_type.is_some());
+            assert!(variants[1].associated_type.is_some());
+        } else {
+            panic!("Expected Enumeration type");
+        }
+    }
+
+    #[test]
+    fn test_parse_enum_mixed_variants() {
+        let mut parser = parser_from_source("enum Option { case Some(Int); case None; }");
+        let result = parser.parse_enum();
+
+        assert!(result.is_ok());
+        let typedef = result.unwrap();
+        if let TypeDefinition::Enumeration { variants, .. } = typedef {
+            assert_eq!(variants.len(), 2);
+            assert!(variants[0].associated_type.is_some());
+            assert!(variants[1].associated_type.is_none());
+        } else {
+            panic!("Expected Enumeration type");
+        }
+    }
+
+    #[test]
+    fn test_parse_enum_error_missing_case() {
+        let mut parser = parser_from_source("enum Color { Red; }");
+        let result = parser.parse_enum();
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_enum_error_missing_semicolon() {
+        let mut parser = parser_from_source("enum Color { case Red }");
+        let result = parser.parse_enum();
 
         assert!(result.is_err());
     }
