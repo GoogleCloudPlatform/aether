@@ -14,15 +14,17 @@ Phase 1: V2 Lexer Implementation
 - [x] Task 1.2: Implement Keyword Recognition (62 tests passing)
 - [x] Task 1.3: Implement Literal Tokenization (86 tests passing)
 - [x] Task 1.4: Implement Operator Tokenization (106 tests passing)
+- [x] Task 1.5: Implement Comment Handling (117 tests passing)
 
 ## Current Task
-Task 1.5: Implement Comment Handling
+Task 1.6: Implement Full Lexer Integration
 
 ## Next Actions
-1. Write tests for V2 comment handling
-2. Implement line comments (//)
-3. Implement doc comments (///)
-4. Integrate comment handling into tokenize()
+1. Write integration tests for complete V2 code snippets
+2. Test hello world module tokenization
+3. Test function with parameters
+4. Test when statement tokenization
+5. Verify lexer coverage is >80%
 
 ## Blockers
 None
@@ -37,3 +39,4 @@ None
 - Task 1.2: Implemented HashMap keyword lookup, 42 keywords total
 - Task 1.3: Implemented read_number, read_string, read_char with escapes
 - Task 1.4: Implemented all operators with multi-character lookahead
+- Task 1.5: Implemented comment handling (// and ///)

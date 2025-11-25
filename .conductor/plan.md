@@ -114,16 +114,22 @@ Implemented operator tokenization in next_token():
 ---
 
 ### Task 1.5: Implement Comment Handling
-- [ ] **Write Tests**: Add tests for comments
+- [x] **Write Tests**: Add tests for comments
   - Line comments: `// comment`
   - Doc comments: `/// doc comment`
   - Comments at end of line
   - Comments on their own line
-- [ ] **Implement**: Implement `read_comment()` method
-- [ ] **Verify**: All comment tests pass
+- [x] **Implement**: Implement `skip_line_comment()` method
+- [x] **Verify**: All comment tests pass (11 new tests, 117 total)
 
 **Notes:**
 ```
+Implemented comment handling:
+- Modified slash case in next_token() to check for //
+- skip_line_comment() consumes characters until newline or EOF
+- Both line comments (//) and doc comments (///) are skipped
+- Single slash remains Slash operator
+- Comments at end of file (no trailing newline) handled correctly
 ```
 
 ---

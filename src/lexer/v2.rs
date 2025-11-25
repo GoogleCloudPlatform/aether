@@ -288,6 +288,21 @@ impl Lexer {
         }
     }
 
+    /// Skip a line comment (// or ///) until end of line or EOF
+    fn skip_line_comment(&mut self) {
+        // We're positioned after the first '/', consume the second '/'
+        self.advance();
+
+        // Skip until newline or EOF
+        while let Some(ch) = self.current_char {
+            if ch == '\n' {
+                self.advance(); // consume the newline
+                break;
+            }
+            self.advance();
+        }
+    }
+
     /// Read a number (integer or float)
     fn read_number(&mut self) -> Result<Token, LexerError> {
         let start_location = self.current_location();
@@ -606,9 +621,17 @@ impl Lexer {
                 self.advance();
                 Ok(Token::new(TokenType::Star, location, "*".to_string()))
             }
+            // Slash, or line comment, or doc comment
             Some('/') => {
                 self.advance();
-                Ok(Token::new(TokenType::Slash, location, "/".to_string()))
+                if self.current_char == Some('/') {
+                    // Line comment (// or ///)
+                    self.skip_line_comment();
+                    // Continue to get the next token after the comment
+                    self.next_token()
+                } else {
+                    Ok(Token::new(TokenType::Slash, location, "/".to_string()))
+                }
             }
             Some('%') => {
                 self.advance();
@@ -1815,5 +1838,115 @@ mod tests {
         assert!(matches!(tokens[4].token_type, TokenType::Identifier(ref s) if s == "b"));
         assert!(matches!(tokens[5].token_type, TokenType::RightBrace));
         assert!(matches!(tokens[6].token_type, TokenType::Plus));
+    }
+
+    // ==================== COMMENT TOKENIZATION TESTS ====================
+
+    #[test]
+    fn test_lexer_skip_line_comment() {
+        let mut lexer = Lexer::new("// this is a comment", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 1); // Just EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_lexer_skip_line_comment_with_code_before() {
+        let mut lexer = Lexer::new("let x // comment", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 3); // let x EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "x"));
+        assert!(matches!(tokens[2].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_lexer_skip_line_comment_with_code_after() {
+        let mut lexer = Lexer::new("// comment\nlet x", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 3); // let x EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "x"));
+    }
+
+    #[test]
+    fn test_lexer_skip_multiple_line_comments() {
+        let mut lexer = Lexer::new("// comment 1\n// comment 2\nlet x", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 3); // let x EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+    }
+
+    #[test]
+    fn test_lexer_skip_doc_comment() {
+        let mut lexer = Lexer::new("/// this is a doc comment", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 1); // Just EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Eof));
+    }
+
+    #[test]
+    fn test_lexer_skip_doc_comment_with_function() {
+        let mut lexer = Lexer::new("/// Adds two numbers\nfunc add", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 3); // func add EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Func)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "add"));
+    }
+
+    #[test]
+    fn test_lexer_slash_not_comment() {
+        // Single slash should be Slash operator, not comment
+        let mut lexer = Lexer::new("a / b", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 4); // a / b EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Identifier(ref s) if s == "a"));
+        assert!(matches!(tokens[1].token_type, TokenType::Slash));
+        assert!(matches!(tokens[2].token_type, TokenType::Identifier(ref s) if s == "b"));
+    }
+
+    #[test]
+    fn test_lexer_comment_does_not_break_lines() {
+        let mut lexer = Lexer::new("let x = 1; // assign\nlet y = 2;", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        // let x = 1 ; let y = 2 ; EOF = 11 tokens
+        assert_eq!(tokens.len(), 11);
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(tokens[5].token_type, TokenType::Keyword(Keyword::Let)));
+    }
+
+    #[test]
+    fn test_lexer_comment_with_special_chars() {
+        let mut lexer = Lexer::new("// comment with special chars: @#$%^&*()!", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 1); // Just EOF
+    }
+
+    #[test]
+    fn test_lexer_empty_comment() {
+        let mut lexer = Lexer::new("//\nlet x", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 3); // let x EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+    }
+
+    #[test]
+    fn test_lexer_comment_at_end_of_file() {
+        let mut lexer = Lexer::new("let x // no newline at end", "test.aether".to_string());
+        let tokens = lexer.tokenize().unwrap();
+
+        assert_eq!(tokens.len(), 3); // let x EOF
+        assert!(matches!(tokens[0].token_type, TokenType::Keyword(Keyword::Let)));
+        assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref s) if s == "x"));
     }
 }
