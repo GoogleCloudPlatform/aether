@@ -106,6 +106,7 @@ pub enum Keyword {
 
     // Control Flow
     When,
+    If,
     Case,
     Else,
     Match,
@@ -221,6 +222,7 @@ impl Lexer {
 
         // Control flow keywords
         self.keywords.insert("when".to_string(), Keyword::When);
+        self.keywords.insert("if".to_string(), Keyword::If);
         self.keywords.insert("case".to_string(), Keyword::Case);
         self.keywords.insert("else".to_string(), Keyword::Else);
         self.keywords.insert("match".to_string(), Keyword::Match);
@@ -1495,9 +1497,9 @@ mod tests {
     #[test]
     fn test_lexer_all_keywords_count() {
         let lexer = Lexer::new("", "test.aether".to_string());
-        // Count total keywords: 8 decl + 2 mod + 10 control + 4 error + 3 resource + 14 types + 3 literals + 3 other = 47
+        // Count total keywords: 8 decl + 2 mod + 11 control + 4 error + 3 resource + 14 types + 3 literals + 3 other = 48
         // Added: var (decl), Int32, Float32, Float64 (types), If (control)
-        assert_eq!(lexer.keywords.len(), 47);
+        assert_eq!(lexer.keywords.len(), 48);
     }
 
     // ==================== LITERAL TOKENIZATION TESTS ====================

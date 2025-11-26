@@ -963,6 +963,7 @@ pub struct MatchCase {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchArm {
     pub pattern: Pattern,
+    pub guard: Option<Box<Expression>>,
     pub body: Block,
     pub source_location: SourceLocation,
 }

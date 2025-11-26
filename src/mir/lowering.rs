@@ -576,9 +576,32 @@ impl LoweringContext {
         // Lower the value being matched
         let match_op = self.lower_expression(value)?;
 
+        // Check if any arm has a guard - if so, use sequential guard checking
+        let has_guards = arms.iter().any(|arm| arm.guard.is_some());
+
         // Create an end block to jump to after each arm
         let end_bb = self.builder.new_block();
 
+        if has_guards {
+            // Sequential guard checking approach
+            self.lower_match_with_guards(match_op, arms, end_bb)?;
+        } else {
+            // Use SwitchInt for simple pattern matching without guards
+            self.lower_match_with_switch(match_op, arms, end_bb)?;
+        }
+
+        // Continue at end block
+        self.builder.switch_to_block(end_bb);
+
+        Ok(())
+    }
+
+    fn lower_match_with_switch(
+        &mut self,
+        match_op: Operand,
+        arms: &[ast::MatchArm],
+        end_bb: BasicBlockId,
+    ) -> Result<(), SemanticError> {
         // Collect all the literal values and their target blocks
         let mut switch_values = Vec::new();
         let mut switch_targets = Vec::new();
@@ -637,8 +660,98 @@ impl LoweringContext {
             }
         }
 
-        // Continue at end block
-        self.builder.switch_to_block(end_bb);
+        Ok(())
+    }
+
+    fn lower_match_with_guards(
+        &mut self,
+        match_op: Operand,
+        arms: &[ast::MatchArm],
+        end_bb: BasicBlockId,
+    ) -> Result<(), SemanticError> {
+        // For guards, we need to check each arm sequentially
+        // Create a chain: check_arm1 -> (guard true -> body1, guard false -> check_arm2) -> ...
+
+        // Save entry block to set its terminator after processing arms
+        let entry_bb = self.builder.current_block.expect("should have current block");
+
+        // Process arms in reverse order to build the chain
+        let arm_count = arms.len();
+        let mut arm_check_blocks = vec![0u32; arm_count];
+        let mut arm_body_blocks = vec![0u32; arm_count];
+
+        // Create all blocks first
+        for i in 0..arm_count {
+            arm_check_blocks[i] = self.builder.new_block();
+            arm_body_blocks[i] = self.builder.new_block();
+        }
+
+        // Process arms in forward order (simpler to understand)
+        for i in 0..arm_count {
+            let arm = &arms[i];
+            let check_bb = arm_check_blocks[i];
+            let body_bb = arm_body_blocks[i];
+            let fallthrough_bb = if i + 1 < arm_count {
+                arm_check_blocks[i + 1]
+            } else {
+                end_bb
+            };
+
+            // Generate the check block
+            self.builder.switch_to_block(check_bb);
+
+            // If pattern has a binding, create a local for it
+            if let ast::Pattern::Wildcard { binding: Some(ident), source_location } = &arm.pattern {
+                // Create a local for the binding
+                let local_id = self.builder.new_local(
+                    Type::primitive(ast::PrimitiveType::Integer),
+                    false, // not mutable
+                );
+                // Store the match value in the binding
+                self.builder.push_statement(Statement::Assign {
+                    place: Place {
+                        local: local_id,
+                        projection: vec![],
+                    },
+                    rvalue: Rvalue::Use(match_op.clone()),
+                    source_info: SourceInfo {
+                        span: source_location.clone(),
+                        scope: 0,
+                    },
+                });
+                // Map the binding name for use in the guard and body
+                self.var_map.insert(ident.name.clone(), local_id);
+            }
+
+            if let Some(guard) = &arm.guard {
+                // Evaluate the guard condition
+                let guard_op = self.lower_expression(guard)?;
+                // Branch based on guard
+                self.builder.set_terminator(Terminator::SwitchInt {
+                    discriminant: guard_op,
+                    switch_ty: Type::primitive(ast::PrimitiveType::Boolean),
+                    targets: SwitchTargets {
+                        values: vec![1], // true
+                        targets: vec![body_bb],
+                        otherwise: fallthrough_bb,
+                    },
+                });
+            } else {
+                // No guard, just go to body
+                self.builder.set_terminator(Terminator::Goto { target: body_bb });
+            }
+
+            // Generate the body block
+            self.builder.switch_to_block(body_bb);
+            self.lower_block(&arm.body)?;
+            if !self.builder.current_block_diverges() {
+                self.builder.set_terminator(Terminator::Goto { target: end_bb });
+            }
+        }
+
+        // Switch back to entry block and set terminator to first arm's check
+        self.builder.switch_to_block(entry_bb);
+        self.builder.set_terminator(Terminator::Goto { target: arm_check_blocks[0] });
 
         Ok(())
     }

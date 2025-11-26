@@ -41,9 +41,10 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.19: Iteration Example Verified (added Makefile) - uses range syntax
 - [x] Task 4.20: Match Example Verified (added Makefile) - implemented match statement parsing and MIR lowering
 - [x] Task 4.21: Match Basics Example Verified (added Makefile)
+- [x] Task 4.22: Match Guards Example Verified (added Makefile) - implemented match guards with `if {condition}` syntax
 
 ## Current Task
-Task 4.22: Continue verifying remaining examples
+Task 4.23: Continue verifying remaining examples
 
 ## Not Yet Working (needs parser/semantic work)
 - closures: needs lambda syntax (`=>`)
@@ -90,3 +91,4 @@ None
 - **Fixed array parameter types:** The LLVM backend function type generation was missing cases for `Type::Array` and `Type::Map`, causing them to fall through to the default `i32`. Fixed by adding explicit cases to generate `ptr` type for arrays and maps. Verified with `arrays` example (returns 15 = sum of 1+2+3+4+5).
 - Verified `iteration` example (returns 55 = 1+2+...+10).
 - **Implemented match statements:** Added `Statement::Match` and `MatchArm` to AST, `parse_match_statement` to parser, semantic analysis handling, and MIR lowering using `SwitchInt` terminator. Supports integer literal patterns and wildcard (`_`) patterns. Verified with `match` example (returns 200) and `match_basics` example (returns 3).
+- **Implemented match guards:** Added `guard: Option<Box<Expression>>` to `MatchArm`, added `if` keyword to lexer, updated parser to parse `pattern if {condition} =>` syntax, updated MIR lowering to use sequential conditional branches for guards instead of `SwitchInt`. Verified with `match_guards` example (returns 4 = grade_score(95)).

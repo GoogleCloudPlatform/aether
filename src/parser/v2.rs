@@ -1758,6 +1758,16 @@ impl Parser {
             // Parse the pattern
             let pattern = self.parse_pattern()?;
 
+            // Check for optional guard: `if { condition }`
+            let guard = if self.check_keyword(Keyword::If) {
+                self.advance(); // consume 'if'
+                // Parse the guard condition (a block expression like `{x < 0}`)
+                let guard_expr = self.parse_expression()?;
+                Some(Box::new(guard_expr))
+            } else {
+                None
+            };
+
             // Expect =>
             self.expect(&TokenType::FatArrow, "expected '=>' after pattern")?;
 
@@ -1766,6 +1776,7 @@ impl Parser {
 
             arms.push(MatchArm {
                 pattern,
+                guard,
                 body,
                 source_location: arm_location,
             });

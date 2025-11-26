@@ -876,11 +876,19 @@ impl SemanticAnalyzer {
 
                 // Analyze each arm
                 for arm in arms {
-                    // Analyze the pattern (for now, just check literals match the value type)
+                    // Enter scope for arm body (and guard) BEFORE analyzing pattern
+                    // (because analyze_pattern adds pattern bindings to the current scope)
+                    self.symbol_table.enter_scope(ScopeKind::Block);
+
+                    // Analyze the pattern (adds bindings to scope)
                     self.analyze_pattern(&arm.pattern, &value_type)?;
 
+                    // Analyze guard expression if present
+                    if let Some(guard) = &arm.guard {
+                        let _guard_type = self.analyze_expression(guard)?;
+                    }
+
                     // Analyze the body block
-                    self.symbol_table.enter_scope(ScopeKind::Block);
                     for stmt in &arm.body.statements {
                         self.analyze_statement(stmt)?;
                     }
