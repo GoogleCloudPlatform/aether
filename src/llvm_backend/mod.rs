@@ -254,6 +254,30 @@ impl<'ctx> LLVMBackend<'ctx> {
         }
     }
 
+    /// Calculate field offset for a given struct type and field index
+    fn calculate_field_offset(&self, struct_name: &str, field_index: usize) -> u64 {
+        if let Some(type_def) = self.type_definitions.get(struct_name) {
+            if let crate::types::TypeDefinition::Struct { fields, .. } = type_def {
+                let mut current_offset = 0u64;
+                for (i, (_, field_ty)) in fields.iter().enumerate() {
+                    if i == field_index {
+                        break;
+                    }
+                    let field_size = self.get_type_size(field_ty);
+                    current_offset += field_size;
+                    // Add alignment padding
+                    let alignment = field_size.min(8);
+                    if current_offset % alignment != 0 {
+                        current_offset = (current_offset + alignment - 1) / alignment * alignment;
+                    }
+                }
+                return current_offset;
+            }
+        }
+        // Fallback: assume 8-byte fields
+        (field_index * 8) as u64
+    }
+
     /// Initialize LLVM targets
     pub fn initialize_targets() {
         Target::initialize_all(&InitializationConfig::default());
@@ -1984,6 +2008,18 @@ impl<'ctx> LLVMBackend<'ctx> {
                         let mut current_type =
                             self.get_basic_type_from_local(place.local, function)?;
 
+                        // Track the current struct type name for nested field access
+                        let mut current_struct_type: Option<String> =
+                            if let Some(local_def) = function.locals.get(&place.local) {
+                                if let crate::types::Type::Named { name, .. } = &local_def.ty {
+                                    Some(name.clone())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            };
+
                         for proj in &place.projection {
                             match proj {
                                 mir::PlaceElem::Deref => {
@@ -2001,57 +2037,14 @@ impl<'ctx> LLVMBackend<'ctx> {
                                         })?
                                         .into_pointer_value();
                                 }
-                                mir::PlaceElem::Field { field, ty: _ } => {
-                                    // For field access, calculate proper offset based on struct definition
-                                    let offset = if let Some(local_def) =
-                                        function.locals.get(&place.local)
-                                    {
-                                        if let crate::types::Type::Named { name, .. } =
-                                            &local_def.ty
-                                        {
-                                            // Look up struct definition
-                                            if let Some(type_def) = self.type_definitions.get(name)
-                                            {
-                                                if let crate::types::TypeDefinition::Struct {
-                                                    fields,
-                                                    ..
-                                                } = type_def
-                                                {
-                                                    // Calculate offset for the field
-                                                    let mut current_offset = 0u64;
-                                                    for (i, (_, field_ty)) in
-                                                        fields.iter().enumerate()
-                                                    {
-                                                        if i == *field as usize {
-                                                            break;
-                                                        }
-                                                        let field_size =
-                                                            self.get_type_size(field_ty);
-                                                        current_offset += field_size;
-                                                        // Add alignment padding
-                                                        let alignment = field_size.min(8);
-                                                        if current_offset % alignment != 0 {
-                                                            current_offset =
-                                                                (current_offset + alignment - 1)
-                                                                    / alignment
-                                                                    * alignment;
-                                                        }
-                                                    }
-                                                    current_offset
-                                                } else {
-                                                    eprintln!("WARNING: {} is not a struct", name);
-                                                    (*field * 8) as u64 // Fallback
-                                                }
-                                            } else {
-                                                eprintln!("WARNING: Struct {} not found", name);
-                                                (*field * 8) as u64 // Fallback
-                                            }
+                                mir::PlaceElem::Field { field, ty } => {
+                                    // For field access, calculate offset based on current struct type
+                                    let offset =
+                                        if let Some(ref struct_name) = current_struct_type {
+                                            self.calculate_field_offset(struct_name, *field as usize)
                                         } else {
-                                            (*field * 8) as u64 // Default for non-named types
-                                        }
-                                    } else {
-                                        (*field * 8) as u64 // Default fallback
-                                    };
+                                            (*field * 8) as u64 // Default fallback
+                                        };
 
                                     let indices = vec![
                                         self.context.i32_type().const_int(0, false),
@@ -2063,12 +2056,35 @@ impl<'ctx> LLVMBackend<'ctx> {
                                             current_type,
                                             current_ptr,
                                             &indices,
-                                            "field_ptr",
+                                            &format!("field_{}_ptr", field),
                                         )
                                     }
                                     .map_err(|e| SemanticError::CodeGenError {
                                         message: e.to_string(),
                                     })?;
+
+                                    // Update current struct type for next projection
+                                    // If the field is a Named type (struct), we need to:
+                                    // 1. Load the pointer (struct fields are stored as pointers)
+                                    // 2. Update current_struct_type for next field access
+                                    if let crate::types::Type::Named { name, .. } = ty {
+                                        // Load the pointer to get the actual struct address
+                                        current_ptr = builder
+                                            .build_load(
+                                                self.context
+                                                    .i8_type()
+                                                    .ptr_type(AddressSpace::default()),
+                                                current_ptr,
+                                                "loaded_struct_ptr",
+                                            )
+                                            .map_err(|e| SemanticError::CodeGenError {
+                                                message: e.to_string(),
+                                            })?
+                                            .into_pointer_value();
+                                        current_struct_type = Some(name.clone());
+                                    } else {
+                                        current_struct_type = None;
+                                    }
                                 }
                                 mir::PlaceElem::Index(index_local) => {
                                     // Array indexing
@@ -2297,8 +2313,20 @@ impl<'ctx> LLVMBackend<'ctx> {
                     // Handle projections (field access)
                     let mut current_ptr = alloca;
 
+                    // Track the current struct type for nested field access
+                    let mut current_struct_type: Option<String> =
+                        if let Some(local_def) = function.locals.get(&place.local) {
+                            if let crate::types::Type::Named { name, .. } = &local_def.ty {
+                                Some(name.clone())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
                     // First load the actual struct pointer if this is a pointer to a struct
-                    let struct_ptr = if place.projection.is_empty() {
+                    let mut struct_ptr = if place.projection.is_empty() {
                         current_ptr
                     } else {
                         // Load the pointer value since structs are stored as pointers
@@ -2328,62 +2356,16 @@ impl<'ctx> LLVMBackend<'ctx> {
                                         message: e.to_string(),
                                     })?;
                                 current_ptr = loaded_ptr.into_pointer_value();
+                                struct_ptr = current_ptr;
                             }
                             mir::PlaceElem::Field { field, ty } => {
-                                // Calculate field offset based on the containing type
-                                let field_offset = if let Some(local_def) =
-                                    function.locals.get(&place.local)
-                                {
-                                    if let crate::types::Type::Named { name, .. } = &local_def.ty {
-                                        // Look up type definition
-                                        if let Some(type_def) = self.type_definitions.get(name) {
-                                            match type_def {
-                                                crate::types::TypeDefinition::Struct {
-                                                    fields,
-                                                    ..
-                                                } => {
-                                                    // Calculate struct field offset
-                                                    let mut current_offset = 0u64;
-                                                    for (i, (_, field_ty)) in
-                                                        fields.iter().enumerate()
-                                                    {
-                                                        if i == *field as usize {
-                                                            break;
-                                                        }
-                                                        let field_size =
-                                                            self.get_type_size(field_ty);
-                                                        current_offset += field_size;
-                                                        // Add alignment padding
-                                                        let alignment = field_size.min(8);
-                                                        if current_offset % alignment != 0 {
-                                                            current_offset =
-                                                                (current_offset + alignment - 1)
-                                                                    / alignment
-                                                                    * alignment;
-                                                        }
-                                                    }
-                                                    current_offset
-                                                }
-                                                crate::types::TypeDefinition::Enum { .. } => {
-                                                    // For enums: field 0 (discriminant) = 0, field 1 (data) = after discriminant
-                                                    if *field == 0 {
-                                                        0
-                                                    } else {
-                                                        // Get the discriminant size for this enum
-                                                        self.get_enum_discriminant_size(name)
-                                                    }
-                                                }
-                                                _ => (*field as u64) * 8, // Fallback
-                                            }
-                                        } else {
-                                            (*field as u64) * 8 // Fallback
-                                        }
+                                // Calculate field offset based on the current struct type
+                                let field_offset =
+                                    if let Some(ref struct_name) = current_struct_type {
+                                        self.calculate_field_offset(struct_name, *field as usize)
                                     } else {
                                         (*field as u64) * 8 // Fallback
-                                    }
-                                } else {
-                                    (*field as u64) * 8 // Fallback
-                                };
+                                    };
 
                                 // Calculate field pointer with byte offset
                                 let i8_ptr = builder
@@ -2443,6 +2425,25 @@ impl<'ctx> LLVMBackend<'ctx> {
                                     .map_err(|e| SemanticError::CodeGenError {
                                         message: e.to_string(),
                                     })?;
+
+                                // Update for nested field access: if this field is a Named type,
+                                // load the pointer and update the current struct type
+                                if let crate::types::Type::Named { name, .. } = ty {
+                                    // Load the pointer to the nested struct
+                                    let loaded_nested = builder
+                                        .build_load(
+                                            self.context.i8_type().ptr_type(AddressSpace::default()),
+                                            current_ptr,
+                                            "loaded_nested_struct",
+                                        )
+                                        .map_err(|e| SemanticError::CodeGenError {
+                                            message: e.to_string(),
+                                        })?;
+                                    struct_ptr = loaded_nested.into_pointer_value();
+                                    current_struct_type = Some(name.clone());
+                                } else {
+                                    current_struct_type = None;
+                                }
                             }
                             _ => {
                                 return Err(SemanticError::CodeGenError {

@@ -19,8 +19,8 @@ struct Rectangle {
 }
 
 func manhattan_distance(line: Line) -> Int {
-    let dx: Int = {line.end.x - line.start.x};
-    let dy: Int = {line.end.y - line.start.y};
+    var dx: Int = {line.end.x - line.start.x};
+    var dy: Int = {line.end.y - line.start.y};
 
     // Absolute values
     when {dx < 0} {

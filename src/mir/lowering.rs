@@ -1095,6 +1095,11 @@ impl LoweringContext {
                 source_location,
             } => self.lower_logical_not(operand, source_location),
 
+            ast::Expression::Negate {
+                operand,
+                source_location,
+            } => self.lower_negate(operand, source_location),
+
             _ => Err(SemanticError::UnsupportedFeature {
                 feature: "Expression type not yet implemented in MIR lowering".to_string(),
                 location: SourceLocation::unknown(),
@@ -1278,6 +1283,39 @@ impl LoweringContext {
             },
             rvalue: Rvalue::UnaryOp {
                 op: UnOp::Not,
+                operand: operand_val,
+            },
+            source_info: SourceInfo {
+                span: SourceLocation::unknown(),
+                scope: 0,
+            },
+        });
+
+        Ok(Operand::Copy(Place {
+            local: result_local,
+            projection: vec![],
+        }))
+    }
+
+    /// Lower a negation expression
+    fn lower_negate(
+        &mut self,
+        operand: &ast::Expression,
+        _source_location: &SourceLocation,
+    ) -> Result<Operand, SemanticError> {
+        let operand_val = self.lower_expression(operand)?;
+
+        // Infer the type from the operand
+        let operand_type = self.infer_operand_type(&operand_val)?;
+
+        let result_local = self.builder.new_local(operand_type, false);
+        self.builder.push_statement(Statement::Assign {
+            place: Place {
+                local: result_local,
+                projection: vec![],
+            },
+            rvalue: Rvalue::UnaryOp {
+                op: UnOp::Neg,
                 operand: operand_val,
             },
             source_info: SourceInfo {

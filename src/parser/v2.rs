@@ -18,7 +18,7 @@
 
 use crate::ast::{
     Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode,
-    ConstantDeclaration, ElseIf, EnumVariant, Expression, ExternalFunction, Function,
+    ConstantDeclaration, ElseIf, EnumVariant, Expression, ExternalFunction, FieldValue, Function,
     FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, Identifier,
     ImportStatement, LambdaBody, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
     Statement, StructField, TypeDefinition, TypeSpecifier,
@@ -281,6 +281,39 @@ impl Parser {
     /// Get the current location for error reporting
     pub fn current_location(&self) -> SourceLocation {
         self.peek().location.clone()
+    }
+
+    /// Check if what follows looks like a struct construction: { field: value, ... }
+    /// This requires looking ahead: after '{', if we see 'identifier :' it's struct construction.
+    /// Called when current token is '{'.
+    /// Note: Empty braces `{ }` are NOT treated as struct construction because they are
+    /// ambiguous (could be a block in control flow like `when x { }`).
+    fn looks_like_struct_construction(&self) -> bool {
+        // Current token should be '{'
+        if !matches!(self.peek().token_type, TokenType::LeftBrace) {
+            return false;
+        }
+
+        // Look at token after '{'
+        if let Some(after_brace) = self.peek_at(self.position + 1) {
+            // Check for field: value pattern
+            // Only treat as struct construction if we see `identifier :` pattern
+            if let TokenType::Identifier(_) = &after_brace.token_type {
+                // Check if identifier is followed by ':'
+                if let Some(after_ident) = self.peek_at(self.position + 2) {
+                    if matches!(after_ident.token_type, TokenType::Colon) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Peek at a specific position in the token stream
+    fn peek_at(&self, pos: usize) -> Option<&Token> {
+        self.tokens.get(pos)
     }
 
     // ==================== ERROR HELPERS ====================
@@ -1247,7 +1280,7 @@ impl Parser {
     }
 
     /// Parse a struct field
-    /// Grammar: IDENTIFIER ":" type ";"
+    /// Grammar: IDENTIFIER ":" type [","]
     fn parse_struct_field(&mut self) -> Result<StructField, ParserError> {
         let start_location = self.current_location();
 
@@ -1257,7 +1290,10 @@ impl Parser {
 
         let field_type = self.parse_type()?;
 
-        self.expect(&TokenType::Semicolon, "expected ';' after field type")?;
+        // Accept comma as field separator (optional for last field)
+        if self.check(&TokenType::Comma) {
+            self.advance();
+        }
 
         Ok(StructField {
             name,
@@ -1712,6 +1748,16 @@ impl Parser {
             });
         }
 
+        // Unary minus: -expr
+        if self.check(&TokenType::Minus) {
+            self.advance(); // consume '-'
+            let operand = self.parse_expression()?;
+            return Ok(Expression::Negate {
+                operand: Box::new(operand),
+                source_location: start_location,
+            });
+        }
+
         // Prefix range expression: ..end or ..=end
         if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
             return self.parse_range_expression(None, start_location);
@@ -1772,10 +1818,17 @@ impl Parser {
             });
         }
 
-        // Identifier (variable reference) with optional postfix operators
+        // Identifier (variable reference, struct construction, or function call)
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name = name.clone();
             self.advance();
+
+            // Check for struct construction: TypeName { field: value, ... }
+            // Only parse as struct construction if it looks like one (has field: value syntax)
+            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction() {
+                return self.parse_struct_construction(name, start_location);
+            }
+
             let mut expr = Expression::Variable {
                 name: Identifier {
                     name,
@@ -1994,6 +2047,16 @@ impl Parser {
             });
         }
 
+        // Unary minus: -expr
+        if self.check(&TokenType::Minus) {
+            self.advance(); // consume '-'
+            let operand = self.parse_primary_expression()?;
+            return Ok(Expression::Negate {
+                operand: Box::new(operand),
+                source_location: start_location,
+            });
+        }
+
         // Integer literal
         if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
             let value = *value;
@@ -2044,10 +2107,17 @@ impl Parser {
             });
         }
 
-        // Identifier (variable reference) with optional postfix operators
+        // Identifier (variable reference, struct construction, or function call)
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name = name.clone();
             self.advance();
+
+            // Check for struct construction: TypeName { field: value, ... }
+            // Only parse as struct construction if it looks like one (has field: value syntax)
+            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction() {
+                return self.parse_struct_construction(name, start_location);
+            }
+
             let mut expr = Expression::Variable {
                 name: Identifier {
                     name,
@@ -2383,6 +2453,66 @@ impl Parser {
             parameters,
             return_type,
             body,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a struct construction expression: TypeName { field: value, field2: value2, ... }
+    fn parse_struct_construction(
+        &mut self,
+        type_name: String,
+        start_location: SourceLocation,
+    ) -> Result<Expression, ParserError> {
+        self.expect(&TokenType::LeftBrace, "expected '{'")?;
+
+        let mut field_values = Vec::new();
+
+        // Parse field: value pairs
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            let field_loc = self.current_location();
+
+            // Parse field name
+            let field_name = if let TokenType::Identifier(name) = &self.peek().token_type {
+                let name = name.clone();
+                self.advance();
+                Identifier {
+                    name,
+                    source_location: field_loc.clone(),
+                }
+            } else {
+                return Err(ParserError::UnexpectedToken {
+                    expected: "field name".to_string(),
+                    found: format!("{:?}", self.peek().token_type),
+                    location: field_loc,
+                });
+            };
+
+            // Expect colon
+            self.expect(&TokenType::Colon, "expected ':' after field name")?;
+
+            // Parse field value
+            let value = Box::new(self.parse_expression()?);
+
+            field_values.push(FieldValue {
+                field_name,
+                value,
+                source_location: field_loc,
+            });
+
+            // Accept comma as field separator (optional for last field)
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            }
+        }
+
+        self.expect(&TokenType::RightBrace, "expected '}'")?;
+
+        Ok(Expression::StructConstruct {
+            type_name: Identifier {
+                name: type_name,
+                source_location: start_location.clone(),
+            },
+            field_values,
             source_location: start_location,
         })
     }
@@ -4792,7 +4922,7 @@ func calculate(
 
     #[test]
     fn test_parse_struct_simple() {
-        let mut parser = parser_from_source("struct Point { x: Float; y: Float; }");
+        let mut parser = parser_from_source("struct Point { x: Float, y: Float }");
         let result = parser.parse_struct();
 
         assert!(result.is_ok());
@@ -4824,7 +4954,7 @@ func calculate(
 
     #[test]
     fn test_parse_struct_single_field() {
-        let mut parser = parser_from_source("struct Wrapper { value: Int; }");
+        let mut parser = parser_from_source("struct Wrapper { value: Int }");
         let result = parser.parse_struct();
 
         assert!(result.is_ok());
@@ -4840,7 +4970,7 @@ func calculate(
     #[test]
     fn test_parse_struct_complex_types() {
         let mut parser =
-            parser_from_source("struct Data { items: Array<Int>; lookup: Map<String, Int>; }");
+            parser_from_source("struct Data { items: Array<Int>, lookup: Map<String, Int> }");
         let result = parser.parse_struct();
 
         assert!(result.is_ok());
@@ -4871,11 +5001,12 @@ func calculate(
     }
 
     #[test]
-    fn test_parse_struct_error_missing_semicolon() {
+    fn test_parse_struct_single_field_no_trailing_comma() {
+        // With comma-separated fields and optional trailing comma, this should succeed
         let mut parser = parser_from_source("struct Point { x: Float }");
         let result = parser.parse_struct();
 
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     // ==================== Enum Parsing Tests ====================
@@ -5025,7 +5156,7 @@ func sum(n: Int) -> Int {
 
     #[test]
     fn test_integration_struct_and_function() {
-        let struct_source = "struct Point { x: Float; y: Float; }";
+        let struct_source = "struct Point { x: Float, y: Float }";
         let mut parser = parser_from_source(struct_source);
         let struct_result = parser.parse_struct();
         assert!(struct_result.is_ok());

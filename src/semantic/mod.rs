@@ -1713,6 +1713,28 @@ impl SemanticAnalyzer {
                 }
             }
 
+            Expression::Negate {
+                operand,
+                source_location,
+            } => {
+                let operand_type = self.analyze_expression(operand)?;
+
+                // Operand must be numeric (integer or float)
+                match &operand_type {
+                    Type::Primitive(PrimitiveType::Integer)
+                    | Type::Primitive(PrimitiveType::Integer32)
+                    | Type::Primitive(PrimitiveType::Integer64)
+                    | Type::Primitive(PrimitiveType::Float)
+                    | Type::Primitive(PrimitiveType::Float32)
+                    | Type::Primitive(PrimitiveType::Float64) => Ok(operand_type),
+                    _ => Err(SemanticError::TypeMismatch {
+                        expected: "numeric type".to_string(),
+                        found: operand_type.to_string(),
+                        location: source_location.clone(),
+                    }),
+                }
+            }
+
             Expression::LogicalNot {
                 operand,
                 source_location,

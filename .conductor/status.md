@@ -27,6 +27,9 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.5: Comparison Example Verified (added Makefile) - required implementing comparison operators
 - [x] Task 4.6: Loops Example Verified (added Makefile) - required implementing var keyword
 - [x] Task 4.7: Logical Example Verified (added Makefile) - required implementing logical operators
+- [x] Task 4.8: Basic Struct Example Verified (added Makefile) - required implementing struct construction
+- [x] Task 4.9: Nested Structs Example Verified (added Makefile) - required fixing nested field access in LLVM backend
+- [x] Task 4.10: Struct Methods Example Verified (added Makefile)
 
 ## Current Task
 Task 4.3: Continue verifying remaining examples
@@ -43,8 +46,10 @@ None
 - [x] ~~`var` keyword not supported~~ (FIXED: added `var` keyword)
 - [x] ~~Comparison operators (`<`, `>`, `==`, etc.)~~ (FIXED)
 - [x] ~~Logical operators (`!`, `&&`, `||`)~~ (FIXED)
-- [ ] Unary minus for negative literals not supported (`-1` fails to parse)
-- [ ] Struct construction expressions not implemented in v2 parser (`Point { x: 1, y: 2 }`)
+- [x] ~~Unary minus for negative literals not supported~~ (FIXED: added `-expr` syntax)
+- [x] ~~Struct construction expressions not implemented~~ (FIXED: `Point { x: 1, y: 2 }` syntax)
+- [x] ~~Nested struct field access broken~~ (FIXED: `rect.top_left.x` now works)
+- [ ] Enum variant expressions not supported (`Color::Red` syntax needs implementation)
 
 ## Session Notes
 - Resolved parser infinite loop for file-scoped modules.
@@ -54,3 +59,8 @@ None
 - Updated all Makefiles to use release build instead of debug.
 - Fixed test compilation errors (parse_source signature, mutable pipeline).
 - Verified additional examples: simple_main, module_system, arithmetic, basic_functions.
+- **Implemented unary minus:** Added `-expr` parsing in parser, `Negate` handling in semantic analysis, and `lower_negate` in MIR lowering using `UnOp::Neg`.
+- **Implemented struct construction:** Added `TypeName { field: value, ... }` parsing with smart lookahead to distinguish from blocks. Changed struct field definitions from semicolon-separated to comma-separated syntax. Verified with `basic_struct` example (returns 50).
+- Updated struct-related tests to use comma syntax instead of semicolons.
+- **Fixed nested struct field access:** The LLVM backend was not tracking the current struct type through projections. Fixed `generate_operand` to properly handle nested field access by tracking `current_struct_type` and loading pointers for struct fields. Verified with `nested_structs` example (returns 100).
+- Verified `struct_methods` example (returns 11).
