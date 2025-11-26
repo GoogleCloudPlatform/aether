@@ -729,24 +729,39 @@ impl TypeChecker {
                 true
             }
 
-            // Integer size promotions
+            // Integer size coercions (bidirectional for assignment compatibility)
             (
                 Type::Primitive(PrimitiveType::Integer32),
                 Type::Primitive(PrimitiveType::Integer64),
             )
             | (
-                Type::Primitive(PrimitiveType::Integer),
+                Type::Primitive(PrimitiveType::Integer64),
                 Type::Primitive(PrimitiveType::Integer32),
             )
             | (
                 Type::Primitive(PrimitiveType::Integer),
+                Type::Primitive(PrimitiveType::Integer32),
+            )
+            | (
+                Type::Primitive(PrimitiveType::Integer32),
+                Type::Primitive(PrimitiveType::Integer),
+            )
+            | (
+                Type::Primitive(PrimitiveType::Integer),
                 Type::Primitive(PrimitiveType::Integer64),
+            )
+            | (
+                Type::Primitive(PrimitiveType::Integer64),
+                Type::Primitive(PrimitiveType::Integer),
             ) => true,
 
-            // Float size promotions
+            // Float size coercions (bidirectional for assignment compatibility)
             (Type::Primitive(PrimitiveType::Float32), Type::Primitive(PrimitiveType::Float64))
+            | (Type::Primitive(PrimitiveType::Float64), Type::Primitive(PrimitiveType::Float32))
             | (Type::Primitive(PrimitiveType::Float), Type::Primitive(PrimitiveType::Float32))
-            | (Type::Primitive(PrimitiveType::Float), Type::Primitive(PrimitiveType::Float64)) => {
+            | (Type::Primitive(PrimitiveType::Float32), Type::Primitive(PrimitiveType::Float))
+            | (Type::Primitive(PrimitiveType::Float), Type::Primitive(PrimitiveType::Float64))
+            | (Type::Primitive(PrimitiveType::Float64), Type::Primitive(PrimitiveType::Float)) => {
                 true
             }
 
