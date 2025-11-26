@@ -158,18 +158,33 @@ impl<'ctx> LLVMBackend<'ctx> {
                 // For structs, we need to use the actual struct type if it's been defined
                 // For FFI, structs are always passed by pointer
                 if let Some(type_def) = self.type_definitions.get(name) {
-                    if let crate::types::TypeDefinition::Struct { .. } = type_def {
-                        // Return pointer to struct for FFI compatibility
-                        self.context
-                            .i8_type()
-                            .ptr_type(AddressSpace::default())
-                            .into()
-                    } else {
-                        // Non-struct named types - use opaque pointer
-                        self.context
-                            .i8_type()
-                            .ptr_type(AddressSpace::default())
-                            .into()
+                    match type_def {
+                        crate::types::TypeDefinition::Struct { .. } => {
+                            // Return pointer to struct for FFI compatibility
+                            self.context
+                                .i8_type()
+                                .ptr_type(AddressSpace::default())
+                                .into()
+                        }
+                        crate::types::TypeDefinition::Enum { variants, .. } => {
+                            // Simple enums (no associated data) are represented as integers
+                            // Determine discriminant size based on number of variants
+                            let max_discriminant = variants.iter().map(|v| v.discriminant).max().unwrap_or(0);
+                            if max_discriminant <= 255 {
+                                self.context.i8_type().into()
+                            } else if max_discriminant <= 65535 {
+                                self.context.i16_type().into()
+                            } else {
+                                self.context.i32_type().into()
+                            }
+                        }
+                        _ => {
+                            // Other named types - use opaque pointer
+                            self.context
+                                .i8_type()
+                                .ptr_type(AddressSpace::default())
+                                .into()
+                        }
                     }
                 } else {
                     // Unknown type - use opaque pointer
@@ -2004,18 +2019,25 @@ impl<'ctx> LLVMBackend<'ctx> {
                             }
                         }
 
-                        // Return pointer to enum
-                        let enum_ptr = builder
-                            .build_pointer_cast(
-                                enum_alloca,
-                                self.context.i8_type().ptr_type(AddressSpace::default()),
-                                &format!("{}_ptr", enum_name),
-                            )
-                            .map_err(|e| SemanticError::CodeGenError {
-                                message: e.to_string(),
-                            })?;
+                        // For simple unit enums (no associated data), return the discriminant directly
+                        // For enums with data, return pointer to the tagged union
+                        if operands.is_empty() {
+                            // Simple enum - return discriminant as integer
+                            Ok(disc_value.into())
+                        } else {
+                            // Enum with data - return pointer to tagged union
+                            let enum_ptr = builder
+                                .build_pointer_cast(
+                                    enum_alloca,
+                                    self.context.i8_type().ptr_type(AddressSpace::default()),
+                                    &format!("{}_ptr", enum_name),
+                                )
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?;
 
-                        Ok(enum_ptr.into())
+                            Ok(enum_ptr.into())
+                        }
                     }
                 }
             }

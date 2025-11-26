@@ -2980,6 +2980,37 @@ impl Parser {
             let name = name.clone();
             self.advance();
 
+            // Check if this is a qualified enum variant pattern: EnumName::Variant
+            if self.check(&TokenType::DoubleColon) {
+                self.advance(); // consume '::'
+                let variant_name = self.parse_identifier()?;
+
+                // Check for binding: EnumName::Variant(x) or EnumName::Variant(_)
+                let binding = if self.check(&TokenType::LeftParen) {
+                    self.advance(); // consume '('
+                    let b = if self.check(&TokenType::Underscore) {
+                        self.advance();
+                        None // _ means discard
+                    } else if !self.check(&TokenType::RightParen) {
+                        Some(self.parse_identifier()?)
+                    } else {
+                        None
+                    };
+                    self.expect(&TokenType::RightParen, "expected ')'")?;
+                    b
+                } else {
+                    None
+                };
+
+                return Ok(Pattern::EnumVariant {
+                    enum_name: Some(Identifier::new(name, start_location.clone())),
+                    variant_name,
+                    binding,
+                    nested_pattern: None,
+                    source_location: start_location,
+                });
+            }
+
             // Check if this is an enum variant pattern: Name(binding) or Name binding
             if self.check(&TokenType::LeftParen) {
                 // Enum variant with parenthesized binding: Some(x)

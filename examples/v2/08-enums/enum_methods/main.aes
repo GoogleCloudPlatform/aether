@@ -4,14 +4,9 @@
 module enum_methods;
 
 enum Status {
-    Active,
-    Inactive,
-    Pending,
-}
-
-enum Response {
-    Success(Int),
-    Error(Int),
+    case Active;
+    case Inactive;
+    case Pending;
 }
 
 func is_active(s: Status) -> Bool {
@@ -22,27 +17,17 @@ func is_active(s: Status) -> Bool {
     }
 }
 
-func get_response_code(r: Response) -> Int {
-    match r {
-        Response::Success(code) => { return code; }
-        Response::Error(code) => { return code; }
-    }
-}
-
-func is_success(r: Response) -> Bool {
-    match r {
-        Response::Success(_) => { return true; }
-        Response::Error(_) => { return false; }
+func status_to_int(s: Status) -> Int {
+    match s {
+        Status::Active => { return 1; }
+        Status::Inactive => { return 0; }
+        Status::Pending => { return 2; }
     }
 }
 
 func main() -> Int {
     let status: Status = Status::Active;
-    let active: Bool = is_active(status);
+    let value: Int = status_to_int(status);
 
-    let response: Response = Response::Success(200);
-    let code: Int = get_response_code(response);
-    let ok: Bool = is_success(response);
-
-    return code;
+    return value;
 }

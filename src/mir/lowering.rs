@@ -628,9 +628,22 @@ impl LoweringContext {
                     // This is the default case
                     wildcard_block = Some(arm_bb);
                 }
-                ast::Pattern::EnumVariant { .. } => {
-                    // TODO: Handle enum variants
-                    wildcard_block = Some(arm_bb);
+                ast::Pattern::EnumVariant { enum_name, variant_name, .. } => {
+                    // Look up the variant's discriminant value
+                    // For now, use variant index as discriminant
+                    if let Some(enum_ident) = enum_name {
+                        if let Some(enum_def) = self.program.type_definitions.get(&enum_ident.name) {
+                            if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
+                                if let Some(idx) = variants.iter().position(|v| v.name == variant_name.name) {
+                                    switch_values.push(idx as u128);
+                                    switch_targets.push(arm_bb);
+                                }
+                            }
+                        }
+                    } else {
+                        // No enum name - treat as wildcard for now
+                        wildcard_block = Some(arm_bb);
+                    }
                 }
             }
         }

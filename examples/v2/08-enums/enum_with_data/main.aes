@@ -4,19 +4,19 @@
 module enum_with_data;
 
 enum Option {
-    Some(Int),
-    None,
+    case Some(Int);
+    case None;
 }
 
 enum Result {
-    Ok(Int),
-    Err(Int),
+    case Ok(Int);
+    case Err(Int);
 }
 
 enum Shape {
-    Circle(Int),
-    Rectangle(Int, Int),
-    Square(Int),
+    case Circle(Int);
+    case Rectangle(Int);  // Simplified: stores area instead of width/height
+    case Square(Int);
 }
 
 func unwrap_or(opt: Option, default: Int) -> Int {
@@ -37,7 +37,7 @@ func main() -> Int {
     let failure: Result = Result::Err(1);
 
     let circle: Shape = Shape::Circle(5);
-    let rect: Shape = Shape::Rectangle(10, 20);
+    let rect: Shape = Shape::Rectangle(200);  // area = 10 * 20
 
     return result1;
 }
