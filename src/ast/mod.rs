@@ -545,6 +545,11 @@ pub enum Statement {
         expr: Box<Expression>,
         source_location: SourceLocation,
     },
+    Match {
+        value: Box<Expression>,
+        arms: Vec<MatchArm>,
+        source_location: SourceLocation,
+    },
 }
 
 /// Variable mutability
@@ -946,11 +951,19 @@ pub struct MapEntry {
     pub source_location: SourceLocation,
 }
 
-/// Match case in pattern matching
+/// Match case in pattern matching (for Expression::Match)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchCase {
     pub pattern: Pattern,
     pub body: Box<Expression>,
+    pub source_location: SourceLocation,
+}
+
+/// Match arm in pattern matching (for Statement::Match with block bodies)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub body: Block,
     pub source_location: SourceLocation,
 }
 

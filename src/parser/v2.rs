@@ -20,7 +20,7 @@ use crate::ast::{
     Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode,
     ConstantDeclaration, ElseIf, EnumVariant, Expression, ExternalFunction, FieldValue, Function,
     FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, Identifier,
-    ImportStatement, LambdaBody, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
+    ImportStatement, LambdaBody, MatchArm, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
     Statement, StructField, TypeDefinition, TypeSpecifier,
 };
 use crate::error::{ParserError, SourceLocation};
@@ -1737,6 +1737,50 @@ impl Parser {
         }
     }
 
+    /// Parse a match statement
+    /// Grammar: "match" expr "{" (pattern "=>" block)* "}"
+    pub fn parse_match_statement(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Match, "expected 'match'")?;
+
+        // Parse the value being matched
+        let value = self.parse_expression()?;
+
+        // Expect opening brace
+        self.expect(&TokenType::LeftBrace, "expected '{' after match value")?;
+
+        // Parse match arms
+        let mut arms = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            let arm_location = self.current_location();
+
+            // Parse the pattern
+            let pattern = self.parse_pattern()?;
+
+            // Expect =>
+            self.expect(&TokenType::FatArrow, "expected '=>' after pattern")?;
+
+            // Parse the body block
+            let body = self.parse_block()?;
+
+            arms.push(MatchArm {
+                pattern,
+                body,
+                source_location: arm_location,
+            });
+        }
+
+        // Expect closing brace
+        self.expect(&TokenType::RightBrace, "expected '}' after match arms")?;
+
+        Ok(Statement::Match {
+            value: Box::new(value),
+            arms,
+            source_location: start_location,
+        })
+    }
+
     /// Parse a break statement
     /// Grammar: "break" ";"
     pub fn parse_break_statement(&mut self) -> Result<Statement, ParserError> {
@@ -1782,6 +1826,9 @@ impl Parser {
         }
         if self.check_keyword(Keyword::For) {
             return self.parse_for_loop();
+        }
+        if self.check_keyword(Keyword::Match) {
+            return self.parse_match_statement();
         }
         if self.check_keyword(Keyword::Break) {
             return self.parse_break_statement();
@@ -2908,7 +2955,7 @@ impl Parser {
     fn parse_pattern(&mut self) -> Result<Pattern, ParserError> {
         let start_location = self.current_location();
 
-        // Wildcard pattern: "_"
+        // Wildcard pattern: "_" (as Underscore token)
         if self.check(&TokenType::Underscore) {
             self.advance();
             return Ok(Pattern::Wildcard {

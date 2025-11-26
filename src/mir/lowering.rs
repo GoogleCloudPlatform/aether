@@ -493,6 +493,14 @@ impl LoweringContext {
                 // Expression statements are evaluated for their side effects only
             }
 
+            ast::Statement::Match {
+                value,
+                arms,
+                source_location,
+            } => {
+                self.lower_match_statement(value, arms)?;
+            }
+
             _ => {
                 // TODO: Implement other statement types
                 return Err(SemanticError::UnsupportedFeature {
@@ -551,6 +559,82 @@ impl LoweringContext {
         if !self.builder.current_block_diverges() {
             self.builder
                 .set_terminator(Terminator::Goto { target: end_bb });
+        }
+
+        // Continue at end block
+        self.builder.switch_to_block(end_bb);
+
+        Ok(())
+    }
+
+    /// Lower a match statement
+    fn lower_match_statement(
+        &mut self,
+        value: &ast::Expression,
+        arms: &[ast::MatchArm],
+    ) -> Result<(), SemanticError> {
+        // Lower the value being matched
+        let match_op = self.lower_expression(value)?;
+
+        // Create an end block to jump to after each arm
+        let end_bb = self.builder.new_block();
+
+        // Collect all the literal values and their target blocks
+        let mut switch_values = Vec::new();
+        let mut switch_targets = Vec::new();
+        let mut wildcard_block = None;
+        let mut arm_blocks = Vec::new();
+
+        // First pass: create blocks for each arm and collect values
+        for arm in arms {
+            let arm_bb = self.builder.new_block();
+            arm_blocks.push(arm_bb);
+
+            match &arm.pattern {
+                ast::Pattern::Literal { value: lit_expr, .. } => {
+                    // Extract the integer value from the literal
+                    if let ast::Expression::IntegerLiteral { value: int_val, .. } = lit_expr.as_ref() {
+                        switch_values.push(*int_val as u128);
+                        switch_targets.push(arm_bb);
+                    } else if let ast::Expression::BooleanLiteral { value: bool_val, .. } = lit_expr.as_ref() {
+                        switch_values.push(if *bool_val { 1 } else { 0 });
+                        switch_targets.push(arm_bb);
+                    }
+                }
+                ast::Pattern::Wildcard { .. } => {
+                    // This is the default case
+                    wildcard_block = Some(arm_bb);
+                }
+                ast::Pattern::EnumVariant { .. } => {
+                    // TODO: Handle enum variants
+                    wildcard_block = Some(arm_bb);
+                }
+            }
+        }
+
+        // Use wildcard as otherwise target, or end block if no wildcard
+        let otherwise = wildcard_block.unwrap_or(end_bb);
+
+        // Emit the switch
+        self.builder.set_terminator(Terminator::SwitchInt {
+            discriminant: match_op,
+            switch_ty: Type::primitive(ast::PrimitiveType::Integer),
+            targets: SwitchTargets {
+                values: switch_values,
+                targets: switch_targets,
+                otherwise,
+            },
+        });
+
+        // Second pass: lower each arm's body
+        for (arm, &arm_bb) in arms.iter().zip(arm_blocks.iter()) {
+            self.builder.switch_to_block(arm_bb);
+            self.lower_block(&arm.body)?;
+            // Only set goto if block doesn't already diverge (e.g., with return)
+            if !self.builder.current_block_diverges() {
+                self.builder
+                    .set_terminator(Terminator::Goto { target: end_bb });
+            }
         }
 
         // Continue at end block

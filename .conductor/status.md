@@ -38,18 +38,21 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.16: Return Values Example Verified (added Makefile) - fixed by MIR return bug fix
 - [x] Task 4.17: Foreach Example Verified (added Makefile) - implemented range syntax in for loops
 - [x] Task 4.18: Arrays Example Verified (added Makefile) - implemented array literals and fixed function parameter types for arrays
+- [x] Task 4.19: Iteration Example Verified (added Makefile) - uses range syntax
+- [x] Task 4.20: Match Example Verified (added Makefile) - implemented match statement parsing and MIR lowering
+- [x] Task 4.21: Match Basics Example Verified (added Makefile)
 
 ## Current Task
-Task 4.19: Continue verifying remaining examples
+Task 4.22: Continue verifying remaining examples
 
 ## Not Yet Working (needs parser/semantic work)
 - closures: needs lambda syntax (`=>`)
 - strings/FFI: needs String to Pointer<Char> coercion
+- enums with data: needs enum variant patterns with bindings
 
 ## Next Actions
 1. Continue verifying examples in `examples/v2/`.
 2. Add Makefiles to verified examples.
-3. Implement `match` expressions for advanced enum examples.
 
 ## Blockers
 None
@@ -63,7 +66,7 @@ None
 - [x] ~~Struct construction expressions not implemented~~ (FIXED: `Point { x: 1, y: 2 }` syntax)
 - [x] ~~Nested struct field access broken~~ (FIXED: `rect.top_left.x` now works)
 - [x] ~~Enum variant expressions not supported~~ (FIXED: `Color::Red` syntax now works)
-- [ ] `match` expressions not supported (needed for enum_with_data, enum_methods examples)
+- [x] ~~`match` expressions not supported~~ (FIXED: implemented Statement::Match with pattern matching on integer literals)
 - [ ] Enums with associated data syntax (e.g., `Some(Int)`) not supported
 - [x] ~~`return` inside `when` without `else` doesn't properly terminate~~ (FIXED: MIR lowering now checks for diverging blocks)
 
@@ -85,3 +88,5 @@ None
 - **Fixed return inside when-without-else:** MIR lowering was unconditionally setting `Goto` terminator after lowering if/while/loop blocks, overwriting any `Return` terminator. Added `current_block_diverges()` helper to check if block already has a `Return` terminator and skip setting the `Goto` in that case. Verified with `return_values` example (now returns 7 instead of 0).
 - **Implemented array literals:** Added `looks_like_array_literal()` to distinguish `[1, 2, 3]` from capture lists, and `parse_array_literal()` to parse array literals. Array creation uses runtime functions `array_create`, `array_set`, `array_get`.
 - **Fixed array parameter types:** The LLVM backend function type generation was missing cases for `Type::Array` and `Type::Map`, causing them to fall through to the default `i32`. Fixed by adding explicit cases to generate `ptr` type for arrays and maps. Verified with `arrays` example (returns 15 = sum of 1+2+3+4+5).
+- Verified `iteration` example (returns 55 = 1+2+...+10).
+- **Implemented match statements:** Added `Statement::Match` and `MatchArm` to AST, `parse_match_statement` to parser, semantic analysis handling, and MIR lowering using `SwitchInt` terminator. Supports integer literal patterns and wildcard (`_`) patterns. Verified with `match` example (returns 200) and `match_basics` example (returns 3).

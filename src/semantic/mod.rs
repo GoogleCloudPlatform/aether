@@ -869,6 +869,24 @@ impl SemanticAnalyzer {
                 // For expression statements, just analyze the expression
                 self.analyze_expression(expr)?;
             }
+
+            Statement::Match { value, arms, .. } => {
+                // Analyze the matched value
+                let value_type = self.analyze_expression(value)?;
+
+                // Analyze each arm
+                for arm in arms {
+                    // Analyze the pattern (for now, just check literals match the value type)
+                    self.analyze_pattern(&arm.pattern, &value_type)?;
+
+                    // Analyze the body block
+                    self.symbol_table.enter_scope(ScopeKind::Block);
+                    for stmt in &arm.body.statements {
+                        self.analyze_statement(stmt)?;
+                    }
+                    let _ = self.symbol_table.exit_scope();
+                }
+            }
         }
 
         Ok(())
