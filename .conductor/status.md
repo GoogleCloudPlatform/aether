@@ -33,9 +33,18 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.11: Basic Enum Example Verified (added Makefile) - required implementing enum variant expressions
 - [x] Task 4.12: If/Else Example Verified (added Makefile)
 - [x] Task 4.13: Primitives Example Verified
+- [x] Task 4.14: Type Aliases Example Verified (added Makefile)
+- [x] Task 4.15: Type Conversions Example Verified (added Makefile)
+- [x] Task 4.16: Return Values Example Verified (added Makefile) - fixed by MIR return bug fix
 
 ## Current Task
-Task 4.14: Continue verifying remaining examples (enum_with_data, enum_methods require match expressions)
+Task 4.17: Continue verifying remaining examples
+
+## Not Yet Working (needs parser/semantic work)
+- closures: needs lambda syntax (`=>`)
+- arrays: needs array literal syntax (`[1, 2, 3]`)
+- strings/FFI: needs String to Pointer<Char> coercion
+- foreach: needs range syntax (`0..10`)
 
 ## Next Actions
 1. Continue verifying examples in `examples/v2/`.
