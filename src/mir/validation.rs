@@ -186,6 +186,11 @@ impl Validator {
             Rvalue::Len(place) | Rvalue::Discriminant(place) => {
                 used.insert((place.local, location));
             }
+            Rvalue::Closure { captures, .. } => {
+                for capture in captures {
+                    self.collect_operand_locals(capture, used, location);
+                }
+            }
         }
     }
 

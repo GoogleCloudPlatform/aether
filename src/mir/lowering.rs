@@ -60,6 +60,9 @@ pub struct LoweringContext {
 
     /// Symbol table from semantic analysis
     symbol_table: Option<SymbolTable>,
+
+    /// Counter for generating unique lambda names
+    lambda_counter: usize,
 }
 
 impl LoweringContext {
@@ -78,6 +81,7 @@ impl LoweringContext {
             return_local: None,
             loop_stack: Vec::new(),
             symbol_table: None,
+            lambda_counter: 0,
         }
     }
 
@@ -258,8 +262,32 @@ impl LoweringContext {
                 source_location,
                 ..
             } => {
-                let ty = self.ast_type_to_mir_type(type_spec)?;
+                let mut ty = self.ast_type_to_mir_type(type_spec)?;
                 let is_mutable = matches!(mutability, ast::Mutability::Mutable);
+
+                // Initialize if value provided (before creating local to infer type)
+                let init_value_opt = if let Some(init_expr) = initial_value {
+                    // Check if it's a lambda expression and infer type
+                    if let ast::Expression::Lambda { parameters, return_type, .. } = init_expr.as_ref() {
+                        // Build function type from lambda signature
+                        let param_types: Vec<Type> = parameters.iter()
+                            .map(|p| self.ast_type_to_mir_type(&p.param_type))
+                            .collect::<Result<Vec<_>, _>>()?;
+                        let ret_type = if let Some(rt) = return_type {
+                            self.ast_type_to_mir_type(rt)?
+                        } else {
+                            Type::primitive(ast::PrimitiveType::Integer)
+                        };
+                        ty = Type::Function {
+                            parameter_types: param_types,
+                            return_type: Box::new(ret_type),
+                        };
+                    }
+                    Some(self.lower_expression(init_expr)?)
+                } else {
+                    None
+                };
+
                 let local_id = self.builder.new_local(ty.clone(), is_mutable);
 
                 // Emit StorageLive
@@ -270,9 +298,8 @@ impl LoweringContext {
                 self.var_map.insert(name.name.clone(), local_id);
                 self.var_types.insert(name.name.clone(), ty.clone());
 
-                // Initialize if value provided
-                if let Some(init_expr) = initial_value {
-                    let init_value = self.lower_expression(init_expr)?;
+                // Assign initial value if provided
+                if let Some(init_value) = init_value_opt {
                     self.builder.push_statement(Statement::Assign {
                         place: Place {
                             local: local_id,
@@ -1390,6 +1417,14 @@ impl LoweringContext {
                 source_location,
             } => self.lower_negate(operand, source_location),
 
+            ast::Expression::Lambda {
+                captures,
+                parameters,
+                return_type,
+                body,
+                source_location,
+            } => self.lower_lambda(captures, parameters, return_type, body, source_location),
+
             _ => Err(SemanticError::UnsupportedFeature {
                 feature: "Expression type not yet implemented in MIR lowering".to_string(),
                 location: SourceLocation::unknown(),
@@ -1620,6 +1655,144 @@ impl LoweringContext {
         }))
     }
 
+    /// Lower a lambda expression
+    fn lower_lambda(
+        &mut self,
+        captures: &[ast::Capture],
+        parameters: &[ast::Parameter],
+        return_type: &Option<Box<ast::TypeSpecifier>>,
+        body: &ast::LambdaBody,
+        _source_location: &SourceLocation,
+    ) -> Result<Operand, SemanticError> {
+        // Generate unique name for the lambda function
+        let lambda_name = format!("__lambda_{}", self.lambda_counter);
+        self.lambda_counter += 1;
+
+        eprintln!("Lowering lambda to MIR function: {}", lambda_name);
+
+        // Convert parameters to MIR types
+        let mut mir_params = Vec::new();
+        for param in parameters {
+            let param_type = self.ast_type_to_mir_type(&param.param_type)?;
+            mir_params.push((param.name.name.clone(), param_type));
+        }
+
+        // Determine return type
+        let mir_return_type = if let Some(ret_type) = return_type {
+            self.ast_type_to_mir_type(ret_type)?
+        } else {
+            // Infer from body - for now default to Int
+            Type::primitive(PrimitiveType::Integer)
+        };
+
+        // Save current builder state
+        let saved_var_map = std::mem::take(&mut self.var_map);
+        let saved_var_types = std::mem::take(&mut self.var_types);
+        let saved_return_local = self.return_local.take();
+        let saved_loop_stack = std::mem::take(&mut self.loop_stack);
+
+        // Use a fresh builder for the lambda
+        let saved_builder = std::mem::replace(&mut self.builder, Builder::new());
+
+        // Start building the lambda function
+        self.builder.start_function(lambda_name.clone(), mir_params.clone(), mir_return_type.clone());
+
+        // Set up parameter mappings
+        if let Some(current_func) = &self.builder.current_function {
+            for (ast_param, mir_param) in parameters.iter().zip(current_func.parameters.iter()) {
+                self.var_map.insert(ast_param.name.name.clone(), mir_param.local_id);
+                self.var_types.insert(ast_param.name.name.clone(), mir_param.ty.clone());
+            }
+        }
+
+        // Create return local if not void
+        let return_local = match &mir_return_type {
+            Type::Primitive(PrimitiveType::Void) => None,
+            _ => {
+                let local_id = self.builder.new_local(mir_return_type.clone(), false);
+                self.builder.push_statement(Statement::StorageLive(local_id));
+                Some(local_id)
+            }
+        };
+        self.return_local = return_local;
+
+        // Lower the lambda body
+        match body {
+            ast::LambdaBody::Expression(expr) => {
+                // Single expression - evaluate and return
+                let result = self.lower_expression(expr)?;
+                if let Some(ret_local) = self.return_local {
+                    self.builder.push_statement(Statement::Assign {
+                        place: Place { local: ret_local, projection: vec![] },
+                        rvalue: Rvalue::Use(result),
+                        source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                    });
+                }
+                self.builder.set_terminator(Terminator::Return);
+            }
+            ast::LambdaBody::Block(block) => {
+                // Block with statements
+                self.lower_block(block)?;
+                // Ensure we have a return terminator
+                if let Some(func) = &self.builder.current_function {
+                    if let Some(block_id) = self.builder.current_block {
+                        if let Some(bb) = func.basic_blocks.get(&block_id) {
+                            if matches!(bb.terminator, Terminator::Unreachable) {
+                                self.builder.set_terminator(Terminator::Return);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Finish the lambda function
+        let mut mir_function = self.builder.finish_function();
+        mir_function.return_local = self.return_local;
+
+        // Add lambda function to program
+        self.program.functions.insert(lambda_name.clone(), mir_function);
+
+        // Restore previous builder state
+        self.builder = saved_builder;
+        self.var_map = saved_var_map;
+        self.var_types = saved_var_types;
+        self.return_local = saved_return_local;
+        self.loop_stack = saved_loop_stack;
+
+        // Create closure value
+        // For now, captures are ignored (Phase 4 will handle them)
+        let capture_operands: Vec<Operand> = captures.iter().map(|_c| {
+            // TODO: Look up captured variable and create operand
+            Operand::Constant(Constant {
+                ty: Type::primitive(PrimitiveType::Integer),
+                value: ConstantValue::Integer(0),
+            })
+        }).collect();
+
+        // Create closure type (function pointer type)
+        let closure_type = Type::Function {
+            parameter_types: mir_params.iter().map(|(_, ty)| ty.clone()).collect(),
+            return_type: Box::new(mir_return_type),
+        };
+
+        // Create a local for the closure and assign the closure value
+        let closure_local = self.builder.new_local(closure_type, false);
+        self.builder.push_statement(Statement::Assign {
+            place: Place { local: closure_local, projection: vec![] },
+            rvalue: Rvalue::Closure {
+                func_name: lambda_name,
+                captures: capture_operands,
+            },
+            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+        });
+
+        Ok(Operand::Copy(Place {
+            local: closure_local,
+            projection: vec![],
+        }))
+    }
+
     /// Lower a function call
     fn lower_function_call(
         &mut self,
@@ -1650,6 +1823,50 @@ impl LoweringContext {
         for arg_expr in &call.variadic_arguments {
             let arg_operand = self.lower_expression(arg_expr)?;
             arg_operands.push(arg_operand);
+        }
+
+        // Check if this is a call to a local variable (closure call)
+        if let Some(&local_id) = self.var_map.get(function_name) {
+            eprintln!("lower_function_call: {} is a local variable (closure)", function_name);
+
+            // Get the closure function pointer from the local variable
+            let func_operand = Operand::Copy(Place {
+                local: local_id,
+                projection: vec![],
+            });
+
+            // Get the return type from the variable's function type
+            let result_type = if let Some(var_type) = self.var_types.get(function_name) {
+                match var_type {
+                    Type::Function { return_type, .. } => (**return_type).clone(),
+                    _ => Type::primitive(ast::PrimitiveType::Integer),
+                }
+            } else {
+                Type::primitive(ast::PrimitiveType::Integer)
+            };
+
+            let result_local = self.builder.new_local(result_type, false);
+
+            // Emit call assignment
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
+                    local: result_local,
+                    projection: vec![],
+                },
+                rvalue: Rvalue::Call {
+                    func: func_operand,
+                    args: arg_operands,
+                },
+                source_info: SourceInfo {
+                    span: source_location.clone(),
+                    scope: 0,
+                },
+            });
+
+            return Ok(Operand::Copy(Place {
+                local: result_local,
+                projection: vec![],
+            }));
         }
 
         // Create function reference operand using the function name

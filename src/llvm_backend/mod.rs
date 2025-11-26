@@ -29,7 +29,8 @@ use inkwell::module::Module;
 use inkwell::targets::{
     CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
-use inkwell::values::{BasicValueEnum, FunctionValue, PointerValue};
+use inkwell::types::BasicMetadataTypeEnum;
+use inkwell::values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, PointerValue};
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 use std::collections::{HashMap, HashSet};
@@ -207,6 +208,13 @@ impl<'ctx> LLVMBackend<'ctx> {
             }
             crate::types::Type::Pointer { .. } => {
                 // Pointers are represented as i8*
+                self.context
+                    .i8_type()
+                    .ptr_type(AddressSpace::default())
+                    .into()
+            }
+            crate::types::Type::Function { .. } => {
+                // Function types are represented as function pointers
                 self.context
                     .i8_type()
                     .ptr_type(AddressSpace::default())
@@ -1444,7 +1452,60 @@ impl<'ctx> LLVMBackend<'ctx> {
                 eprintln!("DEBUG: Function operand: {:?}", func);
                 eprintln!("DEBUG: Arguments: {:?}", args);
 
-                // Extract function name from the func operand
+                // Check if this is an indirect call through a function pointer (closure)
+                if let mir::Operand::Copy(place) | mir::Operand::Move(place) = func {
+                    eprintln!("DEBUG: Indirect call through function pointer");
+
+                    // Load the function pointer from the local
+                    let func_ptr = if let Some(&alloca) = local_allocas.get(&place.local) {
+                        builder
+                            .build_load(
+                                self.context.i8_type().ptr_type(AddressSpace::default()),
+                                alloca,
+                                "func_ptr",
+                            )
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?
+                            .into_pointer_value()
+                    } else {
+                        return Err(SemanticError::CodeGenError {
+                            message: format!(
+                                "Local {:?} not found in allocas for function pointer",
+                                place.local
+                            ),
+                        });
+                    };
+
+                    // Generate argument values
+                    let mut arg_values: Vec<BasicMetadataValueEnum> = Vec::new();
+                    let mut param_types: Vec<BasicMetadataTypeEnum> = Vec::new();
+
+                    for arg in args {
+                        let arg_value =
+                            self.generate_operand(arg, local_allocas, builder, function)?;
+                        // Get the type for the function signature
+                        param_types.push(arg_value.get_type().into());
+                        arg_values.push(arg_value.into());
+                    }
+
+                    // Build the indirect function call
+                    // Create function type based on arguments (assume i32 return for now)
+                    let fn_type = self.context.i32_type().fn_type(&param_types, false);
+
+                    let call_result = builder
+                        .build_indirect_call(fn_type, func_ptr, &arg_values, "closure_call")
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
+                    return Ok(call_result
+                        .try_as_basic_value()
+                        .left()
+                        .unwrap_or_else(|| self.context.i32_type().const_int(0, false).into()));
+                }
+
+                // Extract function name from the func operand (direct call)
                 let function_name = match func {
                     mir::Operand::Constant(constant) => match &constant.value {
                         mir::ConstantValue::String(name) => {
@@ -2253,6 +2314,19 @@ impl<'ctx> LLVMBackend<'ctx> {
                 Err(SemanticError::CodeGenError {
                     message: "Array length operation not yet implemented".to_string(),
                 })
+            }
+
+            mir::Rvalue::Closure { func_name, captures: _ } => {
+                // Get the function pointer for the lambda
+                // The lambda function should already be generated as a separate MIR function
+                if let Some(llvm_func) = self.module.get_function(func_name) {
+                    // Return the function pointer as a value
+                    Ok(llvm_func.as_global_value().as_pointer_value().into())
+                } else {
+                    Err(SemanticError::CodeGenError {
+                        message: format!("Lambda function '{}' not found", func_name),
+                    })
+                }
             }
 
             mir::Rvalue::Discriminant(place) => {

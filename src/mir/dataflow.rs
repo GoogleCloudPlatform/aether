@@ -283,6 +283,12 @@ impl LivenessAnalysis {
             Rvalue::Len(place) | Rvalue::Discriminant(place) => {
                 fact.insert(place.local);
             }
+            Rvalue::Closure { captures, .. } => {
+                // Add uses for captured operands
+                for capture in captures {
+                    self.add_operand_uses(capture, fact);
+                }
+            }
         }
     }
 }

@@ -378,6 +378,10 @@ impl VcGenerator {
                 // Enum discriminant - return symbolic value
                 Ok(Formula::Var("enum_discriminant".to_string()))
             }
+            Rvalue::Closure { func_name, .. } => {
+                // Closure - return symbolic function reference
+                Ok(Formula::Var(format!("closure_{}", func_name)))
+            }
         }
     }
 

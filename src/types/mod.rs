@@ -598,6 +598,17 @@ impl TypeChecker {
                 name,
                 source_location,
             } => {
+                // Special case: _inferred is a placeholder for type inference
+                // Used by lambda expressions without explicit return types
+                if name.name == "_inferred" {
+                    // Return a type variable that will be resolved during type inference
+                    // Using id 0 as a placeholder - actual inference happens during lambda type checking
+                    return Ok(Type::Variable(TypeVariable {
+                        id: 0,
+                        constraints: vec![],
+                    }));
+                }
+
                 // Check if this is a known type
                 eprintln!(
                     "TypeChecker: Looking for type '{}', have {} types",
@@ -835,6 +846,25 @@ impl TypeChecker {
             // Owned type with base type (implicit ownership)
             (Type::Owned { base_type, .. }, other) => self.types_compatible(base_type, other),
             (other, Type::Owned { base_type, .. }) => self.types_compatible(other, base_type),
+
+            // Type variables are compatible with any type (for type inference)
+            (Type::Variable(_), _) | (_, Type::Variable(_)) => true,
+
+            // Function types - check parameter and return type compatibility
+            (
+                Type::Function {
+                    parameter_types: p1,
+                    return_type: r1,
+                },
+                Type::Function {
+                    parameter_types: p2,
+                    return_type: r2,
+                },
+            ) => {
+                p1.len() == p2.len()
+                    && p1.iter().zip(p2.iter()).all(|(t1, t2)| self.types_compatible(t1, t2))
+                    && self.types_compatible(r1, r2)
+            }
 
             _ => false,
         }

@@ -657,6 +657,43 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
+    /// Analyze a lambda block and return the inferred return type
+    /// This differs from analyze_block in that it tracks return types
+    fn analyze_lambda_block_return_type(&mut self, block: &Block) -> Result<Type, SemanticError> {
+        // Don't create a new scope - lambda already created one
+        let mut return_type: Option<Type> = None;
+
+        for statement in &block.statements {
+            // Check for return statements and track their types
+            if let Statement::Return { value, source_location } = statement {
+                let stmt_return_type = if let Some(expr) = value {
+                    self.analyze_expression(expr)?
+                } else {
+                    Type::primitive(PrimitiveType::Void)
+                };
+
+                if let Some(ref existing_type) = return_type {
+                    // Check consistency of return types
+                    if !self.type_checker.borrow().are_types_equal(existing_type, &stmt_return_type) {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: existing_type.to_string(),
+                            found: stmt_return_type.to_string(),
+                            location: source_location.clone(),
+                        });
+                    }
+                } else {
+                    return_type = Some(stmt_return_type);
+                }
+            } else {
+                // Analyze other statements normally
+                self.analyze_statement(statement)?;
+            }
+        }
+
+        // Return the inferred type, or Void if no return statements
+        Ok(return_type.unwrap_or_else(|| Type::primitive(PrimitiveType::Void)))
+    }
+
     /// Analyze a statement
     fn analyze_statement(&mut self, statement: &Statement) -> Result<(), SemanticError> {
         match statement {
@@ -672,12 +709,16 @@ impl SemanticAnalyzer {
                 let declared_type = self.type_checker.borrow().ast_type_to_type(type_spec)?;
                 let is_mutable = matches!(mutability, Mutability::Mutable);
                 let mut is_initialized = false;
+                let mut final_type = declared_type.clone();
 
                 // If there's an initial value, analyze it and check type compatibility
                 if let Some(init_expr) = initial_value {
                     let init_type = self.analyze_expression(init_expr)?;
 
-                    if !self
+                    // If declared type is a type variable, use the inferred type from the initializer
+                    if matches!(declared_type, Type::Variable(_)) {
+                        final_type = init_type.clone();
+                    } else if !self
                         .type_checker
                         .borrow()
                         .types_compatible(&declared_type, &init_type)
@@ -692,10 +733,10 @@ impl SemanticAnalyzer {
                     is_initialized = true;
                 }
 
-                // Add variable to symbol table
+                // Add variable to symbol table with the final type
                 let symbol = Symbol::new(
                     name.name.clone(),
-                    declared_type,
+                    final_type,
                     SymbolKind::Variable,
                     is_mutable,
                     is_initialized,
@@ -1800,6 +1841,91 @@ impl SemanticAnalyzer {
                 }
 
                 Ok(Type::primitive(PrimitiveType::Boolean))
+            }
+
+            Expression::Lambda {
+                captures,
+                parameters,
+                return_type,
+                body,
+                source_location,
+            } => {
+                eprintln!("Semantic: Analyzing lambda expression");
+
+                // Enter a new scope for the lambda
+                self.symbol_table.enter_scope(ScopeKind::Function);
+
+                // Phase 4: Verify captures exist in enclosing scope
+                // For now, we skip capture verification - captures are checked when we
+                // actually use them (they'll fail if not in scope)
+                for capture in captures {
+                    eprintln!("  Lambda capture: {}", capture.name.name);
+                    // TODO: Look up capture in parent scope and add to lambda scope
+                }
+
+                // Add parameters to lambda scope
+                let mut param_types = Vec::new();
+                for param in parameters {
+                    let param_type = self
+                        .type_checker
+                        .borrow()
+                        .ast_type_to_type(&param.param_type)?;
+                    param_types.push(param_type.clone());
+
+                    let param_symbol = Symbol {
+                        name: param.name.name.clone(),
+                        symbol_type: param_type,
+                        kind: SymbolKind::Parameter,
+                        is_mutable: false,
+                        is_initialized: true,
+                        declaration_location: param.source_location.clone(),
+                        is_moved: false,
+                        borrow_state: BorrowState::None,
+                    };
+                    self.symbol_table.add_symbol(param_symbol)?;
+                }
+
+                // Analyze the lambda body and determine return type
+                let body_type = match body {
+                    LambdaBody::Expression(expr) => self.analyze_expression(expr)?,
+                    LambdaBody::Block(block) => {
+                        // Analyze block and infer return type from return statements
+                        self.analyze_lambda_block_return_type(block)?
+                    }
+                };
+
+                // Determine the return type
+                let lambda_return_type = if let Some(explicit_return) = return_type {
+                    let explicit_type = self
+                        .type_checker
+                        .borrow()
+                        .ast_type_to_type(explicit_return)?;
+                    // Check that body type matches explicit return type
+                    if !self
+                        .type_checker
+                        .borrow()
+                        .are_types_equal(&explicit_type, &body_type)
+                    {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: explicit_type.to_string(),
+                            found: body_type.to_string(),
+                            location: source_location.clone(),
+                        });
+                    }
+                    explicit_type
+                } else {
+                    // Infer return type from body
+                    body_type
+                };
+
+                // Exit lambda scope
+                self.symbol_table.exit_scope()?;
+
+                // Return a function type
+                Ok(Type::Function {
+                    parameter_types: param_types,
+                    return_type: Box::new(lambda_return_type),
+                })
             }
 
             // TODO: Handle other expression types

@@ -140,6 +140,14 @@ pub enum Rvalue {
 
     /// Discriminant for enums
     Discriminant(Place),
+
+    /// Closure construction
+    Closure {
+        /// Name of the generated function for this closure
+        func_name: String,
+        /// Captured values (operands for each capture)
+        captures: Vec<Operand>,
+    },
 }
 
 /// Operands (values that can be used)

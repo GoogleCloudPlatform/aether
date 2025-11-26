@@ -2608,7 +2608,7 @@ impl Parser {
 
         // Parse body - either a block or a single expression
         let body = if self.check(&TokenType::LeftBrace) {
-            LambdaBody::Block(self.parse_block()?)
+            self.parse_lambda_block()?
         } else {
             LambdaBody::Expression(Box::new(self.parse_expression()?))
         };
@@ -2620,6 +2620,62 @@ impl Parser {
             body,
             source_location: start_location,
         })
+    }
+
+    /// Parse a lambda block - can be either:
+    /// - A single expression (implicit return): `{expr}`
+    /// - Multiple statements with explicit return: `{ stmt; stmt; return expr; }`
+    fn parse_lambda_block(&mut self) -> Result<LambdaBody, ParserError> {
+        let block_start = self.current_location();
+        self.expect(&TokenType::LeftBrace, "expected '{'")?;
+
+        // Check for empty block
+        if self.check(&TokenType::RightBrace) {
+            let end_loc = self.current_location();
+            self.advance();
+            return Ok(LambdaBody::Block(Block {
+                statements: vec![],
+                source_location: block_start,
+            }));
+        }
+
+        // Try to parse as a single expression first
+        // Save position to backtrack if needed
+        let saved_pos = self.position;
+
+        // Try parsing an expression
+        if let Ok(expr) = self.parse_expression() {
+            // Check if this is followed by `}` (single expression body)
+            if self.check(&TokenType::RightBrace) {
+                self.advance(); // consume '}'
+                // Wrap the expression in an implicit return statement
+                let return_stmt = Statement::Return {
+                    value: Some(Box::new(expr)),
+                    source_location: block_start.clone(),
+                };
+                return Ok(LambdaBody::Block(Block {
+                    statements: vec![return_stmt],
+                    source_location: block_start,
+                }));
+            }
+            // Not a single expression body, backtrack and parse as statements
+            self.position = saved_pos;
+        } else {
+            // Expression parse failed, backtrack
+            self.position = saved_pos;
+        }
+
+        // Parse as regular block with statements
+        let mut statements = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            statements.push(self.parse_statement()?);
+        }
+        self.expect(&TokenType::RightBrace, "expected '}' after lambda block")?;
+
+        Ok(LambdaBody::Block(Block {
+            statements,
+            source_location: block_start,
+        }))
     }
 
     /// Parse a struct construction expression: TypeName { field: value, field2: value2, ... }
