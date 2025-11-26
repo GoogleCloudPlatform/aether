@@ -135,3 +135,6 @@ TAGS
 
 # Compiled binaries
 hello_v2
+
+# Compiled example binaries
+examples/**/main
