@@ -30,13 +30,17 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.8: Basic Struct Example Verified (added Makefile) - required implementing struct construction
 - [x] Task 4.9: Nested Structs Example Verified (added Makefile) - required fixing nested field access in LLVM backend
 - [x] Task 4.10: Struct Methods Example Verified (added Makefile)
+- [x] Task 4.11: Basic Enum Example Verified (added Makefile) - required implementing enum variant expressions
+- [x] Task 4.12: If/Else Example Verified (added Makefile)
+- [x] Task 4.13: Primitives Example Verified
 
 ## Current Task
-Task 4.3: Continue verifying remaining examples
+Task 4.14: Continue verifying remaining examples (enum_with_data, enum_methods require match expressions)
 
 ## Next Actions
 1. Continue verifying examples in `examples/v2/`.
 2. Add Makefiles to verified examples.
+3. Implement `match` expressions for advanced enum examples.
 
 ## Blockers
 None
@@ -49,7 +53,10 @@ None
 - [x] ~~Unary minus for negative literals not supported~~ (FIXED: added `-expr` syntax)
 - [x] ~~Struct construction expressions not implemented~~ (FIXED: `Point { x: 1, y: 2 }` syntax)
 - [x] ~~Nested struct field access broken~~ (FIXED: `rect.top_left.x` now works)
-- [ ] Enum variant expressions not supported (`Color::Red` syntax needs implementation)
+- [x] ~~Enum variant expressions not supported~~ (FIXED: `Color::Red` syntax now works)
+- [ ] `match` expressions not supported (needed for enum_with_data, enum_methods examples)
+- [ ] Enums with associated data syntax (e.g., `Some(Int)`) not supported
+- [ ] `return` inside `when` without `else` doesn't properly terminate (control flow continues after storing value)
 
 ## Session Notes
 - Resolved parser infinite loop for file-scoped modules.
@@ -64,3 +71,6 @@ None
 - Updated struct-related tests to use comma syntax instead of semicolons.
 - **Fixed nested struct field access:** The LLVM backend was not tracking the current struct type through projections. Fixed `generate_operand` to properly handle nested field access by tracking `current_struct_type` and loading pointers for struct fields. Verified with `nested_structs` example (returns 100).
 - Verified `struct_methods` example (returns 11).
+- **Implemented enum variant expressions:** Added `::` (DoubleColon) token to lexer and `parse_enum_variant_expression` function to parser. Now supports `Color::Red` and `Color::Red(value)` syntax. Verified with `basic_enum` example (returns 0).
+- Verified `if_else` example (returns 7 = max(7,3)) and `primitives` example (returns 42).
+- **Known issue:** `return` inside `when` without `else` doesn't properly terminate the function. The MIR stores the return value but continues execution instead of emitting `ret` instruction.

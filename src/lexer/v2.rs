@@ -32,9 +32,10 @@ pub enum TokenType {
     RightBracket, // ]
 
     // Punctuation
-    Semicolon,   // ;
-    Colon,       // :
-    Comma,       // ,
+    Semicolon,    // ;
+    Colon,        // :
+    DoubleColon,  // ::
+    Comma,        // ,
     Dot,         // .
     DotDot,      // ..
     DotDotEqual, // ..=
@@ -636,7 +637,12 @@ impl Lexer {
             }
             Some(':') => {
                 self.advance();
-                Ok(Token::new(TokenType::Colon, location, ":".to_string()))
+                if self.current_char == Some(':') {
+                    self.advance();
+                    Ok(Token::new(TokenType::DoubleColon, location, "::".to_string()))
+                } else {
+                    Ok(Token::new(TokenType::Colon, location, ":".to_string()))
+                }
             }
             Some(',') => {
                 self.advance();

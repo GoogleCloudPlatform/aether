@@ -1818,10 +1818,15 @@ impl Parser {
             });
         }
 
-        // Identifier (variable reference, struct construction, or function call)
+        // Identifier (variable reference, struct construction, enum variant, or function call)
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name = name.clone();
             self.advance();
+
+            // Check for enum variant: EnumType::Variant or EnumType::Variant(value)
+            if self.check(&TokenType::DoubleColon) {
+                return self.parse_enum_variant_expression(name, start_location);
+            }
 
             // Check for struct construction: TypeName { field: value, ... }
             // Only parse as struct construction if it looks like one (has field: value syntax)
@@ -2107,10 +2112,15 @@ impl Parser {
             });
         }
 
-        // Identifier (variable reference, struct construction, or function call)
+        // Identifier (variable reference, struct construction, enum variant, or function call)
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name = name.clone();
             self.advance();
+
+            // Check for enum variant: EnumType::Variant or EnumType::Variant(value)
+            if self.check(&TokenType::DoubleColon) {
+                return self.parse_enum_variant_expression(name, start_location);
+            }
 
             // Check for struct construction: TypeName { field: value, ... }
             // Only parse as struct construction if it looks like one (has field: value syntax)
@@ -2513,6 +2523,51 @@ impl Parser {
                 source_location: start_location.clone(),
             },
             field_values,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an enum variant expression: EnumType::Variant or EnumType::Variant(value)
+    fn parse_enum_variant_expression(
+        &mut self,
+        enum_name: String,
+        start_location: SourceLocation,
+    ) -> Result<Expression, ParserError> {
+        self.expect(&TokenType::DoubleColon, "expected '::'")?;
+
+        // Parse variant name
+        let variant_name = if let TokenType::Identifier(name) = &self.peek().token_type {
+            let name = name.clone();
+            self.advance();
+            Identifier {
+                name,
+                source_location: self.current_location(),
+            }
+        } else {
+            return Err(ParserError::UnexpectedToken {
+                expected: "variant name".to_string(),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.current_location(),
+            });
+        };
+
+        // Check for associated value: Variant(value)
+        let value = if self.check(&TokenType::LeftParen) {
+            self.advance(); // consume '('
+            let expr = self.parse_expression()?;
+            self.expect(&TokenType::RightParen, "expected ')'")?;
+            Some(Box::new(expr))
+        } else {
+            None
+        };
+
+        Ok(Expression::EnumVariant {
+            enum_name: Identifier {
+                name: enum_name,
+                source_location: start_location.clone(),
+            },
+            variant_name,
+            value,
             source_location: start_location,
         })
     }

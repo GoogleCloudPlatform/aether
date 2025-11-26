@@ -4,16 +4,16 @@
 module basic_enum;
 
 enum Color {
-    Red,
-    Green,
-    Blue,
+    case Red;
+    case Green;
+    case Blue;
 }
 
 enum Direction {
-    North,
-    South,
-    East,
-    West,
+    case North;
+    case South;
+    case East;
+    case West;
 }
 
 func is_primary_color(c: Color) -> Bool {
