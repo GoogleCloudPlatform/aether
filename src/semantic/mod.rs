@@ -1674,7 +1674,22 @@ impl SemanticAnalyzer {
                 }
             }
 
-            Expression::GreaterThanOrEqual {
+            Expression::LessThan {
+                left,
+                right,
+                source_location,
+            }
+            | Expression::LessThanOrEqual {
+                left,
+                right,
+                source_location,
+            }
+            | Expression::GreaterThan {
+                left,
+                right,
+                source_location,
+            }
+            | Expression::GreaterThanOrEqual {
                 left,
                 right,
                 source_location,
@@ -1696,6 +1711,47 @@ impl SemanticAnalyzer {
                         location: source_location.clone(),
                     })
                 }
+            }
+
+            Expression::LogicalNot {
+                operand,
+                source_location,
+            } => {
+                let operand_type = self.analyze_expression(operand)?;
+
+                // Operand must be boolean
+                if !matches!(operand_type, Type::Primitive(PrimitiveType::Boolean)) {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: "Boolean".to_string(),
+                        found: operand_type.to_string(),
+                        location: source_location.clone(),
+                    });
+                }
+
+                Ok(Type::primitive(PrimitiveType::Boolean))
+            }
+
+            Expression::LogicalAnd {
+                operands,
+                source_location,
+            }
+            | Expression::LogicalOr {
+                operands,
+                source_location,
+            } => {
+                // All operands must be boolean
+                for operand in operands {
+                    let operand_type = self.analyze_expression(operand)?;
+                    if !matches!(operand_type, Type::Primitive(PrimitiveType::Boolean)) {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: "Boolean".to_string(),
+                            found: operand_type.to_string(),
+                            location: source_location.clone(),
+                        });
+                    }
+                }
+
+                Ok(Type::primitive(PrimitiveType::Boolean))
             }
 
             // TODO: Handle other expression types

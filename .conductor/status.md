@@ -23,6 +23,10 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.3: Module System Example Verified (fixed to return 0)
 - [x] Task 4.3: Arithmetic Example Verified (added Makefile)
 - [x] Task 4.3: Basic Functions Example Verified (added Makefile)
+- [x] Task 4.4: Parameters Example Verified (added Makefile)
+- [x] Task 4.5: Comparison Example Verified (added Makefile) - required implementing comparison operators
+- [x] Task 4.6: Loops Example Verified (added Makefile) - required implementing var keyword
+- [x] Task 4.7: Logical Example Verified (added Makefile) - required implementing logical operators
 
 ## Current Task
 Task 4.3: Continue verifying remaining examples
@@ -36,10 +40,10 @@ None
 
 ## Known Parser/Compiler Limitations
 - [x] ~~`Int32`, `Float`, etc. types~~ (FIXED)
+- [x] ~~`var` keyword not supported~~ (FIXED: added `var` keyword)
+- [x] ~~Comparison operators (`<`, `>`, `==`, etc.)~~ (FIXED)
+- [x] ~~Logical operators (`!`, `&&`, `||`)~~ (FIXED)
 - [ ] Unary minus for negative literals not supported (`-1` fails to parse)
-- [ ] `var` keyword not supported (use `let mut` instead)
-- [ ] Comparison operators (`<`, `>`, `==`, etc.) not handled in semantic analysis
-- [ ] Logical NOT (`!`) not handled in semantic analysis
 - [ ] Struct construction expressions not implemented in v2 parser (`Point { x: 1, y: 2 }`)
 
 ## Session Notes

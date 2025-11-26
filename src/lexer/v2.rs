@@ -94,6 +94,7 @@ pub enum Keyword {
     Import,
     Func,
     Let,
+    Var,
     Const,
     Struct,
     Enum,
@@ -208,6 +209,7 @@ impl Lexer {
         self.keywords.insert("import".to_string(), Keyword::Import);
         self.keywords.insert("func".to_string(), Keyword::Func);
         self.keywords.insert("let".to_string(), Keyword::Let);
+        self.keywords.insert("var".to_string(), Keyword::Var);
         self.keywords.insert("const".to_string(), Keyword::Const);
         self.keywords.insert("struct".to_string(), Keyword::Struct);
         self.keywords.insert("enum".to_string(), Keyword::Enum);
@@ -1487,8 +1489,9 @@ mod tests {
     #[test]
     fn test_lexer_all_keywords_count() {
         let lexer = Lexer::new("", "test.aether".to_string());
-        // Count total keywords: 7 decl + 2 mod + 10 control + 4 error + 3 resource + 11 types + 3 literals + 2 other = 42
-        assert_eq!(lexer.keywords.len(), 42);
+        // Count total keywords: 8 decl + 2 mod + 10 control + 4 error + 3 resource + 14 types + 3 literals + 3 other = 47
+        // Added: var (decl), Int32, Float32, Float64 (types), If (control)
+        assert_eq!(lexer.keywords.len(), 47);
     }
 
     // ==================== LITERAL TOKENIZATION TESTS ====================

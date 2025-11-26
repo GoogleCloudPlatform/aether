@@ -1080,6 +1080,21 @@ impl LoweringContext {
                 source_location,
             } => self.lower_map_access(map, key, source_location),
 
+            ast::Expression::LogicalAnd {
+                operands,
+                source_location,
+            } => self.lower_logical_and(operands, source_location),
+
+            ast::Expression::LogicalOr {
+                operands,
+                source_location,
+            } => self.lower_logical_or(operands, source_location),
+
+            ast::Expression::LogicalNot {
+                operand,
+                source_location,
+            } => self.lower_logical_not(operand, source_location),
+
             _ => Err(SemanticError::UnsupportedFeature {
                 feature: "Expression type not yet implemented in MIR lowering".to_string(),
                 location: SourceLocation::unknown(),
@@ -1145,6 +1160,128 @@ impl LoweringContext {
             },
             source_info: SourceInfo {
                 span: source_location.clone(),
+                scope: 0,
+            },
+        });
+
+        Ok(Operand::Copy(Place {
+            local: result_local,
+            projection: vec![],
+        }))
+    }
+
+    /// Lower a logical AND expression (short-circuit evaluation not implemented yet)
+    fn lower_logical_and(
+        &mut self,
+        operands: &[ast::Expression],
+        _source_location: &SourceLocation,
+    ) -> Result<Operand, SemanticError> {
+        if operands.len() < 2 {
+            return Err(SemanticError::UnsupportedFeature {
+                feature: "LogicalAnd requires at least 2 operands".to_string(),
+                location: SourceLocation::unknown(),
+            });
+        }
+
+        // Start with first operand
+        let mut result = self.lower_expression(&operands[0])?;
+
+        // Chain with AND operations
+        for operand in &operands[1..] {
+            let right = self.lower_expression(operand)?;
+
+            let result_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
+                    local: result_local,
+                    projection: vec![],
+                },
+                rvalue: Rvalue::BinaryOp {
+                    op: BinOp::And,
+                    left: result,
+                    right,
+                },
+                source_info: SourceInfo {
+                    span: SourceLocation::unknown(),
+                    scope: 0,
+                },
+            });
+
+            result = Operand::Copy(Place {
+                local: result_local,
+                projection: vec![],
+            });
+        }
+
+        Ok(result)
+    }
+
+    /// Lower a logical OR expression (short-circuit evaluation not implemented yet)
+    fn lower_logical_or(
+        &mut self,
+        operands: &[ast::Expression],
+        _source_location: &SourceLocation,
+    ) -> Result<Operand, SemanticError> {
+        if operands.len() < 2 {
+            return Err(SemanticError::UnsupportedFeature {
+                feature: "LogicalOr requires at least 2 operands".to_string(),
+                location: SourceLocation::unknown(),
+            });
+        }
+
+        // Start with first operand
+        let mut result = self.lower_expression(&operands[0])?;
+
+        // Chain with OR operations
+        for operand in &operands[1..] {
+            let right = self.lower_expression(operand)?;
+
+            let result_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
+                    local: result_local,
+                    projection: vec![],
+                },
+                rvalue: Rvalue::BinaryOp {
+                    op: BinOp::Or,
+                    left: result,
+                    right,
+                },
+                source_info: SourceInfo {
+                    span: SourceLocation::unknown(),
+                    scope: 0,
+                },
+            });
+
+            result = Operand::Copy(Place {
+                local: result_local,
+                projection: vec![],
+            });
+        }
+
+        Ok(result)
+    }
+
+    /// Lower a logical NOT expression
+    fn lower_logical_not(
+        &mut self,
+        operand: &ast::Expression,
+        _source_location: &SourceLocation,
+    ) -> Result<Operand, SemanticError> {
+        let operand_val = self.lower_expression(operand)?;
+
+        let result_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+        self.builder.push_statement(Statement::Assign {
+            place: Place {
+                local: result_local,
+                projection: vec![],
+            },
+            rvalue: Rvalue::UnaryOp {
+                op: UnOp::Not,
+                operand: operand_val,
+            },
+            source_info: SourceInfo {
+                span: SourceLocation::unknown(),
                 scope: 0,
             },
         });

@@ -515,10 +515,10 @@ Implemented function parsing:
 
 ### Known Parser/Compiler Limitations (discovered during verification)
 - [x] ~~`Int32`, `Float`, etc. types not implemented~~ (FIXED: added lexer/parser support + type coercion)
+- [x] ~~`var` keyword not supported~~ (FIXED: added `var` keyword to lexer and parser)
+- [x] ~~Comparison operators (`<`, `>`, `==`, etc.) not handled in semantic analysis~~ (FIXED)
+- [x] ~~Logical NOT (`!`) not handled in semantic analysis~~ (FIXED: added logical AND/OR/NOT support)
 - [ ] Unary minus for negative literals not supported (`-1` fails to parse)
-- [ ] `var` keyword not supported (use `let mut` instead)
-- [ ] Comparison operators (`<`, `>`, `==`, etc.) not handled in semantic analysis
-- [ ] Logical NOT (`!`) not handled in semantic analysis
 - [ ] Struct construction expressions not implemented in v2 parser (`Point { x: 1, y: 2 }`)
 
 ---

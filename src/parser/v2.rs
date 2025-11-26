@@ -223,6 +223,7 @@ impl Parser {
                     | Keyword::Struct
                     | Keyword::Enum
                     | Keyword::Let
+                    | Keyword::Var
                     | Keyword::Const
                     | Keyword::Import
                     | Keyword::Module
@@ -1330,11 +1331,18 @@ impl Parser {
     pub fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
         let start_location = self.current_location();
 
-        // Expect 'let' keyword
-        self.expect_keyword(Keyword::Let, "expected 'let'")?;
+        // Check for 'let' or 'var' keyword
+        let is_var = self.check_keyword(Keyword::Var);
+        if is_var {
+            self.advance(); // consume 'var'
+        } else {
+            self.expect_keyword(Keyword::Let, "expected 'let' or 'var'")?;
+        }
 
-        // Check for 'mut' keyword
-        let mutability = if self.check_keyword(Keyword::Mut) {
+        // Check for 'mut' keyword (only valid after 'let', 'var' is implicitly mutable)
+        let mutability = if is_var {
+            Mutability::Mutable
+        } else if self.check_keyword(Keyword::Mut) {
             self.advance();
             Mutability::Mutable
         } else {
@@ -1635,7 +1643,7 @@ impl Parser {
     /// Parse any statement based on the leading token
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         // Check for keywords that start statements
-        if self.check_keyword(Keyword::Let) {
+        if self.check_keyword(Keyword::Let) || self.check_keyword(Keyword::Var) {
             return self.parse_variable_declaration();
         }
         if self.check_keyword(Keyword::Return) {
@@ -1692,6 +1700,16 @@ impl Parser {
         // Braced binary expression: {left op right}
         if self.check(&TokenType::LeftBrace) {
             return self.parse_braced_expression();
+        }
+
+        // Logical NOT: !expr
+        if self.check(&TokenType::Bang) {
+            self.advance(); // consume '!'
+            let operand = self.parse_expression()?;
+            return Ok(Expression::LogicalNot {
+                operand: Box::new(operand),
+                source_location: start_location,
+            });
         }
 
         // Prefix range expression: ..end or ..=end
@@ -1960,6 +1978,21 @@ impl Parser {
     /// Parse a primary expression (non-binary): literals, identifiers
     fn parse_primary_expression(&mut self) -> Result<Expression, ParserError> {
         let start_location = self.current_location();
+
+        // Nested braced expression
+        if self.check(&TokenType::LeftBrace) {
+            return self.parse_braced_expression();
+        }
+
+        // Logical NOT: !expr
+        if self.check(&TokenType::Bang) {
+            self.advance(); // consume '!'
+            let operand = self.parse_primary_expression()?;
+            return Ok(Expression::LogicalNot {
+                operand: Box::new(operand),
+                source_location: start_location,
+            });
+        }
 
         // Integer literal
         if let TokenType::IntegerLiteral(value) = &self.peek().token_type {

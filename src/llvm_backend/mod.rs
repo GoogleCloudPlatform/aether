@@ -1145,6 +1145,60 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 message: e.to_string(),
                             })
                     }
+                    // Logical AND (for boolean operands stored as integers)
+                    (mir::BinOp::And, BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                        // Ensure both are same size by extending if needed
+                        let (left_coerced, right_coerced) =
+                            if l.get_type().get_bit_width() != r.get_type().get_bit_width() {
+                                let target_type = self.context.i32_type();
+                                let l_ext = builder
+                                    .build_int_z_extend(l, target_type, "l_ext")
+                                    .map_err(|e| SemanticError::CodeGenError {
+                                        message: e.to_string(),
+                                    })?;
+                                let r_ext = builder
+                                    .build_int_z_extend(r, target_type, "r_ext")
+                                    .map_err(|e| SemanticError::CodeGenError {
+                                        message: e.to_string(),
+                                    })?;
+                                (l_ext, r_ext)
+                            } else {
+                                (l, r)
+                            };
+                        builder
+                            .build_and(left_coerced, right_coerced, "logical_and")
+                            .map(|v| v.into())
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })
+                    }
+                    // Logical OR (for boolean operands stored as integers)
+                    (mir::BinOp::Or, BasicValueEnum::IntValue(l), BasicValueEnum::IntValue(r)) => {
+                        // Ensure both are same size by extending if needed
+                        let (left_coerced, right_coerced) =
+                            if l.get_type().get_bit_width() != r.get_type().get_bit_width() {
+                                let target_type = self.context.i32_type();
+                                let l_ext = builder
+                                    .build_int_z_extend(l, target_type, "l_ext")
+                                    .map_err(|e| SemanticError::CodeGenError {
+                                        message: e.to_string(),
+                                    })?;
+                                let r_ext = builder
+                                    .build_int_z_extend(r, target_type, "r_ext")
+                                    .map_err(|e| SemanticError::CodeGenError {
+                                        message: e.to_string(),
+                                    })?;
+                                (l_ext, r_ext)
+                            } else {
+                                (l, r)
+                            };
+                        builder
+                            .build_or(left_coerced, right_coerced, "logical_or")
+                            .map(|v| v.into())
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })
+                    }
                     // Float comparisons
                     (
                         mir::BinOp::Eq,
