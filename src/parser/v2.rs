@@ -311,6 +311,68 @@ impl Parser {
         false
     }
 
+    /// Check if what follows looks like an array literal: [expr, expr, ...]
+    /// vs a capture list: [ident, ident, ...](params) => body
+    /// Called when current token is '['.
+    ///
+    /// Array literal detection: if the first element after '[' is NOT an identifier,
+    /// or if ']' is NOT followed by '(', it's an array literal.
+    fn looks_like_array_literal(&self) -> bool {
+        // Current token should be '['
+        if !matches!(self.peek().token_type, TokenType::LeftBracket) {
+            return false;
+        }
+
+        // Empty brackets [] - treat as empty array
+        if let Some(after_bracket) = self.peek_at(self.position + 1) {
+            if matches!(after_bracket.token_type, TokenType::RightBracket) {
+                // Check if followed by '(' - if so, it's an empty capture list
+                if let Some(after_close) = self.peek_at(self.position + 2) {
+                    if matches!(after_close.token_type, TokenType::LeftParen) {
+                        return false; // capture list
+                    }
+                }
+                return true; // empty array
+            }
+        }
+
+        // Check the first element after '['
+        if let Some(first_elem) = self.peek_at(self.position + 1) {
+            // If it's not an identifier (or & for capture by ref), it's definitely an array
+            match &first_elem.token_type {
+                TokenType::Identifier(_) | TokenType::Ampersand => {
+                    // Could be either - need to scan to find ']' and check what follows
+                    // For simplicity, scan ahead to find the matching ']'
+                    let mut depth = 1;
+                    let mut pos = self.position + 1;
+                    while depth > 0 {
+                        if let Some(tok) = self.peek_at(pos) {
+                            match &tok.token_type {
+                                TokenType::LeftBracket => depth += 1,
+                                TokenType::RightBracket => depth -= 1,
+                                _ => {}
+                            }
+                            pos += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    // pos is now just after ']'
+                    // Check if followed by '('
+                    if let Some(after_close) = self.peek_at(pos) {
+                        if matches!(after_close.token_type, TokenType::LeftParen) {
+                            return false; // capture list followed by params
+                        }
+                    }
+                    return true; // not followed by '(', so it's an array
+                }
+                _ => return true, // non-identifier first element = array literal
+            }
+        }
+
+        true // default to array
+    }
+
     /// Peek at a specific position in the token stream
     fn peek_at(&self, pos: usize) -> Option<&Token> {
         self.tokens.get(pos)
@@ -2009,18 +2071,26 @@ impl Parser {
             return Ok(expr);
         }
 
-        // Closure with capture list: [captures](params) => body
+        // Array literal or closure with capture list
         if self.check(&TokenType::LeftBracket) {
-            let captures = self.parse_capture_list()?;
-            // After capture list, we must have parameters in parens
-            if !self.check(&TokenType::LeftParen) {
-                return Err(ParserError::SyntaxError {
-                    message: "expected '(' after capture list".to_string(),
-                    location: self.current_location(),
-                    suggestion: Some("use [captures](params) => body syntax".to_string()),
-                });
+            // Determine if this is an array literal or capture list
+            // Array literal: [1, 2, 3] or [expr, expr, ...]
+            // Capture list: [x, y](params) => body (followed by '(')
+            if self.looks_like_array_literal() {
+                return self.parse_array_literal();
+            } else {
+                // Parse as capture list for closure
+                let captures = self.parse_capture_list()?;
+                // After capture list, we must have parameters in parens
+                if !self.check(&TokenType::LeftParen) {
+                    return Err(ParserError::SyntaxError {
+                        message: "expected '(' after capture list".to_string(),
+                        location: self.current_location(),
+                        suggestion: Some("use [captures](params) => body syntax".to_string()),
+                    });
+                }
+                return self.parse_paren_expr_or_lambda_with_captures(captures);
             }
-            return self.parse_paren_expr_or_lambda_with_captures(captures);
         }
 
         // Parenthesized expression or lambda
@@ -2595,6 +2665,40 @@ impl Parser {
             },
             variant_name,
             value,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an array literal: [expr, expr, ...]
+    fn parse_array_literal(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect(&TokenType::LeftBracket, "expected '['")?;
+
+        let mut elements = Vec::new();
+
+        // Parse elements until we see ]
+        while !self.check(&TokenType::RightBracket) {
+            let element = self.parse_expression()?;
+            elements.push(Box::new(element));
+
+            // Expect comma or closing bracket
+            if !self.check(&TokenType::RightBracket) {
+                self.expect(&TokenType::Comma, "expected ',' or ']'")?;
+            }
+        }
+
+        self.expect(&TokenType::RightBracket, "expected ']'")?;
+
+        // Infer element type from first element or default to Int
+        let element_type = Box::new(TypeSpecifier::Primitive {
+            type_name: PrimitiveType::Integer,
+            source_location: start_location.clone(),
+        });
+
+        Ok(Expression::ArrayLiteral {
+            element_type,
+            elements,
             source_location: start_location,
         })
     }

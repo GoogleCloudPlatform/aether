@@ -37,13 +37,13 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.15: Type Conversions Example Verified (added Makefile)
 - [x] Task 4.16: Return Values Example Verified (added Makefile) - fixed by MIR return bug fix
 - [x] Task 4.17: Foreach Example Verified (added Makefile) - implemented range syntax in for loops
+- [x] Task 4.18: Arrays Example Verified (added Makefile) - implemented array literals and fixed function parameter types for arrays
 
 ## Current Task
-Task 4.18: Continue verifying remaining examples
+Task 4.19: Continue verifying remaining examples
 
 ## Not Yet Working (needs parser/semantic work)
 - closures: needs lambda syntax (`=>`)
-- arrays: needs array literal syntax (`[1, 2, 3]`)
 - strings/FFI: needs String to Pointer<Char> coercion
 
 ## Next Actions
@@ -83,3 +83,5 @@ None
 - **Implemented enum variant expressions:** Added `::` (DoubleColon) token to lexer and `parse_enum_variant_expression` function to parser. Now supports `Color::Red` and `Color::Red(value)` syntax. Verified with `basic_enum` example (returns 0).
 - Verified `if_else` example (returns 7 = max(7,3)) and `primitives` example (returns 42).
 - **Fixed return inside when-without-else:** MIR lowering was unconditionally setting `Goto` terminator after lowering if/while/loop blocks, overwriting any `Return` terminator. Added `current_block_diverges()` helper to check if block already has a `Return` terminator and skip setting the `Goto` in that case. Verified with `return_values` example (now returns 7 instead of 0).
+- **Implemented array literals:** Added `looks_like_array_literal()` to distinguish `[1, 2, 3]` from capture lists, and `parse_array_literal()` to parse array literals. Array creation uses runtime functions `array_create`, `array_set`, `array_get`.
+- **Fixed array parameter types:** The LLVM backend function type generation was missing cases for `Type::Array` and `Type::Map`, causing them to fall through to the default `i32`. Fixed by adding explicit cases to generate `ptr` type for arrays and maps. Verified with `arrays` example (returns 15 = sum of 1+2+3+4+5).

@@ -495,6 +495,20 @@ impl<'ctx> LLVMBackend<'ctx> {
                                     .ptr_type(AddressSpace::default())
                                     .into()
                             }
+                            crate::types::Type::Array { .. } => {
+                                // Arrays are passed as pointers (void*)
+                                self.context
+                                    .i8_type()
+                                    .ptr_type(AddressSpace::default())
+                                    .into()
+                            }
+                            crate::types::Type::Map { .. } => {
+                                // Maps are passed as pointers (void*)
+                                self.context
+                                    .i8_type()
+                                    .ptr_type(AddressSpace::default())
+                                    .into()
+                            }
                             _ => self.context.i32_type().into(),
                         }
                     })
@@ -526,6 +540,20 @@ impl<'ctx> LLVMBackend<'ctx> {
                     }
                     crate::types::Type::Named { .. } => {
                         // Named types (structs, enums) are returned as pointers
+                        self.context
+                            .i8_type()
+                            .ptr_type(AddressSpace::default())
+                            .fn_type(&param_types, false)
+                    }
+                    crate::types::Type::Array { .. } => {
+                        // Arrays are returned as pointers (void*)
+                        self.context
+                            .i8_type()
+                            .ptr_type(AddressSpace::default())
+                            .fn_type(&param_types, false)
+                    }
+                    crate::types::Type::Map { .. } => {
+                        // Maps are returned as pointers (void*)
                         self.context
                             .i8_type()
                             .ptr_type(AddressSpace::default())
