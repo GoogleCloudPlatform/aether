@@ -506,15 +506,20 @@ Implemented function parsing:
 - [x] `01-basics/module_system` (fixed to return 0)
 - [x] `05-operators/arithmetic` (returns 2, added Makefile)
 - [x] `04-functions/basic_functions` (returns 120, added Makefile)
+- [x] `03-types/primitives` (returns 42, added Makefile)
+- [x] `04-functions/parameters` (returns 42, added Makefile)
 - [ ] **Iterate**: Go through each example folder in `examples/v2`.
 - [ ] **Verify**: Ensure it compiles and runs.
 - [ ] **Makefile**: Add standard Makefile.
 - [ ] **Commit**: Commit after each success.
 
 ### Known Parser/Compiler Limitations (discovered during verification)
-- `Int32`, `Float`, etc. types not implemented (primitives example fails)
-- Unary minus for negative literals not supported (`-1` fails to parse)
-- `var` keyword not supported (use `let mut` instead)
+- [x] ~~`Int32`, `Float`, etc. types not implemented~~ (FIXED: added lexer/parser support + type coercion)
+- [ ] Unary minus for negative literals not supported (`-1` fails to parse)
+- [ ] `var` keyword not supported (use `let mut` instead)
+- [ ] Comparison operators (`<`, `>`, `==`, etc.) not handled in semantic analysis
+- [ ] Logical NOT (`!`) not handled in semantic analysis
+- [ ] Struct construction expressions not implemented in v2 parser (`Point { x: 1, y: 2 }`)
 
 ---
 

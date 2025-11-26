@@ -35,9 +35,12 @@ Task 4.3: Continue verifying remaining examples
 None
 
 ## Known Parser/Compiler Limitations
-- `Int32`, `Float`, etc. types not implemented
-- Unary minus for negative literals not supported (`-1` fails to parse)
-- `var` keyword not supported (use `let mut` instead)
+- [x] ~~`Int32`, `Float`, etc. types~~ (FIXED)
+- [ ] Unary minus for negative literals not supported (`-1` fails to parse)
+- [ ] `var` keyword not supported (use `let mut` instead)
+- [ ] Comparison operators (`<`, `>`, `==`, etc.) not handled in semantic analysis
+- [ ] Logical NOT (`!`) not handled in semantic analysis
+- [ ] Struct construction expressions not implemented in v2 parser (`Point { x: 1, y: 2 }`)
 
 ## Session Notes
 - Resolved parser infinite loop for file-scoped modules.
