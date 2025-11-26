@@ -56,7 +56,7 @@ None
 - [x] ~~Enum variant expressions not supported~~ (FIXED: `Color::Red` syntax now works)
 - [ ] `match` expressions not supported (needed for enum_with_data, enum_methods examples)
 - [ ] Enums with associated data syntax (e.g., `Some(Int)`) not supported
-- [ ] `return` inside `when` without `else` doesn't properly terminate (control flow continues after storing value)
+- [x] ~~`return` inside `when` without `else` doesn't properly terminate~~ (FIXED: MIR lowering now checks for diverging blocks)
 
 ## Session Notes
 - Resolved parser infinite loop for file-scoped modules.
@@ -73,4 +73,4 @@ None
 - Verified `struct_methods` example (returns 11).
 - **Implemented enum variant expressions:** Added `::` (DoubleColon) token to lexer and `parse_enum_variant_expression` function to parser. Now supports `Color::Red` and `Color::Red(value)` syntax. Verified with `basic_enum` example (returns 0).
 - Verified `if_else` example (returns 7 = max(7,3)) and `primitives` example (returns 42).
-- **Known issue:** `return` inside `when` without `else` doesn't properly terminate the function. The MIR stores the return value but continues execution instead of emitting `ret` instruction.
+- **Fixed return inside when-without-else:** MIR lowering was unconditionally setting `Goto` terminator after lowering if/while/loop blocks, overwriting any `Return` terminator. Added `current_block_diverges()` helper to check if block already has a `Return` terminator and skip setting the `Goto` in that case. Verified with `return_values` example (now returns 7 instead of 0).

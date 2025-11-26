@@ -533,8 +533,11 @@ impl LoweringContext {
         // Then block
         self.builder.switch_to_block(then_bb);
         self.lower_block(then_block)?;
-        self.builder
-            .set_terminator(Terminator::Goto { target: end_bb });
+        // Only set goto if block doesn't already diverge (e.g., with return)
+        if !self.builder.current_block_diverges() {
+            self.builder
+                .set_terminator(Terminator::Goto { target: end_bb });
+        }
 
         // Else block (including else-ifs)
         self.builder.switch_to_block(else_bb);
@@ -544,8 +547,11 @@ impl LoweringContext {
                 self.lower_block(else_block)?;
             }
         }
-        self.builder
-            .set_terminator(Terminator::Goto { target: end_bb });
+        // Only set goto if block doesn't already diverge (e.g., with return)
+        if !self.builder.current_block_diverges() {
+            self.builder
+                .set_terminator(Terminator::Goto { target: end_bb });
+        }
 
         // Continue at end block
         self.builder.switch_to_block(end_bb);
@@ -591,8 +597,11 @@ impl LoweringContext {
         // Loop body
         self.builder.switch_to_block(loop_body);
         self.lower_block(body)?;
-        self.builder
-            .set_terminator(Terminator::Goto { target: loop_head });
+        // Only set goto if block doesn't already diverge (e.g., with return)
+        if !self.builder.current_block_diverges() {
+            self.builder
+                .set_terminator(Terminator::Goto { target: loop_head });
+        }
 
         // Pop loop context
         self.loop_stack.pop();
@@ -789,9 +798,12 @@ impl LoweringContext {
         // Loop body
         self.builder.switch_to_block(loop_body);
         self.lower_block(body)?;
-        self.builder.set_terminator(Terminator::Goto {
-            target: loop_increment,
-        });
+        // Only set goto if block doesn't already diverge (e.g., with return)
+        if !self.builder.current_block_diverges() {
+            self.builder.set_terminator(Terminator::Goto {
+                target: loop_increment,
+            });
+        }
 
         // Increment block
         self.builder.switch_to_block(loop_increment);
@@ -3268,32 +3280,35 @@ impl LoweringContext {
         // Lower the loop body
         self.lower_block(body)?;
 
-        // Increment index
-        self.builder.push_statement(Statement::Assign {
-            place: Place {
-                local: index_local,
-                projection: vec![],
-            },
-            rvalue: Rvalue::BinaryOp {
-                op: BinOp::Add,
-                left: Operand::Copy(Place {
+        // Only increment and loop back if block doesn't diverge (e.g., with return)
+        if !self.builder.current_block_diverges() {
+            // Increment index
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
                     local: index_local,
                     projection: vec![],
-                }),
-                right: Operand::Constant(Constant {
-                    ty: Type::primitive(PrimitiveType::Integer),
-                    value: ConstantValue::Integer(1),
-                }),
-            },
-            source_info: SourceInfo {
-                span: _source_location.clone(),
-                scope: 0,
-            },
-        });
+                },
+                rvalue: Rvalue::BinaryOp {
+                    op: BinOp::Add,
+                    left: Operand::Copy(Place {
+                        local: index_local,
+                        projection: vec![],
+                    }),
+                    right: Operand::Constant(Constant {
+                        ty: Type::primitive(PrimitiveType::Integer),
+                        value: ConstantValue::Integer(1),
+                    }),
+                },
+                source_info: SourceInfo {
+                    span: _source_location.clone(),
+                    scope: 0,
+                },
+            });
 
-        // Jump back to loop head
-        self.builder
-            .set_terminator(Terminator::Goto { target: loop_head });
+            // Jump back to loop head
+            self.builder
+                .set_terminator(Terminator::Goto { target: loop_head });
+        }
 
         // Continue after loop
         self.builder.switch_to_block(loop_end);

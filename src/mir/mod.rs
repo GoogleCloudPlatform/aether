@@ -547,6 +547,20 @@ impl Builder {
         }
     }
 
+    /// Check if the current block's terminator is a Return statement
+    /// that was explicitly set during lowering (not just the default Unreachable)
+    pub fn current_block_diverges(&self) -> bool {
+        if let (Some(func), Some(block_id)) = (&self.current_function, self.current_block) {
+            if let Some(block) = func.basic_blocks.get(&block_id) {
+                // Only Return counts as intentionally diverging.
+                // Unreachable is the default terminator for new blocks, so we shouldn't
+                // treat it as an intentional termination.
+                return matches!(block.terminator, Terminator::Return);
+            }
+        }
+        false
+    }
+
     /// Push a new scope
     pub fn push_scope(&mut self) -> ScopeId {
         let scope_id = self.next_scope_id;
