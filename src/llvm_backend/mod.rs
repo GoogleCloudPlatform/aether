@@ -33,6 +33,7 @@ use inkwell::types::BasicMetadataTypeEnum;
 use inkwell::values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, PointerValue};
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -108,6 +109,8 @@ pub struct LLVMBackend<'ctx> {
     function_declarations: Option<HashMap<String, FunctionValue<'ctx>>>,
     string_globals: HashMap<String, PointerValue<'ctx>>,
     type_definitions: HashMap<String, crate::types::TypeDefinition>,
+    /// Stores captured operands for each closure local (keyed by the local where closure is assigned)
+    closure_captures: RefCell<HashMap<mir::LocalId, Vec<mir::Operand>>>,
 }
 
 impl<'ctx> LLVMBackend<'ctx> {
@@ -122,6 +125,7 @@ impl<'ctx> LLVMBackend<'ctx> {
             function_declarations: None,
             string_globals: HashMap::new(),
             type_definitions: HashMap::new(),
+            closure_captures: RefCell::new(HashMap::new()),
         }
     }
 
@@ -748,6 +752,19 @@ impl<'ctx> LLVMBackend<'ctx> {
             for (i, stmt) in mir_block.statements.iter().enumerate() {
                 match stmt {
                     mir::Statement::Assign { place, rvalue, .. } => {
+                        // Step 4: Store captures when assigning a Closure
+                        if let mir::Rvalue::Closure { captures, .. } = rvalue {
+                            self.closure_captures.borrow_mut().insert(place.local, captures.clone());
+                        }
+                        
+                        // Propagate captures when copying/moving a closure
+                        if let mir::Rvalue::Use(mir::Operand::Copy(src_place) | mir::Operand::Move(src_place)) = rvalue {
+                             let captures = self.closure_captures.borrow().get(&src_place.local).cloned();
+                             if let Some(c) = captures {
+                                 self.closure_captures.borrow_mut().insert(place.local, c);
+                             }
+                        }
+
                         let result =
                             self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
                         if let Some(&alloca) = local_allocas.get(&place.local) {
@@ -1480,6 +1497,19 @@ impl<'ctx> LLVMBackend<'ctx> {
                     // Generate argument values
                     let mut arg_values: Vec<BasicMetadataValueEnum> = Vec::new();
                     let mut param_types: Vec<BasicMetadataTypeEnum> = Vec::new();
+
+                    // Step 5: Prepend captured variables if this is a closure call
+                    // Clone captures before iterating to avoid holding RefCell borrow
+                    // while calling generate_operand (which needs mutable self access)
+                    let captures_clone = self.closure_captures.borrow().get(&place.local).cloned();
+                    if let Some(captures) = captures_clone {
+                        for capture in captures {
+                            let capture_value =
+                                self.generate_operand(&capture, local_allocas, builder, function)?;
+                            param_types.push(capture_value.get_type().into());
+                            arg_values.push(capture_value.into());
+                        }
+                    }
 
                     for arg in args {
                         let arg_value =

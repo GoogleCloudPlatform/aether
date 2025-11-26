@@ -411,7 +411,7 @@ pub type ScopeId = u32;
 /// MIR builder for constructing MIR from AST
 pub struct Builder {
     /// Current function being built
-    current_function: Option<Function>,
+    pub current_function: Option<Function>,
 
     /// Next local ID
     next_local_id: LocalId,

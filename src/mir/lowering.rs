@@ -283,7 +283,17 @@ impl LoweringContext {
                             return_type: Box::new(ret_type),
                         };
                     }
-                    Some(self.lower_expression(init_expr)?)
+                    
+                    let op = self.lower_expression(init_expr)?;
+                    
+                    // If type is inferred, use the type of the initializer
+                    if let Type::Named { name, .. } = &ty {
+                        if name == "_inferred" {
+                            ty = self.get_operand_type(&op);
+                        }
+                    }
+                    
+                    Some(op)
                 } else {
                     None
                 };
@@ -1166,6 +1176,25 @@ impl LoweringContext {
         Ok(())
     }
 
+    /// Helper to get type of an operand
+    fn get_operand_type(&self, operand: &Operand) -> Type {
+        match operand {
+            Operand::Constant(c) => c.ty.clone(),
+            Operand::Copy(place) | Operand::Move(place) => {
+                if let Some(func) = &self.builder.current_function {
+                    if let Some(local) = func.locals.get(&place.local) {
+                        return local.ty.clone();
+                    }
+                    if let Some(param) = func.parameters.iter().find(|p| p.local_id == place.local) {
+                        return param.ty.clone();
+                    }
+                }
+                // Default fallback
+                Type::primitive(PrimitiveType::Integer)
+            }
+        }
+    }
+
     /// Lower an expression to an operand
     fn lower_expression(&mut self, expr: &ast::Expression) -> Result<Operand, SemanticError> {
         match expr {
@@ -1668,10 +1697,34 @@ impl LoweringContext {
         let lambda_name = format!("__lambda_{}", self.lambda_counter);
         self.lambda_counter += 1;
 
-        eprintln!("Lowering lambda to MIR function: {}", lambda_name);
+        // Look up captured variables in the CURRENT scope before switching to lambda builder
+        let mut capture_operands = Vec::new();
+        let mut capture_types = Vec::new();
+        for capture in captures {
+            if let Some(&local_id) = self.var_map.get(&capture.name.name) {
+                let capture_type = self.var_types.get(&capture.name.name)
+                    .cloned()
+                    .unwrap_or_else(|| Type::primitive(PrimitiveType::Integer));
+                capture_operands.push((capture.name.name.clone(), Operand::Copy(Place {
+                    local: local_id,
+                    projection: vec![],
+                })));
+                capture_types.push((capture.name.name.clone(), capture_type));
+            } else {
+                return Err(SemanticError::UndefinedSymbol {
+                    symbol: capture.name.name.clone(),
+                    location: capture.source_location.clone(),
+                });
+            }
+        }
 
-        // Convert parameters to MIR types
+        // Build parameters list: captures first, then regular parameters
         let mut mir_params = Vec::new();
+        // Add captures as parameters
+        for (name, ty) in &capture_types {
+            mir_params.push((format!("__capture_{}", name), ty.clone()));
+        }
+        // Add regular parameters
         for param in parameters {
             let param_type = self.ast_type_to_mir_type(&param.param_type)?;
             mir_params.push((param.name.name.clone(), param_type));
@@ -1694,14 +1747,25 @@ impl LoweringContext {
         // Use a fresh builder for the lambda
         let saved_builder = std::mem::replace(&mut self.builder, Builder::new());
 
-        // Start building the lambda function
+        // Start building the lambda function with captures as extra parameters
         self.builder.start_function(lambda_name.clone(), mir_params.clone(), mir_return_type.clone());
 
-        // Set up parameter mappings
+        // Set up parameter mappings - first captures, then regular parameters
         if let Some(current_func) = &self.builder.current_function {
-            for (ast_param, mir_param) in parameters.iter().zip(current_func.parameters.iter()) {
+            let mut param_idx = 0;
+            // Map captures (using original names, not __capture_ prefix)
+            for (capture_name, capture_type) in &capture_types {
+                let mir_param = &current_func.parameters[param_idx];
+                self.var_map.insert(capture_name.clone(), mir_param.local_id);
+                self.var_types.insert(capture_name.clone(), capture_type.clone());
+                param_idx += 1;
+            }
+            // Map regular parameters
+            for ast_param in parameters {
+                let mir_param = &current_func.parameters[param_idx];
                 self.var_map.insert(ast_param.name.name.clone(), mir_param.local_id);
                 self.var_types.insert(ast_param.name.name.clone(), mir_param.ty.clone());
+                param_idx += 1;
             }
         }
 
@@ -1760,17 +1824,13 @@ impl LoweringContext {
         self.return_local = saved_return_local;
         self.loop_stack = saved_loop_stack;
 
-        // Create closure value
-        // For now, captures are ignored (Phase 4 will handle them)
-        let capture_operands: Vec<Operand> = captures.iter().map(|_c| {
-            // TODO: Look up captured variable and create operand
-            Operand::Constant(Constant {
-                ty: Type::primitive(PrimitiveType::Integer),
-                value: ConstantValue::Integer(0),
-            })
-        }).collect();
+        // Create closure value with captured operands
+        let closure_captures: Vec<Operand> = capture_operands
+            .into_iter()
+            .map(|(_, operand)| operand)
+            .collect();
 
-        // Create closure type (function pointer type)
+        // Create closure type (function pointer type) - includes captures and regular params
         let closure_type = Type::Function {
             parameter_types: mir_params.iter().map(|(_, ty)| ty.clone()).collect(),
             return_type: Box::new(mir_return_type),
@@ -1782,7 +1842,7 @@ impl LoweringContext {
             place: Place { local: closure_local, projection: vec![] },
             rvalue: Rvalue::Closure {
                 func_name: lambda_name,
-                captures: capture_operands,
+                captures: closure_captures,
             },
             source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
         });

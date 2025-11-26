@@ -1850,17 +1850,36 @@ impl SemanticAnalyzer {
                 body,
                 source_location,
             } => {
-                eprintln!("Semantic: Analyzing lambda expression");
+                // First, look up all captures in the CURRENT (parent) scope before entering lambda scope
+                let mut captured_symbols = Vec::new();
+                for capture in captures {
+                    // Look up the captured variable in the enclosing scope
+                    if let Some(symbol) = self.symbol_table.lookup_symbol(&capture.name.name) {
+                        captured_symbols.push(symbol.clone());
+                    } else {
+                        return Err(SemanticError::UndefinedSymbol {
+                            symbol: capture.name.name.clone(),
+                            location: capture.source_location.clone(),
+                        });
+                    }
+                }
 
                 // Enter a new scope for the lambda
                 self.symbol_table.enter_scope(ScopeKind::Function);
 
-                // Phase 4: Verify captures exist in enclosing scope
-                // For now, we skip capture verification - captures are checked when we
-                // actually use them (they'll fail if not in scope)
-                for capture in captures {
-                    eprintln!("  Lambda capture: {}", capture.name.name);
-                    // TODO: Look up capture in parent scope and add to lambda scope
+                // Add captured variables to the lambda scope
+                for symbol in captured_symbols {
+                    let capture_symbol = Symbol {
+                        name: symbol.name.clone(),
+                        symbol_type: symbol.symbol_type.clone(),
+                        kind: SymbolKind::Variable, // Captured as a local variable
+                        is_mutable: false, // Captures are immutable by default
+                        is_initialized: true,
+                        declaration_location: symbol.declaration_location.clone(),
+                        is_moved: false,
+                        borrow_state: BorrowState::None,
+                    };
+                    self.symbol_table.add_symbol(capture_symbol)?;
                 }
 
                 // Add parameters to lambda scope
