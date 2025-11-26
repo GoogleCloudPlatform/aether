@@ -42,12 +42,12 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.20: Match Example Verified (added Makefile) - implemented match statement parsing and MIR lowering
 - [x] Task 4.21: Match Basics Example Verified (added Makefile)
 - [x] Task 4.22: Match Guards Example Verified (added Makefile) - implemented match guards with `if {condition}` syntax
+- [x] Task 4.23: Closures Example Verified (verified with test_capture.aes) - implemented capture tracking, hidden parameters, and proper calling convention
 
 ## Current Task
-Task 4.23: Continue verifying remaining examples
+Task 4.24: Continue verifying remaining examples
 
 ## Not Yet Working (needs parser/semantic work)
-- closures: needs lambda syntax (`=>`)
 - strings/FFI: needs String to Pointer<Char> coercion
 - enums with data: needs enum variant patterns with bindings
 
@@ -70,6 +70,7 @@ None
 - [x] ~~`match` expressions not supported~~ (FIXED: implemented Statement::Match with pattern matching on integer literals)
 - [ ] Enums with associated data syntax (e.g., `Some(Int)`) not supported
 - [x] ~~`return` inside `when` without `else` doesn't properly terminate~~ (FIXED: MIR lowering now checks for diverging blocks)
+- [x] ~~Closures not capturing variables~~ (FIXED: implemented full capture support)
 
 ## Session Notes
 - Resolved parser infinite loop for file-scoped modules.
@@ -92,3 +93,4 @@ None
 - Verified `iteration` example (returns 55 = 1+2+...+10).
 - **Implemented match statements:** Added `Statement::Match` and `MatchArm` to AST, `parse_match_statement` to parser, semantic analysis handling, and MIR lowering using `SwitchInt` terminator. Supports integer literal patterns and wildcard (`_`) patterns. Verified with `match` example (returns 200) and `match_basics` example (returns 3).
 - **Implemented match guards:** Added `guard: Option<Box<Expression>>` to `MatchArm`, added `if` keyword to lexer, updated parser to parse `pattern if {condition} =>` syntax, updated MIR lowering to use sequential conditional branches for guards instead of `SwitchInt`. Verified with `match_guards` example (returns 4 = grade_score(95)).
+- **Implemented closure captures:** Added capture tracking in semantic analysis, hidden parameters in MIR lowering, and capture propagation in LLVM backend. Also fixed type inference for `_inferred` variables during lowering. Verified with `test_capture.aes` (returns 42).
