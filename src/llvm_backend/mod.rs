@@ -167,15 +167,26 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 .into()
                         }
                         crate::types::TypeDefinition::Enum { variants, .. } => {
-                            // Simple enums (no associated data) are represented as integers
-                            // Determine discriminant size based on number of variants
-                            let max_discriminant = variants.iter().map(|v| v.discriminant).max().unwrap_or(0);
-                            if max_discriminant <= 255 {
-                                self.context.i8_type().into()
-                            } else if max_discriminant <= 65535 {
-                                self.context.i16_type().into()
+                            // Check if any variant has associated data
+                            let has_data = variants.iter().any(|v| v.associated_type.is_some());
+
+                            if has_data {
+                                // Enums with data are represented as pointers to tagged unions
+                                self.context
+                                    .i8_type()
+                                    .ptr_type(AddressSpace::default())
+                                    .into()
                             } else {
-                                self.context.i32_type().into()
+                                // Simple enums (no associated data) are represented as integers
+                                // Determine discriminant size based on number of variants
+                                let max_discriminant = variants.iter().map(|v| v.discriminant).max().unwrap_or(0);
+                                if max_discriminant <= 255 {
+                                    self.context.i8_type().into()
+                                } else if max_discriminant <= 65535 {
+                                    self.context.i16_type().into()
+                                } else {
+                                    self.context.i32_type().into()
+                                }
                             }
                         }
                         _ => {
@@ -269,24 +280,35 @@ impl<'ctx> LLVMBackend<'ctx> {
         }
     }
 
-    /// Calculate field offset for a given struct type and field index
-    fn calculate_field_offset(&self, struct_name: &str, field_index: usize) -> u64 {
-        if let Some(type_def) = self.type_definitions.get(struct_name) {
-            if let crate::types::TypeDefinition::Struct { fields, .. } = type_def {
-                let mut current_offset = 0u64;
-                for (i, (_, field_ty)) in fields.iter().enumerate() {
-                    if i == field_index {
-                        break;
+    /// Calculate field offset for a given struct or enum type and field index
+    fn calculate_field_offset(&self, type_name: &str, field_index: usize) -> u64 {
+        if let Some(type_def) = self.type_definitions.get(type_name) {
+            match type_def {
+                crate::types::TypeDefinition::Struct { fields, .. } => {
+                    let mut current_offset = 0u64;
+                    for (i, (_, field_ty)) in fields.iter().enumerate() {
+                        if i == field_index {
+                            break;
+                        }
+                        let field_size = self.get_type_size(field_ty);
+                        current_offset += field_size;
+                        // Add alignment padding
+                        let alignment = field_size.min(8);
+                        if current_offset % alignment != 0 {
+                            current_offset = (current_offset + alignment - 1) / alignment * alignment;
+                        }
                     }
-                    let field_size = self.get_type_size(field_ty);
-                    current_offset += field_size;
-                    // Add alignment padding
-                    let alignment = field_size.min(8);
-                    if current_offset % alignment != 0 {
-                        current_offset = (current_offset + alignment - 1) / alignment * alignment;
+                    return current_offset;
+                }
+                crate::types::TypeDefinition::Enum { .. } => {
+                    // For enums: field 0 = discriminant at offset 0, field 1 = data at offset 4
+                    if field_index == 0 {
+                        return 0; // Discriminant
+                    } else {
+                        return 4; // Data field is after 4-byte discriminant
                     }
                 }
-                return current_offset;
+                _ => {}
             }
         }
         // Fallback: assume 8-byte fields
@@ -2019,13 +2041,23 @@ impl<'ctx> LLVMBackend<'ctx> {
                             }
                         }
 
-                        // For simple unit enums (no associated data), return the discriminant directly
-                        // For enums with data, return pointer to the tagged union
-                        if operands.is_empty() {
-                            // Simple enum - return discriminant as integer
+                        // Check if the enum type has ANY variants with associated data
+                        // If so, the enum type is a pointer type and we must return a pointer
+                        let enum_has_data = if let Some(enum_def) = self.type_definitions.get(enum_name) {
+                            if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
+                                variants.iter().any(|v| v.associated_type.is_some())
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+
+                        if !enum_has_data && operands.is_empty() {
+                            // Simple enum (no data on any variant) - return discriminant as integer
                             Ok(disc_value.into())
                         } else {
-                            // Enum with data - return pointer to tagged union
+                            // Enum with data (on some variant) - return pointer to tagged union
                             let enum_ptr = builder
                                 .build_pointer_cast(
                                     enum_alloca,
@@ -2093,7 +2125,30 @@ impl<'ctx> LLVMBackend<'ctx> {
                                         if let Some(ref struct_name) = current_struct_type {
                                             self.calculate_field_offset(struct_name, *field as usize)
                                         } else {
-                                            (*field * 8) as u64 // Default fallback
+                                            // Check if we're accessing an enum's data field
+                                            // For enums, field 0 is discriminant (at offset 0) and field 1 is data (at offset 4)
+                                            if let Some(local) = function.locals.get(&place.local) {
+                                                if let crate::types::Type::Named { name, .. } = &local.ty {
+                                                    if let Some(type_def) = self.type_definitions.get(name) {
+                                                        if matches!(type_def, crate::types::TypeDefinition::Enum { .. }) {
+                                                            // For enum data extraction, field 1 (data) is at offset 4
+                                                            if *field == 1 {
+                                                                4u64
+                                                            } else {
+                                                                0u64 // Discriminant is at offset 0
+                                                            }
+                                                        } else {
+                                                            (*field * 8) as u64
+                                                        }
+                                                    } else {
+                                                        (*field * 8) as u64
+                                                    }
+                                                } else {
+                                                    (*field * 8) as u64
+                                                }
+                                            } else {
+                                                (*field * 8) as u64 // Default fallback
+                                            }
                                         };
 
                                     let indices = vec![

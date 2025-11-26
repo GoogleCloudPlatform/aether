@@ -651,9 +651,63 @@ impl LoweringContext {
         // Use wildcard as otherwise target, or end block if no wildcard
         let otherwise = wildcard_block.unwrap_or(end_bb);
 
+        // Get the value_place from match_op for binding extraction (before it's moved)
+        let value_place = match &match_op {
+            Operand::Copy(place) | Operand::Move(place) => place.clone(),
+            Operand::Constant(_) => {
+                // If it's a constant, we can't extract fields from it
+                // This shouldn't happen for enums with data
+                Place {
+                    local: 0,
+                    projection: vec![],
+                }
+            }
+        };
+
+        // Clone switch_values for use after the terminator is set
+        let switch_values_copy = switch_values.clone();
+
+        // Check if we're matching on an enum with associated data
+        // If so, we need to extract the discriminant first
+        let switch_discriminant = if let Some(ast::Pattern::EnumVariant { enum_name: Some(enum_ident), source_location, .. }) = arms.first().map(|a| &a.pattern) {
+            // Check if this enum has associated data
+            if let Some(enum_def) = self.program.type_definitions.get(&enum_ident.name) {
+                if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
+                    let has_data = variants.iter().any(|v| v.associated_type.is_some());
+                    if has_data {
+                        // For enums with data, extract the discriminant from the pointer
+                        let disc_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+                        self.builder.push_statement(Statement::Assign {
+                            place: Place {
+                                local: disc_local,
+                                projection: vec![],
+                            },
+                            rvalue: Rvalue::Discriminant(value_place.clone()),
+                            source_info: SourceInfo {
+                                span: source_location.clone(),
+                                scope: 0,
+                            },
+                        });
+                        Operand::Copy(Place {
+                            local: disc_local,
+                            projection: vec![],
+                        })
+                    } else {
+                        match_op.clone()
+                    }
+                } else {
+                    match_op.clone()
+                }
+            } else {
+                match_op.clone()
+            }
+        } else {
+            match_op.clone()
+        };
+
         // Emit the switch
         self.builder.set_terminator(Terminator::SwitchInt {
-            discriminant: match_op,
+            discriminant: switch_discriminant,
             switch_ty: Type::primitive(ast::PrimitiveType::Integer),
             targets: SwitchTargets {
                 values: switch_values,
@@ -663,8 +717,22 @@ impl LoweringContext {
         });
 
         // Second pass: lower each arm's body
-        for (arm, &arm_bb) in arms.iter().zip(arm_blocks.iter()) {
+        for (i, (arm, &arm_bb)) in arms.iter().zip(arm_blocks.iter()).enumerate() {
             self.builder.switch_to_block(arm_bb);
+
+            // Handle pattern bindings before lowering the body
+            if let ast::Pattern::EnumVariant { binding, .. } = &arm.pattern {
+                if binding.is_some() {
+                    // Get the discriminant value for this arm
+                    let variant_idx = if i < switch_values_copy.len() {
+                        switch_values_copy[i]
+                    } else {
+                        0
+                    };
+                    self.lower_pattern_bindings(&arm.pattern, &value_place, variant_idx)?;
+                }
+            }
+
             self.lower_block(&arm.body)?;
             // Only set goto if block doesn't already diverge (e.g., with return)
             if !self.builder.current_block_diverges() {
@@ -2833,7 +2901,7 @@ impl LoweringContext {
     ) -> Result<(), SemanticError> {
         match pattern {
             ast::Pattern::EnumVariant {
-                enum_name: _,
+                enum_name,
                 variant_name,
                 binding,
                 nested_pattern,
@@ -2949,47 +3017,16 @@ impl LoweringContext {
                 // If there's a binding (and no nested pattern), extract the enum variant's associated data
                 if let Some(binding_name) = binding {
                     if nested_pattern.is_none() {
-                        // Get the type of the associated data from symbol table
-                        let binding_type = if let Some(st) = &self.symbol_table {
-                            eprintln!(
-                                "MIR: Looking up binding {} in symbol table",
-                                binding_name.name
-                            );
-                            // Look up the binding in the symbol table
-                            if let Some(symbol) = st.lookup_symbol(&binding_name.name) {
+                        // Get the type of the associated data from the enum definition
+                        let binding_type = self.get_enum_variant_associated_type(enum_name, variant_name)
+                            .unwrap_or_else(|| {
                                 eprintln!(
-                                    "MIR: Found symbol {} with type {:?}",
-                                    binding_name.name, symbol.symbol_type
+                                    "MIR: Could not find associated type for {:?}::{}",
+                                    enum_name.as_ref().map(|e| &e.name),
+                                    variant_name.name
                                 );
-                                match &symbol.kind {
-                                    SymbolKind::Variable | SymbolKind::Parameter => {
-                                        symbol.symbol_type.clone()
-                                    }
-                                    _ => {
-                                        eprintln!(
-                                            "MIR: Symbol {} has wrong kind: {:?}",
-                                            binding_name.name, symbol.kind
-                                        );
-                                        Type::Error
-                                    }
-                                }
-                            } else {
-                                eprintln!(
-                                    "MIR: Symbol {} not found in symbol table",
-                                    binding_name.name
-                                );
-                                // Try to infer the type from the enum variant
-                                // For now, use Integer for Ok variant, String for Error variant
-                                match variant_name.name.as_str() {
-                                    "Ok" => Type::primitive(ast::PrimitiveType::Integer),
-                                    "Error" => Type::primitive(ast::PrimitiveType::String),
-                                    _ => Type::Error,
-                                }
-                            }
-                        } else {
-                            eprintln!("MIR: No symbol table available");
-                            Type::Error
-                        };
+                                Type::primitive(ast::PrimitiveType::Integer) // Default to Int
+                            });
 
                         // Create a local for the binding
                         let binding_local = self.builder.new_local(binding_type.clone(), false);
@@ -3098,6 +3135,30 @@ impl LoweringContext {
             }
         }
         None
+    }
+
+    /// Get the associated type for a specific enum variant given the enum name
+    fn get_enum_variant_associated_type(
+        &self,
+        enum_name: &Option<ast::Identifier>,
+        variant_name: &ast::Identifier,
+    ) -> Option<Type> {
+        // First try to look up by enum name if provided
+        if let Some(enum_ident) = enum_name {
+            // Check type_definitions from program (copied from symbol table)
+            if let Some(type_def) = self.program.type_definitions.get(&enum_ident.name) {
+                if let TypeDefinition::Enum { variants, .. } = type_def {
+                    for variant in variants {
+                        if variant.name == variant_name.name {
+                            return variant.associated_type.clone();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: search all enums for this variant (less precise)
+        self.get_enum_variant_type(variant_name)
     }
 
     /// Get the type of an expression
