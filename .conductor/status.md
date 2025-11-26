@@ -36,15 +36,15 @@ Phase 4: Example Verification and Makefiles
 - [x] Task 4.14: Type Aliases Example Verified (added Makefile)
 - [x] Task 4.15: Type Conversions Example Verified (added Makefile)
 - [x] Task 4.16: Return Values Example Verified (added Makefile) - fixed by MIR return bug fix
+- [x] Task 4.17: Foreach Example Verified (added Makefile) - implemented range syntax in for loops
 
 ## Current Task
-Task 4.17: Continue verifying remaining examples
+Task 4.18: Continue verifying remaining examples
 
 ## Not Yet Working (needs parser/semantic work)
 - closures: needs lambda syntax (`=>`)
 - arrays: needs array literal syntax (`[1, 2, 3]`)
 - strings/FFI: needs String to Pointer<Char> coercion
-- foreach: needs range syntax (`0..10`)
 
 ## Next Actions
 1. Continue verifying examples in `examples/v2/`.

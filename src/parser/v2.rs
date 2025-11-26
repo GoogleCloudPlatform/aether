@@ -1619,33 +1619,60 @@ impl Parser {
         // Optional type annotation: for x: T in ...
         let element_type = if self.check(&TokenType::Colon) {
             self.advance();
-            Box::new(self.parse_type()?)
+            Some(Box::new(self.parse_type()?))
         } else {
-            // Default to Integer type (should be inferred later by type checker)
-            Box::new(TypeSpecifier::Primitive {
-                type_name: PrimitiveType::Integer,
-                source_location: start_location.clone(),
-            })
+            None
         };
 
         // Expect 'in' keyword
         self.expect_keyword(Keyword::In, "expected 'in' after loop variable")?;
 
-        // Parse the collection/iterable expression
-        let collection = Box::new(self.parse_expression()?);
+        // Parse the start of the range or collection expression
+        let from_expr = self.parse_primary_expression()?;
 
-        // Parse the loop body
-        let body = self.parse_block()?;
+        // Check if this is a range expression (.. or ..=)
+        if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
+            let inclusive = self.check(&TokenType::DotDotEqual);
+            self.advance(); // consume .. or ..=
 
-        Ok(Statement::ForEachLoop {
-            collection,
-            element_binding,
-            element_type,
-            index_binding: None,
-            body,
-            label: None,
-            source_location: start_location,
-        })
+            // Parse the end of the range
+            let to_expr = self.parse_primary_expression()?;
+
+            // Parse the loop body
+            let body = self.parse_block()?;
+
+            Ok(Statement::FixedIterationLoop {
+                counter: element_binding,
+                from_value: Box::new(from_expr),
+                to_value: Box::new(to_expr),
+                step_value: None,
+                inclusive,
+                body,
+                label: None,
+                source_location: start_location,
+            })
+        } else {
+            // This is a for-each loop over a collection
+            let collection = Box::new(from_expr);
+
+            // Parse the loop body
+            let body = self.parse_block()?;
+
+            let default_type = Box::new(TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
+                source_location: start_location.clone(),
+            });
+
+            Ok(Statement::ForEachLoop {
+                collection,
+                element_binding,
+                element_type: element_type.unwrap_or(default_type),
+                index_binding: None,
+                body,
+                label: None,
+                source_location: start_location,
+            })
+        }
     }
 
     /// Parse a break statement
@@ -6185,33 +6212,33 @@ func next_item() -> Int {
 
     #[test]
     fn test_for_loop_with_range() {
-        // For loop iterating over a range
+        // For loop iterating over a range - now produces FixedIterationLoop
         let source = "for i in 0..10 { x = i; }";
         let mut parser = parser_from_source(source);
         let result = parser.parse_for_loop();
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::ForEachLoop { collection, .. } = stmt {
-            assert!(matches!(*collection, Expression::Range { .. }));
+        if let Statement::FixedIterationLoop { counter, inclusive, .. } = stmt {
+            assert_eq!(counter.name, "i");
+            assert!(!inclusive); // exclusive range
         } else {
-            panic!("Expected ForEachLoop statement");
+            panic!("Expected FixedIterationLoop statement");
         }
     }
 
     #[test]
     fn test_for_loop_with_inclusive_range() {
-        // For loop with inclusive range
+        // For loop with inclusive range - now produces FixedIterationLoop
         let source = "for i in 1..=5 { x = i; }";
         let mut parser = parser_from_source(source);
         let result = parser.parse_for_loop();
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::ForEachLoop { collection, .. } = stmt {
-            if let Expression::Range { inclusive, .. } = *collection {
-                assert!(inclusive);
-            } else {
-                panic!("Expected Range expression");
-            }
+        if let Statement::FixedIterationLoop { counter, inclusive, .. } = stmt {
+            assert_eq!(counter.name, "i");
+            assert!(inclusive); // inclusive range
+        } else {
+            panic!("Expected FixedIterationLoop statement");
         }
     }
 
@@ -6360,16 +6387,17 @@ func next_item() -> Int {
     // Combined feature tests
     #[test]
     fn test_combined_for_range() {
-        // For loop with integer range
+        // For loop with integer range - produces FixedIterationLoop
         let source = "for i in 0..10 { x = i; }";
         let mut parser = parser_from_source(source);
         let result = parser.parse_for_loop();
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::ForEachLoop { collection, .. } = stmt {
-            assert!(matches!(*collection, Expression::Range { .. }));
+        if let Statement::FixedIterationLoop { counter, inclusive, .. } = stmt {
+            assert_eq!(counter.name, "i");
+            assert!(!inclusive);
         } else {
-            panic!("Expected ForEachLoop statement");
+            panic!("Expected FixedIterationLoop statement");
         }
     }
 
@@ -6420,22 +6448,18 @@ func next_item() -> Int {
         let result = parser.parse_for_loop();
         assert!(result.is_ok());
         let stmt = result.unwrap();
-        if let Statement::ForEachLoop {
-            collection,
+        if let Statement::FixedIterationLoop {
+            counter,
             body,
-            element_binding,
+            inclusive,
             ..
         } = stmt
         {
-            assert_eq!(element_binding.name, "i");
-            if let Expression::Range { inclusive, .. } = *collection {
-                assert!(inclusive);
-            } else {
-                panic!("Expected Range expression");
-            }
+            assert_eq!(counter.name, "i");
+            assert!(inclusive); // inclusive range
             assert!(!body.statements.is_empty());
         } else {
-            panic!("Expected ForEachLoop statement");
+            panic!("Expected FixedIterationLoop statement");
         }
     }
 
