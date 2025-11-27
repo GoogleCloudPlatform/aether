@@ -788,6 +788,31 @@ impl TypeChecker {
                 },
             ) if t1 == t2 => true,
 
+            // Reference to Pointer coercion (implicit cast for unsafe contexts)
+            (
+                Type::Pointer { target_type: ptr_target, is_mutable: ptr_mut },
+                Type::Owned { ownership: OwnershipKind::Borrowed, base_type: ref_base },
+            ) => {
+                // &T -> *const T is allowed
+                // &T -> *mut T is NOT allowed
+                self.types_compatible(ptr_target, ref_base) && !*ptr_mut
+            },
+            (
+                Type::Pointer { target_type: ptr_target, is_mutable: _ },
+                Type::Owned { ownership: OwnershipKind::MutableBorrow, base_type: ref_base },
+            ) => {
+                // &mut T -> *mut T or *const T is allowed
+                self.types_compatible(ptr_target, ref_base)
+            },
+
+            // String to Pointer<Char> coercion (CString compatibility)
+            (
+                Type::Pointer { target_type, is_mutable: false },
+                Type::Primitive(PrimitiveType::String),
+            ) => {
+                matches!(target_type.as_ref(), Type::Primitive(PrimitiveType::Char))
+            },
+
             // Array compatibility (dynamic vs sized arrays)
             (
                 Type::Array {

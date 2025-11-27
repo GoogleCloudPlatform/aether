@@ -250,24 +250,24 @@ impl MemoryManager {
     }
 }
 
-/// Allocate memory (returns address as integer for AetherScript)
+/// Allocate memory
 #[no_mangle]
-pub unsafe extern "C" fn aether_malloc(size: c_int) -> isize {
+pub unsafe extern "C" fn aether_malloc(size: c_int) -> *mut c_void {
     if size <= 0 {
-        return 0;
+        return ptr::null_mut();
     }
 
     let mut manager = match MEMORY_MANAGER.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
-    manager.allocate(size as usize) as isize
+    manager.allocate(size as usize)
 }
 
-/// Free memory (accepts address as integer for AetherScript)
+/// Free memory
 #[no_mangle]
-pub unsafe extern "C" fn aether_free(ptr: isize) {
-    if ptr == 0 {
+pub unsafe extern "C" fn aether_free(ptr: *mut c_void) {
+    if ptr.is_null() {
         return;
     }
 
@@ -275,7 +275,7 @@ pub unsafe extern "C" fn aether_free(ptr: isize) {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
-    manager.deallocate(ptr as *mut c_void);
+    manager.deallocate(ptr);
 }
 
 /// Reallocate memory
@@ -376,8 +376,8 @@ pub unsafe extern "C" fn aether_strdup(s: *const c_char) -> *mut c_char {
 
 /// Write a byte at offset
 #[no_mangle]
-pub unsafe extern "C" fn aether_write_byte(ptr: isize, offset: c_int, value: c_int) {
-    if ptr == 0 || offset < 0 {
+pub unsafe extern "C" fn aether_write_byte(ptr: *mut c_void, offset: c_int, value: c_int) {
+    if ptr.is_null() || offset < 0 {
         return;
     }
 
@@ -387,19 +387,19 @@ pub unsafe extern "C" fn aether_write_byte(ptr: isize, offset: c_int, value: c_i
 
 /// Read a byte at offset
 #[no_mangle]
-pub unsafe extern "C" fn aether_read_byte(ptr: isize, offset: c_int) -> c_int {
-    if ptr == 0 || offset < 0 {
+pub unsafe extern "C" fn aether_read_byte(ptr: *const c_void, offset: c_int) -> c_int {
+    if ptr.is_null() || offset < 0 {
         return 0;
     }
 
-    let byte_ptr = (ptr as *mut u8).add(offset as usize);
+    let byte_ptr = (ptr as *const u8).add(offset as usize);
     *byte_ptr as c_int
 }
 
 /// Write an i32 at offset
 #[no_mangle]
-pub unsafe extern "C" fn aether_write_i32(ptr: isize, offset: c_int, value: c_int) {
-    if ptr == 0 || offset < 0 {
+pub unsafe extern "C" fn aether_write_i32(ptr: *mut c_void, offset: c_int, value: c_int) {
+    if ptr.is_null() || offset < 0 {
         return;
     }
 
@@ -409,19 +409,19 @@ pub unsafe extern "C" fn aether_write_i32(ptr: isize, offset: c_int, value: c_in
 
 /// Read an i32 at offset
 #[no_mangle]
-pub unsafe extern "C" fn aether_read_i32(ptr: isize, offset: c_int) -> c_int {
-    if ptr == 0 || offset < 0 {
+pub unsafe extern "C" fn aether_read_i32(ptr: *const c_void, offset: c_int) -> c_int {
+    if ptr.is_null() || offset < 0 {
         return 0;
     }
 
-    let i32_ptr = (ptr as *mut u8).add(offset as usize) as *mut c_int;
+    let i32_ptr = (ptr as *const u8).add(offset as usize) as *mut c_int;
     *i32_ptr
 }
 
 /// Write an i64 at offset
 #[no_mangle]
-pub unsafe extern "C" fn aether_write_i64(ptr: isize, offset: c_int, value: i64) {
-    if ptr == 0 || offset < 0 {
+pub unsafe extern "C" fn aether_write_i64(ptr: *mut c_void, offset: c_int, value: i64) {
+    if ptr.is_null() || offset < 0 {
         return;
     }
 
@@ -431,12 +431,12 @@ pub unsafe extern "C" fn aether_write_i64(ptr: isize, offset: c_int, value: i64)
 
 /// Read an i64 at offset
 #[no_mangle]
-pub unsafe extern "C" fn aether_read_i64(ptr: isize, offset: c_int) -> i64 {
-    if ptr == 0 || offset < 0 {
+pub unsafe extern "C" fn aether_read_i64(ptr: *const c_void, offset: c_int) -> i64 {
+    if ptr.is_null() || offset < 0 {
         return 0;
     }
 
-    let i64_ptr = (ptr as *mut u8).add(offset as usize) as *mut i64;
+    let i64_ptr = (ptr as *const u8).add(offset as usize) as *mut i64;
     *i64_ptr
 }
 
