@@ -550,6 +550,10 @@ pub enum Statement {
         arms: Vec<MatchArm>,
         source_location: SourceLocation,
     },
+    Concurrent {
+        block: Block,
+        source_location: SourceLocation,
+    },
 }
 
 /// Variable mutability
@@ -1331,6 +1335,14 @@ impl ASTPrettyPrinter {
                 } else {
                     "return;".to_string()
                 }
+            }
+            Statement::Concurrent { block, .. } => {
+                let mut result = "concurrent {\n".to_string();
+                self.indent();
+                result.push_str(&self.print_block(block));
+                self.dedent();
+                result.push_str(&format!("{}}}", self.current_indent()));
+                result
             }
             _ => "/* other statement */".to_string(),
         }

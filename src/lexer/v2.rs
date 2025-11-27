@@ -116,6 +116,7 @@ pub enum Keyword {
     Return,
     Break,
     Continue,
+    Concurrent, // New async/await alternative
 
     // Error Handling
     Try,
@@ -233,6 +234,8 @@ impl Lexer {
         self.keywords.insert("break".to_string(), Keyword::Break);
         self.keywords
             .insert("continue".to_string(), Keyword::Continue);
+        self.keywords
+            .insert("concurrent".to_string(), Keyword::Concurrent);
 
         // Error handling keywords
         self.keywords.insert("try".to_string(), Keyword::Try);

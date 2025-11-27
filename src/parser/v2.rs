@@ -1881,6 +1881,21 @@ impl Parser {
         })
     }
 
+    /// Parse a concurrent block
+    /// Grammar: "concurrent" block
+    pub fn parse_concurrent_block(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Concurrent, "expected 'concurrent'")?;
+
+        let block = self.parse_block()?;
+
+        Ok(Statement::Concurrent {
+            block,
+            source_location: start_location,
+        })
+    }
+
     /// Parse any statement based on the leading token
     pub fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         // Check for keywords that start statements
@@ -1907,6 +1922,9 @@ impl Parser {
         }
         if self.check_keyword(Keyword::Continue) {
             return self.parse_continue_statement();
+        }
+        if self.check_keyword(Keyword::Concurrent) {
+            return self.parse_concurrent_block();
         }
 
         // Otherwise, try to parse as assignment or expression statement
