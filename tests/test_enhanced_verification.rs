@@ -13,18 +13,18 @@
 // limitations under the License.
 
 // Test program to demonstrate enhanced verification features
-use aether::verification::contracts::*;
 use aether::ast;
 use aether::error::SourceLocation;
-use aether::types::Type;
 use aether::semantic::metadata::*;
+use aether::types::Type;
+use aether::verification::contracts::*;
 
 fn main() {
     println!("Testing Enhanced Contract Verification System");
-    
+
     // Create a function contract with LLM-first features
     let mut contract = FunctionContract::new("safe_divide".to_string());
-    
+
     // Add enhanced precondition with proof hint
     contract.add_enhanced_precondition(
         "non_zero_denominator".to_string(),
@@ -38,7 +38,7 @@ fn main() {
         FailureAction::ThrowException("Division by zero".to_string()),
         VerificationHint::SMTSolver,
     );
-    
+
     // Add enhanced postcondition
     contract.add_enhanced_postcondition(
         "result_correct".to_string(),
@@ -56,7 +56,7 @@ fn main() {
         FailureAction::Abort,
         VerificationHint::SMTSolver,
     );
-    
+
     // Add semantic intent
     contract.set_intent(IntentSpec {
         primary_intent: "Perform safe division with zero check".to_string(),
@@ -66,16 +66,14 @@ fn main() {
             "Division completes without error".to_string(),
             "Result is mathematically correct".to_string(),
         ],
-        failure_modes: vec![
-            FailureMode {
-                description: "Division by zero".to_string(),
-                probability: 0.1,
-                impact: ImpactLevel::Critical,
-                mitigation: "Precondition check".to_string(),
-            }
-        ],
+        failure_modes: vec![FailureMode {
+            description: "Division by zero".to_string(),
+            probability: 0.1,
+            impact: ImpactLevel::Critical,
+            mitigation: "Precondition check".to_string(),
+        }],
     });
-    
+
     // Add behavioral specification
     contract.set_behavior(BehavioralSpec {
         idempotent: true,
@@ -86,23 +84,23 @@ fn main() {
         deterministic: true,
         thread_safe: true,
     });
-    
+
     // Generate proof obligations
     let obligations = contract.generate_proof_obligations();
-    
+
     println!("\n=== Contract Summary ===");
     println!("Function: {}", contract.function_name);
     println!("Preconditions: {}", contract.preconditions.len());
     println!("Postconditions: {}", contract.postconditions.len());
     println!("Is Pure: {}", contract.is_pure);
-    
+
     println!("\n=== Proof Obligations ===");
     for (i, obligation) in obligations.iter().enumerate() {
         println!("{}. {} - {}", i + 1, obligation.id, obligation.description);
         println!("   Method: {:?}", obligation.method);
         println!("   Priority: {:?}", obligation.priority);
     }
-    
+
     // Test semantic predicates
     println!("\n=== Semantic Predicates Test ===");
     let email_check = Expression::SemanticPredicate {
@@ -110,7 +108,7 @@ fn main() {
         args: vec![Expression::Variable("email".to_string())],
     };
     println!("Email validation: {}", email_check.to_string());
-    
+
     // Test temporal expressions
     println!("\n=== Temporal Expressions Test ===");
     let invariant = Expression::Temporal {
@@ -122,7 +120,7 @@ fn main() {
         }),
     };
     println!("Invariant: {}", invariant.to_string());
-    
+
     // Test aggregate expressions
     println!("\n=== Aggregate Expressions Test ===");
     let sum_positive = Expression::Aggregate {
@@ -135,6 +133,6 @@ fn main() {
         })),
     };
     println!("All accounts non-negative: {}", sum_positive.to_string());
-    
+
     println!("\n=== Test Complete ===");
 }

@@ -1,0 +1,10 @@
+// Minimal closure test - no captures, no calls
+module test_simple;
+
+func main() -> Int {
+    // Just define a lambda, don't call it yet
+    let add_one = (a: Int) -> Int => {{a + 1}};
+
+    // Return a constant to verify compilation works
+    return 42;
+}

@@ -1,0 +1,19 @@
+// Pointers Example
+// Demonstrates raw pointer usage
+
+module pointers;
+
+@extern("C")
+func printf(format: Pointer<Char>, value: Int) -> Int;
+
+func main() -> Int {
+    let x: Int = 42;
+
+    // Create a pointer to x
+    let ptr: Pointer<Int> = &x;
+
+    // Pointer arithmetic and dereferencing would be used here
+    // in unsafe contexts
+
+    return x;
+}

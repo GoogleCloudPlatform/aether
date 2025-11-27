@@ -13,55 +13,55 @@
 // limitations under the License.
 
 //! Verified Pattern Library for LLM Code Generation
-//! 
+//!
 //! This module provides a comprehensive library of verified code patterns
 //! that can be composed to generate correct programs.
 
 pub mod catalog;
 pub mod composition;
 
-use crate::ast::{Function, Statement, Expression, Block};
-use crate::verification::contracts::FunctionContract;
+use crate::ast::{Block, Expression, Function, Statement};
 use crate::error::SourceLocation;
+use crate::verification::contracts::FunctionContract;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// A verified code pattern that can be instantiated
 #[derive(Debug, Clone)]
 pub struct Pattern {
     /// Unique pattern identifier
     pub id: String,
-    
+
     /// Human-readable name
     pub name: String,
-    
+
     /// Pattern category
     pub category: PatternCategory,
-    
+
     /// Intent description for LLM understanding
     pub intent: String,
-    
+
     /// Detailed description
     pub description: String,
-    
+
     /// Pattern metadata
     pub metadata: PatternMetadata,
-    
+
     /// Template parameters
     pub parameters: Vec<PatternParameter>,
-    
+
     /// The pattern template
     pub template: PatternTemplate,
-    
+
     /// Verification contract
     pub contract: FunctionContract,
-    
+
     /// Composition rules
     pub composition_rules: Vec<CompositionRule>,
-    
+
     /// Usage examples
     pub examples: Vec<PatternExample>,
-    
+
     /// Performance characteristics
     pub performance: PerformanceProfile,
 }
@@ -106,25 +106,25 @@ pub enum PatternCategory {
 pub struct PatternMetadata {
     /// Tags for search
     pub tags: Vec<String>,
-    
+
     /// Required features
     pub requires: Vec<String>,
-    
+
     /// Provides capabilities
     pub provides: Vec<String>,
-    
+
     /// Author information
     pub author: String,
-    
+
     /// Version
     pub version: String,
-    
+
     /// Stability level
     pub stability: StabilityLevel,
-    
+
     /// Complexity estimate
     pub complexity: ComplexityEstimate,
-    
+
     /// Safety guarantees
     pub safety: SafetyGuarantees,
 }
@@ -145,10 +145,10 @@ pub enum StabilityLevel {
 pub struct ComplexityEstimate {
     /// Time complexity
     pub time: String,
-    
+
     /// Space complexity
     pub space: String,
-    
+
     /// I/O complexity if applicable
     pub io: Option<String>,
 }
@@ -158,13 +158,13 @@ pub struct ComplexityEstimate {
 pub struct SafetyGuarantees {
     /// Memory safety
     pub memory_safe: bool,
-    
+
     /// Thread safety
     pub thread_safe: bool,
-    
+
     /// Exception safety
     pub exception_safe: ExceptionSafety,
-    
+
     /// Resource cleanup guaranteed
     pub resource_safe: bool,
 }
@@ -187,16 +187,16 @@ pub enum ExceptionSafety {
 pub struct PatternParameter {
     /// Parameter name
     pub name: String,
-    
+
     /// Parameter type
     pub param_type: ParameterType,
-    
+
     /// Description for LLM
     pub description: String,
-    
+
     /// Default value if any
     pub default: Option<ParameterValue>,
-    
+
     /// Validation constraints
     pub constraints: Vec<ParameterConstraint>,
 }
@@ -271,16 +271,16 @@ pub enum PatternTemplate {
 pub struct FunctionTemplate {
     /// Function name template
     pub name_template: String,
-    
+
     /// Parameter templates
     pub parameters: Vec<ParameterTemplate>,
-    
+
     /// Return type template
     pub return_type_template: String,
-    
+
     /// Body template
     pub body_template: String,
-    
+
     /// Contract template
     pub contract_template: Option<String>,
 }
@@ -311,13 +311,13 @@ pub struct ExpressionTemplate {
 pub struct ModuleTemplate {
     /// Module name template
     pub name_template: String,
-    
+
     /// Import templates
     pub imports: Vec<String>,
-    
+
     /// Type definition templates
     pub types: Vec<String>,
-    
+
     /// Function templates
     pub functions: Vec<FunctionTemplate>,
 }
@@ -327,13 +327,13 @@ pub struct ModuleTemplate {
 pub struct CompositionRule {
     /// Rule identifier
     pub id: String,
-    
+
     /// When this rule applies
     pub condition: CompositionCondition,
-    
+
     /// How to compose
     pub action: CompositionAction,
-    
+
     /// Priority for conflict resolution
     pub priority: u32,
 }
@@ -369,16 +369,16 @@ pub enum CompositionAction {
 pub struct PatternExample {
     /// Example name
     pub name: String,
-    
+
     /// Description
     pub description: String,
-    
+
     /// Parameter values
     pub parameters: HashMap<String, ParameterValue>,
-    
+
     /// Expected output preview
     pub preview: String,
-    
+
     /// Verification status
     pub verified: bool,
 }
@@ -388,13 +388,13 @@ pub struct PatternExample {
 pub struct PerformanceProfile {
     /// Typical execution time
     pub execution_time: ExecutionTime,
-    
+
     /// Memory usage
     pub memory_usage: MemoryUsage,
-    
+
     /// I/O characteristics
     pub io_profile: Option<IOProfile>,
-    
+
     /// Scalability notes
     pub scalability: String,
 }
@@ -404,10 +404,10 @@ pub struct PerformanceProfile {
 pub struct ExecutionTime {
     /// Best case in microseconds
     pub best_case_us: u64,
-    
+
     /// Average case in microseconds
     pub average_case_us: u64,
-    
+
     /// Worst case in microseconds
     pub worst_case_us: u64,
 }
@@ -417,10 +417,10 @@ pub struct ExecutionTime {
 pub struct MemoryUsage {
     /// Stack usage in bytes
     pub stack_bytes: u64,
-    
+
     /// Heap usage in bytes
     pub heap_bytes: u64,
-    
+
     /// Whether it allocates
     pub allocates: bool,
 }
@@ -430,13 +430,13 @@ pub struct MemoryUsage {
 pub struct IOProfile {
     /// Reads data
     pub reads: bool,
-    
+
     /// Writes data
     pub writes: bool,
-    
+
     /// Network I/O
     pub network: bool,
-    
+
     /// File I/O
     pub file: bool,
 }
@@ -445,13 +445,13 @@ pub struct IOProfile {
 pub struct PatternLibrary {
     /// All patterns indexed by ID
     patterns: HashMap<String, Pattern>,
-    
+
     /// Patterns indexed by category
     by_category: HashMap<PatternCategory, Vec<String>>,
-    
+
     /// Patterns indexed by capability
     by_capability: HashMap<String, Vec<String>>,
-    
+
     /// Composition graph
     composition_graph: CompositionGraph,
 }
@@ -460,7 +460,7 @@ pub struct PatternLibrary {
 pub struct CompositionGraph {
     /// Adjacency list of compatible patterns
     compatible: HashMap<String, Vec<String>>,
-    
+
     /// Exclusion relationships
     exclusions: HashMap<String, Vec<String>>,
 }
@@ -478,20 +478,20 @@ impl PatternLibrary {
             },
         }
     }
-    
+
     /// Load standard patterns
     pub fn load_standard_patterns(&mut self) {
         // Load from catalog
         self.add_patterns(crate::patterns::catalog::load_all_patterns());
     }
-    
+
     /// Add patterns to the library
     pub fn add_patterns(&mut self, patterns: Vec<Pattern>) {
         for pattern in patterns {
             self.add_pattern(pattern);
         }
     }
-    
+
     /// Add a single pattern
     pub fn add_pattern(&mut self, pattern: Pattern) {
         // Index by category
@@ -499,7 +499,7 @@ impl PatternLibrary {
             .entry(pattern.category.clone())
             .or_insert_with(Vec::new)
             .push(pattern.id.clone());
-        
+
         // Index by capabilities
         for capability in &pattern.metadata.provides {
             self.by_capability
@@ -507,18 +507,20 @@ impl PatternLibrary {
                 .or_insert_with(Vec::new)
                 .push(pattern.id.clone());
         }
-        
+
         // Update composition graph
         for rule in &pattern.composition_rules {
             match &rule.condition {
                 CompositionCondition::CompatibleWith { pattern_id } => {
-                    self.composition_graph.compatible
+                    self.composition_graph
+                        .compatible
                         .entry(pattern.id.clone())
                         .or_insert_with(Vec::new)
                         .push(pattern_id.clone());
                 }
                 CompositionCondition::ExcludesWith { pattern_id } => {
-                    self.composition_graph.exclusions
+                    self.composition_graph
+                        .exclusions
                         .entry(pattern.id.clone())
                         .or_insert_with(Vec::new)
                         .push(pattern_id.clone());
@@ -526,48 +528,43 @@ impl PatternLibrary {
                 _ => {}
             }
         }
-        
+
         // Store pattern
         self.patterns.insert(pattern.id.clone(), pattern);
     }
-    
+
     /// Find patterns by category
     pub fn find_by_category(&self, category: &PatternCategory) -> Vec<&Pattern> {
         self.by_category
             .get(category)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.patterns.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.patterns.get(id)).collect())
             .unwrap_or_default()
     }
-    
+
     /// Find patterns providing capability
     pub fn find_by_capability(&self, capability: &str) -> Vec<&Pattern> {
         self.by_capability
             .get(capability)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.patterns.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.patterns.get(id)).collect())
             .unwrap_or_default()
     }
-    
+
     /// Find patterns matching intent
     pub fn find_by_intent(&self, intent: &str) -> Vec<&Pattern> {
         let intent_lower = intent.to_lowercase();
         self.patterns
             .values()
             .filter(|p| {
-                p.intent.to_lowercase().contains(&intent_lower) ||
-                p.description.to_lowercase().contains(&intent_lower) ||
-                p.metadata.tags.iter().any(|t| t.to_lowercase().contains(&intent_lower))
+                p.intent.to_lowercase().contains(&intent_lower)
+                    || p.description.to_lowercase().contains(&intent_lower)
+                    || p.metadata
+                        .tags
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&intent_lower))
             })
             .collect()
     }
-    
+
     /// Check if two patterns can be composed
     pub fn can_compose(&self, pattern1: &str, pattern2: &str) -> bool {
         // Check exclusions first
@@ -576,21 +573,21 @@ impl PatternLibrary {
                 return false;
             }
         }
-        
+
         // Check compatibility
         if let Some(compatible) = self.composition_graph.compatible.get(pattern1) {
             return compatible.contains(&pattern2.to_string());
         }
-        
+
         // Default to true if no explicit rules
         true
     }
-    
+
     /// Get a pattern by ID
     pub fn get_pattern(&self, id: &str) -> Option<&Pattern> {
         self.patterns.get(id)
     }
-    
+
     /// Get all patterns
     pub fn all_patterns(&self) -> Vec<&Pattern> {
         self.patterns.values().collect()
@@ -600,12 +597,12 @@ impl PatternLibrary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_pattern_library_creation() {
         let mut library = PatternLibrary::new();
         assert!(library.patterns.is_empty());
-        
+
         // Create a test pattern
         let pattern = Pattern {
             id: "test_pattern".to_string(),
@@ -668,10 +665,13 @@ mod tests {
                 scalability: "Constant".to_string(),
             },
         };
-        
+
         library.add_pattern(pattern);
         assert_eq!(library.patterns.len(), 1);
-        assert_eq!(library.find_by_category(&PatternCategory::Algorithms).len(), 1);
+        assert_eq!(
+            library.find_by_category(&PatternCategory::Algorithms).len(),
+            1
+        );
         assert_eq!(library.find_by_capability("test_capability").len(), 1);
     }
 }

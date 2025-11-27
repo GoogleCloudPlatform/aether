@@ -19,15 +19,12 @@
 #[path = "../utils/mod.rs"]
 mod utils;
 
-use utils::{
-    compiler_wrapper::TestCompiler,
-    assertions::*,
-};
+use utils::{assertions::*, compiler_wrapper::TestCompiler};
 
 #[test]
 fn test_intent_to_implementation_workflow() {
     let compiler = TestCompiler::new("intent_to_implementation");
-    
+
     let source = r#"
 (DEFINE_MODULE intent_to_implementation
   (USE_PATTERN_LIBRARY)
@@ -141,12 +138,12 @@ fn test_intent_to_implementation_workflow() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "intent_to_implementation.aether");
-    
+
     if result.is_success() {
         assert_compilation_success(&result, "Intent to implementation workflow");
-        
+
         // Verify contract analysis was performed
         if let Some(compilation_result) = result.success() {
             // Note: Current CompilationResult doesn't track warnings
@@ -162,7 +159,7 @@ fn test_intent_to_implementation_workflow() {
 #[test]
 fn test_error_driven_development_workflow() {
     let compiler = TestCompiler::new("error_driven_development");
-    
+
     // Simulate LLM generating code with intentional errors to test error recovery
     let source = r#"
 (DEFINE_MODULE error_driven_development
@@ -184,31 +181,39 @@ fn test_error_driven_development_workflow() {
       (RETURN_VALUE (INTEGER_LITERAL 42))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "error_driven_development.aether");
     assert_compilation_failure(&result, "Error-driven development workflow");
-    
+
     if let Some(error) = result.error() {
         let error_msg = format!("{}", error);
-        
+
         // Should provide structured error with auto-fix suggestions
-        assert!(error_msg.contains("TYPE-") || error_msg.contains("SEM-"), 
-                "Error should contain structured error codes");
-        
+        assert!(
+            error_msg.contains("TYPE-") || error_msg.contains("SEM-"),
+            "Error should contain structured error codes"
+        );
+
         // Should provide LLM-friendly suggestions
-        assert!(error_msg.contains("suggestion") || error_msg.contains("fix") || error_msg.contains("try"),
-                "Error should contain fix suggestions");
-        
+        assert!(
+            error_msg.contains("suggestion")
+                || error_msg.contains("fix")
+                || error_msg.contains("try"),
+            "Error should contain fix suggestions"
+        );
+
         // Should mention the function's intent for context
-        assert!(error_msg.contains("intent") || error_msg.contains("Process array"),
-                "Error should reference function intent for context");
+        assert!(
+            error_msg.contains("intent") || error_msg.contains("Process array"),
+            "Error should reference function intent for context"
+        );
     }
 }
 
 #[test]
 fn test_iterative_refinement_workflow() {
     let compiler = TestCompiler::new("iterative_refinement");
-    
+
     // Simulate LLM iteratively refining implementation based on verification feedback
     let initial_attempt = r#"
 (DEFINE_MODULE iterative_refinement_v1
@@ -242,15 +247,15 @@ fn test_iterative_refinement_workflow() {
       (RETURN_VALUE (FLOAT_LITERAL 0.0))))
 )
     "#;
-    
+
     let result_v1 = compiler.compile_source(initial_attempt, "iterative_refinement_v1.aether");
-    
+
     // Should compile but may have warnings about missing safety checks
     if result_v1.is_success() {
         let execution = result_v1.execute();
         // This might crash or produce incorrect results due to division by zero
     }
-    
+
     // Refined version based on feedback
     let refined_attempt = r#"
 (DEFINE_MODULE iterative_refinement_v2
@@ -345,15 +350,19 @@ fn test_iterative_refinement_workflow() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result_v2 = compiler.compile_source(refined_attempt, "iterative_refinement_v2.aether");
-    assert_compile_and_execute(&result_v2, "Add result: 16.00", "Iterative refinement workflow");
+    assert_compile_and_execute(
+        &result_v2,
+        "Add result: 16.00",
+        "Iterative refinement workflow",
+    );
 }
 
 #[test]
 fn test_pattern_composition_workflow() {
     let compiler = TestCompiler::new("pattern_composition_workflow");
-    
+
     let source = r#"
 (DEFINE_MODULE pattern_composition_workflow
   (USE_PATTERN_LIBRARY)
@@ -437,27 +446,34 @@ fn test_pattern_composition_workflow() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "pattern_composition_workflow.aether");
-    
+
     if result.is_success() {
         assert_compilation_success(&result, "Pattern composition workflow");
-        
+
         // Check for pattern optimization suggestions
         if let Some(compilation_result) = result.success() {
             // Note: Current CompilationResult doesn't track warnings
             let has_optimization_info = false;
-            println!("Pattern optimization analysis performed: {}", has_optimization_info);
+            println!(
+                "Pattern optimization analysis performed: {}",
+                has_optimization_info
+            );
         }
     } else {
-        assert_compilation_error(&result, "pattern", "Pattern composition workflow integration");
+        assert_compilation_error(
+            &result,
+            "pattern",
+            "Pattern composition workflow integration",
+        );
     }
 }
 
 #[test]
 fn test_verification_driven_development_workflow() {
     let compiler = TestCompiler::new("verification_driven_development");
-    
+
     let source = r#"
 (DEFINE_MODULE verification_driven_development
   (DEFINE_FUNCTION
@@ -571,22 +587,26 @@ fn test_verification_driven_development_workflow() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "verification_driven_development.aether");
-    assert_compile_and_execute(&result, "Binary search result: 7", "Verification-driven development workflow");
+    assert_compile_and_execute(
+        &result,
+        "Binary search result: 7",
+        "Verification-driven development workflow",
+    );
 }
 
 #[test]
 fn test_multi_phase_llm_code_generation() {
     let compiler = TestCompiler::new("multi_phase_llm_generation");
-    
+
     // Simulate LLM generating code through multiple phases:
     // Phase 1: Intent analysis and high-level design
     // Phase 2: Contract specification
     // Phase 3: Pattern identification and selection
     // Phase 4: Implementation generation
     // Phase 5: Verification and optimization
-    
+
     let source = r#"
 (DEFINE_MODULE multi_phase_llm_generation
   (USE_PATTERN_LIBRARY)
@@ -738,12 +758,12 @@ fn test_multi_phase_llm_code_generation() {
       (RETURN_VALUE (INTEGER_LITERAL 0))))
 )
     "#;
-    
+
     let result = compiler.compile_source(source, "multi_phase_llm_generation.aether");
-    
+
     if result.is_success() {
         assert_compilation_success(&result, "Multi-phase LLM code generation");
-        
+
         // Verify all phases were processed
         if let Some(compilation_result) = result.success() {
             // Note: Current CompilationResult doesn't track warnings

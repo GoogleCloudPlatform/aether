@@ -14,19 +14,19 @@
 
 #[cfg(test)]
 mod ownership_integration_tests {
-    use std::process::Command;
     use std::fs;
     use std::path::Path;
-    
+    use std::process::Command;
+
     fn compile_and_run(source_file: &str, expected_exit_code: i32) {
         let output_file = source_file.replace(".aether", "");
-        
+
         // Compile the source file
         let compile_result = Command::new("cargo")
             .args(&["run", "--", source_file, "-o", &output_file])
             .output()
             .expect("Failed to execute compiler");
-        
+
         if !compile_result.status.success() {
             panic!(
                 "Compilation failed:\nstdout: {}\nstderr: {}",
@@ -34,12 +34,12 @@ mod ownership_integration_tests {
                 String::from_utf8_lossy(&compile_result.stderr)
             );
         }
-        
+
         // Run the compiled program
         let run_result = Command::new(&format!("./{}", output_file))
             .output()
             .expect("Failed to execute compiled program");
-        
+
         assert_eq!(
             run_result.status.code().unwrap_or(-1),
             expected_exit_code,
@@ -47,11 +47,11 @@ mod ownership_integration_tests {
             String::from_utf8_lossy(&run_result.stdout),
             String::from_utf8_lossy(&run_result.stderr)
         );
-        
+
         // Clean up
         fs::remove_file(&output_file).ok();
     }
-    
+
     #[test]
     fn test_string_cleanup() {
         let source = r#"
@@ -70,15 +70,15 @@ module string_cleanup_test {
     }
 }
 "#;
-        
+
         let test_file = "test_string_cleanup.aether";
         fs::write(test_file, source).expect("Failed to write test file");
-        
+
         compile_and_run(test_file, 0);
-        
+
         fs::remove_file(test_file).ok();
     }
-    
+
     #[test]
     fn test_array_cleanup() {
         let source = r#"
@@ -95,15 +95,15 @@ module array_cleanup_test {
     }
 }
 "#;
-        
+
         let test_file = "test_array_cleanup.aether";
         fs::write(test_file, source).expect("Failed to write test file");
-        
+
         compile_and_run(test_file, 0);
-        
+
         fs::remove_file(test_file).ok();
     }
-    
+
     #[test]
     fn test_map_cleanup() {
         let source = r#"
@@ -125,15 +125,15 @@ module map_cleanup_test {
     }
 }
 "#;
-        
+
         let test_file = "test_map_cleanup.aether";
         fs::write(test_file, source).expect("Failed to write test file");
-        
+
         compile_and_run(test_file, 0);
-        
+
         fs::remove_file(test_file).ok();
     }
-    
+
     #[test]
     fn test_early_return_cleanup() {
         let source = r#"
@@ -159,15 +159,15 @@ module early_return_cleanup_test {
     }
 }
 "#;
-        
+
         let test_file = "test_early_return_cleanup.aether";
         fs::write(test_file, source).expect("Failed to write test file");
-        
+
         compile_and_run(test_file, 0);
-        
+
         fs::remove_file(test_file).ok();
     }
-    
+
     #[test]
     fn test_shared_ownership_refcount() {
         let source = r#"
@@ -194,15 +194,15 @@ module shared_ownership_test {
     }
 }
 "#;
-        
+
         let test_file = "test_shared_ownership.aether";
         fs::write(test_file, source).expect("Failed to write test file");
-        
+
         compile_and_run(test_file, 0);
-        
+
         fs::remove_file(test_file).ok();
     }
-    
+
     #[test]
     fn test_nested_scopes_cleanup() {
         let source = r#"
@@ -224,15 +224,15 @@ module nested_scopes_test {
     }
 }
 "#;
-        
+
         let test_file = "test_nested_scopes.aether";
         fs::write(test_file, source).expect("Failed to write test file");
-        
+
         compile_and_run(test_file, 0);
-        
+
         fs::remove_file(test_file).ok();
     }
-    
+
     #[test]
     fn test_loop_cleanup() {
         let source = r#"
@@ -249,12 +249,12 @@ module loop_cleanup_test {
     }
 }
 "#;
-        
+
         let test_file = "test_loop_cleanup.aether";
         fs::write(test_file, source).expect("Failed to write test file");
-        
+
         compile_and_run(test_file, 0);
-        
+
         fs::remove_file(test_file).ok();
     }
 }

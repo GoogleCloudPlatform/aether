@@ -14,24 +14,24 @@
 
 //! Tests for ownership annotation parsing
 
-use aether::parser::Parser;
+use aether::ast::{OwnershipKind, TypeSpecifier};
 use aether::lexer::Lexer;
-use aether::ast::{TypeSpecifier, OwnershipKind};
+use aether::parser::Parser;
 
 #[test]
 fn test_owned_type_parsing() {
     let source = "(module test_ownership
         (function test (^integer) void))";
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let module = &program.modules[0];
     let function = &module.function_definitions[0];
     let param_type = &function.parameters[0].param_type;
-    
+
     match param_type.as_ref() {
         TypeSpecifier::Owned { ownership, .. } => {
             assert_eq!(*ownership, OwnershipKind::Owned);
@@ -44,16 +44,16 @@ fn test_owned_type_parsing() {
 fn test_borrowed_type_parsing() {
     let source = "(module test_ownership
         (function test (&integer) void))";
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let module = &program.modules[0];
     let function = &module.function_definitions[0];
     let param_type = &function.parameters[0].param_type;
-    
+
     match param_type.as_ref() {
         TypeSpecifier::Owned { ownership, .. } => {
             assert_eq!(*ownership, OwnershipKind::Borrowed);
@@ -66,16 +66,16 @@ fn test_borrowed_type_parsing() {
 fn test_mut_borrowed_type_parsing() {
     let source = "(module test_ownership
         (function test (&mut integer) void))";
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let module = &program.modules[0];
     let function = &module.function_definitions[0];
     let param_type = &function.parameters[0].param_type;
-    
+
     match param_type.as_ref() {
         TypeSpecifier::Owned { ownership, .. } => {
             assert_eq!(*ownership, OwnershipKind::BorrowedMut);
@@ -88,16 +88,16 @@ fn test_mut_borrowed_type_parsing() {
 fn test_shared_type_parsing() {
     let source = "(module test_ownership
         (function test (~integer) void))";
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
-    
+
     let program = parser.parse_program().unwrap();
     let module = &program.modules[0];
     let function = &module.function_definitions[0];
     let param_type = &function.parameters[0].param_type;
-    
+
     match param_type.as_ref() {
         TypeSpecifier::Owned { ownership, .. } => {
             assert_eq!(*ownership, OwnershipKind::Shared);

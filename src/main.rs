@@ -13,11 +13,11 @@
 // limitations under the License.
 
 //! AetherScript Compiler CLI
-//! 
+//!
 //! Command-line interface for the AetherScript compiler
 
-use aether::Compiler;
 use aether::pipeline::CompileOptions;
+use aether::Compiler;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process;
@@ -26,42 +26,49 @@ use std::process;
 fn format_ast_for_display(program: &aether::ast::Program) -> String {
     let mut output = String::new();
     output.push_str("Program {\n");
-    
+
     for module in &program.modules {
         output.push_str(&format!("  Module '{}'\n", module.name.name));
-        
+
         if let Some(intent) = &module.intent {
             output.push_str(&format!("    Intent: {}\n", intent));
         }
-        
+
         // Format constants
         for constant in &module.constant_declarations {
-            output.push_str(&format!("    const {}: {}\n", 
+            output.push_str(&format!(
+                "    const {}: {}\n",
                 constant.name.name,
                 format_type(&constant.type_spec)
             ));
         }
-        
-        // Format functions  
+
+        // Format functions
         for function in &module.function_definitions {
             output.push_str(&format!("    fn {}(", function.name.name));
             for (i, param) in function.parameters.iter().enumerate() {
-                if i > 0 { output.push_str(", "); }
-                output.push_str(&format!("{}: {}", param.name.name, format_type(&param.param_type)));
+                if i > 0 {
+                    output.push_str(", ");
+                }
+                output.push_str(&format!(
+                    "{}: {}",
+                    param.name.name,
+                    format_type(&param.param_type)
+                ));
             }
             output.push_str(") -> ");
             output.push_str(&format_type(&function.return_type));
             output.push('\n');
         }
     }
-    
+
     output.push_str("}\n");
     output
 }
 
 /// Format a type for display
 fn format_type(type_spec: &aether::ast::TypeSpecifier) -> String {
-    use aether::ast::{PrimitiveType, OwnershipKind};
+    use aether::ast::{OwnershipKind, PrimitiveType};
     match type_spec {
         aether::ast::TypeSpecifier::Primitive { type_name, .. } => match type_name {
             PrimitiveType::Integer => "Integer".to_string(),
@@ -78,21 +85,60 @@ fn format_type(type_spec: &aether::ast::TypeSpecifier) -> String {
             PrimitiveType::UIntPtrT => "UIntPtrT".to_string(),
         },
         aether::ast::TypeSpecifier::Named { name, .. } => name.name.clone(),
-        aether::ast::TypeSpecifier::Array { element_type, .. } => 
-            format!("Array<{}>", format_type(element_type)),
-        aether::ast::TypeSpecifier::Map { key_type, value_type, .. } => 
-            format!("Map<{}, {}>", format_type(key_type), format_type(value_type)),
-        aether::ast::TypeSpecifier::Pointer { target_type, is_mutable, .. } => 
-            format!("{}{}", if *is_mutable { "*mut " } else { "*" }, format_type(target_type)),
-        aether::ast::TypeSpecifier::Function { parameter_types, return_type, .. } => {
-            let param_strs: Vec<String> = parameter_types.iter().map(|t| format_type(t)).collect();
-            format!("({}) -> {}", param_strs.join(", "), format_type(return_type))
+        aether::ast::TypeSpecifier::Array { element_type, .. } => {
+            format!("Array<{}>", format_type(element_type))
         }
-        aether::ast::TypeSpecifier::Generic { base_type, type_arguments, .. } => {
-            format!("{}<{}>", base_type.name, type_arguments.iter().map(|t| format_type(t)).collect::<Vec<_>>().join(", "))
+        aether::ast::TypeSpecifier::Map {
+            key_type,
+            value_type,
+            ..
+        } => format!(
+            "Map<{}, {}>",
+            format_type(key_type),
+            format_type(value_type)
+        ),
+        aether::ast::TypeSpecifier::Pointer {
+            target_type,
+            is_mutable,
+            ..
+        } => format!(
+            "{}{}",
+            if *is_mutable { "*mut " } else { "*" },
+            format_type(target_type)
+        ),
+        aether::ast::TypeSpecifier::Function {
+            parameter_types,
+            return_type,
+            ..
+        } => {
+            let param_strs: Vec<String> = parameter_types.iter().map(|t| format_type(t)).collect();
+            format!(
+                "({}) -> {}",
+                param_strs.join(", "),
+                format_type(return_type)
+            )
+        }
+        aether::ast::TypeSpecifier::Generic {
+            base_type,
+            type_arguments,
+            ..
+        } => {
+            format!(
+                "{}<{}>",
+                base_type.name,
+                type_arguments
+                    .iter()
+                    .map(|t| format_type(t))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
         aether::ast::TypeSpecifier::TypeParameter { name, .. } => name.name.clone(),
-        aether::ast::TypeSpecifier::Owned { ownership, base_type, .. } => {
+        aether::ast::TypeSpecifier::Owned {
+            ownership,
+            base_type,
+            ..
+        } => {
             let prefix = match ownership {
                 OwnershipKind::Owned => "^",
                 OwnershipKind::Borrowed => "&",
@@ -112,11 +158,11 @@ struct Cli {
     /// Enable verbose output
     #[arg(short, long, global = true)]
     verbose: bool,
-    
+
     /// Enable debug output
     #[arg(short, long, global = true)]
     debug: bool,
-    
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -128,95 +174,95 @@ enum Commands {
         /// Input source file(s)
         #[arg(required = true)]
         input: Vec<PathBuf>,
-        
+
         /// Output file name (defaults to first input file name without extension)
         #[arg(short, long)]
         output: Option<PathBuf>,
-        
+
         /// Optimization level (0-3)
         #[arg(short = 'O', long, default_value = "2")]
         optimization: u8,
-        
+
         /// Generate debug information
         #[arg(short, long)]
         debug: bool,
-        
+
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
-        
+
         /// Keep intermediate files
         #[arg(long)]
         keep_intermediates: bool,
-        
+
         /// Generate object file only (don't link)
         #[arg(short = 'c', long)]
         compile_only: bool,
-        
+
         /// Compile as a library (shared object/dylib)
         #[arg(long)]
         library: bool,
-        
+
         /// Additional library search paths
         #[arg(short = 'L', long = "library-path")]
         library_paths: Vec<PathBuf>,
-        
+
         /// Link with library
         #[arg(short = 'l', long = "link")]
         link_libraries: Vec<String>,
     },
-    
+
     /// Check syntax without generating code
     Check {
         /// Input source file(s)
         #[arg(required = true)]
         input: Vec<PathBuf>,
-        
+
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
     },
-    
+
     /// Run AetherScript program (compile and execute)
     Run {
         /// Input source file
         #[arg(required = true)]
         input: PathBuf,
-        
+
         /// Program arguments
         #[arg(trailing_var_arg = true)]
         args: Vec<String>,
-        
+
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
     },
-    
+
     /// Print AST (Abstract Syntax Tree)
     Ast {
         /// Input source file
         #[arg(required = true)]
         input: PathBuf,
-        
+
         /// Output directory (prints to stdout if not specified)
         #[arg(short, long)]
         output: Option<String>,
-        
+
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
     },
-    
+
     /// Print tokens
     Tokens {
         /// Input source file
         #[arg(required = true)]
         input: PathBuf,
-        
+
         /// Output directory (prints to stdout if not specified)
         #[arg(short, long)]
         output: Option<String>,
-        
+
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
@@ -225,13 +271,13 @@ enum Commands {
 
 fn main() {
     let cli = Cli::parse();
-    
+
     let result = match cli.command {
-        Some(Commands::Compile { 
-            input, 
-            output, 
-            optimization, 
-            debug, 
+        Some(Commands::Compile {
+            input,
+            output,
+            optimization,
+            debug,
             verbose,
             keep_intermediates,
             compile_only,
@@ -248,11 +294,11 @@ fn main() {
             options.compile_as_library = library;
             options.library_paths = library_paths;
             options.link_libraries = link_libraries;
-            
+
             if let Some(output_path) = output {
                 options.output = Some(output_path);
             }
-            
+
             let compiler = Compiler::with_options(options);
             match compiler.compile_files(&input) {
                 Ok(result) => {
@@ -262,35 +308,35 @@ fn main() {
                     }
                     Ok(result)
                 }
-                Err(e) => Err(e)
+                Err(e) => Err(e),
             }
         }
-        
+
         Some(Commands::Check { input, verbose }) => {
             let mut options = CompileOptions::default();
             options.verbose = verbose || cli.verbose;
             options.debug_info = cli.debug;
             // syntax_only still runs semantic analysis, just skips code generation
             options.syntax_only = true;
-            
+
             if cli.debug {
                 eprintln!("[DEBUG] Starting syntax check for {} files", input.len());
             }
-            
+
             let mut total_errors = 0;
             let mut files_passed = 0;
             let mut files_failed = 0;
-            
+
             if verbose || cli.verbose {
                 eprintln!("[VERBOSE] Type checking {} file(s)", input.len());
             }
-            
+
             // Check each file
             for file in &input {
                 if verbose || cli.verbose {
                     println!("[VERBOSE] Checking {}...", file.display());
                 }
-                
+
                 // Check if file exists
                 if !file.exists() {
                     eprintln!("Error: File '{}' not found", file.display());
@@ -298,7 +344,7 @@ fn main() {
                     total_errors += 1;
                     continue;
                 }
-                
+
                 let compiler = Compiler::with_options(options.clone());
                 match compiler.compile_files(&[file.clone()]) {
                     Ok(_) => {
@@ -319,7 +365,7 @@ fn main() {
                     }
                 }
             }
-            
+
             // Print summary
             if files_failed == 0 {
                 println!("Type checking passed");
@@ -332,7 +378,7 @@ fn main() {
                 })
             } else {
                 println!("Type checking failed");
-                println!("Files passed: {}", files_passed); 
+                println!("Files passed: {}", files_passed);
                 println!("Files with errors: {}", files_failed);
                 println!("Total errors: {}", total_errors);
                 Err(aether::error::CompilerError::SemanticError(
@@ -340,24 +386,36 @@ fn main() {
                         expected: "valid".to_string(),
                         found: "errors".to_string(),
                         location: aether::error::SourceLocation::unknown(),
-                    }
+                    },
                 ))
             }
         }
-        
-        Some(Commands::Run { input, args, verbose }) => {
+
+        Some(Commands::Run {
+            input,
+            args,
+            verbose,
+        }) => {
             // First compile the program
             let mut options = CompileOptions::default();
             options.verbose = verbose;
             options.optimization_level = 2;
-            
+
             let compiler = Compiler::with_options(options);
             match compiler.compile_files(&[input]) {
                 Ok(result) => {
                     // Execute the compiled program
-                    let mut cmd = process::Command::new(&result.executable_path);
+                    // Ensure path is absolute or has ./ prefix for current directory
+                    let exe_path = if result.executable_path.is_absolute() {
+                        result.executable_path.clone()
+                    } else {
+                        std::env::current_dir()
+                            .unwrap_or_default()
+                            .join(&result.executable_path)
+                    };
+                    let mut cmd = process::Command::new(&exe_path);
                     cmd.args(&args);
-                    
+
                     match cmd.status() {
                         Ok(status) => {
                             if !status.success() {
@@ -374,12 +432,16 @@ fn main() {
                 Err(e) => Err(e),
             }
         }
-        
-        Some(Commands::Ast { input, output, verbose }) => {
-            use aether::parser::Parser;
-            use aether::lexer::Lexer;
+
+        Some(Commands::Ast {
+            input,
+            output,
+            verbose: _,
+        }) => {
+            use aether::lexer::v2::Lexer as LexerV2;
+            use aether::parser::v2::Parser as ParserV2;
             use std::fs;
-            
+
             let content = match fs::read_to_string(&input) {
                 Ok(content) => content,
                 Err(e) => {
@@ -387,32 +449,23 @@ fn main() {
                     process::exit(1);
                 }
             };
-            
-            // First tokenize
-            let mut lexer = Lexer::new(&content, input.display().to_string());
-            let mut tokens = vec![];
-            
-            loop {
-                match lexer.next_token() {
-                    Ok(token) => {
-                        if matches!(token.token_type, aether::lexer::TokenType::Eof) {
-                            break;
-                        }
-                        tokens.push(token);
-                    }
-                    Err(e) => {
-                        eprintln!("Lexer error: {}", e);
-                        process::exit(1);
-                    }
+
+            // Parse using V2 parser
+            let mut lexer = LexerV2::new(&content, input.display().to_string());
+            let tokens = match lexer.tokenize() {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("Lexer error: {:?}", e);
+                    process::exit(1);
                 }
-            }
-            
-            // Then parse
-            let mut parser = Parser::new(tokens);
-            match parser.parse_program() {
+            };
+            let mut parser = ParserV2::new(tokens);
+            let ast = parser.parse_program();
+
+            match ast {
                 Ok(ast) => {
                     let output_content = format_ast_for_display(&ast);
-                    
+
                     if let Some(output_dir) = output {
                         let output_path = std::path::Path::new(&output_dir)
                             .join(input.file_stem().unwrap())
@@ -434,11 +487,15 @@ fn main() {
                 }
             }
         }
-        
-        Some(Commands::Tokens { input, output, verbose }) => {
-            use aether::lexer::Lexer;
+
+        Some(Commands::Tokens {
+            input,
+            output,
+            verbose: _,
+        }) => {
+            use aether::lexer::v2::Lexer as LexerV2;
             use std::fs;
-            
+
             let content = match fs::read_to_string(&input) {
                 Ok(content) => content,
                 Err(e) => {
@@ -446,57 +503,32 @@ fn main() {
                     process::exit(1);
                 }
             };
-            
-            let mut lexer = Lexer::new(&content, input.display().to_string());
-            let mut tokens = vec![];
-            
-            loop {
-                match lexer.next_token() {
-                    Ok(token) => {
-                        if matches!(token.token_type, aether::lexer::TokenType::Eof) {
-                            break;
-                        }
-                        tokens.push(token);
-                    }
-                    Err(e) => {
-                        eprintln!("Lexer error: {}", e);
-                        process::exit(1);
-                    }
-                }
-            }
-            
-            // Format tokens in the expected debug format for both stdout and file output
+
             let mut token_output = String::new();
             token_output.push_str(&format!("Tokens for {}:\n", input.display()));
             token_output.push_str("=================\n");
-            for token in &tokens {
-                // Format TokenType in the expected format
-                let token_str = match &token.token_type {
-                    aether::lexer::TokenType::LeftParen => "LeftParen".to_string(),
-                    aether::lexer::TokenType::RightParen => "RightParen".to_string(),
-                    aether::lexer::TokenType::Keyword(k) => format!("Keyword(\"{}\")", k),
-                    aether::lexer::TokenType::Identifier(i) => format!("Identifier(\"{}\")", i),
-                    aether::lexer::TokenType::Integer(n) => format!("Integer({})", n),
-                    aether::lexer::TokenType::Float(f) => format!("Float({})", f),
-                    aether::lexer::TokenType::String(s) => format!("String(\"{}\")", s),
-                    aether::lexer::TokenType::Character(c) => format!("Character('{}')", c),
-                    aether::lexer::TokenType::Boolean(b) => format!("Boolean({})", b),
-                    aether::lexer::TokenType::NullValue => "NullValue".to_string(),
-                    aether::lexer::TokenType::Caret => "Caret".to_string(),
-                    aether::lexer::TokenType::Ampersand => "Ampersand".to_string(),
-                    aether::lexer::TokenType::Tilde => "Tilde".to_string(),
-                    aether::lexer::TokenType::Comment(c) => format!("Comment(\"{}\")", c),
-                    aether::lexer::TokenType::Whitespace => "Whitespace".to_string(),
-                    aether::lexer::TokenType::Eof => "Eof".to_string(),
-                };
-                token_output.push_str(&format!("{} at {}:{}\n", 
-                    token_str,
-                    token.location.line, 
-                    token.location.column
-                ));
+
+            let mut lexer = LexerV2::new(&content, input.display().to_string());
+            match lexer.tokenize() {
+                Ok(tokens) => {
+                    for token in tokens {
+                        if matches!(token.token_type, aether::lexer::v2::TokenType::Eof) {
+                            break;
+                        }
+                        token_output.push_str(&format!(
+                            "{:?} at {}:{}\n",
+                            token.token_type, token.location.line, token.location.column
+                        ));
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Lexer error: {:?}", e);
+                    process::exit(1);
+                }
             }
+
             let output_content = token_output;
-            
+
             if let Some(output_dir) = output {
                 let output_path = std::path::Path::new(&output_dir)
                     .join(input.file_stem().unwrap())
@@ -506,14 +538,14 @@ fn main() {
             } else {
                 println!("{}", output_content);
             }
-            
+
             Ok(aether::pipeline::CompilationResult {
                 executable_path: PathBuf::new(),
                 intermediate_files: vec![],
                 stats: Default::default(),
             })
         }
-        
+
         None => {
             // No subcommand provided - print error and help
             eprintln!("Error: No subcommand provided");
@@ -524,7 +556,7 @@ fn main() {
             process::exit(1);
         }
     };
-    
+
     match result {
         Ok(_) => {
             // Success

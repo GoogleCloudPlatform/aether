@@ -1,0 +1,25 @@
+// Standard Library I/O Example
+// Demonstrates input/output operations
+
+module stdlib_io;
+
+@extern("C")
+func puts(s: Pointer<Char>) -> Int;
+
+@extern("C")
+func printf(format: Pointer<Char>, value: Int) -> Int;
+
+func print_number(n: Int) -> Void {
+    printf("Number: %d\n", n);
+}
+
+func main() -> Int {
+    puts("=== I/O Example ===");
+
+    print_number(42);
+    print_number(100);
+    print_number(-5);
+
+    puts("Done!");
+    return 0;
+}

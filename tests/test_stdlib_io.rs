@@ -15,8 +15,8 @@
 //! Tests for Standard Library I/O Operations
 
 // Test utilities are defined locally
-use aether::Compiler;
 use aether::error::CompilerError;
+use aether::Compiler;
 use std::fs;
 use tempfile::TempDir;
 
@@ -25,12 +25,12 @@ fn compile_and_run(source: &str) -> Result<String, CompilerError> {
     let temp_dir = TempDir::new()?;
     let test_file = temp_dir.path().join("test.aether");
     fs::write(&test_file, source)?;
-    
+
     let compiler = Compiler::new();
     let result = compiler.compile_file(test_file)?;
-    
+
     // Compilation succeeded if we got here without error
-    
+
     // For now, just return success status - actual execution would require linking
     Ok("Success".to_string())
 }
@@ -73,7 +73,7 @@ fn test_file_write_and_read() {
 
     let result = compile_and_run(program);
     assert!(result.is_ok());
-    
+
     // Clean up
     let _ = std::fs::remove_file("test_output.txt");
 }
@@ -137,7 +137,7 @@ fn test_file_size_limit() {
 
     let result = compile_and_run(program);
     assert!(result.is_ok());
-    
+
     // Clean up
     let _ = std::fs::remove_file("small_file.txt");
 }

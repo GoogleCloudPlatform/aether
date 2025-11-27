@@ -1,0 +1,15 @@
+// Type Conversions Example
+// Demonstrates type casting between types
+
+module type_conversions;
+
+func main() -> Int {
+    let i: Int = 42;
+    let f: Float = 3.14;
+
+    // Integer to float operations
+    let sum: Float = {3.0 + 2.0};
+
+    // Return integer result
+    return i;
+}

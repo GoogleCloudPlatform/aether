@@ -1,0 +1,52 @@
+// HTTP Client Example
+// Demonstrates HTTP request concepts
+
+module http_client;
+
+@extern("C")
+func puts(s: Pointer<Char>) -> Int;
+
+enum HttpMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+}
+
+struct HttpRequest {
+    method: HttpMethod,
+    port: Int,
+}
+
+struct HttpResponse {
+    status_code: Int,
+    success: Bool,
+}
+
+func create_request(method: HttpMethod, port: Int) -> HttpRequest {
+    return HttpRequest { method: method, port: port };
+}
+
+func is_success(response: HttpResponse) -> Bool {
+    return {response.status_code >= 200 && response.status_code < 300};
+}
+
+func main() -> Int {
+    puts("HTTP Client Example (conceptual)");
+
+    let request: HttpRequest = create_request(HttpMethod::GET, 80);
+
+    // Simulated response
+    let response: HttpResponse = HttpResponse {
+        status_code: 200,
+        success: true,
+    };
+
+    when is_success(response) {
+        puts("Request successful!");
+        return 0;
+    } else {
+        puts("Request failed!");
+        return 1;
+    }
+}

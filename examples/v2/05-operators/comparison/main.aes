@@ -1,0 +1,34 @@
+// Comparison Operators Example
+// Demonstrates ==, !=, <, >, <=, >=
+
+module comparison;
+
+func main() -> Int {
+    let a: Int = 10;
+    let b: Int = 20;
+    let c: Int = 10;
+
+    // Equality
+    let eq: Bool = {a == c};
+
+    // Inequality
+    let neq: Bool = {a != b};
+
+    // Less than
+    let lt: Bool = {a < b};
+
+    // Greater than
+    let gt: Bool = {b > a};
+
+    // Less than or equal
+    let lte: Bool = {a <= c};
+
+    // Greater than or equal
+    let gte: Bool = {b >= a};
+
+    when lt {
+        return 1;
+    } else {
+        return 0;
+    }
+}

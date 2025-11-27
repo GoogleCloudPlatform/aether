@@ -1,0 +1,30 @@
+// Match Example
+// Demonstrates pattern matching basics
+
+module match_example;
+
+func number_name(n: Int) -> Int {
+    match n {
+        1 => { return 100; }
+        2 => { return 200; }
+        3 => { return 300; }
+        _ => { return 0; }
+    }
+}
+
+func is_special(n: Int) -> Bool {
+    match n {
+        0 => { return true; }
+        1 => { return true; }
+        42 => { return true; }
+        _ => { return false; }
+    }
+}
+
+func main() -> Int {
+    let name1: Int = number_name(2);
+    let name4: Int = number_name(99);
+    let special: Bool = is_special(42);
+
+    return name1;
+}

@@ -1,0 +1,40 @@
+// Basic Functions Example
+// Demonstrates function declaration and calling
+
+module basic_functions;
+
+// Simple function with no parameters
+func get_magic_number() -> Int {
+    return 42;
+}
+
+// Function with parameters
+func add(a: Int, b: Int) -> Int {
+    return {a + b};
+}
+
+// Function with multiple operations
+func compute(x: Int, y: Int, z: Int) -> Int {
+    let sum: Int = {x + y};
+    let result: Int = {sum * z};
+    return result;
+}
+
+// Recursive function: factorial
+func factorial(n: Int) -> Int {
+    when {n <= 1} {
+        return 1;
+    } else {
+        return {n * factorial({n - 1})};
+    }
+}
+
+func main() -> Int {
+    let magic: Int = get_magic_number();
+    let sum: Int = add(10, 20);
+    let computed: Int = compute(2, 3, 4);
+    let fact5: Int = factorial(5);
+
+    // fact5 = 120
+    return fact5;
+}

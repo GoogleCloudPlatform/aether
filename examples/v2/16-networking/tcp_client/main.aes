@@ -1,0 +1,33 @@
+// TCP Client Example
+// Demonstrates basic networking concepts
+
+module tcp_client;
+
+@extern("C")
+func puts(s: Pointer<Char>) -> Int;
+
+// In a real implementation, these would be actual network functions
+// This is a conceptual example
+
+struct Connection {
+    port: Int,
+    connected: Bool,
+}
+
+func create_connection(port: Int) -> Connection {
+    return Connection { port: port, connected: false };
+}
+
+func main() -> Int {
+    puts("TCP Client Example (conceptual)");
+
+    let conn: Connection = create_connection(8080);
+
+    when conn.connected {
+        puts("Connected!");
+        return 0;
+    } else {
+        puts("Not connected");
+        return 1;
+    }
+}

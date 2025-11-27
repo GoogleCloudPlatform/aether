@@ -14,10 +14,10 @@
 
 //! Tests for mutability and borrowing enforcement
 
+use aether::error::SemanticError;
 use aether::lexer::Lexer;
 use aether::parser::Parser;
 use aether::semantic::SemanticAnalyzer;
-use aether::error::SemanticError;
 
 #[test]
 fn test_use_after_move() {
@@ -33,19 +33,21 @@ fn test_use_after_move() {
     (function consume_value (^integer value) void
         (print_int value)))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().unwrap();
-    
+
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     // Should fail with use after move error
     assert!(result.is_err());
     let errors = result.unwrap_err();
-    assert!(errors.iter().any(|e| matches!(e, SemanticError::UseAfterMove { .. })));
+    assert!(errors
+        .iter()
+        .any(|e| matches!(e, SemanticError::UseAfterMove { .. })));
 }
 
 #[test]
@@ -63,15 +65,15 @@ fn test_immutable_borrow_while_borrowed() {
     (function borrow_value (&integer value) integer
         (+ value 1)))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().unwrap();
-    
+
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     // Should succeed - multiple immutable borrows are allowed
     assert!(result.is_ok());
 }
@@ -94,15 +96,15 @@ fn test_mutable_borrow_while_immutably_borrowed() {
     (function modify_value (&mut integer value) void
         (set value (* value 2))))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().unwrap();
-    
+
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     // Should fail - cannot mutably borrow while immutably borrowed
     assert!(result.is_err());
 }
@@ -117,19 +119,21 @@ fn test_immutable_variable_mutation() {
             (set x 100)
             x)))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().unwrap();
-    
+
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     // Should fail - cannot assign to immutable variable
     assert!(result.is_err());
     let errors = result.unwrap_err();
-    assert!(errors.iter().any(|e| matches!(e, SemanticError::AssignToImmutable { .. })));
+    assert!(errors
+        .iter()
+        .any(|e| matches!(e, SemanticError::AssignToImmutable { .. })));
 }
 
 #[test]
@@ -142,15 +146,15 @@ fn test_mutable_variable_mutation() {
             (set x 100)
             x)))
 "#;
-    
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().unwrap();
-    
+
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     // Should succeed - can assign to mutable variable
     assert!(result.is_ok());
 }

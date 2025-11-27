@@ -1,0 +1,12 @@
+// Hello World Example
+// The classic first program in AetherScript V2
+
+module hello_world;
+
+@extern("C")
+func puts(s: String) -> Int;
+
+func main() -> Int {
+    puts("Hello, World!");
+    return 0;
+}

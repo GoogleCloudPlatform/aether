@@ -33,7 +33,7 @@ fn test_compiler_default() {
 
 // Additional integration tests are in separate files:
 // - cli_integration_tests.rs: CLI interface testing
-// - end_to_end_tests.rs: Complete compilation pipeline testing  
+// - end_to_end_tests.rs: Complete compilation pipeline testing
 // - property_based_tests.rs: Property-based and fuzz testing
 // - integration/: LLM-first feature integration tests
 

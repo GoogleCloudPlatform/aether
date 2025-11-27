@@ -1,0 +1,21 @@
+// Type Aliases Example
+// Demonstrates custom type names
+
+module type_aliases;
+
+// Type aliases make code more readable
+// Note: Type aliases are conceptual in this example
+
+func get_user_id() -> Int {
+    return 12345;
+}
+
+func get_score() -> Int {
+    return 95;
+}
+
+func main() -> Int {
+    let user_id: Int = get_user_id();
+    let score: Int = get_score();
+    return {user_id + score};
+}

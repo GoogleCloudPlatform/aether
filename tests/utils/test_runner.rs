@@ -14,8 +14,8 @@
 
 //! Test runner utilities for organizing and executing tests
 
-use std::time::{Duration, Instant};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 /// Test suite for organizing related tests
 pub struct TestSuite {
@@ -59,7 +59,7 @@ impl TestSuite {
             teardown: None,
         }
     }
-    
+
     /// Add a test to the suite
     pub fn add_test<F>(mut self, name: &str, test_fn: F) -> Self
     where
@@ -73,7 +73,7 @@ impl TestSuite {
         });
         self
     }
-    
+
     /// Add a test with timeout
     pub fn add_test_with_timeout<F>(mut self, name: &str, timeout: Duration, test_fn: F) -> Self
     where
@@ -87,7 +87,7 @@ impl TestSuite {
         });
         self
     }
-    
+
     /// Add a test that is expected to fail
     pub fn add_test_expected_fail<F>(mut self, name: &str, test_fn: F) -> Self
     where
@@ -101,7 +101,7 @@ impl TestSuite {
         });
         self
     }
-    
+
     /// Set setup function
     pub fn setup<F>(mut self, setup_fn: F) -> Self
     where
@@ -110,7 +110,7 @@ impl TestSuite {
         self.setup = Some(Box::new(setup_fn));
         self
     }
-    
+
     /// Set teardown function
     pub fn teardown<F>(mut self, teardown_fn: F) -> Self
     where
@@ -131,7 +131,7 @@ impl TestResult {
             details: None,
         }
     }
-    
+
     /// Create a successful test result with details
     pub fn success_with_details(message: &str, details: &str) -> Self {
         Self {
@@ -141,7 +141,7 @@ impl TestResult {
             details: Some(details.to_string()),
         }
     }
-    
+
     /// Create a failed test result
     pub fn failure(message: &str) -> Self {
         Self {
@@ -151,7 +151,7 @@ impl TestResult {
             details: None,
         }
     }
-    
+
     /// Create a failed test result with details
     pub fn failure_with_details(message: &str, details: &str) -> Self {
         Self {
@@ -161,7 +161,7 @@ impl TestResult {
             details: Some(details.to_string()),
         }
     }
-    
+
     /// Set execution time
     pub fn with_time(mut self, time: Duration) -> Self {
         self.execution_time = time;
@@ -178,51 +178,51 @@ impl TestRunner {
             parallel: false,
         }
     }
-    
+
     /// Enable verbose output
     pub fn verbose(mut self) -> Self {
         self.verbose = true;
         self
     }
-    
+
     /// Enable parallel execution
     pub fn parallel(mut self) -> Self {
         self.parallel = true;
         self
     }
-    
+
     /// Add a test suite
     pub fn add_suite(mut self, suite: TestSuite) -> Self {
         self.suites.push(suite);
         self
     }
-    
+
     /// Run all test suites
     pub fn run(&self) -> TestRunResults {
         let start_time = Instant::now();
         let mut results = TestRunResults::new();
-        
+
         for suite in &self.suites {
             if self.verbose {
                 println!("Running test suite: {}", suite.name);
             }
-            
+
             // Run setup
             if let Some(setup) = &suite.setup {
                 setup();
             }
-            
+
             // Run tests
             for test in &suite.tests {
                 let test_start = Instant::now();
-                
+
                 if self.verbose {
                     print!("  Running test: {}... ", test.name);
                 }
-                
+
                 let mut result = (test.test_fn)();
                 result.execution_time = test_start.elapsed();
-                
+
                 // Handle expected failures
                 if test.expected_to_fail {
                     result.passed = !result.passed;
@@ -230,7 +230,7 @@ impl TestRunner {
                         result.message = format!("Expected failure: {}", result.message);
                     }
                 }
-                
+
                 if self.verbose {
                     if result.passed {
                         println!("PASS ({:?})", result.execution_time);
@@ -238,20 +238,20 @@ impl TestRunner {
                         println!("FAIL ({:?}): {}", result.execution_time, result.message);
                     }
                 }
-                
+
                 results.add_result(&suite.name, &test.name, result);
             }
-            
+
             // Run teardown
             if let Some(teardown) = &suite.teardown {
                 teardown();
             }
-            
+
             if self.verbose {
                 println!();
             }
         }
-        
+
         results.total_time = start_time.elapsed();
         results
     }
@@ -271,7 +271,7 @@ impl TestRunResults {
             total_time: Duration::from_secs(0),
         }
     }
-    
+
     /// Add a test result
     pub fn add_result(&mut self, suite_name: &str, test_name: &str, result: TestResult) {
         self.suite_results
@@ -279,30 +279,31 @@ impl TestRunResults {
             .or_insert_with(HashMap::new)
             .insert(test_name.to_string(), result);
     }
-    
+
     /// Get total test count
     pub fn total_tests(&self) -> usize {
         self.suite_results.values().map(|tests| tests.len()).sum()
     }
-    
+
     /// Get passed test count
     pub fn passed_tests(&self) -> usize {
-        self.suite_results.values()
+        self.suite_results
+            .values()
             .flat_map(|tests| tests.values())
             .filter(|result| result.passed)
             .count()
     }
-    
+
     /// Get failed test count
     pub fn failed_tests(&self) -> usize {
         self.total_tests() - self.passed_tests()
     }
-    
+
     /// Check if all tests passed
     pub fn all_passed(&self) -> bool {
         self.failed_tests() == 0
     }
-    
+
     /// Print summary
     pub fn print_summary(&self) {
         println!("\n=== Test Summary ===");
@@ -310,7 +311,7 @@ impl TestRunResults {
         println!("Passed: {}", self.passed_tests());
         println!("Failed: {}", self.failed_tests());
         println!("Total time: {:?}", self.total_time);
-        
+
         if !self.all_passed() {
             println!("\n=== Failed Tests ===");
             for (suite_name, tests) in &self.suite_results {

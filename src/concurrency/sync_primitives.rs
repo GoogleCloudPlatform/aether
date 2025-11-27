@@ -18,8 +18,8 @@
 
 use crate::error::SemanticError;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, Condvar, Barrier, RwLock};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Barrier, Condvar, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 /// Manager for synchronization primitives
@@ -27,19 +27,19 @@ use std::time::{Duration, Instant};
 pub struct SyncPrimitiveManager {
     /// Registered mutexes
     mutexes: HashMap<String, Arc<AetherMutex>>,
-    
+
     /// Registered semaphores
     semaphores: HashMap<String, Arc<AetherSemaphore>>,
-    
+
     /// Registered condition variables
     condition_variables: HashMap<String, Arc<AetherCondVar>>,
-    
+
     /// Registered read-write locks
     rw_locks: HashMap<String, Arc<AetherRwLock>>,
-    
+
     /// Registered barriers
     barriers: HashMap<String, Arc<AetherBarrier>>,
-    
+
     /// Sync primitive statistics
     stats: SyncStats,
 }
@@ -49,10 +49,10 @@ pub struct SyncPrimitiveManager {
 pub struct AetherMutex {
     /// Inner mutex
     inner: Mutex<MutexState>,
-    
+
     /// Mutex name
     name: String,
-    
+
     /// Metrics
     metrics: Mutex<MutexMetrics>,
 }
@@ -62,19 +62,19 @@ pub struct AetherMutex {
 pub struct AetherSemaphore {
     /// Current permits
     permits: AtomicUsize,
-    
+
     /// Maximum permits
     max_permits: usize,
-    
+
     /// Condition variable for waiting
     condvar: Condvar,
-    
+
     /// Mutex for condvar
     mutex: Mutex<()>,
-    
+
     /// Semaphore name
     name: String,
-    
+
     /// Metrics
     metrics: Mutex<SemaphoreMetrics>,
 }
@@ -84,13 +84,13 @@ pub struct AetherSemaphore {
 pub struct AetherCondVar {
     /// Condition variable
     inner: Condvar,
-    
+
     /// Associated mutex name
     associated_mutex: Option<String>,
-    
+
     /// Name
     name: String,
-    
+
     /// Metrics
     metrics: Mutex<CondVarMetrics>,
 }
@@ -100,10 +100,10 @@ pub struct AetherCondVar {
 pub struct AetherRwLock {
     /// Inner RwLock
     inner: RwLock<RwLockState>,
-    
+
     /// Name
     name: String,
-    
+
     /// Metrics
     metrics: Mutex<RwLockMetrics>,
 }
@@ -113,10 +113,10 @@ pub struct AetherRwLock {
 pub struct AetherBarrier {
     /// Barrier
     inner: Barrier,
-    
+
     /// Name
     name: String,
-    
+
     /// Metrics
     metrics: Mutex<BarrierMetrics>,
 }
@@ -130,8 +130,7 @@ struct MutexState {
 
 /// RwLock state
 #[derive(Debug, Default)]
-struct RwLockState {
-}
+struct RwLockState {}
 
 /// Barrier state
 #[derive(Debug)]
@@ -179,7 +178,7 @@ struct SemaphoreMetrics {
 struct CondVarMetrics {
     /// Number of notifications
     notifications: u64,
-    
+
     /// Number of waits
     waits: u64,
 }
@@ -189,7 +188,7 @@ struct CondVarMetrics {
 struct RwLockMetrics {
     /// Read locks acquired
     read_locks: u64,
-    
+
     /// Write locks acquired
     write_locks: u64,
 }
@@ -211,16 +210,16 @@ pub type LockResult<T> = Result<T, LockError>;
 pub enum LockError {
     /// Lock timeout
     Timeout,
-    
+
     /// Lock poisoned
     Poisoned,
-    
+
     /// Would block
     WouldBlock,
-    
+
     /// Already locked by current thread
     AlreadyLocked,
-    
+
     /// Not locked by current thread
     NotLocked,
 }
@@ -254,7 +253,7 @@ impl SyncPrimitiveManager {
             stats: SyncStats::default(),
         }
     }
-    
+
     /// Create a new mutex
     pub fn create_mutex(&mut self, name: String) -> Result<Arc<AetherMutex>, SemanticError> {
         if self.mutexes.contains_key(&name) {
@@ -264,16 +263,20 @@ impl SyncPrimitiveManager {
                 previous_location: crate::error::SourceLocation::unknown(),
             });
         }
-        
+
         let mutex = Arc::new(AetherMutex::new(name.clone()));
         self.mutexes.insert(name, mutex.clone());
         self.stats.total_mutexes += 1;
-        
+
         Ok(mutex)
     }
-    
+
     /// Create a new semaphore
-    pub fn create_semaphore(&mut self, name: String, permits: usize) -> Result<Arc<AetherSemaphore>, SemanticError> {
+    pub fn create_semaphore(
+        &mut self,
+        name: String,
+        permits: usize,
+    ) -> Result<Arc<AetherSemaphore>, SemanticError> {
         if self.semaphores.contains_key(&name) {
             return Err(SemanticError::DuplicateDefinition {
                 symbol: name,
@@ -281,16 +284,20 @@ impl SyncPrimitiveManager {
                 previous_location: crate::error::SourceLocation::unknown(),
             });
         }
-        
+
         let semaphore = Arc::new(AetherSemaphore::new(name.clone(), permits));
         self.semaphores.insert(name, semaphore.clone());
         self.stats.total_semaphores += 1;
-        
+
         Ok(semaphore)
     }
-    
+
     /// Create a new condition variable
-    pub fn create_condition_variable(&mut self, name: String, mutex_name: Option<String>) -> Result<Arc<AetherCondVar>, SemanticError> {
+    pub fn create_condition_variable(
+        &mut self,
+        name: String,
+        mutex_name: Option<String>,
+    ) -> Result<Arc<AetherCondVar>, SemanticError> {
         if self.condition_variables.contains_key(&name) {
             return Err(SemanticError::DuplicateDefinition {
                 symbol: name,
@@ -298,14 +305,14 @@ impl SyncPrimitiveManager {
                 previous_location: crate::error::SourceLocation::unknown(),
             });
         }
-        
+
         let condvar = Arc::new(AetherCondVar::new(name.clone(), mutex_name));
         self.condition_variables.insert(name, condvar.clone());
         self.stats.total_condition_variables += 1;
-        
+
         Ok(condvar)
     }
-    
+
     /// Create a new read-write lock
     pub fn create_rw_lock(&mut self, name: String) -> Result<Arc<AetherRwLock>, SemanticError> {
         if self.rw_locks.contains_key(&name) {
@@ -315,16 +322,20 @@ impl SyncPrimitiveManager {
                 previous_location: crate::error::SourceLocation::unknown(),
             });
         }
-        
+
         let rw_lock = Arc::new(AetherRwLock::new(name.clone()));
         self.rw_locks.insert(name, rw_lock.clone());
         self.stats.total_rw_locks += 1;
-        
+
         Ok(rw_lock)
     }
-    
+
     /// Create a new barrier
-    pub fn create_barrier(&mut self, name: String, thread_count: usize) -> Result<Arc<AetherBarrier>, SemanticError> {
+    pub fn create_barrier(
+        &mut self,
+        name: String,
+        thread_count: usize,
+    ) -> Result<Arc<AetherBarrier>, SemanticError> {
         if self.barriers.contains_key(&name) {
             return Err(SemanticError::DuplicateDefinition {
                 symbol: name,
@@ -332,39 +343,39 @@ impl SyncPrimitiveManager {
                 previous_location: crate::error::SourceLocation::unknown(),
             });
         }
-        
+
         let barrier = Arc::new(AetherBarrier::new(name.clone(), thread_count));
         self.barriers.insert(name, barrier.clone());
         self.stats.total_barriers += 1;
-        
+
         Ok(barrier)
     }
-    
+
     /// Get mutex by name
     pub fn get_mutex(&self, name: &str) -> Option<Arc<AetherMutex>> {
         self.mutexes.get(name).cloned()
     }
-    
+
     /// Get semaphore by name
     pub fn get_semaphore(&self, name: &str) -> Option<Arc<AetherSemaphore>> {
         self.semaphores.get(name).cloned()
     }
-    
+
     /// Get condition variable by name
     pub fn get_condition_variable(&self, name: &str) -> Option<Arc<AetherCondVar>> {
         self.condition_variables.get(name).cloned()
     }
-    
+
     /// Get read-write lock by name
     pub fn get_rw_lock(&self, name: &str) -> Option<Arc<AetherRwLock>> {
         self.rw_locks.get(name).cloned()
     }
-    
+
     /// Get barrier by name
     pub fn get_barrier(&self, name: &str) -> Option<Arc<AetherBarrier>> {
         self.barriers.get(name).cloned()
     }
-    
+
     /// Get statistics
     pub fn stats(&self) -> &SyncStats {
         &self.stats
@@ -379,11 +390,11 @@ impl AetherMutex {
             metrics: Mutex::new(MutexMetrics::default()),
         }
     }
-    
+
     /// Lock the mutex
     pub fn lock(&self) -> LockResult<MutexGuard> {
         let start_time = Instant::now();
-        
+
         match self.inner.lock() {
             Ok(mut state) => {
                 if state.locked {
@@ -396,10 +407,10 @@ impl AetherMutex {
                     }
                     return Err(LockError::WouldBlock);
                 }
-                
+
                 state.locked = true;
                 state.owner_thread = Some(std::thread::current().id());
-                
+
                 // Update metrics
                 if let Ok(mut metrics) = self.metrics.lock() {
                     metrics.lock_count += 1;
@@ -409,7 +420,7 @@ impl AetherMutex {
                         metrics.max_wait_time_ms = wait_time;
                     }
                 }
-                
+
                 Ok(MutexGuard {
                     mutex: self,
                     acquired_at: Instant::now(),
@@ -418,7 +429,7 @@ impl AetherMutex {
             Err(_) => Err(LockError::Poisoned),
         }
     }
-    
+
     /// Try to lock the mutex without blocking
     pub fn try_lock(&self) -> LockResult<MutexGuard> {
         match self.inner.try_lock() {
@@ -426,14 +437,14 @@ impl AetherMutex {
                 if state.locked {
                     return Err(LockError::WouldBlock);
                 }
-                
+
                 state.locked = true;
                 state.owner_thread = Some(std::thread::current().id());
-                
+
                 if let Ok(mut metrics) = self.metrics.lock() {
                     metrics.lock_count += 1;
                 }
-                
+
                 Ok(MutexGuard {
                     mutex: self,
                     acquired_at: Instant::now(),
@@ -442,7 +453,7 @@ impl AetherMutex {
             Err(_) => Err(LockError::WouldBlock),
         }
     }
-    
+
     /// Get mutex name
     pub fn name(&self) -> &str {
         &self.name
@@ -460,20 +471,24 @@ impl AetherSemaphore {
             metrics: Mutex::new(SemaphoreMetrics::default()),
         }
     }
-    
+
     /// Acquire a permit
     pub fn acquire(&self) -> LockResult<()> {
         let start_time = Instant::now();
-        
+
         loop {
             let current = self.permits.load(Ordering::Acquire);
             if current > 0 {
-                if self.permits.compare_exchange_weak(
-                    current,
-                    current - 1,
-                    Ordering::Release,
-                    Ordering::Relaxed,
-                ).is_ok() {
+                if self
+                    .permits
+                    .compare_exchange_weak(
+                        current,
+                        current - 1,
+                        Ordering::Release,
+                        Ordering::Relaxed,
+                    )
+                    .is_ok()
+                {
                     // Update metrics
                     if let Ok(mut metrics) = self.metrics.lock() {
                         metrics.acquire_count += 1;
@@ -489,24 +504,23 @@ impl AetherSemaphore {
                 // Wait for permits to become available
                 let _guard = self.mutex.lock().unwrap();
                 let _result = self.condvar.wait(_guard).unwrap();
-                
+
                 if let Ok(mut metrics) = self.metrics.lock() {
                     metrics.wait_count += 1;
                 }
             }
         }
     }
-    
+
     /// Try to acquire a permit without blocking
     pub fn try_acquire(&self) -> LockResult<()> {
         let current = self.permits.load(Ordering::Acquire);
         if current > 0 {
-            if self.permits.compare_exchange_weak(
-                current,
-                current - 1,
-                Ordering::Release,
-                Ordering::Relaxed,
-            ).is_ok() {
+            if self
+                .permits
+                .compare_exchange_weak(current, current - 1, Ordering::Release, Ordering::Relaxed)
+                .is_ok()
+            {
                 if let Ok(mut metrics) = self.metrics.lock() {
                     metrics.acquire_count += 1;
                 }
@@ -515,24 +529,24 @@ impl AetherSemaphore {
         }
         Err(LockError::WouldBlock)
     }
-    
+
     /// Release a permit
     pub fn release(&self) {
         let old_permits = self.permits.fetch_add(1, Ordering::Release);
         if old_permits < self.max_permits {
             self.condvar.notify_one();
-            
+
             if let Ok(mut metrics) = self.metrics.lock() {
                 metrics.release_count += 1;
             }
         }
     }
-    
+
     /// Get available permits
     pub fn available_permits(&self) -> usize {
         self.permits.load(Ordering::Acquire)
     }
-    
+
     /// Get semaphore name
     pub fn name(&self) -> &str {
         &self.name
@@ -548,40 +562,40 @@ impl AetherCondVar {
             metrics: Mutex::new(CondVarMetrics::default()),
         }
     }
-    
+
     /// Wait on the condition variable
     pub fn wait<'a>(&self, guard: MutexGuard<'a>) -> LockResult<MutexGuard<'a>> {
         let start_time = Instant::now();
-        
+
         // In a real implementation, this would properly integrate with the mutex guard
         // For now, we'll simulate the wait
         std::thread::sleep(Duration::from_millis(1));
-        
+
         if let Ok(mut metrics) = self.metrics.lock() {
             metrics.waits += 1;
         }
-        
+
         Ok(guard)
     }
-    
+
     /// Notify one waiting thread
     pub fn notify_one(&self) {
         self.inner.notify_one();
-        
+
         if let Ok(mut metrics) = self.metrics.lock() {
             metrics.notifications += 1;
         }
     }
-    
+
     /// Notify all waiting threads
     pub fn notify_all(&self) {
         self.inner.notify_all();
-        
+
         if let Ok(mut metrics) = self.metrics.lock() {
             metrics.notifications += 1;
         }
     }
-    
+
     /// Get condition variable name
     pub fn name(&self) -> &str {
         &self.name
@@ -596,17 +610,17 @@ impl AetherRwLock {
             metrics: Mutex::new(RwLockMetrics::default()),
         }
     }
-    
+
     /// Acquire a read lock
     pub fn read(&self) -> LockResult<ReadGuard> {
         let start_time = Instant::now();
-        
+
         match self.inner.read() {
             Ok(_guard) => {
                 if let Ok(mut metrics) = self.metrics.lock() {
                     metrics.read_locks += 1;
                 }
-                
+
                 Ok(ReadGuard {
                     rw_lock: self,
                     acquired_at: start_time,
@@ -615,17 +629,17 @@ impl AetherRwLock {
             Err(_) => Err(LockError::Poisoned),
         }
     }
-    
+
     /// Acquire a write lock
     pub fn write(&self) -> LockResult<WriteGuard> {
         let start_time = Instant::now();
-        
+
         match self.inner.write() {
             Ok(_guard) => {
                 if let Ok(mut metrics) = self.metrics.lock() {
                     metrics.write_locks += 1;
                 }
-                
+
                 Ok(WriteGuard {
                     rw_lock: self,
                     acquired_at: start_time,
@@ -634,7 +648,7 @@ impl AetherRwLock {
             Err(_) => Err(LockError::Poisoned),
         }
     }
-    
+
     /// Get lock name
     pub fn name(&self) -> &str {
         &self.name
@@ -649,13 +663,13 @@ impl AetherBarrier {
             metrics: Mutex::new(BarrierMetrics::default()),
         }
     }
-    
+
     /// Wait at the barrier
     pub fn wait(&self) -> LockResult<bool> {
         let start_time = Instant::now();
-        
+
         let result = self.inner.wait();
-        
+
         if let Ok(mut metrics) = self.metrics.lock() {
             metrics.wait_count += 1;
             let wait_time = start_time.elapsed().as_millis() as f64;
@@ -664,10 +678,10 @@ impl AetherBarrier {
                 metrics.max_wait_time_ms = wait_time;
             }
         }
-        
+
         Ok(result.is_leader())
     }
-    
+
     /// Get barrier name
     pub fn name(&self) -> &str {
         &self.name
@@ -680,7 +694,7 @@ impl<'a> Drop for MutexGuard<'a> {
         if let Ok(mut state) = self.mutex.inner.lock() {
             state.locked = false;
             state.owner_thread = None;
-            
+
             // Update metrics
             if let Ok(mut metrics) = self.mutex.metrics.lock() {
                 metrics.unlock_count += 1;
@@ -694,16 +708,14 @@ impl<'a> Drop for MutexGuard<'a> {
 impl<'a> Drop for ReadGuard<'a> {
     fn drop(&mut self) {
         // Update metrics
-        if let Ok(mut metrics) = self.rw_lock.metrics.lock() {
-        }
+        if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
     }
 }
 
 impl<'a> Drop for WriteGuard<'a> {
     fn drop(&mut self) {
         // Update metrics
-        if let Ok(mut metrics) = self.rw_lock.metrics.lock() {
-        }
+        if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
     }
 }
 
@@ -716,108 +728,114 @@ impl Default for SyncPrimitiveManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_sync_primitive_manager_creation() {
         let manager = SyncPrimitiveManager::new();
         assert_eq!(manager.stats.total_mutexes, 0);
         assert_eq!(manager.stats.total_semaphores, 0);
     }
-    
+
     #[test]
     fn test_mutex_creation() {
         let mut manager = SyncPrimitiveManager::new();
         let mutex = manager.create_mutex("test_mutex".to_string()).unwrap();
-        
+
         assert_eq!(mutex.name(), "test_mutex");
         assert_eq!(manager.stats.total_mutexes, 1);
     }
-    
+
     #[test]
     fn test_mutex_locking() {
         let mut manager = SyncPrimitiveManager::new();
         let mutex = manager.create_mutex("lock_test".to_string()).unwrap();
-        
+
         let guard = mutex.lock();
         assert!(guard.is_ok());
-        
+
         // Try to lock again (should fail)
         let second_guard = mutex.try_lock();
         assert!(second_guard.is_err());
     }
-    
+
     #[test]
     fn test_semaphore_creation() {
         let mut manager = SyncPrimitiveManager::new();
-        let semaphore = manager.create_semaphore("test_semaphore".to_string(), 3).unwrap();
-        
+        let semaphore = manager
+            .create_semaphore("test_semaphore".to_string(), 3)
+            .unwrap();
+
         assert_eq!(semaphore.name(), "test_semaphore");
         assert_eq!(semaphore.available_permits(), 3);
         assert_eq!(manager.stats.total_semaphores, 1);
     }
-    
+
     #[test]
     fn test_semaphore_acquire_release() {
         let mut manager = SyncPrimitiveManager::new();
-        let semaphore = manager.create_semaphore("acquire_test".to_string(), 2).unwrap();
-        
+        let semaphore = manager
+            .create_semaphore("acquire_test".to_string(), 2)
+            .unwrap();
+
         // Acquire permits
         assert!(semaphore.try_acquire().is_ok());
         assert_eq!(semaphore.available_permits(), 1);
-        
+
         assert!(semaphore.try_acquire().is_ok());
         assert_eq!(semaphore.available_permits(), 0);
-        
+
         // Should fail when no permits available
         assert!(semaphore.try_acquire().is_err());
-        
+
         // Release a permit
         semaphore.release();
         assert_eq!(semaphore.available_permits(), 1);
-        
+
         // Should succeed now
         assert!(semaphore.try_acquire().is_ok());
     }
-    
+
     #[test]
     fn test_rw_lock_creation() {
         let mut manager = SyncPrimitiveManager::new();
         let rw_lock = manager.create_rw_lock("test_rw_lock".to_string()).unwrap();
-        
+
         assert_eq!(rw_lock.name(), "test_rw_lock");
         assert_eq!(manager.stats.total_rw_locks, 1);
     }
-    
+
     #[test]
     fn test_rw_lock_read_write() {
         let mut manager = SyncPrimitiveManager::new();
         let rw_lock = manager.create_rw_lock("rw_test".to_string()).unwrap();
-        
+
         // Multiple readers should be allowed
         let _read_guard1 = rw_lock.read().unwrap();
         let _read_guard2 = rw_lock.read().unwrap();
-        
+
         // Drop readers before testing writer
         drop(_read_guard1);
         drop(_read_guard2);
-        
+
         // Writer should work
         let _write_guard = rw_lock.write().unwrap();
     }
-    
+
     #[test]
     fn test_barrier_creation() {
         let mut manager = SyncPrimitiveManager::new();
-        let barrier = manager.create_barrier("test_barrier".to_string(), 3).unwrap();
-        
+        let barrier = manager
+            .create_barrier("test_barrier".to_string(), 3)
+            .unwrap();
+
         assert_eq!(barrier.name(), "test_barrier");
         assert_eq!(manager.stats.total_barriers, 1);
     }
-    
+
     #[test]
     fn test_duplicate_names() {
         let mut manager = SyncPrimitiveManager::new();
-        
+
         assert!(manager.create_mutex("duplicate".to_string()).is_ok());
         assert!(manager.create_mutex("duplicate".to_string()).is_err());
     }

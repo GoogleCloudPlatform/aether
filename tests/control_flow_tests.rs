@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use aether::ast::*;
 use aether::lexer::Lexer;
 use aether::parser::Parser;
 use aether::semantic::SemanticAnalyzer;
-use aether::ast::*;
 
 /// Helper function to create a simple test module with control flow
 fn create_control_flow_module() -> String {
@@ -67,23 +67,28 @@ fn create_control_flow_module() -> String {
 #[test]
 fn test_if_statement_parsing() {
     let source = create_control_flow_module();
-    
+
     let mut lexer = Lexer::new(&source, "control_flow_test.aether".to_string());
     let tokens = lexer.tokenize().expect("Tokenization should succeed");
-    
+
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().expect("Parsing should succeed");
-    
+
     assert_eq!(program.modules.len(), 1);
     assert_eq!(program.modules[0].function_definitions.len(), 2);
-    
+
     // Check first function has if statement
     let first_func = &program.modules[0].function_definitions[0];
     assert_eq!(first_func.name.name, "test_if");
     assert_eq!(first_func.body.statements.len(), 1);
-    
+
     match &first_func.body.statements[0] {
-        Statement::If { condition, then_block, else_block, .. } => {
+        Statement::If {
+            condition,
+            then_block,
+            else_block,
+            ..
+        } => {
             assert!(matches!(condition.as_ref(), Expression::GreaterThan { .. }));
             assert_eq!(then_block.statements.len(), 1);
             assert!(else_block.is_some());
@@ -95,20 +100,22 @@ fn test_if_statement_parsing() {
 #[test]
 fn test_while_loop_parsing() {
     let source = create_control_flow_module();
-    
+
     let mut lexer = Lexer::new(&source, "control_flow_test.aether".to_string());
     let tokens = lexer.tokenize().expect("Tokenization should succeed");
-    
+
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().expect("Parsing should succeed");
-    
+
     // Check second function has while loop
     let second_func = &program.modules[0].function_definitions[1];
     assert_eq!(second_func.name.name, "test_while");
     assert_eq!(second_func.body.statements.len(), 3); // declare, while, return
-    
+
     match &second_func.body.statements[1] {
-        Statement::WhileLoop { condition, body, .. } => {
+        Statement::WhileLoop {
+            condition, body, ..
+        } => {
             assert!(matches!(condition.as_ref(), Expression::LessThan { .. }));
             assert_eq!(body.statements.len(), 1);
         }
@@ -119,16 +126,18 @@ fn test_while_loop_parsing() {
 #[test]
 fn test_control_flow_semantic_analysis() {
     let source = create_control_flow_module();
-    
+
     let mut lexer = Lexer::new(&source, "control_flow_test.aether".to_string());
     let tokens = lexer.tokenize().expect("Tokenization should succeed");
-    
+
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().expect("Parsing should succeed");
-    
+
     let mut analyzer = SemanticAnalyzer::new();
-    analyzer.analyze_program(&program).expect("Semantic analysis should succeed");
-    
+    analyzer
+        .analyze_program(&program)
+        .expect("Semantic analysis should succeed");
+
     let stats = analyzer.get_statistics();
     assert_eq!(stats.modules_analyzed, 1);
     assert_eq!(stats.functions_analyzed, 2);
@@ -155,19 +164,21 @@ fn test_boolean_condition_type_checking() {
             )
         )
     )"#;
-    
+
     let mut lexer = Lexer::new(source, "bad_control_flow.aether".to_string());
     let tokens = lexer.tokenize().expect("Tokenization should succeed");
-    
+
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().expect("Parsing should succeed");
-    
+
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     assert!(result.is_err());
     let errors = result.unwrap_err();
-    assert!(errors.iter().any(|e| e.to_string().contains("Type mismatch")));
+    assert!(errors
+        .iter()
+        .any(|e| e.to_string().contains("Type mismatch")));
 }
 
 #[test]
@@ -197,19 +208,21 @@ fn test_loop_scope_isolation() {
             )
         )
     )"#;
-    
+
     let mut lexer = Lexer::new(source, "loop_scope_test.aether".to_string());
     let tokens = lexer.tokenize().expect("Tokenization should succeed");
-    
+
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().expect("Parsing should succeed");
-    
+
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     assert!(result.is_err());
     let errors = result.unwrap_err();
-    assert!(errors.iter().any(|e| e.to_string().contains("Undefined symbol")));
+    assert!(errors
+        .iter()
+        .any(|e| e.to_string().contains("Undefined symbol")));
 }
 
 #[test]
@@ -261,16 +274,18 @@ fn test_nested_control_flow() {
             )
         )
     )"#;
-    
+
     let mut lexer = Lexer::new(source, "nested_control.aether".to_string());
     let tokens = lexer.tokenize().expect("Tokenization should succeed");
-    
+
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().expect("Parsing should succeed");
-    
+
     let mut analyzer = SemanticAnalyzer::new();
-    analyzer.analyze_program(&program).expect("Semantic analysis should succeed");
-    
+    analyzer
+        .analyze_program(&program)
+        .expect("Semantic analysis should succeed");
+
     let stats = analyzer.get_statistics();
     assert_eq!(stats.modules_analyzed, 1);
     assert_eq!(stats.functions_analyzed, 1);

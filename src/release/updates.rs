@@ -19,28 +19,28 @@
 
 use crate::error::SemanticError;
 use crate::release::VersionInfo;
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use std::path::PathBuf;
 
 /// Update manager for handling software updates
 #[derive(Debug)]
 pub struct UpdateManager {
     /// Update configuration
     config: UpdateConfig,
-    
+
     /// Current version information
     current_version: VersionInfo,
-    
+
     /// Update channels
     channels: Vec<UpdateChannel>,
-    
+
     /// Update cache
     cache: UpdateCache<CachedUpdate>,
-    
+
     /// Update history
     history: Vec<UpdateRecord>,
-    
+
     /// Security manager
     security: UpdateSecurity,
 }
@@ -50,31 +50,31 @@ pub struct UpdateManager {
 pub struct UpdateConfig {
     /// Enable automatic updates
     pub auto_update: bool,
-    
+
     /// Update check interval (seconds)
     pub check_interval: u64,
-    
+
     /// Update channels to monitor
     pub channels: Vec<String>,
-    
+
     /// Allowed update types
     pub allowed_types: Vec<UpdateType>,
-    
+
     /// Update verification settings
     pub verification: UpdateVerification,
-    
+
     /// Download settings
     pub download: DownloadConfig,
-    
+
     /// Installation settings
     pub installation: InstallationConfig,
-    
+
     /// Rollback settings
     pub rollback: RollbackConfig,
-    
+
     /// Notification settings
     pub notifications: UpdateNotifications,
-    
+
     /// Bandwidth limits
     pub bandwidth: BandwidthConfig,
 }
@@ -84,22 +84,22 @@ pub struct UpdateConfig {
 pub enum UpdateType {
     /// Major version updates
     Major,
-    
+
     /// Minor version updates
     Minor,
-    
+
     /// Patch updates
     Patch,
-    
+
     /// Security updates
     Security,
-    
+
     /// Hotfix updates
     Hotfix,
-    
+
     /// Beta updates
     Beta,
-    
+
     /// Nightly updates
     Nightly,
 }
@@ -109,22 +109,22 @@ pub enum UpdateType {
 pub struct UpdateVerification {
     /// Verify digital signatures
     pub verify_signatures: bool,
-    
+
     /// Verify checksums
     pub verify_checksums: bool,
-    
+
     /// Trusted certificate authorities
     pub trusted_cas: Vec<PathBuf>,
-    
+
     /// Required signature algorithms
     pub signature_algorithms: Vec<SignatureAlgorithm>,
-    
+
     /// Checksum algorithms
     pub checksum_algorithms: Vec<ChecksumAlgorithm>,
-    
+
     /// Verification timeout
     pub timeout: u64,
-    
+
     /// Strict verification mode
     pub strict_mode: bool,
 }
@@ -153,25 +153,25 @@ pub enum ChecksumAlgorithm {
 pub struct DownloadConfig {
     /// Maximum download size
     pub max_size: u64,
-    
+
     /// Download timeout
     pub timeout: u64,
-    
+
     /// Concurrent downloads
     pub max_concurrent: usize,
-    
+
     /// Chunk size for downloads
     pub chunk_size: u64,
-    
+
     /// Resume partial downloads
     pub resume_downloads: bool,
-    
+
     /// Download retry settings
     pub retry: RetryConfig,
-    
+
     /// Mirror servers
     pub mirrors: Vec<String>,
-    
+
     /// Preferred mirror selection
     pub mirror_selection: MirrorSelection,
 }
@@ -181,16 +181,16 @@ pub struct DownloadConfig {
 pub enum MirrorSelection {
     /// Fastest mirror
     Fastest,
-    
+
     /// Geographic proximity
     Geographic,
-    
+
     /// Round robin
     RoundRobin,
-    
+
     /// Random selection
     Random,
-    
+
     /// Prefer specific mirrors
     Preferred(Vec<String>),
 }
@@ -200,13 +200,13 @@ pub enum MirrorSelection {
 pub struct RetryConfig {
     /// Maximum retry attempts
     pub max_attempts: u32,
-    
+
     /// Retry delay
     pub delay: u64,
-    
+
     /// Backoff strategy
     pub backoff: BackoffStrategy,
-    
+
     /// Retry conditions
     pub retry_on: Vec<RetryCondition>,
 }
@@ -235,25 +235,25 @@ pub enum RetryCondition {
 pub struct InstallationConfig {
     /// Installation strategy
     pub strategy: InstallationStrategy,
-    
+
     /// Backup current version
     pub backup_current: bool,
-    
+
     /// Installation timeout
     pub timeout: u64,
-    
+
     /// Post-install verification
     pub verify_installation: bool,
-    
+
     /// Custom install scripts
     pub custom_scripts: Vec<PathBuf>,
-    
+
     /// Service restart settings
     pub service_restart: ServiceRestartConfig,
-    
+
     /// File permissions
     pub preserve_permissions: bool,
-    
+
     /// Installation directory
     pub install_dir: Option<PathBuf>,
 }
@@ -263,16 +263,16 @@ pub struct InstallationConfig {
 pub enum InstallationStrategy {
     /// Replace current installation
     Replace,
-    
+
     /// Side-by-side installation
     SideBySide,
-    
+
     /// Incremental update
     Incremental,
-    
+
     /// Blue-green deployment
     BlueGreen,
-    
+
     /// Rolling update
     Rolling,
 }
@@ -282,16 +282,16 @@ pub enum InstallationStrategy {
 pub struct ServiceRestartConfig {
     /// Restart services after update
     pub restart_services: bool,
-    
+
     /// Services to restart
     pub services: Vec<String>,
-    
+
     /// Restart timeout
     pub timeout: u64,
-    
+
     /// Graceful shutdown
     pub graceful_shutdown: bool,
-    
+
     /// Wait for service readiness
     pub wait_for_ready: bool,
 }
@@ -301,19 +301,19 @@ pub struct ServiceRestartConfig {
 pub struct RollbackConfig {
     /// Enable automatic rollback
     pub auto_rollback: bool,
-    
+
     /// Rollback timeout
     pub timeout: u64,
-    
+
     /// Health check settings
     pub health_checks: Vec<HealthCheck>,
-    
+
     /// Rollback triggers
     pub triggers: Vec<RollbackTrigger>,
-    
+
     /// Maximum rollback attempts
     pub max_attempts: u32,
-    
+
     /// Preserve user data
     pub preserve_data: bool,
 }
@@ -323,19 +323,19 @@ pub struct RollbackConfig {
 pub struct HealthCheck {
     /// Check name
     pub name: String,
-    
+
     /// Check type
     pub check_type: HealthCheckType,
-    
+
     /// Check interval
     pub interval: u64,
-    
+
     /// Check timeout
     pub timeout: u64,
-    
+
     /// Failure threshold
     pub failure_threshold: u32,
-    
+
     /// Success threshold
     pub success_threshold: u32,
 }
@@ -344,32 +344,19 @@ pub struct HealthCheck {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HealthCheckType {
     /// HTTP endpoint check
-    Http {
-        url: String,
-        expected_status: u16,
-    },
-    
+    Http { url: String, expected_status: u16 },
+
     /// TCP port check
-    Tcp {
-        host: String,
-        port: u16,
-    },
-    
+    Tcp { host: String, port: u16 },
+
     /// Process check
-    Process {
-        name: String,
-    },
-    
+    Process { name: String },
+
     /// File existence check
-    File {
-        path: PathBuf,
-    },
-    
+    File { path: PathBuf },
+
     /// Custom script check
-    Script {
-        path: PathBuf,
-        args: Vec<String>,
-    },
+    Script { path: PathBuf, args: Vec<String> },
 }
 
 /// Rollback triggers
@@ -377,19 +364,19 @@ pub enum HealthCheckType {
 pub enum RollbackTrigger {
     /// Health check failure
     HealthCheckFailure,
-    
+
     /// Installation failure
     InstallationFailure,
-    
+
     /// Service start failure
     ServiceStartFailure,
-    
+
     /// User initiated
     UserInitiated,
-    
+
     /// Timeout exceeded
     TimeoutExceeded,
-    
+
     /// Custom trigger
     Custom(String),
 }
@@ -399,13 +386,13 @@ pub enum RollbackTrigger {
 pub struct UpdateNotifications {
     /// Enable notifications
     pub enabled: bool,
-    
+
     /// Notification channels
     pub channels: Vec<NotificationChannel>,
-    
+
     /// Notification events
     pub events: Vec<NotificationEvent>,
-    
+
     /// Notification templates
     pub templates: HashMap<String, String>,
 }
@@ -415,29 +402,27 @@ pub struct UpdateNotifications {
 pub enum NotificationChannel {
     /// System notifications
     System,
-    
+
     /// Email notifications
     Email {
         smtp_server: String,
         recipients: Vec<String>,
     },
-    
+
     /// Slack notifications
     Slack {
         webhook_url: String,
         channel: String,
     },
-    
+
     /// Webhook notifications
     Webhook {
         url: String,
         headers: HashMap<String, String>,
     },
-    
+
     /// Log file notifications
-    Log {
-        path: PathBuf,
-    },
+    Log { path: PathBuf },
 }
 
 /// Notification events
@@ -457,16 +442,16 @@ pub enum NotificationEvent {
 pub struct BandwidthConfig {
     /// Enable bandwidth limiting
     pub enabled: bool,
-    
+
     /// Maximum download rate (bytes/sec)
     pub max_rate: u64,
-    
+
     /// Bandwidth scheduling
     pub schedule: Vec<BandwidthSchedule>,
-    
+
     /// Adaptive bandwidth
     pub adaptive: bool,
-    
+
     /// Network type detection
     pub detect_network_type: bool,
 }
@@ -476,13 +461,13 @@ pub struct BandwidthConfig {
 pub struct BandwidthSchedule {
     /// Schedule name
     pub name: String,
-    
+
     /// Time range
     pub time_range: TimeRange,
-    
+
     /// Day of week
     pub days: Vec<DayOfWeek>,
-    
+
     /// Bandwidth limit
     pub limit: u64,
 }
@@ -492,7 +477,7 @@ pub struct BandwidthSchedule {
 pub struct TimeRange {
     /// Start time (HH:MM)
     pub start: String,
-    
+
     /// End time (HH:MM)
     pub end: String,
 }
@@ -514,22 +499,22 @@ pub enum DayOfWeek {
 pub struct UpdateChannel {
     /// Channel name
     pub name: String,
-    
+
     /// Channel URL
     pub url: String,
-    
+
     /// Last check time
     pub last_checked: Option<std::time::SystemTime>,
-    
+
     /// Channel statistics
     pub stats: ChannelStats,
-    
+
     /// Channel configuration
     pub config: UpdateChannelConfig,
-    
+
     /// Channel status
     pub status: ChannelStatus,
-    
+
     /// Available updates from this channel
     pub available_updates: Vec<UpdateInfo>,
 }
@@ -539,25 +524,25 @@ pub struct UpdateChannel {
 pub struct UpdateChannelConfig {
     /// Channel name
     pub name: String,
-    
+
     /// Channel URL
     pub url: String,
-    
+
     /// Channel type
     pub channel_type: ChannelType,
-    
+
     /// Update frequency
     pub update_types: Vec<UpdateType>,
-    
+
     /// Release stages
     pub stages: Vec<ReleaseStage>,
-    
+
     /// Authentication
     pub auth: Option<ChannelAuth>,
-    
+
     /// Priority
     pub priority: u32,
-    
+
     /// Channel timeout
     pub timeout: u64,
 }
@@ -567,16 +552,16 @@ pub struct UpdateChannelConfig {
 pub enum ChannelType {
     /// Official release channel
     Official,
-    
+
     /// Beta channel
     Beta,
-    
+
     /// Nightly builds
     Nightly,
-    
+
     /// Security updates only
     Security,
-    
+
     /// Custom channel
     Custom(String),
 }
@@ -597,7 +582,7 @@ pub enum ReleaseStage {
 pub struct ChannelAuth {
     /// Authentication type
     pub auth_type: AuthType,
-    
+
     /// Credentials
     pub credentials: HashMap<String, String>,
 }
@@ -626,19 +611,19 @@ pub enum ChannelStatus {
 pub struct ChannelStats {
     /// Total checks
     pub total_checks: u64,
-    
+
     /// Successful checks
     pub successful_checks: u64,
-    
+
     /// Failed checks
     pub failed_checks: u64,
-    
+
     /// Last check time
     pub last_check: Option<std::time::SystemTime>,
-    
+
     /// Average response time
     pub avg_response_time: std::time::Duration,
-    
+
     /// Updates found
     pub updates_found: u64,
 }
@@ -648,13 +633,13 @@ pub struct ChannelStats {
 pub struct UpdateCache<T> {
     /// Cache directory
     cache_dir: PathBuf,
-    
+
     /// Cached updates
     cached_updates: HashMap<String, T>,
-    
+
     /// Cache statistics
     stats: CacheStats,
-    
+
     /// Cache settings
     settings: CacheSettings,
 }
@@ -664,16 +649,16 @@ pub struct UpdateCache<T> {
 pub struct CacheSettings {
     /// Maximum cache size in bytes
     pub max_size: u64,
-    
+
     /// Cache expiration time
     pub expiration: std::time::Duration,
-    
+
     /// Enable automatic cleanup
     pub auto_cleanup: bool,
-    
+
     /// Compression settings
     pub compression: CompressionConfig,
-    
+
     /// Cleanup policy
     pub cleanup_policy: CleanupPolicy,
 }
@@ -683,7 +668,7 @@ pub struct CacheSettings {
 pub struct CompressionConfig {
     /// Enable compression
     pub enabled: bool,
-    
+
     /// Compression level
     pub level: u32,
 }
@@ -693,10 +678,10 @@ pub struct CompressionConfig {
 pub enum CleanupPolicy {
     /// Clean up files older than duration
     Age(std::time::Duration),
-    
+
     /// Clean up when size exceeds limit
     Size(u64),
-    
+
     /// Clean up least recently used
     LRU { max_items: usize },
 }
@@ -706,36 +691,35 @@ pub enum CleanupPolicy {
 pub struct CachedUpdate {
     /// Update information
     pub update_info: UpdateInfo,
-    
+
     /// Download path
     pub download_path: Option<PathBuf>,
-    
+
     /// Download progress
     pub download_progress: DownloadProgress,
-    
+
     /// Cache timestamp
     pub cached_at: std::time::SystemTime,
-    
+
     /// Verification status
     pub verified: bool,
 }
-
 
 /// Cache statistics
 #[derive(Debug, Clone)]
 pub struct CacheStats {
     /// Total cache hits
     pub hits: u64,
-    
+
     /// Total cache misses
     pub misses: u64,
-    
+
     /// Current cache size
     pub current_size: u64,
-    
+
     /// Number of cached items
     pub item_count: usize,
-    
+
     /// Last cleanup time
     pub last_cleanup: Option<std::time::SystemTime>,
 }
@@ -745,49 +729,49 @@ pub struct CacheStats {
 pub struct UpdateInfo {
     /// Update version
     pub version: String,
-    
+
     /// Update type
     pub update_type: UpdateType,
-    
+
     /// Release stage
     pub stage: ReleaseStage,
-    
+
     /// Release notes
     pub release_notes: String,
-    
+
     /// Download URL
     pub download_url: String,
-    
+
     /// File size
     pub file_size: u64,
-    
+
     /// Checksums
     pub checksums: HashMap<ChecksumAlgorithm, String>,
-    
+
     /// Digital signature
     pub signature: Option<String>,
-    
+
     /// Release timestamp
     pub released_at: String,
-    
+
     /// Minimum version requirement
     pub min_version: Option<String>,
-    
+
     /// Maximum version requirement
     pub max_version: Option<String>,
-    
+
     /// Platform requirements
     pub platforms: Vec<PlatformRequirement>,
-    
+
     /// Dependencies
     pub dependencies: Vec<UpdateDependency>,
-    
+
     /// Installation instructions
     pub install_instructions: Option<String>,
-    
+
     /// Breaking changes
     pub breaking_changes: Vec<String>,
-    
+
     /// Security fixes
     pub security_fixes: Vec<SecurityFix>,
 }
@@ -797,13 +781,13 @@ pub struct UpdateInfo {
 pub struct PlatformRequirement {
     /// Operating system
     pub os: String,
-    
+
     /// Architecture
     pub arch: String,
-    
+
     /// Minimum OS version
     pub min_os_version: Option<String>,
-    
+
     /// Required features
     pub features: Vec<String>,
 }
@@ -813,10 +797,10 @@ pub struct PlatformRequirement {
 pub struct UpdateDependency {
     /// Dependency name
     pub name: String,
-    
+
     /// Required version
     pub version: String,
-    
+
     /// Dependency type
     pub dependency_type: DependencyType,
 }
@@ -834,13 +818,13 @@ pub enum DependencyType {
 pub struct SecurityFix {
     /// CVE identifier
     pub cve_id: Option<String>,
-    
+
     /// Severity level
     pub severity: SecuritySeverity,
-    
+
     /// Description
     pub description: String,
-    
+
     /// CVSS score
     pub cvss_score: Option<f32>,
 }
@@ -859,16 +843,16 @@ pub enum SecuritySeverity {
 pub struct DownloadProgress {
     /// Total bytes
     pub total_bytes: u64,
-    
+
     /// Downloaded bytes
     pub downloaded_bytes: u64,
-    
+
     /// Download speed (bytes/sec)
     pub speed: f64,
-    
+
     /// Estimated time remaining
     pub eta: Option<std::time::Duration>,
-    
+
     /// Download status
     pub status: DownloadStatus,
 }
@@ -889,13 +873,13 @@ pub enum DownloadStatus {
 pub struct UpdateSecurity {
     /// Security policies
     policies: Vec<SecurityPolicy>,
-    
+
     /// Trusted certificates
     trusted_certs: Vec<Certificate>,
-    
+
     /// Signature verification settings
     signature_verification: SignatureVerificationConfig,
-    
+
     /// Certificate validation settings
     cert_validation: CertificateValidation,
 }
@@ -905,10 +889,10 @@ pub struct UpdateSecurity {
 pub struct CertificateValidation {
     /// Check certificate expiration
     pub check_expiration: bool,
-    
+
     /// Check certificate revocation
     pub check_revocation: bool,
-    
+
     /// Validate certificate chain
     pub validate_chain: bool,
 }
@@ -918,19 +902,19 @@ pub struct CertificateValidation {
 pub struct Certificate {
     /// Certificate data
     pub data: Vec<u8>,
-    
+
     /// Certificate format
     pub format: CertificateFormat,
-    
+
     /// Certificate subject
     pub subject: String,
-    
+
     /// Certificate issuer
     pub issuer: String,
-    
+
     /// Expiration date
     pub expires_at: std::time::SystemTime,
-    
+
     /// Certificate fingerprint
     pub fingerprint: String,
 }
@@ -948,16 +932,16 @@ pub enum CertificateFormat {
 pub struct CertValidationConfig {
     /// Validate certificate chain
     pub validate_chain: bool,
-    
+
     /// Check certificate expiration
     pub check_expiration: bool,
-    
+
     /// Verify certificate revocation
     pub check_revocation: bool,
-    
+
     /// Allow self-signed certificates
     pub allow_self_signed: bool,
-    
+
     /// Certificate pinning
     pub pinned_certificates: Vec<String>,
 }
@@ -967,13 +951,13 @@ pub struct CertValidationConfig {
 pub struct SignatureVerificationConfig {
     /// Required signature algorithms
     pub required_algorithms: Vec<SignatureAlgorithm>,
-    
+
     /// Minimum key size
     pub min_key_size: u32,
-    
+
     /// Allow weak algorithms
     pub allow_weak_algorithms: bool,
-    
+
     /// Signature validation timeout
     pub timeout: u64,
 }
@@ -983,10 +967,10 @@ pub struct SignatureVerificationConfig {
 pub struct SecurityPolicy {
     /// Policy name
     pub name: String,
-    
+
     /// Policy rules
     pub rules: Vec<SecurityRule>,
-    
+
     /// Policy action
     pub action: PolicyAction,
 }
@@ -996,10 +980,10 @@ pub struct SecurityPolicy {
 pub struct SecurityRule {
     /// Rule condition
     pub condition: RuleCondition,
-    
+
     /// Rule value
     pub value: String,
-    
+
     /// Rule operator
     pub operator: RuleOperator,
 }
@@ -1041,22 +1025,22 @@ pub enum PolicyAction {
 pub struct UpdateRecord {
     /// Update timestamp
     pub timestamp: std::time::SystemTime,
-    
+
     /// Update information
     pub update_info: UpdateInfo,
-    
+
     /// Update status
     pub status: UpdateStatus,
-    
+
     /// Installation method
     pub method: InstallationStrategy,
-    
+
     /// Duration
     pub duration: Option<std::time::Duration>,
-    
+
     /// Error details
     pub error: Option<String>,
-    
+
     /// Rollback information
     pub rollback_info: Option<RollbackInfo>,
 }
@@ -1078,16 +1062,16 @@ pub enum UpdateStatus {
 pub struct RollbackInfo {
     /// Rollback timestamp
     pub timestamp: std::time::SystemTime,
-    
+
     /// Rollback reason
     pub reason: RollbackReason,
-    
+
     /// Previous version
     pub previous_version: String,
-    
+
     /// Rollback status
     pub status: RollbackStatus,
-    
+
     /// Rollback duration
     pub duration: Option<std::time::Duration>,
 }
@@ -1118,12 +1102,12 @@ impl UpdateManager {
         std::fs::create_dir_all(&cache_dir).map_err(|e| SemanticError::Internal {
             message: format!("Failed to create cache directory: {}", e),
         })?;
-        
+
         let cache = UpdateCache {
             cache_dir,
             cached_updates: HashMap::new(),
             settings: CacheSettings {
-                max_size: 1024 * 1024 * 1024, // 1GB
+                max_size: 1024 * 1024 * 1024,                             // 1GB
                 expiration: std::time::Duration::from_secs(24 * 60 * 60), // 24 hours
                 auto_cleanup: true,
                 compression: CompressionConfig {
@@ -1140,7 +1124,7 @@ impl UpdateManager {
                 last_cleanup: None,
             },
         };
-        
+
         let security = UpdateSecurity {
             trusted_certs: Vec::new(),
             cert_validation: CertificateValidation {
@@ -1149,14 +1133,17 @@ impl UpdateManager {
                 check_revocation: true,
             },
             signature_verification: SignatureVerificationConfig {
-                required_algorithms: vec![SignatureAlgorithm::RSA2048, SignatureAlgorithm::ECDSA256],
+                required_algorithms: vec![
+                    SignatureAlgorithm::RSA2048,
+                    SignatureAlgorithm::ECDSA256,
+                ],
                 min_key_size: 2048,
                 allow_weak_algorithms: false,
                 timeout: 30,
             },
             policies: Vec::new(),
         };
-        
+
         Ok(Self {
             config,
             current_version,
@@ -1166,7 +1153,7 @@ impl UpdateManager {
             security,
         })
     }
-    
+
     /// Add an update channel
     pub fn add_channel(&mut self, config: UpdateChannelConfig) -> Result<(), SemanticError> {
         let channel = UpdateChannel {
@@ -1185,21 +1172,23 @@ impl UpdateManager {
                 updates_found: 0,
             },
         };
-        
+
         self.channels.push(channel);
         Ok(())
     }
-    
+
     /// Check for available updates
     pub fn check_for_updates(&mut self) -> Result<Vec<UpdateInfo>, SemanticError> {
         let mut all_updates = Vec::new();
-        
-        let active_indices: Vec<usize> = self.channels.iter()
+
+        let active_indices: Vec<usize> = self
+            .channels
+            .iter()
             .enumerate()
             .filter(|(_, channel)| matches!(channel.status, ChannelStatus::Active))
             .map(|(i, _)| i)
             .collect();
-        
+
         for idx in active_indices {
             let channel_clone = self.channels[idx].clone();
             match self.check_channel_for_updates(&channel_clone) {
@@ -1213,26 +1202,29 @@ impl UpdateManager {
                     self.channels[idx].status = ChannelStatus::Error(e.to_string());
                 }
             }
-            
+
             self.channels[idx].stats.total_checks += 1;
             self.channels[idx].stats.last_check = Some(std::time::SystemTime::now());
         }
-        
+
         // Filter and sort updates
         let filtered_updates = self.filter_updates(all_updates)?;
-        
+
         // Cache updates
         for update in &filtered_updates {
             self.cache_update(update.clone())?;
         }
-        
+
         Ok(filtered_updates)
     }
-    
+
     /// Check a specific channel for updates
-    fn check_channel_for_updates(&self, channel: &UpdateChannel) -> Result<Vec<UpdateInfo>, SemanticError> {
+    fn check_channel_for_updates(
+        &self,
+        channel: &UpdateChannel,
+    ) -> Result<Vec<UpdateInfo>, SemanticError> {
         println!("Checking channel: {}", channel.config.name);
-        
+
         // In real implementation, would make HTTP request to channel URL
         // For now, simulate with dummy data
         let dummy_update = UpdateInfo {
@@ -1240,7 +1232,10 @@ impl UpdateManager {
             update_type: UpdateType::Minor,
             stage: ReleaseStage::Stable,
             release_notes: "Bug fixes and improvements".to_string(),
-            download_url: format!("{}/releases/1.1.0/aetherscript-1.1.0.tar.gz", channel.config.url),
+            download_url: format!(
+                "{}/releases/1.1.0/aetherscript-1.1.0.tar.gz",
+                channel.config.url
+            ),
             file_size: 50 * 1024 * 1024, // 50MB
             checksums: {
                 let mut map = HashMap::new();
@@ -1251,97 +1246,95 @@ impl UpdateManager {
             released_at: chrono::Utc::now().to_rfc3339(),
             min_version: Some("1.0.0".to_string()),
             max_version: None,
-            platforms: vec![
-                PlatformRequirement {
-                    os: "linux".to_string(),
-                    arch: "x86_64".to_string(),
-                    min_os_version: None,
-                    features: vec![],
-                }
-            ],
+            platforms: vec![PlatformRequirement {
+                os: "linux".to_string(),
+                arch: "x86_64".to_string(),
+                min_os_version: None,
+                features: vec![],
+            }],
             dependencies: vec![],
             install_instructions: None,
             breaking_changes: vec![],
             security_fixes: vec![],
         };
-        
+
         // Note: In a real implementation, we would update the channel's available_updates
         // but since we're taking an immutable reference, we can't modify it here
         Ok(vec![dummy_update])
     }
-    
+
     /// Filter updates based on configuration and current version
     fn filter_updates(&self, updates: Vec<UpdateInfo>) -> Result<Vec<UpdateInfo>, SemanticError> {
         let mut filtered = Vec::new();
-        
+
         for update in updates {
             // Check if update type is allowed
             if !self.config.allowed_types.contains(&update.update_type) {
                 continue;
             }
-            
+
             // Check version compatibility
             if let Some(min_version) = &update.min_version {
                 if !self.is_version_compatible(min_version, &self.current_version.current) {
                     continue;
                 }
             }
-            
+
             // Check if this is actually a newer version
             if !self.is_newer_version(&update.version, &self.current_version.current) {
                 continue;
             }
-            
+
             // Check platform compatibility
             if !self.is_platform_compatible(&update.platforms) {
                 continue;
             }
-            
+
             // Apply security policies
             if !self.passes_security_policies(&update)? {
                 continue;
             }
-            
+
             filtered.push(update);
         }
-        
+
         // Sort by version (newest first)
         filtered.sort_by(|a, b| self.compare_versions(&b.version, &a.version));
-        
+
         Ok(filtered)
     }
-    
+
     /// Check if version is compatible
     fn is_version_compatible(&self, min_version: &str, current_version: &str) -> bool {
         // Simple version comparison - in real implementation would use semver
         current_version >= min_version
     }
-    
+
     /// Check if version is newer
     fn is_newer_version(&self, update_version: &str, current_version: &str) -> bool {
         // Simple version comparison - in real implementation would use semver
         update_version > current_version
     }
-    
+
     /// Compare versions
     fn compare_versions(&self, a: &str, b: &str) -> std::cmp::Ordering {
         a.cmp(b)
     }
-    
+
     /// Check platform compatibility
     fn is_platform_compatible(&self, platforms: &[PlatformRequirement]) -> bool {
         if platforms.is_empty() {
             return true; // Platform-agnostic update
         }
-        
+
         let current_os = std::env::consts::OS;
         let current_arch = std::env::consts::ARCH;
-        
-        platforms.iter().any(|platform| {
-            platform.os == current_os && platform.arch == current_arch
-        })
+
+        platforms
+            .iter()
+            .any(|platform| platform.os == current_os && platform.arch == current_arch)
     }
-    
+
     /// Check if update passes security policies
     fn passes_security_policies(&self, update: &UpdateInfo) -> Result<bool, SemanticError> {
         for policy in &self.security.policies {
@@ -1350,8 +1343,10 @@ impl UpdateManager {
                     match policy.action {
                         PolicyAction::Deny => return Ok(false),
                         PolicyAction::Warn => {
-                            println!("Security warning: Policy '{}' failed for update {}", 
-                                   policy.name, update.version);
+                            println!(
+                                "Security warning: Policy '{}' failed for update {}",
+                                policy.name, update.version
+                            );
                         }
                         PolicyAction::RequireApproval => {
                             println!("Security approval required for update {}", update.version);
@@ -1362,12 +1357,16 @@ impl UpdateManager {
                 }
             }
         }
-        
+
         Ok(true)
     }
-    
+
     /// Evaluate a security rule
-    fn evaluate_security_rule(&self, rule: &SecurityRule, update: &UpdateInfo) -> Result<bool, SemanticError> {
+    fn evaluate_security_rule(
+        &self,
+        rule: &SecurityRule,
+        update: &UpdateInfo,
+    ) -> Result<bool, SemanticError> {
         let actual_value = match rule.condition {
             RuleCondition::SourceURL => &update.download_url,
             RuleCondition::FileSize => &update.file_size.to_string(),
@@ -1376,7 +1375,7 @@ impl UpdateManager {
             RuleCondition::SignaturePresent => &update.signature.is_some().to_string(),
             RuleCondition::CertificateIssuer => "unknown", // Would extract from certificate
         };
-        
+
         match rule.operator {
             RuleOperator::Equals => Ok(actual_value == &rule.value),
             RuleOperator::NotEquals => Ok(actual_value != &rule.value),
@@ -1398,7 +1397,7 @@ impl UpdateManager {
             }
         }
     }
-    
+
     /// Cache an update
     fn cache_update(&mut self, update: UpdateInfo) -> Result<(), SemanticError> {
         let cached_update = CachedUpdate {
@@ -1414,125 +1413,148 @@ impl UpdateManager {
             cached_at: std::time::SystemTime::now(),
             verified: false,
         };
-        
-        self.cache.cached_updates.insert(update.version.clone(), cached_update);
+
+        self.cache
+            .cached_updates
+            .insert(update.version.clone(), cached_update);
         self.cache.stats.item_count = self.cache.cached_updates.len();
-        
+
         Ok(())
     }
-    
+
     /// Download an update
     pub fn download_update(&mut self, version: &str) -> Result<PathBuf, SemanticError> {
-        let cached_update = self.cache.cached_updates.get_mut(version)
-            .ok_or_else(|| SemanticError::Internal {
-                message: format!("Update {} not found in cache", version),
-            })?;
-        
+        let cached_update =
+            self.cache
+                .cached_updates
+                .get_mut(version)
+                .ok_or_else(|| SemanticError::Internal {
+                    message: format!("Update {} not found in cache", version),
+                })?;
+
         // Check if already downloaded
         if let Some(path) = &cached_update.download_path {
             if path.exists() && cached_update.verified {
                 return Ok(path.clone());
             }
         }
-        
+
         println!("Downloading update: {}", version);
-        
+
         // Simulate download
         let download_path = self.cache.cache_dir.join(format!("{}.tar.gz", version));
-        
+
         // In real implementation, would perform actual download with progress tracking
-        std::fs::write(&download_path, b"simulated update package").map_err(|e| SemanticError::Internal {
-            message: format!("Failed to write update file: {}", e),
+        std::fs::write(&download_path, b"simulated update package").map_err(|e| {
+            SemanticError::Internal {
+                message: format!("Failed to write update file: {}", e),
+            }
         })?;
-        
+
         cached_update.download_path = Some(download_path.clone());
         cached_update.download_progress.status = DownloadStatus::Completed;
-        cached_update.download_progress.downloaded_bytes = cached_update.download_progress.total_bytes;
-        
+        cached_update.download_progress.downloaded_bytes =
+            cached_update.download_progress.total_bytes;
+
         // Verify the download
         self.verify_update(version)?;
-        
+
         Ok(download_path)
     }
-    
+
     /// Verify an update
     pub fn verify_update(&mut self, version: &str) -> Result<(), SemanticError> {
         // Extract needed data to avoid borrow conflicts
-        let (download_path, update_info) = {
-            let cached_update = self.cache.cached_updates.get(version)
-                .ok_or_else(|| SemanticError::Internal {
-                    message: format!("Update {} not found in cache", version),
+        let (download_path, update_info) =
+            {
+                let cached_update = self.cache.cached_updates.get(version).ok_or_else(|| {
+                    SemanticError::Internal {
+                        message: format!("Update {} not found in cache", version),
+                    }
                 })?;
-            
-            let download_path = cached_update.download_path.as_ref()
-                .ok_or_else(|| SemanticError::Internal {
-                    message: format!("Update {} not downloaded", version),
-                })?
-                .clone();
-            
-            (download_path, cached_update.update_info.clone())
-        };
-        
+
+                let download_path = cached_update
+                    .download_path
+                    .as_ref()
+                    .ok_or_else(|| SemanticError::Internal {
+                        message: format!("Update {} not downloaded", version),
+                    })?
+                    .clone();
+
+                (download_path, cached_update.update_info.clone())
+            };
+
         println!("Verifying update: {}", version);
-        
+
         // Verify checksum
         if self.config.verification.verify_checksums {
             self.verify_checksum(&download_path, &update_info)?;
         }
-        
+
         // Verify signature
         if self.config.verification.verify_signatures {
             self.verify_signature(&download_path, &update_info)?;
         }
-        
+
         // Update the verified flag
         if let Some(cached_update) = self.cache.cached_updates.get_mut(version) {
             cached_update.verified = true;
         }
-        
+
         println!("Update {} verified successfully", version);
-        
+
         Ok(())
     }
-    
+
     /// Verify update checksum
-    fn verify_checksum(&self, file_path: &PathBuf, update_info: &UpdateInfo) -> Result<(), SemanticError> {
+    fn verify_checksum(
+        &self,
+        file_path: &PathBuf,
+        update_info: &UpdateInfo,
+    ) -> Result<(), SemanticError> {
         for (algorithm, expected_checksum) in &update_info.checksums {
             let calculated_checksum = self.calculate_checksum(file_path, algorithm)?;
-            
+
             if calculated_checksum != *expected_checksum {
                 return Err(SemanticError::Internal {
-                    message: format!("Checksum verification failed for {:?}: expected {}, got {}", 
-                                   algorithm, expected_checksum, calculated_checksum),
+                    message: format!(
+                        "Checksum verification failed for {:?}: expected {}, got {}",
+                        algorithm, expected_checksum, calculated_checksum
+                    ),
                 });
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Calculate file checksum
-    fn calculate_checksum(&self, file_path: &PathBuf, algorithm: &ChecksumAlgorithm) -> Result<String, SemanticError> {
+    fn calculate_checksum(
+        &self,
+        file_path: &PathBuf,
+        algorithm: &ChecksumAlgorithm,
+    ) -> Result<String, SemanticError> {
         use std::io::Read;
-        
+
         let mut file = std::fs::File::open(file_path).map_err(|e| SemanticError::Internal {
             message: format!("Failed to open file for checksum: {}", e),
         })?;
-        
+
         let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).map_err(|e| SemanticError::Internal {
-            message: format!("Failed to read file for checksum: {}", e),
-        })?;
-        
+        file.read_to_end(&mut buffer)
+            .map_err(|e| SemanticError::Internal {
+                message: format!("Failed to read file for checksum: {}", e),
+            })?;
+
         match algorithm {
             ChecksumAlgorithm::SHA256 => {
-                use sha2::{Sha256, Digest};
+                use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
                 hasher.update(&buffer);
                 Ok(format!("{:x}", hasher.finalize()))
             }
             ChecksumAlgorithm::SHA512 => {
-                use sha2::{Sha512, Digest};
+                use sha2::{Digest, Sha512};
                 let mut hasher = Sha512::new();
                 hasher.update(&buffer);
                 Ok(format!("{:x}", hasher.finalize()))
@@ -1543,48 +1565,58 @@ impl UpdateManager {
             }
         }
     }
-    
+
     /// Verify update signature
-    fn verify_signature(&self, file_path: &PathBuf, update_info: &UpdateInfo) -> Result<(), SemanticError> {
+    fn verify_signature(
+        &self,
+        file_path: &PathBuf,
+        update_info: &UpdateInfo,
+    ) -> Result<(), SemanticError> {
         if update_info.signature.is_none() {
             return Err(SemanticError::Internal {
                 message: "No signature found for update".to_string(),
             });
         }
-        
+
         // In real implementation, would verify digital signature using cryptographic libraries
         println!("Verifying signature for: {}", file_path.display());
-        
+
         Ok(())
     }
-    
+
     /// Install an update
     pub fn install_update(&mut self, version: &str) -> Result<(), SemanticError> {
-        let cached_update = self.cache.cached_updates.get(version)
-            .ok_or_else(|| SemanticError::Internal {
-                message: format!("Update {} not found in cache", version),
-            })?;
-        
+        let cached_update =
+            self.cache
+                .cached_updates
+                .get(version)
+                .ok_or_else(|| SemanticError::Internal {
+                    message: format!("Update {} not found in cache", version),
+                })?;
+
         if !cached_update.verified {
             return Err(SemanticError::Internal {
                 message: format!("Update {} not verified", version),
             });
         }
-        
-        let download_path = cached_update.download_path.as_ref()
-            .ok_or_else(|| SemanticError::Internal {
-                message: format!("Update {} not downloaded", version),
-            })?;
-        
+
+        let download_path =
+            cached_update
+                .download_path
+                .as_ref()
+                .ok_or_else(|| SemanticError::Internal {
+                    message: format!("Update {} not downloaded", version),
+                })?;
+
         println!("Installing update: {}", version);
-        
+
         let start_time = std::time::SystemTime::now();
-        
+
         // Backup current version if configured
         if self.config.installation.backup_current {
             self.backup_current_version()?;
         }
-        
+
         // Perform installation based on strategy
         match self.config.installation.strategy {
             InstallationStrategy::Replace => {
@@ -1602,23 +1634,23 @@ impl UpdateManager {
                 });
             }
         }
-        
+
         // Restart services if configured
         if self.config.installation.service_restart.restart_services {
             self.restart_services()?;
         }
-        
+
         // Verify installation
         if self.config.installation.verify_installation {
             self.verify_installation(&cached_update.update_info)?;
         }
-        
+
         // Run health checks
         self.run_health_checks()?;
-        
+
         let end_time = std::time::SystemTime::now();
         let duration = end_time.duration_since(start_time).ok();
-        
+
         // Record update in history
         let record = UpdateRecord {
             timestamp: start_time,
@@ -1629,101 +1661,117 @@ impl UpdateManager {
             error: None,
             rollback_info: None,
         };
-        
+
         self.history.push(record);
-        
+
         // Send notification
         self.send_notification(NotificationEvent::UpdateCompleted, Some(version))?;
-        
+
         println!("Update {} installed successfully", version);
-        
+
         Ok(())
     }
-    
+
     /// Backup current version
     fn backup_current_version(&self) -> Result<(), SemanticError> {
         println!("Backing up current version");
-        
+
         // In real implementation, would create backup of current installation
-        let backup_dir = self.cache.cache_dir.join("backup").join(&self.current_version.current);
+        let backup_dir = self
+            .cache
+            .cache_dir
+            .join("backup")
+            .join(&self.current_version.current);
         std::fs::create_dir_all(&backup_dir).map_err(|e| SemanticError::Internal {
             message: format!("Failed to create backup directory: {}", e),
         })?;
-        
+
         Ok(())
     }
-    
+
     /// Install using replace strategy
-    fn install_replace(&self, _download_path: &PathBuf, _update_info: &UpdateInfo) -> Result<(), SemanticError> {
+    fn install_replace(
+        &self,
+        _download_path: &PathBuf,
+        _update_info: &UpdateInfo,
+    ) -> Result<(), SemanticError> {
         println!("Installing update using replace strategy");
-        
+
         // In real implementation, would extract and replace files
-        
+
         Ok(())
     }
-    
+
     /// Install using side-by-side strategy
-    fn install_side_by_side(&self, _download_path: &PathBuf, update_info: &UpdateInfo) -> Result<(), SemanticError> {
+    fn install_side_by_side(
+        &self,
+        _download_path: &PathBuf,
+        update_info: &UpdateInfo,
+    ) -> Result<(), SemanticError> {
         println!("Installing update using side-by-side strategy");
-        
+
         // In real implementation, would install in separate directory
         let install_dir = if let Some(dir) = &self.config.installation.install_dir {
             dir.join(&update_info.version)
         } else {
             PathBuf::from(format!("/opt/aetherscript/{}", update_info.version))
         };
-        
+
         std::fs::create_dir_all(&install_dir).map_err(|e| SemanticError::Internal {
             message: format!("Failed to create installation directory: {}", e),
         })?;
-        
+
         Ok(())
     }
-    
+
     /// Install using incremental strategy
-    fn install_incremental(&self, _download_path: &PathBuf, _update_info: &UpdateInfo) -> Result<(), SemanticError> {
+    fn install_incremental(
+        &self,
+        _download_path: &PathBuf,
+        _update_info: &UpdateInfo,
+    ) -> Result<(), SemanticError> {
         println!("Installing update using incremental strategy");
-        
+
         // In real implementation, would apply incremental patches
-        
+
         Ok(())
     }
-    
+
     /// Restart services
     fn restart_services(&self) -> Result<(), SemanticError> {
         println!("Restarting services");
-        
+
         for service in &self.config.installation.service_restart.services {
             println!("Restarting service: {}", service);
-            
+
             // In real implementation, would restart actual services
             if self.config.installation.service_restart.graceful_shutdown {
                 println!("Gracefully shutting down {}", service);
             }
-            
+
             println!("Starting {}", service);
-            
+
             if self.config.installation.service_restart.wait_for_ready {
                 println!("Waiting for {} to be ready", service);
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Verify installation
     fn verify_installation(&self, _update_info: &UpdateInfo) -> Result<(), SemanticError> {
         println!("Verifying installation");
-        
+
         // In real implementation, would verify installation integrity
-        
+
         Ok(())
     }
-    
+
     /// Run health checks
     fn run_health_checks(&self) -> Result<(), SemanticError> {
         println!("Running health checks");
-        
+
         for health_check in &self.config.rollback.health_checks {
             match self.run_health_check(health_check) {
                 Ok(true) => {
@@ -1731,10 +1779,13 @@ impl UpdateManager {
                 }
                 Ok(false) => {
                     println!("Health check '{}' failed", health_check.name);
-                    
+
                     if self.config.rollback.auto_rollback {
                         return Err(SemanticError::Internal {
-                            message: format!("Health check '{}' failed, triggering rollback", health_check.name),
+                            message: format!(
+                                "Health check '{}' failed, triggering rollback",
+                                health_check.name
+                            ),
                         });
                     }
                 }
@@ -1743,14 +1794,17 @@ impl UpdateManager {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Run a single health check
     fn run_health_check(&self, health_check: &HealthCheck) -> Result<bool, SemanticError> {
         match &health_check.check_type {
-            HealthCheckType::Http { url, expected_status } => {
+            HealthCheckType::Http {
+                url,
+                expected_status,
+            } => {
                 println!("Running HTTP health check for: {}", url);
                 // In real implementation, would make HTTP request
                 Ok(*expected_status == 200) // Simulate success
@@ -1776,30 +1830,40 @@ impl UpdateManager {
             }
         }
     }
-    
+
     /// Send notification
-    fn send_notification(&self, event: NotificationEvent, context: Option<&str>) -> Result<(), SemanticError> {
+    fn send_notification(
+        &self,
+        event: NotificationEvent,
+        context: Option<&str>,
+    ) -> Result<(), SemanticError> {
         if !self.config.notifications.enabled {
             return Ok(());
         }
-        
+
         if !self.config.notifications.events.contains(&event) {
             return Ok(());
         }
-        
+
         let message = self.format_notification_message(&event, context);
-        
+
         for channel in &self.config.notifications.channels {
             match channel {
                 NotificationChannel::System => {
                     println!("System notification: {}", message);
                 }
-                NotificationChannel::Email { smtp_server: _, recipients } => {
+                NotificationChannel::Email {
+                    smtp_server: _,
+                    recipients,
+                } => {
                     for recipient in recipients {
                         println!("Email notification to {}: {}", recipient, message);
                     }
                 }
-                NotificationChannel::Slack { webhook_url: _, channel } => {
+                NotificationChannel::Slack {
+                    webhook_url: _,
+                    channel,
+                } => {
                     println!("Slack notification to {}: {}", channel, message);
                 }
                 NotificationChannel::Webhook { url, headers: _ } => {
@@ -1811,23 +1875,30 @@ impl UpdateManager {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Format notification message
-    fn format_notification_message(&self, event: &NotificationEvent, context: Option<&str>) -> String {
-        let template = self.config.notifications.templates
+    fn format_notification_message(
+        &self,
+        event: &NotificationEvent,
+        context: Option<&str>,
+    ) -> String {
+        let template = self
+            .config
+            .notifications
+            .templates
             .get(&format!("{:?}", event))
             .cloned()
             .unwrap_or_else(|| format!("{:?}", event));
-        
+
         // Simple template substitution
         template
             .replace("{version}", context.unwrap_or("unknown"))
             .replace("{timestamp}", &chrono::Utc::now().to_rfc3339())
     }
-    
+
     /// Rollback to previous version
     pub fn rollback(&mut self, reason: RollbackReason) -> Result<(), SemanticError> {
         if !self.config.rollback.auto_rollback && !matches!(reason, RollbackReason::UserRequested) {
@@ -1835,19 +1906,23 @@ impl UpdateManager {
                 message: "Automatic rollback is disabled".to_string(),
             });
         }
-        
-        let last_record = self.history.iter()
+
+        let last_record = self
+            .history
+            .iter()
             .filter(|r| matches!(r.status, UpdateStatus::Installed))
             .last()
             .ok_or_else(|| SemanticError::Internal {
                 message: "No previous installation found for rollback".to_string(),
             })?;
-        
-        println!("Rolling back from version {} due to {:?}", 
-                last_record.update_info.version, reason);
-        
+
+        println!(
+            "Rolling back from version {} due to {:?}",
+            last_record.update_info.version, reason
+        );
+
         let start_time = std::time::SystemTime::now();
-        
+
         // Perform rollback based on installation method
         match last_record.method {
             InstallationStrategy::Replace => {
@@ -1862,10 +1937,10 @@ impl UpdateManager {
                 });
             }
         }
-        
+
         let end_time = std::time::SystemTime::now();
         let duration = end_time.duration_since(start_time).ok();
-        
+
         // Create rollback info
         let rollback_info = RollbackInfo {
             timestamp: start_time,
@@ -1874,78 +1949,89 @@ impl UpdateManager {
             status: RollbackStatus::Completed,
             duration,
         };
-        
+
         // Update the last record with rollback info
         if let Some(last_record) = self.history.last_mut() {
             last_record.status = UpdateStatus::RolledBack;
             last_record.rollback_info = Some(rollback_info);
         }
-        
+
         // Send notification
         self.send_notification(NotificationEvent::RollbackCompleted, None)?;
-        
+
         println!("Rollback completed successfully");
-        
+
         Ok(())
     }
-    
+
     /// Rollback using replace strategy
     fn rollback_replace(&self) -> Result<(), SemanticError> {
         println!("Rolling back using replace strategy");
-        
+
         // In real implementation, would restore from backup
-        let backup_dir = self.cache.cache_dir.join("backup").join(&self.current_version.current);
-        
+        let backup_dir = self
+            .cache
+            .cache_dir
+            .join("backup")
+            .join(&self.current_version.current);
+
         if !backup_dir.exists() {
             return Err(SemanticError::Internal {
                 message: "Backup not found for rollback".to_string(),
             });
         }
-        
+
         // Restore files from backup
-        
+
         Ok(())
     }
-    
+
     /// Rollback using side-by-side strategy
     fn rollback_side_by_side(&self) -> Result<(), SemanticError> {
         println!("Rolling back using side-by-side strategy");
-        
+
         // In real implementation, would switch symlinks or update configuration
         // to point to previous version
-        
+
         Ok(())
     }
-    
+
     /// Get update statistics
     pub fn get_update_stats(&self) -> UpdateStats {
         let total_updates = self.history.len();
-        let successful_updates = self.history.iter()
+        let successful_updates = self
+            .history
+            .iter()
             .filter(|r| matches!(r.status, UpdateStatus::Installed))
             .count();
-        let failed_updates = self.history.iter()
+        let failed_updates = self
+            .history
+            .iter()
             .filter(|r| matches!(r.status, UpdateStatus::Failed))
             .count();
-        let rollbacks = self.history.iter()
+        let rollbacks = self
+            .history
+            .iter()
             .filter(|r| matches!(r.status, UpdateStatus::RolledBack))
             .count();
-        
+
         let avg_duration = if !self.history.is_empty() {
-            let total_duration: std::time::Duration = self.history.iter()
-                .filter_map(|r| r.duration)
-                .sum();
+            let total_duration: std::time::Duration =
+                self.history.iter().filter_map(|r| r.duration).sum();
             total_duration / self.history.len() as u32
         } else {
             std::time::Duration::from_secs(0)
         };
-        
+
         UpdateStats {
             total_updates,
             successful_updates,
             failed_updates,
             rollbacks,
             avg_duration,
-            last_check: self.channels.iter()
+            last_check: self
+                .channels
+                .iter()
                 .filter_map(|c| c.stats.last_check)
                 .max(),
             cache_stats: self.cache.stats.clone(),
@@ -1959,25 +2045,25 @@ impl UpdateManager {
 pub struct UpdateStats {
     /// Total number of updates
     pub total_updates: usize,
-    
+
     /// Successful updates
     pub successful_updates: usize,
-    
+
     /// Failed updates
     pub failed_updates: usize,
-    
+
     /// Number of rollbacks
     pub rollbacks: usize,
-    
+
     /// Average update duration
     pub avg_duration: std::time::Duration,
-    
+
     /// Last check time
     pub last_check: Option<std::time::SystemTime>,
-    
+
     /// Cache statistics
     pub cache_stats: CacheStats,
-    
+
     /// Channel statistics
     pub channel_stats: Vec<ChannelStats>,
 }

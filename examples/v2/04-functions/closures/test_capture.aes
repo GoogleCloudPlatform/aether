@@ -1,0 +1,15 @@
+// Test lambda with captures
+module test_capture;
+
+func main() -> Int {
+    let x = 10;
+
+    // Lambda that captures x from enclosing scope
+    let add_x = [x](a: Int) -> Int => {{a + x}};
+
+    // Call the lambda
+    let result = add_x(32);
+
+    // Should return 42 (32 + 10)
+    return result;
+}

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::process::Command;
-use std::path::Path;
 use std::fs;
+use std::path::Path;
+use std::process::Command;
 
 /// Helper function to run the aether CLI and capture output
 fn run_aether_cli(args: &[&str]) -> (String, String, i32) {
@@ -23,11 +23,11 @@ fn run_aether_cli(args: &[&str]) -> (String, String, i32) {
         .args(args)
         .output()
         .expect("Failed to execute aether CLI");
-    
+
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     let exit_code = output.status.code().unwrap_or(-1);
-    
+
     // On Unix systems, exit codes might be transformed. If we get -1, try to extract from status
     let final_exit_code = if exit_code == -1 {
         if output.status.success() {
@@ -38,7 +38,7 @@ fn run_aether_cli(args: &[&str]) -> (String, String, i32) {
     } else {
         exit_code
     };
-    
+
     (stdout, stderr, final_exit_code)
 }
 
@@ -50,7 +50,7 @@ fn fixture_path(filename: &str) -> String {
 #[test]
 fn test_cli_help_command() {
     let (stdout, _stderr, exit_code) = run_aether_cli(&["--help"]);
-    
+
     assert_eq!(exit_code, 0);
     assert!(stdout.contains("Compiler for the AetherScript programming language"));
     assert!(stdout.contains("compile"));
@@ -62,18 +62,16 @@ fn test_cli_help_command() {
 #[test]
 fn test_cli_version_flag() {
     let (stdout, _stderr, exit_code) = run_aether_cli(&["--version"]);
-    
+
     assert_eq!(exit_code, 0);
     assert!(stdout.contains("0.1.0"));
 }
 
 #[test]
 fn test_cli_check_valid_file() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        &fixture_path("simple_module.aether")
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["check", &fixture_path("simple_module.aether")]);
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Type checking passed"));
     assert!(stdout.contains("Files passed: 1"));
@@ -81,11 +79,9 @@ fn test_cli_check_valid_file() {
 
 #[test]
 fn test_cli_check_invalid_file() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        &fixture_path("type_errors.aether")
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["check", &fixture_path("type_errors.aether")]);
+
     assert_eq!(exit_code, 1);
     assert!(stdout.contains("Type checking failed"));
     assert!(stderr.contains("Type mismatch") || stdout.contains("Type mismatch"));
@@ -93,11 +89,8 @@ fn test_cli_check_invalid_file() {
 
 #[test]
 fn test_cli_check_nonexistent_file() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        "nonexistent_file.aether"
-    ]);
-    
+    let (stdout, stderr, exit_code) = run_aether_cli(&["check", "nonexistent_file.aether"]);
+
     assert_eq!(exit_code, 1);
     assert!(stderr.contains("not found") || stdout.contains("not found"));
 }
@@ -105,11 +98,11 @@ fn test_cli_check_nonexistent_file() {
 #[test]
 fn test_cli_check_multiple_files() {
     let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "check", 
+        "check",
         &fixture_path("simple_module.aether"),
-        &fixture_path("empty_module.aether")
+        &fixture_path("empty_module.aether"),
     ]);
-    
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Files passed: 2"));
     assert!(stdout.contains("Total errors: 0"));
@@ -118,11 +111,11 @@ fn test_cli_check_multiple_files() {
 #[test]
 fn test_cli_check_mixed_files() {
     let (stdout, _stderr, exit_code) = run_aether_cli(&[
-        "check", 
+        "check",
         &fixture_path("simple_module.aether"),
-        &fixture_path("type_errors.aether")
+        &fixture_path("type_errors.aether"),
     ]);
-    
+
     assert_eq!(exit_code, 1);
     assert!(stdout.contains("Files passed: 1"));
     assert!(stdout.contains("Files with errors: 1"));
@@ -130,12 +123,9 @@ fn test_cli_check_mixed_files() {
 
 #[test]
 fn test_cli_check_verbose_mode() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        &fixture_path("simple_module.aether"),
-        "--verbose"
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["check", &fixture_path("simple_module.aether"), "--verbose"]);
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stderr.contains("[VERBOSE]") || stdout.contains("VERBOSE"));
     assert!(stderr.contains("Type checking 1 file(s)") || stdout.contains("Processing:"));
@@ -143,23 +133,18 @@ fn test_cli_check_verbose_mode() {
 
 #[test]
 fn test_cli_check_debug_mode() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        &fixture_path("simple_module.aether"),
-        "--debug"
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["check", &fixture_path("simple_module.aether"), "--debug"]);
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stderr.contains("[DEBUG]") || stderr.contains("DEBUG"));
 }
 
 #[test]
 fn test_cli_ast_command() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "ast", 
-        &fixture_path("simple_module.aether")
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["ast", &fixture_path("simple_module.aether")]);
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Program {"));
     assert!(stdout.contains("Module 'simple_module'"));
@@ -170,40 +155,39 @@ fn test_cli_ast_command() {
 #[test]
 fn test_cli_ast_output_to_directory() {
     let output_dir = "tests/output";
-    
+
     // Clean up any existing output
     let _ = fs::remove_dir_all(output_dir);
-    
+
     let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "ast", 
+        "ast",
         &fixture_path("simple_module.aether"),
-        "--output", output_dir
+        "--output",
+        output_dir,
     ]);
-    
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
-    
+
     let output_file = Path::new(output_dir).join("simple_module.ast");
-    
+
     // Add a small delay to ensure file system operations complete
     std::thread::sleep(std::time::Duration::from_millis(100));
-    
+
     assert!(output_file.exists(), "AST output file should exist");
-    
+
     let ast_content = fs::read_to_string(&output_file).unwrap();
     assert!(ast_content.contains("Program {"));
     assert!(ast_content.contains("Module 'simple_module'"));
-    
+
     // Clean up
     let _ = fs::remove_dir_all(output_dir);
 }
 
 #[test]
 fn test_cli_tokens_command() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "tokens", 
-        &fixture_path("simple_module.aether")
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["tokens", &fixture_path("simple_module.aether")]);
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Tokens for"));
     assert!(stdout.contains("LeftParen"));
@@ -215,40 +199,39 @@ fn test_cli_tokens_command() {
 #[test]
 fn test_cli_tokens_output_to_directory() {
     let output_dir = "tests/output";
-    
+
     // Clean up any existing output
     let _ = fs::remove_dir_all(output_dir);
-    
+
     let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "tokens", 
+        "tokens",
         &fixture_path("simple_module.aether"),
-        "--output", output_dir
+        "--output",
+        output_dir,
     ]);
-    
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
-    
+
     let output_file = Path::new(output_dir).join("simple_module.tokens");
-    
+
     // Add a small delay to ensure file system operations complete
     std::thread::sleep(std::time::Duration::from_millis(100));
-    
+
     assert!(output_file.exists(), "Tokens output file should exist");
-    
+
     let tokens_content = fs::read_to_string(&output_file).unwrap();
     assert!(tokens_content.contains("LeftParen"));
     assert!(tokens_content.contains("Keyword(\"DEFINE_MODULE\")"));
-    
+
     // Clean up
     let _ = fs::remove_dir_all(output_dir);
 }
 
 #[test]
 fn test_cli_compile_command() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "compile", 
-        &fixture_path("simple_module.aether")
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["compile", &fixture_path("simple_module.aether")]);
+
     // Since compilation is not yet implemented, we expect success but with placeholder message
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Compilation completed successfully"));
@@ -257,11 +240,12 @@ fn test_cli_compile_command() {
 #[test]
 fn test_cli_compile_with_output() {
     let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "compile", 
+        "compile",
         &fixture_path("simple_module.aether"),
-        "--output", "test_output"
+        "--output",
+        "test_output",
     ]);
-    
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Compilation completed successfully"));
 }
@@ -269,47 +253,34 @@ fn test_cli_compile_with_output() {
 #[test]
 fn test_cli_error_exit_codes() {
     // Test with nonexistent file
-    let (_stdout, _stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        "does_not_exist.aether"
-    ]);
+    let (_stdout, _stderr, exit_code) = run_aether_cli(&["check", "does_not_exist.aether"]);
     assert_eq!(exit_code, 1);
-    
+
     // Test with type error file
-    let (_stdout, _stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        &fixture_path("type_errors.aether")
-    ]);
+    let (_stdout, _stderr, exit_code) =
+        run_aether_cli(&["check", &fixture_path("type_errors.aether")]);
     assert_eq!(exit_code, 1);
-    
+
     // Test with syntax error file
-    let (_stdout, _stderr, exit_code) = run_aether_cli(&[
-        "ast", 
-        &fixture_path("syntax_errors.aether")
-    ]);
+    let (_stdout, _stderr, exit_code) =
+        run_aether_cli(&["ast", &fixture_path("syntax_errors.aether")]);
     assert_eq!(exit_code, 1);
 }
 
 #[test]
 fn test_cli_global_verbose_flag() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "--verbose",
-        "check", 
-        &fixture_path("simple_module.aether")
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["--verbose", "check", &fixture_path("simple_module.aether")]);
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stderr.contains("[VERBOSE]") || stdout.contains("VERBOSE"));
 }
 
 #[test]
 fn test_cli_global_debug_flag() {
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "--debug",
-        "check", 
-        &fixture_path("simple_module.aether")
-    ]);
-    
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["--debug", "check", &fixture_path("simple_module.aether")]);
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stderr.contains("[DEBUG]") || stderr.contains("DEBUG"));
 }
@@ -317,7 +288,7 @@ fn test_cli_global_debug_flag() {
 #[test]
 fn test_cli_no_subcommand() {
     let (_stdout, stderr, exit_code) = run_aether_cli(&[]);
-    
+
     assert_eq!(exit_code, 1);
     assert!(stderr.contains("No subcommand provided"));
 }
@@ -325,7 +296,7 @@ fn test_cli_no_subcommand() {
 #[test]
 fn test_cli_invalid_subcommand() {
     let (_stdout, stderr, exit_code) = run_aether_cli(&["invalid_command"]);
-    
+
     // clap should handle this and provide help
     assert_ne!(exit_code, 0);
 }
@@ -333,18 +304,20 @@ fn test_cli_invalid_subcommand() {
 #[test]
 fn test_performance_large_file() {
     use std::time::Instant;
-    
+
     let start = Instant::now();
-    let (stdout, stderr, exit_code) = run_aether_cli(&[
-        "check", 
-        &fixture_path("large_file.aether")
-    ]);
+    let (stdout, stderr, exit_code) =
+        run_aether_cli(&["check", &fixture_path("large_file.aether")]);
     let duration = start.elapsed();
-    
+
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Type checking passed"));
     assert!(stdout.contains("Files passed: 1"));
-    
+
     // Performance assertion: should complete within 5 seconds
-    assert!(duration.as_secs() < 5, "Large file processing took too long: {:?}", duration);
+    assert!(
+        duration.as_secs() < 5,
+        "Large file processing took too long: {:?}",
+        duration
+    );
 }

@@ -1,0 +1,51 @@
+// Return Values Example
+// Demonstrates various return patterns
+
+module return_values;
+
+// Return integer
+func get_int() -> Int {
+    return 42;
+}
+
+// Return float
+func get_pi() -> Float {
+    return 3.14159;
+}
+
+// Return bool
+func is_positive(n: Int) -> Bool {
+    when {n > 0} {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// Early return
+func find_first_positive(a: Int, b: Int, c: Int) -> Int {
+    when {a > 0} {
+        return a;
+    }
+    when {b > 0} {
+        return b;
+    }
+    when {c > 0} {
+        return c;
+    }
+    return 0;
+}
+
+// Void return (no value)
+func do_nothing() -> Void {
+    // Nothing to return
+}
+
+func main() -> Int {
+    let i: Int = get_int();
+    let pi: Float = get_pi();
+    let positive: Bool = is_positive(5);
+    let first: Int = find_first_positive(0, 0, 7);
+
+    return first;
+}

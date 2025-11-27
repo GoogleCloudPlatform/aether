@@ -1,0 +1,43 @@
+// Enum with Associated Data Example
+// Demonstrates enums that carry values
+
+module enum_with_data;
+
+enum Option {
+    case Some(Int);
+    case None;
+}
+
+enum Result {
+    case Ok(Int);
+    case Err(Int);
+}
+
+enum Shape {
+    case Circle(Int);
+    case Rectangle(Int);  // Simplified: stores area instead of width/height
+    case Square(Int);
+}
+
+func unwrap_or(opt: Option, default: Int) -> Int {
+    match opt {
+        Option::Some(value) => { return value; }
+        Option::None => { return default; }
+    }
+}
+
+func main() -> Int {
+    let some_value: Option = Option::Some(42);
+    let no_value: Option = Option::None;
+
+    let result1: Int = unwrap_or(some_value, 0);
+    let result2: Int = unwrap_or(no_value, 99);
+
+    let success: Result = Result::Ok(100);
+    let failure: Result = Result::Err(1);
+
+    let circle: Shape = Shape::Circle(5);
+    let rect: Shape = Shape::Rectangle(200);  // area = 10 * 20
+
+    return result1;
+}

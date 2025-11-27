@@ -1,0 +1,19 @@
+// String Basics Example
+// Demonstrates string literals and basic operations
+
+module string_basics;
+
+@extern("C")
+func puts(s: String) -> Int;
+
+func main() -> Int {
+    // String literals
+    let greeting: String = "Hello, World!";
+    let name: String = "AetherScript";
+
+    // Print using FFI
+    puts("Hello from AetherScript!");
+    puts("Welcome to V2 syntax.");
+
+    return 0;
+}

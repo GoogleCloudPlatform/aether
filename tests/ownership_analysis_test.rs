@@ -14,11 +14,11 @@
 
 #[cfg(test)]
 mod ownership_analysis_tests {
-    use aether::parser::Parser;
-    use aether::lexer::Lexer;
-    use aether::semantic::SemanticAnalyzer;
     use aether::error::SemanticError;
-    
+    use aether::lexer::Lexer;
+    use aether::parser::Parser;
+    use aether::semantic::SemanticAnalyzer;
+
     #[test]
     fn test_use_after_move_detection() {
         let source = r#"
@@ -33,23 +33,27 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_err());
         if let Err(errors) = result {
-            assert!(errors.iter().any(|e| matches!(e, SemanticError::UseAfterMove { variable, .. } if variable == "x")),
-                    "Expected UseAfterMove error for variable 'x'");
+            assert!(
+                errors.iter().any(
+                    |e| matches!(e, SemanticError::UseAfterMove { variable, .. } if variable == "x")
+                ),
+                "Expected UseAfterMove error for variable 'x'"
+            );
         }
     }
-    
+
     #[test]
     fn test_multiple_immutable_borrows_allowed() {
         let source = r#"
@@ -67,19 +71,22 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
-        assert!(result.is_ok(), "Multiple immutable borrows should be allowed");
+
+        assert!(
+            result.is_ok(),
+            "Multiple immutable borrows should be allowed"
+        );
     }
-    
+
     #[test]
     fn test_cannot_move_while_borrowed() {
         let source = r#"
@@ -95,20 +102,20 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_err());
         // Check for appropriate error
     }
-    
+
     #[test]
     fn test_string_ownership_transfer() {
         let source = r#"
@@ -125,19 +132,19 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_ok(), "String ownership transfer should succeed");
     }
-    
+
     #[test]
     fn test_array_ownership_and_cleanup() {
         let source = r#"
@@ -153,19 +160,19 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_ok(), "Array ownership transfer should succeed");
     }
-    
+
     #[test]
     fn test_map_ownership() {
         let source = r#"
@@ -182,19 +189,19 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_ok(), "Map ownership transfer should succeed");
     }
-    
+
     #[test]
     fn test_shared_ownership_no_move() {
         let source = r#"
@@ -212,19 +219,19 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_ok(), "Shared ownership should not cause moves");
     }
-    
+
     #[test]
     fn test_ownership_in_loops() {
         let source = r#"
@@ -242,19 +249,19 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_ok(), "Ownership in loops should work correctly");
     }
-    
+
     #[test]
     fn test_ownership_type_checking() {
         let source = r#"
@@ -278,16 +285,16 @@ mod ownership_analysis_tests {
             }
         }
         "#;
-        
+
         let mut lexer = Lexer::new(source, "test.aether".to_string());
         let tokens = lexer.tokenize().expect("Tokenization failed");
-        
+
         let mut parser = Parser::new(tokens);
         let ast = parser.parse_program().expect("Parsing failed");
-        
+
         let mut analyzer = SemanticAnalyzer::new();
         let result = analyzer.analyze_program(&ast);
-        
+
         assert!(result.is_ok(), "Ownership type checking should work");
     }
 }

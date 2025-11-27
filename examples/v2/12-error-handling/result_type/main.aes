@@ -1,0 +1,45 @@
+// Result Type Example
+// Demonstrates error handling with Result enum
+
+module result_type;
+
+enum Result {
+    Ok(Int),
+    Err(Int),
+}
+
+func divide(a: Int, b: Int) -> Result {
+    when {b == 0} {
+        return Result::Err(1);
+    } else {
+        return Result::Ok({a / b});
+    }
+}
+
+func safe_sqrt(n: Int) -> Result {
+    when {n < 0} {
+        return Result::Err(2);
+    } else {
+        // Simplified - just return n for positive numbers
+        return Result::Ok(n);
+    }
+}
+
+func unwrap_result(r: Result) -> Int {
+    match r {
+        Result::Ok(value) => { return value; }
+        Result::Err(code) => { return {0 - code}; }
+    }
+}
+
+func main() -> Int {
+    let r1: Result = divide(10, 2);
+    let r2: Result = divide(10, 0);
+    let r3: Result = safe_sqrt(16);
+    let r4: Result = safe_sqrt(-4);
+
+    let v1: Int = unwrap_result(r1);
+    let v2: Int = unwrap_result(r2);
+
+    return v1;
+}

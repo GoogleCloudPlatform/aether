@@ -1,0 +1,43 @@
+// Match Guards Example
+// Demonstrates conditional patterns with guards
+
+module match_guards;
+
+func classify_number(n: Int) -> Int {
+    match n {
+        x if {x < 0} => {
+            return -1;
+        }
+        x if {x == 0} => {
+            return 0;
+        }
+        x if {x > 100} => {
+            return 2;
+        }
+        _ => {
+            return 1;
+        }
+    }
+}
+
+func grade_score(score: Int) -> Int {
+    match score {
+        s if {s >= 90} => { return 4; }
+        s if {s >= 80} => { return 3; }
+        s if {s >= 70} => { return 2; }
+        s if {s >= 60} => { return 1; }
+        _ => { return 0; }
+    }
+}
+
+func main() -> Int {
+    let c1: Int = classify_number(-5);
+    let c2: Int = classify_number(0);
+    let c3: Int = classify_number(50);
+    let c4: Int = classify_number(150);
+
+    let g1: Int = grade_score(95);
+    let g2: Int = grade_score(75);
+
+    return g1;
+}

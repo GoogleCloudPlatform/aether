@@ -1,0 +1,23 @@
+// Closures Example
+// Demonstrates lambda expressions and captures
+
+module closures;
+
+func main() -> Int {
+    // Simple lambda - V2 syntax requires braces around binary operations
+    let add = (a: Int, b: Int) => {{a + b}};
+
+    // Lambda with explicit return type
+    let multiply = (a: Int, b: Int) -> Int => {{a * b}};
+
+    // Capture by value
+    let x: Int = 10;
+    let add_x = [x](a: Int) => {{a + x}};
+
+    // Multiple captures
+    let y: Int = 20;
+    let add_both = [x, y](a: Int) => {{{a + x} + y}};
+
+    // Use the lambdas (conceptually - actual call syntax may vary)
+    return x;
+}
