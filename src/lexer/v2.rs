@@ -1500,9 +1500,8 @@ mod tests {
     #[test]
     fn test_lexer_all_keywords_count() {
         let lexer = Lexer::new("", "test.aether".to_string());
-        // Count total keywords: 8 decl + 2 mod + 11 control + 4 error + 3 resource + 14 types + 3 literals + 3 other = 48
-        // Added: var (decl), Int32, Float32, Float64 (types), If (control)
-        assert_eq!(lexer.keywords.len(), 48);
+        // Count total keywords: 48 + concurrent = 49
+        assert_eq!(lexer.keywords.len(), 49);
     }
 
     // ==================== LITERAL TOKENIZATION TESTS ====================

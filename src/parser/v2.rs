@@ -1399,10 +1399,8 @@ impl Parser {
     fn parse_enum_variant(&mut self) -> Result<EnumVariant, ParserError> {
         let start_location = self.current_location();
 
-        // "case" keyword is optional in comma-separated lists
-        if self.check_keyword(Keyword::Case) {
-            self.advance();
-        }
+        // Expect 'case' keyword
+        self.expect_keyword(Keyword::Case, "expected 'case' before enum variant")?;
 
         let name = self.parse_identifier()?;
 
@@ -1424,11 +1422,17 @@ impl Parser {
             Vec::new()
         };
 
-        // Consume delimiter if present (comma or semicolon)
+        // Expect delimiter (semicolon or comma)
         if self.check(&TokenType::Semicolon) {
             self.advance();
         } else if self.check(&TokenType::Comma) {
             self.advance();
+        } else {
+            return Err(ParserError::UnexpectedToken {
+                expected: "; or ,".to_string(),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.current_location(),
+            });
         }
 
         Ok(EnumVariant {
@@ -5826,8 +5830,8 @@ func calculate(
         if let TypeDefinition::Enumeration { name, variants, .. } = typedef {
             assert_eq!(name.name, "Result");
             assert_eq!(variants.len(), 2);
-            assert!(variants[0].associated_type.is_some());
-            assert!(variants[1].associated_type.is_some());
+            assert!(!variants[0].associated_types.is_empty());
+            assert!(!variants[1].associated_types.is_empty());
         } else {
             panic!("Expected Enumeration type");
         }
@@ -5842,8 +5846,8 @@ func calculate(
         let typedef = result.unwrap();
         if let TypeDefinition::Enumeration { variants, .. } = typedef {
             assert_eq!(variants.len(), 2);
-            assert!(variants[0].associated_type.is_some());
-            assert!(variants[1].associated_type.is_none());
+            assert!(!variants[0].associated_types.is_empty());
+            assert!(variants[1].associated_types.is_empty());
         } else {
             panic!("Expected Enumeration type");
         }
@@ -6313,12 +6317,13 @@ func next_item() -> Int {
             // First case: Some(x)
             if let Pattern::EnumVariant {
                 variant_name,
-                binding,
+                bindings,
                 ..
             } = &cases[0].pattern
             {
                 assert_eq!(variant_name.name, "Some");
-                assert!(binding.is_some());
+                assert_eq!(bindings.len(), 1);
+                assert_eq!(bindings[0].name, "x");
             } else {
                 panic!("Expected EnumVariant pattern");
             }
