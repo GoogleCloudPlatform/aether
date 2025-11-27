@@ -294,3 +294,40 @@ car go fmt && car go clippy && car go test
 | 7 | 7.1 - 7.4 | Asynchronous I/O Implementation | ✅ Done |
 
 **Total Tasks:** 42 (All Complete)
+## Phase 8: True Asynchronous Backend Implementation
+
+### Phase 8.1: Runtime Support
+
+- [ ] **Task 8.1.1: Basic Async Runtime**: Implement `runtime/src/async_runtime.rs`
+    - Implement `AetherFuture` struct with status (Pending, Complete, Failed) and result storage.
+    - Implement a simple thread pool (using `std::thread` or a crate like `threadpool`).
+    - Implement `aether_spawn` FFI function.
+    - Implement `aether_await` FFI function.
+- [ ] **Task 8.1.2: Verify Runtime FFI**: Create a Rust test in `runtime/src/lib.rs` that mocks the compiler behavior (manually creates a task function and calls spawn/await).
+
+### Phase 8.2: Compiler Analysis
+
+- [ ] **Task 8.2.1: Capture Analysis Pass**: Create a new analysis pass `src/semantic/capture_analysis.rs`.
+    - Traverse the AST/HIR.
+    - For every `Concurrent` block, identify variables defined outside but used inside.
+    - Store this capture list in the `Semantic` context.
+- [ ] **Task 8.2.2: Verify Capture Analysis**: Unit tests to ensure variables are correctly identified as captures.
+
+### Phase 8.3: LLVM Backend Implementation
+
+- [ ] **Task 8.3.1: Context Struct Generation**: Modify `LLVMBackend` to generate a struct type for captures.
+- [ ] **Task 8.3.2: Function Outlining**: Implement `outline_concurrent_block` in `src/llvm_backend/mod.rs`.
+    - Generate a new function with a synthetic name.
+    - Generate argument unpacking code.
+    - Move the block's lowering logic into this new function.
+- [ ] **Task 8.3.3: Spawn Generation**: Implement `lower_concurrent_statement`.
+    - Generate context allocation and population.
+    - Generate call to `aether_spawn`.
+- [ ] **Task 8.3.4: Await Generation**: Implement implicit awaiting.
+    - Update `lower_expression` to handle `Future` types (if implicit) or specific await keywords.
+    - For V2, likely implicit await on use or explicit `await` keyword (if added) or just `wait()` function. *Decision: Implement `aether_async_wait` as a stdlib function for now.*
+
+### Phase 8.4: Integration and Verification
+
+- [ ] **Task 8.4.1: End-to-End Test**: Compile `examples/v2/17-concurrency/async_io`.
+- [ ] **Task 8.4.2: Verify Parallelism**: Modify the example to sleep/delay and print timestamps to prove parallel execution.
