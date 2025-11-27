@@ -16,26 +16,20 @@
 
 - **Phase 8.1: Runtime Support (Completed):**
     - Implemented `runtime/src/async_runtime.rs` with `AetherFuture`, `ThreadPool`, and FFI exports.
-    - Verified FFI via unit tests (confirmed double-free was pre-existing).
-    - Implemented `Clone` for `AetherFuture` to fix race conditions.
+    - Verified FFI via unit tests.
 - **Phase 8.2: Compiler Analysis (Completed):**
-    - Implemented Capture Analysis to identify variables used inside `concurrent` blocks.
-    - Verified with unit tests covering simple and nested concurrent blocks.
-- **Phase 8.3: LLVM Backend Implementation (In Progress):**
+    - Implemented Capture Analysis.
+- **Phase 8.3: LLVM Backend Implementation (Completed):**
     - [x] Task 8.3.1: Context Struct Generation
     - [x] Task 8.3.2: Function Outlining
     - [x] Task 8.3.3: Spawn Generation
-    - [ ] Task 8.3.4: Await Generation (Implicit await logic)
+    - [x] Task 8.3.4: Await Generation (Implicit await logic via `maybe_await_operand`)
 
 ### Current Focus
 
-- **Phase 8.3: LLVM Backend Implementation (Pending Await Generation):**
-    - Implement `aether_async_wait` generation for `Future` types.
-
-### Remaining Tasks
-
-- **Phase 8.4: Integration and Verification:**
+- **Phase 8.4: Integration and Verification (Active):**
     - Verify `async_io` example with true parallelism.
+    - Ensure end-to-end execution works.
 
 ## Completed Phases
 

@@ -918,10 +918,13 @@ impl<'ctx> LLVMBackend<'ctx> {
                     ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
                     
                     // Call spawn
-                    let spawn_fn = self.module.get_function("aether_async_spawn")
-                        .ok_or_else(|| SemanticError::CodeGenError { message: "aether_async_spawn not found".to_string() })?;
+                    let spawn_fn = self.module.get_function("aether_spawn")
+                        .ok_or_else(|| SemanticError::CodeGenError { message: "aether_spawn not found".to_string() })?;
                         
-                    let _handle = builder.build_call(spawn_fn, &[func_ptr_cast.into(), context_ptr_cast.into()], "spawn_call")
+                    // Pass null for cleanup_fn
+                    let null_ptr = i8_ptr_type.const_null();
+                    
+                    let _handle = builder.build_call(spawn_fn, &[func_ptr_cast.into(), context_ptr_cast.into(), null_ptr.into()], "spawn_call")
                         .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
                         
                     // 5. Continue to target block
@@ -3553,16 +3556,17 @@ impl<'ctx> LLVMBackend<'ctx> {
         let async_shutdown_fn = self.module.add_function("aether_async_shutdown", async_shutdown_type, None);
         function_declarations.insert("aether_async_shutdown".to_string(), async_shutdown_fn);
 
-        // aether_async_spawn(fn_ptr, arg_ptr) -> task_handle_ptr
+        // aether_spawn(fn_ptr, arg_ptr, cleanup_ptr) -> task_handle_ptr
         // Note: fn_ptr is extern "C" fn(*mut c_void) -> *mut c_void, which we model as ptr
-        let async_spawn_type = i8_ptr_type.fn_type(&[i8_ptr_type.into(), i8_ptr_type.into()], false);
-        let async_spawn_fn = self.module.add_function("aether_async_spawn", async_spawn_type, None);
-        function_declarations.insert("aether_async_spawn".to_string(), async_spawn_fn);
+        // args: task_fn, context, cleanup_fn
+        let async_spawn_type = i8_ptr_type.fn_type(&[i8_ptr_type.into(), i8_ptr_type.into(), i8_ptr_type.into()], false);
+        let async_spawn_fn = self.module.add_function("aether_spawn", async_spawn_type, None);
+        function_declarations.insert("aether_spawn".to_string(), async_spawn_fn);
 
-        // aether_async_wait(task_handle_ptr) -> result_ptr
+        // aether_await(task_handle_ptr) -> result_ptr
         let async_wait_type = i8_ptr_type.fn_type(&[i8_ptr_type.into()], false);
-        let async_wait_fn = self.module.add_function("aether_async_wait", async_wait_type, None);
-        function_declarations.insert("aether_async_wait".to_string(), async_wait_fn);
+        let async_wait_fn = self.module.add_function("aether_await", async_wait_type, None);
+        function_declarations.insert("aether_await".to_string(), async_wait_fn);
 
         Ok(())
     }

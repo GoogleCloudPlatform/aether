@@ -102,6 +102,35 @@ impl LoweringContext {
     }
 
 
+    /// Ensure operand is compatible with target type (awaiting if necessary)
+    fn ensure_compatible_operand(
+        &mut self,
+        operand: Operand,
+        target_type: &Type,
+    ) -> Result<Operand, SemanticError> {
+        // Check if operand is Future and target is not
+        let op_type = self.infer_operand_type(&operand)?;
+        
+        if let Type::GenericInstance { base_type, type_arguments, .. } = &op_type {
+            if base_type == "Future" && !type_arguments.is_empty() {
+                // Operand is Future<T>
+                // Check if target type is Future (or generic/unspecified)
+                // If target is specifically NOT a future (e.g. Int), await it.
+                let target_is_future = if let Type::GenericInstance { base_type, .. } = target_type {
+                    base_type == "Future"
+                } else {
+                    false
+                };
+                
+                if !target_is_future {
+                    return self.maybe_await_operand(operand);
+                }
+            }
+        }
+        
+        Ok(operand)
+    }
+
     /// Lower an AST program to MIR
     pub fn lower_program(&mut self, ast_program: &ast::Program) -> Result<Program, SemanticError> {
         // Copy type definitions from symbol table if available
@@ -299,11 +328,13 @@ impl LoweringContext {
                     // If type is inferred, use the type of the initializer
                     if let Type::Named { name, .. } = &ty {
                         if name == "_inferred" {
-                            ty = self.get_operand_type(&op);
+                            ty = self.infer_operand_type(&op)?;
                         }
                     }
                     
-                    Some(op)
+                    // Check compatibility and await if needed
+                    let compatible_op = self.ensure_compatible_operand(op, &ty)?;
+                    Some(compatible_op)
                 } else {
                     None
                 };
@@ -1269,24 +1300,68 @@ impl LoweringContext {
         Ok(())
     }
 
-    /// Helper to get type of an operand
-    fn get_operand_type(&self, operand: &Operand) -> Type {
-        match operand {
-            Operand::Constant(c) => c.ty.clone(),
-            Operand::Copy(place) | Operand::Move(place) => {
-                if let Some(func) = &self.builder.current_function {
-                    if let Some(local) = func.locals.get(&place.local) {
-                        return local.ty.clone();
-                    }
-                    if let Some(param) = func.parameters.iter().find(|p| p.local_id == place.local) {
-                        return param.ty.clone();
-                    }
-                }
-                // Default fallback
-                Type::primitive(PrimitiveType::Integer)
+    /// Helper to await an operand if it is a Future<T>
+    fn maybe_await_operand(&mut self, operand: Operand) -> Result<Operand, SemanticError> {
+        let ty = self.infer_operand_type(&operand)?;
+        if let Type::GenericInstance { base_type, type_arguments, .. } = &ty {
+            if base_type == "Future" && !type_arguments.is_empty() {
+                let inner_type = &type_arguments[0];
+                
+                // Emit call to aether_async_wait
+                // 1. Create temp for result pointer (i8*)
+                let result_ptr_local = self.builder.new_local(
+                    Type::Pointer { target_type: Box::new(Type::primitive(PrimitiveType::Char)), is_mutable: true }, 
+                    false
+                );
+                
+                self.builder.push_statement(Statement::Assign {
+                    place: Place { local: result_ptr_local, projection: vec![] },
+                    rvalue: Rvalue::Call {
+                        func: Operand::Constant(Constant {
+                            ty: Type::primitive(PrimitiveType::String),
+                            value: ConstantValue::String("aether_await".to_string()),
+                        }),
+                        args: vec![operand],
+                    },
+                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                });
+                
+                // 2. Cast result pointer to inner_type*
+                let typed_ptr_local = self.builder.new_local(
+                    Type::Pointer { target_type: Box::new(inner_type.clone()), is_mutable: true },
+                    false
+                );
+                
+                self.builder.push_statement(Statement::Assign {
+                    place: Place { local: typed_ptr_local, projection: vec![] },
+                    rvalue: Rvalue::Cast {
+                        kind: CastKind::Pointer,
+                        operand: Operand::Copy(Place { local: result_ptr_local, projection: vec![] }),
+                        ty: Type::Pointer { target_type: Box::new(inner_type.clone()), is_mutable: true },
+                    },
+                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                });
+                
+                // 3. Dereference to get value
+                let value_local = self.builder.new_local(inner_type.clone(), false);
+                
+                self.builder.push_statement(Statement::Assign {
+                    place: Place { local: value_local, projection: vec![] },
+                    rvalue: Rvalue::Use(Operand::Copy(Place { 
+                        local: typed_ptr_local, 
+                        projection: vec![PlaceElem::Deref] 
+                    })),
+                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                });
+                
+                return Ok(Operand::Copy(Place { local: value_local, projection: vec![] }));
             }
         }
+        
+        Ok(operand)
     }
+
+
 
     /// Get the index and type of a struct field
     fn get_struct_field_index(&self, struct_name: &str, field_name: &str) -> Result<(usize, Type), SemanticError> {
@@ -1780,6 +1855,10 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let left_op = self.lower_expression(left)?;
         let right_op = self.lower_expression(right)?;
+
+        // Handle implicit await for Futures
+        let left_op = self.maybe_await_operand(left_op)?;
+        let right_op = self.maybe_await_operand(right_op)?;
 
         // Try to infer operand types
         let left_type = self.infer_operand_type(&left_op)?;
