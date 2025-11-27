@@ -3067,6 +3067,45 @@ impl Parser {
                 });
             }
 
+            // Check for Struct pattern: Name { field: pattern, ... }
+            if self.check(&TokenType::LeftBrace) {
+                self.advance(); // consume '{'
+                let mut fields = Vec::new();
+                
+                while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+                    // Field name
+                    let field_name = self.parse_identifier()?;
+                    
+                    let pattern = if self.check(&TokenType::Colon) {
+                        self.advance(); // consume ':'
+                        self.parse_pattern()?
+                    } else {
+                        // Shorthand: field name is also the binding
+                        // Treat as wildcard pattern with binding
+                        Pattern::Wildcard {
+                            binding: Some(field_name.clone()),
+                            source_location: field_name.source_location.clone(),
+                        }
+                    };
+                    
+                    fields.push((field_name, pattern));
+                    
+                    if self.check(&TokenType::Comma) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                
+                self.expect(&TokenType::RightBrace, "expected '}' after struct pattern fields")?;
+                
+                return Ok(Pattern::Struct {
+                    struct_name: Identifier::new(name, start_location.clone()),
+                    fields,
+                    source_location: start_location,
+                });
+            }
+
             // Check if this is an enum variant pattern: Name(binding) or Name binding
             if self.check(&TokenType::LeftParen) {
                 // Enum variant with parenthesized binding: Some(x)

@@ -984,6 +984,12 @@ pub enum Pattern {
         value: Box<Expression>,
         source_location: SourceLocation,
     },
+    /// Match a struct (e.g. Point { x: 0, y: 0 })
+    Struct {
+        struct_name: Identifier,
+        fields: Vec<(Identifier, Pattern)>,
+        source_location: SourceLocation,
+    },
     /// Wildcard pattern (matches anything)
     Wildcard {
         binding: Option<Identifier>, // Variable to bind the matched value

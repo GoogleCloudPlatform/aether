@@ -613,13 +613,14 @@ impl LoweringContext {
         // Lower the value being matched
         let match_op = self.lower_expression(value)?;
 
-        // Check if any arm has a guard - if so, use sequential guard checking
+        // Check if any arm has a guard or complex pattern
         let has_guards = arms.iter().any(|arm| arm.guard.is_some());
+        let has_complex_patterns = arms.iter().any(|arm| matches!(arm.pattern, ast::Pattern::Struct { .. } | ast::Pattern::EnumVariant { nested_pattern: Some(_), .. }));
 
         // Create an end block to jump to after each arm
         let end_bb = self.builder.new_block();
 
-        if has_guards {
+        if has_guards || has_complex_patterns {
             // Sequential guard checking approach
             self.lower_match_with_guards(match_op, arms, end_bb)?;
         } else {
@@ -681,6 +682,11 @@ impl LoweringContext {
                         // No enum name - treat as wildcard for now
                         wildcard_block = Some(arm_bb);
                     }
+                }
+                ast::Pattern::Struct { .. } => {
+                    // Struct patterns should be handled by lower_match_with_guards
+                    // But if we are here, treat as wildcard/unreachable for the switch construction
+                    wildcard_block = Some(arm_bb);
                 }
             }
         }
@@ -818,28 +824,45 @@ impl LoweringContext {
             // Generate the check block
             self.builder.switch_to_block(check_bb);
 
-            // If pattern has a binding, create a local for it
-            if let ast::Pattern::Wildcard { binding: Some(ident), source_location } = &arm.pattern {
-                // Create a local for the binding
-                let local_id = self.builder.new_local(
-                    Type::primitive(ast::PrimitiveType::Integer),
-                    false, // not mutable
-                );
-                // Store the match value in the binding
-                self.builder.push_statement(Statement::Assign {
-                    place: Place {
-                        local: local_id,
-                        projection: vec![],
-                    },
-                    rvalue: Rvalue::Use(match_op.clone()),
-                    source_info: SourceInfo {
-                        span: source_location.clone(),
-                        scope: 0,
-                    },
-                });
-                // Map the binding name for use in the guard and body
-                self.var_map.insert(ident.name.clone(), local_id);
-            }
+            // Convert match_op to a Place if possible (for field access)
+            let match_place = match &match_op {
+                Operand::Copy(place) | Operand::Move(place) => place.clone(),
+                Operand::Constant(_) => {
+                    // If it's a constant, we store it in a temporary to get a Place
+                    let temp = self.builder.new_local(
+                        Type::primitive(ast::PrimitiveType::Integer), // Type will be inferred/checked later
+                        false
+                    );
+                    self.builder.push_statement(Statement::Assign {
+                        place: Place { local: temp, projection: vec![] },
+                        rvalue: Rvalue::Use(match_op.clone()),
+                        source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                    });
+                    Place { local: temp, projection: vec![] }
+                }
+            };
+
+            // Check if pattern matches
+            let pattern_match_op = self.lower_pattern_check(&arm.pattern, &match_place)?;
+            
+            // Create a block for when pattern matches (to process bindings and guard)
+            let pattern_matched_bb = self.builder.new_block();
+            
+            self.builder.set_terminator(Terminator::SwitchInt {
+                discriminant: pattern_match_op,
+                switch_ty: Type::primitive(ast::PrimitiveType::Boolean),
+                targets: SwitchTargets {
+                    values: vec![1], // true
+                    targets: vec![pattern_matched_bb],
+                    otherwise: fallthrough_bb,
+                },
+            });
+            
+            // In pattern_matched_bb, process bindings and guard
+            self.builder.switch_to_block(pattern_matched_bb);
+            
+            // Extract bindings
+            self.lower_pattern_bindings(&arm.pattern, &match_place, 0)?; // 0 variant idx is placeholder
 
             if let Some(guard) = &arm.guard {
                 // Evaluate the guard condition
@@ -1191,6 +1214,107 @@ impl LoweringContext {
                 }
                 // Default fallback
                 Type::primitive(PrimitiveType::Integer)
+            }
+        }
+    }
+
+    /// Get the index and type of a struct field
+    fn get_struct_field_index(&self, struct_name: &str, field_name: &str) -> Result<(usize, Type), SemanticError> {
+        if let Some(type_def) = self.program.type_definitions.get(struct_name) {
+            if let crate::types::TypeDefinition::Struct { fields, .. } = type_def {
+                if let Some(idx) = fields.iter().position(|(name, _)| name == field_name) {
+                    return Ok((idx, fields[idx].1.clone()));
+                }
+            }
+        }
+        Err(SemanticError::UndefinedSymbol {
+            symbol: format!("Field {} in struct {}", field_name, struct_name),
+            location: SourceLocation::unknown(),
+        })
+    }
+
+    /// Generate a boolean operand that is true if the pattern matches the value at place
+    fn lower_pattern_check(&mut self, pattern: &ast::Pattern, place: &Place) -> Result<Operand, SemanticError> {
+        match pattern {
+            ast::Pattern::Wildcard { .. } => {
+                // Always matches
+                Ok(Operand::Constant(Constant {
+                    ty: Type::primitive(ast::PrimitiveType::Boolean),
+                    value: ConstantValue::Integer(1),
+                }))
+            }
+            ast::Pattern::Literal { value, .. } => {
+                // Evaluate literal
+                let lit_op = self.lower_expression(value)?;
+                
+                // Generate comparison: place == literal
+                let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
+                
+                self.builder.push_statement(Statement::Assign {
+                    place: Place { local: result_local, projection: vec![] },
+                    rvalue: Rvalue::BinaryOp {
+                        op: BinOp::Eq,
+                        left: Operand::Copy(place.clone()),
+                        right: lit_op,
+                    },
+                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                });
+                
+                Ok(Operand::Copy(Place { local: result_local, projection: vec![] }))
+            }
+            ast::Pattern::Struct { struct_name, fields, .. } => {
+                // Check each field
+                let mut conditions = Vec::new();
+                
+                for (field_name, field_pattern) in fields {
+                    let (field_idx, field_type) = self.get_struct_field_index(&struct_name.name, &field_name.name)?;
+                    
+                    let field_place = Place {
+                        local: place.local,
+                        projection: place.projection.iter().cloned().chain(vec![
+                            PlaceElem::Field {
+                                field: field_idx as u32,
+                                ty: field_type,
+                            }
+                        ]).collect(),
+                    };
+                    
+                    let field_check = self.lower_pattern_check(field_pattern, &field_place)?;
+                    conditions.push(field_check);
+                }
+                
+                // Combine conditions with AND
+                if conditions.is_empty() {
+                    Ok(Operand::Constant(Constant {
+                        ty: Type::primitive(ast::PrimitiveType::Boolean),
+                        value: ConstantValue::Integer(1),
+                    }))
+                } else {
+                    let mut result_op = conditions[0].clone();
+                    for i in 1..conditions.len() {
+                        let right_op = conditions[i].clone();
+                        let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
+                        self.builder.push_statement(Statement::Assign {
+                            place: Place { local: result_local, projection: vec![] },
+                            rvalue: Rvalue::BinaryOp {
+                                op: BinOp::And,
+                                left: result_op,
+                                right: right_op,
+                            },
+                            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                        });
+                        result_op = Operand::Copy(Place { local: result_local, projection: vec![] });
+                    }
+                    Ok(result_op)
+                }
+            }
+            ast::Pattern::EnumVariant { .. } => {
+                // TODO: Implement enum variant check
+                // For now assume true if used in struct match context
+                Ok(Operand::Constant(Constant {
+                    ty: Type::primitive(ast::PrimitiveType::Boolean),
+                    value: ConstantValue::Integer(1),
+                }))
             }
         }
     }
@@ -3391,6 +3515,93 @@ impl LoweringContext {
             }
             ast::Pattern::Literal { .. } => {
                 // Literal patterns don't create bindings
+            }
+            ast::Pattern::Struct {
+                struct_name,
+                fields,
+                source_location: _,
+            } => {
+                for (field_name, field_pattern) in fields {
+                    let (field_idx, field_type) = self.get_struct_field_index(&struct_name.name, &field_name.name)?;
+                    
+                    let field_place = Place {
+                        local: value_place.local,
+                        projection: value_place.projection.iter().cloned().chain(vec![
+                            PlaceElem::Field {
+                                field: field_idx as u32,
+                                ty: field_type,
+                            }
+                        ]).collect(),
+                    };
+                    
+                    self.lower_pattern_bindings(field_pattern, &field_place, 0)?;
+                }
+            }
+            ast::Pattern::Wildcard {
+                binding: Some(binding_name),
+                source_location,
+            } => {
+                // This is a variable binding
+                // Look up the type from the symbol table or infer it
+                let binding_type = if let Some(st) = &self.symbol_table {
+                    if let Some(symbol) = st.lookup_symbol(&binding_name.name) {
+                        match &symbol.kind {
+                            SymbolKind::Variable | SymbolKind::Parameter => {
+                                symbol.symbol_type.clone()
+                            }
+                            _ => Type::Error,
+                        }
+                    } else {
+                        Type::Error // Should infer from value_place
+                    }
+                } else {
+                    Type::Error // Should infer from value_place
+                };
+                
+                // Better type inference: use the type of the value we are binding
+                let binding_type = if matches!(binding_type, Type::Error) {
+                    if let Some(func) = &self.builder.current_function {
+                        if let Some(local) = func.locals.get(&value_place.local) {
+                            // Walk projections to find type
+                            let mut current_ty = local.ty.clone();
+                            for proj in &value_place.projection {
+                                if let PlaceElem::Field { ty, .. } = proj {
+                                    current_ty = ty.clone();
+                                }
+                            }
+                            current_ty
+                        } else {
+                            Type::primitive(ast::PrimitiveType::Integer) // Fallback
+                        }
+                    } else {
+                        Type::primitive(ast::PrimitiveType::Integer) // Fallback
+                    }
+                } else {
+                    binding_type
+                };
+
+                // Create a local for the binding
+                let binding_local = self.builder.new_local(binding_type.clone(), false);
+                self.var_map
+                    .insert(binding_name.name.clone(), binding_local);
+                self.var_types
+                    .insert(binding_name.name.clone(), binding_type);
+
+                // Copy the value to the binding local
+                self.builder.push_statement(Statement::Assign {
+                    place: Place {
+                        local: binding_local,
+                        projection: vec![],
+                    },
+                    rvalue: Rvalue::Use(Operand::Copy(value_place.clone())),
+                    source_info: SourceInfo {
+                        span: source_location.clone(),
+                        scope: 0,
+                    },
+                });
+            }
+            ast::Pattern::Wildcard { binding: None, .. } => {
+                // Wildcard without binding, do nothing
             }
         }
 

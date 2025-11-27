@@ -2905,6 +2905,63 @@ impl SemanticAnalyzer {
             Pattern::Literal { .. } => {
                 // Literal patterns don't create bindings
             }
+
+            Pattern::Struct {
+                struct_name,
+                fields,
+                source_location,
+            } => {
+                // Check that expected_type is a struct with the given name
+                if let Type::Named { name, .. } = expected_type {
+                    if name != &struct_name.name {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: struct_name.name.clone(),
+                            found: name.clone(),
+                            location: source_location.clone(),
+                        });
+                    }
+                    
+                    // Look up struct definition
+                    let type_def = self
+                        .type_checker
+                        .borrow()
+                        .lookup_type_definition(name)
+                        .cloned()
+                        .ok_or_else(|| SemanticError::UndefinedSymbol {
+                            symbol: name.clone(),
+                            location: source_location.clone(),
+                        })?;
+                        
+                    if let crate::types::TypeDefinition::Struct { fields: def_fields, .. } = type_def {
+                        // Check fields
+                        for (field_name, field_pattern) in fields {
+                            // Find field type
+                            let field_type = def_fields.iter().find(|(fname, _)| fname == &field_name.name)
+                                .map(|(_, ftype)| ftype)
+                                .ok_or_else(|| SemanticError::UnknownField {
+                                    struct_name: name.clone(),
+                                    field_name: field_name.name.clone(),
+                                    location: source_location.clone(),
+                                })?;
+                                
+                            // Recursively analyze
+                            self.analyze_pattern(field_pattern, field_type)?;
+                        }
+                    } else {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: "Struct".to_string(),
+                            found: format!("{:?}", type_def),
+                            location: source_location.clone(),
+                        });
+                    }
+                } else {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: struct_name.name.clone(),
+                        found: expected_type.to_string(),
+                        location: source_location.clone(),
+                    });
+                }
+            }
         }
 
         Ok(())
