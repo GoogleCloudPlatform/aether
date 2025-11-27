@@ -4,7 +4,7 @@
 module string_basics;
 
 @extern("C")
-func puts(s: Pointer<Char>) -> Int;
+func puts(s: String) -> Int;
 
 func main() -> Int {
     // String literals

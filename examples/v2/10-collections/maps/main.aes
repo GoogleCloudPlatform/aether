@@ -7,9 +7,13 @@ func main() -> Int {
     // Map from string keys to integer values
     let scores: Map<String, Int> = {};
 
-    // Maps would be used with methods like:
-    // scores.insert("Alice", 100);
-    // let score: Int = scores.get("Alice");
+    // Use map methods
+    scores.insert("Alice", 100);
+    scores.insert("Bob", 95);
+    
+    let alice_score: Int = scores.get("Alice");
+    let bob_score: Int = scores.get("Bob");
 
-    return 0;
+    // Should return 100 + 95 = 195
+    return {alice_score + bob_score};
 }

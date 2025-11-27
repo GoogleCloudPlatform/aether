@@ -1668,6 +1668,88 @@ impl SemanticAnalyzer {
                 }
             }
 
+            Expression::MethodCall {
+                receiver,
+                method_name,
+                arguments,
+                source_location,
+            } => {
+                let receiver_type = self.analyze_expression(receiver)?;
+                
+                match &receiver_type {
+                    Type::Map { key_type, value_type } => {
+                        if method_name.name == "insert" {
+                            if arguments.len() != 2 {
+                                return Err(SemanticError::ArgumentCountMismatch {
+                                    function: "map.insert".to_string(),
+                                    expected: 2,
+                                    found: arguments.len(),
+                                    location: source_location.clone(),
+                                });
+                            }
+                            
+                            // Check key type
+                            let arg_key_type = self.analyze_expression(&arguments[0].value)?;
+                            if !self.type_checker.borrow().types_compatible(key_type, &arg_key_type) {
+                                return Err(SemanticError::TypeMismatch {
+                                    expected: key_type.to_string(),
+                                    found: arg_key_type.to_string(),
+                                    location: arguments[0].source_location.clone(),
+                                });
+                            }
+                            
+                            // Check value type
+                            let arg_value_type = self.analyze_expression(&arguments[1].value)?;
+                            if !self.type_checker.borrow().types_compatible(value_type, &arg_value_type) {
+                                return Err(SemanticError::TypeMismatch {
+                                    expected: value_type.to_string(),
+                                    found: arg_value_type.to_string(),
+                                    location: arguments[1].source_location.clone(),
+                                });
+                            }
+                            
+                            Ok(Type::Primitive(PrimitiveType::Void))
+                        } else if method_name.name == "get" {
+                            if arguments.len() != 1 {
+                                return Err(SemanticError::ArgumentCountMismatch {
+                                    function: "map.get".to_string(),
+                                    expected: 1,
+                                    found: arguments.len(),
+                                    location: source_location.clone(),
+                                });
+                            }
+                            
+                            // Check key type
+                            let arg_key_type = self.analyze_expression(&arguments[0].value)?;
+                            if !self.type_checker.borrow().types_compatible(key_type, &arg_key_type) {
+                                return Err(SemanticError::TypeMismatch {
+                                    expected: key_type.to_string(),
+                                    found: arg_key_type.to_string(),
+                                    location: arguments[0].source_location.clone(),
+                                });
+                            }
+                            
+                            // Returns value type
+                            Ok(*value_type.clone())
+                        } else {
+                            Err(SemanticError::InvalidOperation {
+                                operation: format!("method call '{}'", method_name.name),
+                                reason: format!("method not found on type Map"),
+                                location: source_location.clone(),
+                            })
+                        }
+                    }
+                    _ => {
+                        // For now, only Maps have methods supported here
+                        Err(SemanticError::InvalidOperation {
+                            operation: format!("method call '{}'", method_name.name),
+                            reason: format!("type '{}' does not support methods", receiver_type),
+                            location: source_location.clone(),
+                        })
+                    }
+                }
+            }
+
             Expression::MapLiteral {
                 key_type,
                 value_type,

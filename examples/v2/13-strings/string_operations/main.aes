@@ -4,10 +4,10 @@
 module string_operations;
 
 @extern("C")
-func strlen(s: Pointer<Char>) -> Int;
+func strlen(s: String) -> Int;
 
 @extern("C")
-func puts(s: Pointer<Char>) -> Int;
+func puts(s: String) -> Int;
 
 func main() -> Int {
     let message: String = "Hello, AetherScript!";

@@ -1578,10 +1578,124 @@ impl LoweringContext {
                 source_location,
             } => self.lower_lambda(captures, parameters, return_type, body, source_location),
 
+            ast::Expression::MethodCall {
+                receiver,
+                method_name,
+                arguments,
+                source_location,
+            } => self.lower_method_call(receiver, method_name, arguments, source_location),
+
             _ => Err(SemanticError::UnsupportedFeature {
                 feature: "Expression type not yet implemented in MIR lowering".to_string(),
                 location: SourceLocation::unknown(),
             }),
+        }
+    }
+
+    /// Lower a method call
+    fn lower_method_call(
+        &mut self,
+        receiver: &ast::Expression,
+        method_name: &ast::Identifier,
+        arguments: &[ast::Argument],
+        source_location: &SourceLocation,
+    ) -> Result<Operand, SemanticError> {
+        // For map methods "insert" and "get", lower to map_insert/map_get runtime calls
+        // In a real compiler, this would look up the type of receiver and dispatch appropriately
+        // For now, we'll assume it's a map if the method name matches map operations
+        
+        if method_name.name == "insert" {
+            // map.insert(key, value) -> map_insert(map, key, value)
+            let map_op = self.lower_expression(receiver)?;
+            
+            if arguments.len() != 2 {
+                return Err(SemanticError::ArgumentCountMismatch {
+                    function: "map.insert".to_string(),
+                    expected: 2,
+                    found: arguments.len(),
+                    location: source_location.clone(),
+                });
+            }
+            
+            let key_op = self.lower_expression(&arguments[0].value)?;
+            let value_op = self.lower_expression(&arguments[1].value)?;
+            
+            // Call map_insert(map, key, value)
+            let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Void), false);
+            
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
+                    local: result_local,
+                    projection: vec![],
+                },
+                rvalue: Rvalue::Call {
+                    func: Operand::Constant(Constant {
+                        ty: Type::primitive(ast::PrimitiveType::String),
+                        value: ConstantValue::String("map_insert".to_string()),
+                    }),
+                    args: vec![map_op, key_op, value_op],
+                },
+                source_info: SourceInfo {
+                    span: source_location.clone(),
+                    scope: 0,
+                },
+            });
+            
+            Ok(Operand::Copy(Place {
+                local: result_local,
+                projection: vec![],
+            }))
+        } else if method_name.name == "get" {
+            // map.get(key) -> map_get(map, key)
+            let map_op = self.lower_expression(receiver)?;
+            
+            if arguments.len() != 1 {
+                return Err(SemanticError::ArgumentCountMismatch {
+                    function: "map.get".to_string(),
+                    expected: 1,
+                    found: arguments.len(),
+                    location: source_location.clone(),
+                });
+            }
+            
+            let key_op = self.lower_expression(&arguments[0].value)?;
+            
+            // Assume integer return for now (need generics for full support)
+            let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+            
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
+                    local: result_local,
+                    projection: vec![],
+                },
+                rvalue: Rvalue::Call {
+                    func: Operand::Constant(Constant {
+                        ty: Type::primitive(ast::PrimitiveType::String),
+                        value: ConstantValue::String("map_get".to_string()),
+                    }),
+                    args: vec![map_op, key_op],
+                },
+                source_info: SourceInfo {
+                    span: source_location.clone(),
+                    scope: 0,
+                },
+            });
+            
+            Ok(Operand::Copy(Place {
+                local: result_local,
+                projection: vec![],
+            }))
+        } else {
+            // For other methods, try to find them in the type system
+            // This requires knowing the type of the receiver, which we might not have fully resolved here
+            // Fallback: treat as function call "ReceiverType_MethodName(receiver, args)"?
+            // Or "MethodName(receiver, args)"?
+            
+            // For now, just error
+            Err(SemanticError::UnsupportedFeature {
+                feature: format!("Method call '{}' not supported yet", method_name.name),
+                location: source_location.clone(),
+            })
         }
     }
 

@@ -1508,6 +1508,51 @@ impl Parser {
 
     // ==================== ASSIGNMENT PARSING ====================
 
+    /// Check if the current statement looks like an assignment
+    fn looks_like_assignment(&self) -> bool {
+        let mut i = self.position;
+        
+        // Must start with identifier
+        if i >= self.tokens.len() { return false; }
+        if !matches!(self.tokens[i].token_type, TokenType::Identifier(_)) {
+            return false;
+        }
+        i += 1;
+        
+        while i < self.tokens.len() {
+            match &self.tokens[i].token_type {
+                TokenType::Dot => {
+                    i += 1;
+                    // Expect identifier after dot
+                    if i < self.tokens.len() && matches!(self.tokens[i].token_type, TokenType::Identifier(_)) {
+                        i += 1;
+                    } else {
+                        return false; 
+                    }
+                },
+                TokenType::LeftBracket => {
+                    // Skip until RightBracket (balanced)
+                    i += 1;
+                    let mut depth = 1;
+                    while i < self.tokens.len() && depth > 0 {
+                        match &self.tokens[i].token_type {
+                            TokenType::LeftBracket => depth += 1,
+                            TokenType::RightBracket => depth -= 1,
+                            _ => {}
+                        }
+                        i += 1;
+                    }
+                },
+                TokenType::Equal => return true, // Found assignment operator
+                
+                TokenType::LeftParen => return false, // Method/Function call
+                TokenType::Semicolon => return false, // Expression statement
+                _ => return false, // Unexpected token for assignment target
+            }
+        }
+        false
+    }
+
     /// Parse an assignment statement
     /// Grammar: assignment_target "=" expression ";"
     pub fn parse_assignment(&mut self) -> Result<Statement, ParserError> {
@@ -1865,17 +1910,9 @@ impl Parser {
         }
 
         // Otherwise, try to parse as assignment or expression statement
-        // For now, assume identifier at start means assignment
-        if let TokenType::Identifier(_) = &self.peek().token_type {
-            // Look ahead to see if this is an assignment
-            if let Some(next) = self.peek_next() {
-                if matches!(
-                    next.token_type,
-                    TokenType::Equal | TokenType::LeftBracket | TokenType::Dot
-                ) {
-                    return self.parse_assignment();
-                }
-            }
+        // Check if it looks like an assignment
+        if self.looks_like_assignment() {
+            return self.parse_assignment();
         }
 
         // Default: expression statement
@@ -1896,8 +1933,11 @@ impl Parser {
     pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
         let start_location = self.current_location();
 
-        // Braced binary expression: {left op right}
+        // Braced binary expression: {left op right} or Map Literal
         if self.check(&TokenType::LeftBrace) {
+            if self.looks_like_map_literal() {
+                return self.parse_map_literal();
+            }
             return self.parse_braced_expression();
         }
 
@@ -2208,8 +2248,21 @@ impl Parser {
     fn parse_primary_expression(&mut self) -> Result<Expression, ParserError> {
         let start_location = self.current_location();
 
-        // Nested braced expression
+        // Check for Map literal: { key: value, ... }
+        // Distinguished from braced expression { expr } by looking ahead for a colon
         if self.check(&TokenType::LeftBrace) {
+            // If it's an empty brace {}, it could be an empty map or an empty block (which isn't an expression usually)
+            // In Aether V2, {} is ambiguous. Let's assume it's an empty Map if context allows, or empty block.
+            // Actually, `{ expr }` is a braced expression. `{ stmt; }` is a block.
+            // `{ key: value }` is a map.
+            // `{}` is typically an empty Map literal in this context.
+            
+            // Lookahead to see if it's a map literal
+            if self.looks_like_map_literal() {
+                return self.parse_map_literal();
+            }
+            
+            // Otherwise parse as braced expression
             return self.parse_braced_expression();
         }
 
@@ -2839,6 +2892,121 @@ impl Parser {
         Ok(Expression::ArrayLiteral {
             element_type,
             elements,
+            source_location: start_location,
+        })
+    }
+
+    /// Check if the current token sequence looks like a map literal
+    /// { key: value } or {} (empty map)
+    fn looks_like_map_literal(&self) -> bool {
+        if !self.check(&TokenType::LeftBrace) {
+            return false;
+        }
+        
+        // Empty map {}
+        if let Some(next) = self.tokens.get(self.position + 1) {
+            if matches!(next.token_type, TokenType::RightBrace) {
+                return true; 
+            }
+        }
+        
+        // Map with entries: { key: value
+        // We need to skip the key expression to find the colon
+        // This is hard without full backtracking.
+        // Simple heuristic: if next token is a string/int literal or identifier, 
+        // and followed by colon (after skipping potential complex key), it's a map.
+        
+        // For now, let's just check if we can find a colon at the right nesting level
+        let mut depth = 0;
+        let mut i = self.position + 1;
+        while i < self.tokens.len() {
+            match &self.tokens[i].token_type {
+                TokenType::LeftBrace => depth += 1,
+                TokenType::RightBrace => {
+                    if depth == 0 {
+                        return false; // End of brace before finding colon
+                    }
+                    depth -= 1;
+                },
+                TokenType::Colon => {
+                    if depth == 0 {
+                        return true; // Found top-level colon
+                    }
+                },
+                TokenType::Semicolon => return false, // Semicolon implies block/statements
+                _ => {}
+            }
+            i += 1;
+        }
+        
+        false
+    }
+
+    /// Parse a map literal: { key: value, ... }
+    fn parse_map_literal(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        self.expect(&TokenType::LeftBrace, "expected '{'")?;
+
+        let mut entries = Vec::new();
+
+        // Check for empty map
+        if self.check(&TokenType::RightBrace) {
+            self.advance();
+            let key_type = Box::new(TypeSpecifier::Primitive { 
+                type_name: PrimitiveType::String,
+                source_location: start_location.clone() 
+            });
+            let value_type = Box::new(TypeSpecifier::Primitive { 
+                type_name: PrimitiveType::Integer,
+                source_location: start_location.clone() 
+            });
+            return Ok(Expression::MapLiteral {
+                key_type,
+                value_type,
+                entries,
+                source_location: start_location,
+            });
+        }
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            // Parse key expression
+            let key = self.parse_expression()?;
+            
+            self.expect(&TokenType::Colon, "expected ':' after map key")?;
+            
+            // Parse value expression
+            let value = self.parse_expression()?;
+            
+            entries.push(crate::ast::MapEntry {
+                key: Box::new(key),
+                value: Box::new(value),
+                source_location: self.current_location(),
+            });
+            
+            if self.check(&TokenType::Comma) {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        
+        self.expect(&TokenType::RightBrace, "expected '}' after map entries")?;
+        
+        // Inferred types (String -> Integer for now as default)
+        // In a real compiler, we'd infer from context or first entry
+        let key_type = Box::new(TypeSpecifier::Primitive { 
+            type_name: PrimitiveType::String,
+            source_location: start_location.clone() 
+        });
+        let value_type = Box::new(TypeSpecifier::Primitive { 
+            type_name: PrimitiveType::Integer,
+            source_location: start_location.clone() 
+        });
+
+        Ok(Expression::MapLiteral {
+            key_type,
+            value_type,
+            entries,
             source_location: start_location,
         })
     }
