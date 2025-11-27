@@ -3489,6 +3489,28 @@ impl<'ctx> LLVMBackend<'ctx> {
         let map_get_fn = self.module.add_function("map_get", map_get_type, None);
         function_declarations.insert("map_get".to_string(), map_get_fn);
 
+        // Async Runtime functions
+        // aether_async_init() -> void
+        let async_init_type = void_type.fn_type(&[], false);
+        let async_init_fn = self.module.add_function("aether_async_init", async_init_type, None);
+        function_declarations.insert("aether_async_init".to_string(), async_init_fn);
+
+        // aether_async_shutdown() -> void
+        let async_shutdown_type = void_type.fn_type(&[], false);
+        let async_shutdown_fn = self.module.add_function("aether_async_shutdown", async_shutdown_type, None);
+        function_declarations.insert("aether_async_shutdown".to_string(), async_shutdown_fn);
+
+        // aether_async_spawn(fn_ptr, arg_ptr) -> task_handle_ptr
+        // Note: fn_ptr is extern "C" fn(*mut c_void) -> *mut c_void, which we model as ptr
+        let async_spawn_type = i8_ptr_type.fn_type(&[i8_ptr_type.into(), i8_ptr_type.into()], false);
+        let async_spawn_fn = self.module.add_function("aether_async_spawn", async_spawn_type, None);
+        function_declarations.insert("aether_async_spawn".to_string(), async_spawn_fn);
+
+        // aether_async_wait(task_handle_ptr) -> result_ptr
+        let async_wait_type = i8_ptr_type.fn_type(&[i8_ptr_type.into()], false);
+        let async_wait_fn = self.module.add_function("aether_async_wait", async_wait_type, None);
+        function_declarations.insert("aether_async_wait".to_string(), async_wait_fn);
+
         Ok(())
     }
 }

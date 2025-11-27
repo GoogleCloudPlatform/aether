@@ -1298,7 +1298,7 @@ impl ASTPrettyPrinter {
         result
     }
 
-    fn print_statement(&self, statement: &Statement) -> String {
+    fn print_statement(&mut self, statement: &Statement) -> String {
         match statement {
             Statement::VariableDeclaration {
                 name,
