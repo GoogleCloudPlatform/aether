@@ -142,7 +142,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                     self.context.f64_type().into()
                 }
                 crate::ast::PrimitiveType::Float32 => self.context.f32_type().into(),
-                crate::ast::PrimitiveType::Boolean => self.context.bool_type().into(),
+                crate::ast::PrimitiveType::Boolean => self.context.i32_type().into(), // Use i32 for bool to match C ABI and backend assumptions
                 crate::ast::PrimitiveType::Char => self.context.i8_type().into(),
                 crate::ast::PrimitiveType::String => {
                     self.context.i8_type().ptr_type(AddressSpace::default()).into()
@@ -740,18 +740,23 @@ impl<'ctx> LLVMBackend<'ctx> {
                         let then_block = llvm_blocks[&targets.targets[0]];
                         let else_block = llvm_blocks[&targets.otherwise];
 
-                        // Convert integer to boolean
-                        let zero = self.context.i32_type().const_int(0, false);
-                        let is_true = builder
-                            .build_int_compare(
-                                inkwell::IntPredicate::NE,
-                                int_value,
-                                zero,
-                                "is_true",
-                            )
-                            .map_err(|e| SemanticError::CodeGenError {
-                                message: e.to_string(),
-                            })?;
+                        let is_true = if int_value.get_type().get_bit_width() == 1 {
+                            // If it's already i1, use it directly
+                            int_value
+                        } else {
+                            // Convert integer to boolean (ne 0)
+                            let zero = int_value.get_type().const_int(0, false);
+                            builder
+                                .build_int_compare(
+                                    inkwell::IntPredicate::NE,
+                                    int_value,
+                                    zero,
+                                    "is_true",
+                                )
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?
+                        };
 
                         builder
                             .build_conditional_branch(is_true, then_block, else_block)
@@ -2848,7 +2853,7 @@ impl<'ctx> LLVMBackend<'ctx> {
     /// Write object file
     pub fn write_object_file<P: AsRef<Path>>(&self, path: P) -> Result<(), String> {
         // Verify the module first (temporarily disabled to debug function signature issues)
-        // self.module.verify().map_err(|e| format!("Module verification failed: {}", e))?;
+        self.module.verify().map_err(|e| format!("Module verification failed: {}", e))?;
 
         // Print IR for debugging
         eprintln!("LLVM IR:\n{}", self.module.print_to_string().to_string());
@@ -3282,32 +3287,33 @@ impl<'ctx> LLVMBackend<'ctx> {
         function_declarations.insert("tcp_close".to_string(), tcp_close_fn);
 
         // Memory management functions
-        // aether_malloc(int64 size) -> int64
-        let malloc_type = i64_type.fn_type(&[i64_type.into()], false);
+        // aether_malloc(size: int) -> ptr
+        let malloc_type = i8_ptr_type.fn_type(&[i32_type.into()], false);
         let malloc_fn = self.module.add_function("aether_malloc", malloc_type, None);
         function_declarations.insert("aether_malloc".to_string(), malloc_fn);
 
-        // aether_free(int64 ptr) -> void
-        let free_type = void_type.fn_type(&[i64_type.into()], false);
+        // aether_free(ptr) -> void
+        let free_type = void_type.fn_type(&[i8_ptr_type.into()], false);
         let free_fn = self.module.add_function("aether_free", free_type, None);
         function_declarations.insert("aether_free".to_string(), free_fn);
 
-        // aether_realloc(int64 ptr, int64 new_size) -> int64
-        let realloc_type = i64_type.fn_type(&[i64_type.into(), i64_type.into()], false);
+        // aether_realloc(ptr, size: int) -> ptr
+        let realloc_type =
+            i8_ptr_type.fn_type(&[i8_ptr_type.into(), i32_type.into()], false);
         let realloc_fn = self
             .module
             .add_function("aether_realloc", realloc_type, None);
         function_declarations.insert("aether_realloc".to_string(), realloc_fn);
 
-        // aether_gc_add_root(int64 ptr) -> void
-        let gc_add_root_type = void_type.fn_type(&[i64_type.into()], false);
+        // aether_gc_add_root(ptr) -> void
+        let gc_add_root_type = void_type.fn_type(&[i8_ptr_type.into()], false);
         let gc_add_root_fn = self
             .module
             .add_function("aether_gc_add_root", gc_add_root_type, None);
         function_declarations.insert("aether_gc_add_root".to_string(), gc_add_root_fn);
 
-        // aether_gc_remove_root(int64 ptr) -> void
-        let gc_remove_root_type = void_type.fn_type(&[i64_type.into()], false);
+        // aether_gc_remove_root(ptr) -> void
+        let gc_remove_root_type = void_type.fn_type(&[i8_ptr_type.into()], false);
         let gc_remove_root_fn =
             self.module
                 .add_function("aether_gc_remove_root", gc_remove_root_type, None);

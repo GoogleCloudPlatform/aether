@@ -32,6 +32,7 @@ struct AetherArray {
 /// Create an array with given count
 #[no_mangle]
 pub unsafe extern "C" fn array_create(count: c_int) -> *mut c_void {
+    eprintln!("RUNTIME: array_create count={}", count);
     if count <= 0 {
         return ptr::null_mut();
     }
@@ -44,6 +45,7 @@ pub unsafe extern "C" fn array_create(count: c_int) -> *mut c_void {
     let array_ptr = std::alloc::alloc(layout) as *mut AetherArray;
 
     if array_ptr.is_null() {
+        eprintln!("RUNTIME: array_create failed to allocate");
         return ptr::null_mut();
     }
 
@@ -54,6 +56,7 @@ pub unsafe extern "C" fn array_create(count: c_int) -> *mut c_void {
     let elements_ptr = array_ptr.add(1) as *mut i32;
     ptr::write_bytes(elements_ptr, 0, count as usize);
 
+    eprintln!("RUNTIME: array_create returning {:?}", array_ptr);
     array_ptr as *mut c_void
 }
 
@@ -93,14 +96,18 @@ pub unsafe extern "C" fn array_create_from_elements(
 /// Set an element in an array
 #[no_mangle]
 pub unsafe extern "C" fn array_set(array_ptr: *mut c_void, index: c_int, value: c_int) {
+    eprintln!("RUNTIME: array_set ptr={:?} index={} value={}", array_ptr, index, value);
     if array_ptr.is_null() {
+        eprintln!("RUNTIME: array_set ptr is null");
         return;
     }
 
     let array = array_ptr as *mut AetherArray;
 
     // Bounds check
-    if index < 0 || index >= (*array).length {
+    let len = (*array).length;
+    if index < 0 || index >= len {
+        eprintln!("RUNTIME: array_set out of bounds index={} length={}", index, len);
         return;
     }
 
@@ -114,6 +121,7 @@ pub unsafe extern "C" fn array_set(array_ptr: *mut c_void, index: c_int, value: 
 /// Get an element from an array
 #[no_mangle]
 pub unsafe extern "C" fn array_get(array_ptr: *mut c_void, index: c_int) -> c_int {
+    eprintln!("RUNTIME: array_get ptr={:?} index={}", array_ptr, index);
     if array_ptr.is_null() {
         return 0;
     }
