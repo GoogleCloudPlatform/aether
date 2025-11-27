@@ -315,19 +315,19 @@ car go fmt && car go clippy && car go test
 
 ### Phase 8.3: LLVM Backend Implementation
 
-- [ ] **Task 8.3.1: Context Struct Generation**: Modify `LLVMBackend` to generate a struct type for captures.
-- [ ] **Task 8.3.2: Function Outlining**: Implement `outline_concurrent_block` in `src/llvm_backend/mod.rs`.
+- [x] **Task 8.3.1: Context Struct Generation**: Modify `LLVMBackend` to generate a struct type for captures.
+- [x] **Task 8.3.2: Function Outlining**: Implement `outline_concurrent_block` in `src/llvm_backend/mod.rs`.
     - Generate a new function with a synthetic name.
     - Generate argument unpacking code.
     - Move the block's lowering logic into this new function.
-- [ ] **Task 8.3.3: Spawn Generation**: Implement `lower_concurrent_statement`.
+- [x] **Task 8.3.3: Spawn Generation**: Implement `lower_concurrent_statement`.
     - Generate context allocation and population.
     - Generate call to `aether_spawn`.
-- [ ] **Task 8.3.4: Await Generation**: Implement implicit awaiting.
+- [x] **Task 8.3.4: Await Generation**: Implement implicit awaiting.
     - Update `lower_expression` to handle `Future` types (if implicit) or specific await keywords.
     - For V2, likely implicit await on use or explicit `await` keyword (if added) or just `wait()` function. *Decision: Implement `aether_async_wait` as a stdlib function for now.*
 
 ### Phase 8.4: Integration and Verification
 
-- [ ] **Task 8.4.1: End-to-End Test**: Compile `examples/v2/17-concurrency/async_io`.
-- [ ] **Task 8.4.2: Verify Parallelism**: Modify the example to sleep/delay and print timestamps to prove parallel execution.
+- [x] **Task 8.4.1: End-to-End Test**: Compile `examples/v2/17-concurrency/async_io`.
+- [x] **Task 8.4.2: Verify Parallelism**: Modify the example to sleep/delay and print timestamps to prove parallel execution.
