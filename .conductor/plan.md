@@ -327,7 +327,28 @@ car go fmt && car go clippy && car go test
     - Update `lower_expression` to handle `Future` types (if implicit) or specific await keywords.
     - For V2, likely implicit await on use or explicit `await` keyword (if added) or just `wait()` function. *Decision: Implement `aether_async_wait` as a stdlib function for now.*
 
-### Phase 8.4: Integration and Verification
+## Phase 9: Ownership System Enforcement
 
-- [x] **Task 8.4.1: End-to-End Test**: Compile `examples/v2/17-concurrency/async_io`.
-- [x] **Task 8.4.2: Verify Parallelism**: Modify the example to sleep/delay and print timestamps to prove parallel execution.
+- [ ] **Task 9.1: Ownership Analysis Pass**: Implement a borrow checker pass in `src/semantic/ownership.rs`.
+    - Track variable lifetimes and ownership states (Owned, Borrowed, Moved).
+    - Enforce "use after move" errors.
+    - Enforce mutable borrow exclusivity.
+- [ ] **Task 9.2: Lifetime Annotations**: Update parser to support lifetime annotations `'a` in function signatures and struct definitions.
+- [ ] **Task 9.3: Verification**: Create test cases for ownership violations and valid borrowing patterns.
+
+## Phase 10: Language Server Protocol (LSP)
+
+- [ ] **Task 10.1: Basic LSP Server**: Implement a basic LSP server using `tower-lsp` crate.
+    - Support `initialize` and `shutdown`.
+    - Support `textDocument/didOpen`, `didChange`.
+- [ ] **Task 10.2: Diagnostics**: Integrate compiler error reporting with LSP diagnostics.
+    - Report syntax errors and semantic errors in real-time.
+- [ ] **Task 10.3: Go to Definition**: Implement symbol resolution lookup for `textDocument/definition`.
+- [ ] **Task 10.4: Hover**: Implement type info and documentation on hover.
+
+## Phase 11: Optimization Passes
+
+- [ ] **Task 11.1: Optimization Manager**: Create `src/optimizations/mod.rs` to manage MIR transformation passes.
+- [ ] **Task 11.2: Dead Code Elimination**: Implement a pass to remove unreachable blocks and unused locals.
+- [ ] **Task 11.3: Constant Propagation**: Implement a pass to fold constants and propagate values.
+- [ ] **Task 11.4: Inlining**: Implement function inlining for small functions.
