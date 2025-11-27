@@ -17,6 +17,7 @@
 //! Performs type checking, symbol resolution, and semantic validation
 
 pub mod metadata;
+pub mod capture_analysis;
 // #[cfg(test)]
 // mod ownership_tests;
 
@@ -72,6 +73,9 @@ pub struct SemanticAnalyzer {
 
     /// Analyzed modules cache to prevent double-analysis
     analyzed_modules: HashMap<String, LoadedModule>,
+
+    /// Capture analysis results for concurrent blocks
+    pub captures: HashMap<SourceLocation, std::collections::HashSet<String>>,
 }
 
 /// Statistics about the semantic analysis
@@ -107,6 +111,7 @@ impl SemanticAnalyzer {
             in_finally_block: false,
             in_concurrent_block: false,
             analyzed_modules: HashMap::new(),
+            captures: HashMap::new(),
         }
     }
 
@@ -178,6 +183,11 @@ impl SemanticAnalyzer {
         for export in &module.exports {
             self.analyze_export(export)?;
         }
+
+        // Run capture analysis
+        let mut capture_analyzer = capture_analysis::CaptureAnalyzer::new();
+        capture_analyzer.analyze(module);
+        self.captures.extend(capture_analyzer.captures);
 
         // Exit module scope
         self.symbol_table.exit_scope()?;

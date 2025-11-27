@@ -10,24 +10,43 @@
     - 13-strings (string_basics, string_operations)
     - 14-ffi (c_functions)
 
-## Phase 7: Asynchronous I/O (Active)
+## Phase 8: True Asynchronous Backend Implementation (Active)
 
-## Recent Achievements
+### Achievements
 
-- **Implemented `concurrent` Keyword and AST Support (Task 7.1):**
-    - Added `concurrent` keyword to the lexer.
-    - Updated AST with `Concurrent` statement node.
-    - Modified parser to correctly parse `concurrent { ... }` blocks.
-- **Implemented Semantic Analysis for Concurrency (Task 7.2):**
-    - Added `in_concurrent_block` flag to `SemanticAnalyzer`.
-    - Modified semantic analysis to correctly type function calls as `Future<T>` when inside a `concurrent` block, and `T` otherwise.
-    - Implemented logic to implicitly join/resolve futures at the end of `concurrent` blocks.
+- **Phase 8.1: Runtime Support (Completed):**
+    - Implemented `runtime/src/async_runtime.rs` with `AetherFuture`, `ThreadPool`, and FFI exports.
+    - Verified FFI via unit tests (confirmed double-free was pre-existing).
+    - Implemented `Clone` for `AetherFuture` to fix race conditions.
 
-## Pending Tasks (Next Steps)
+### Current Focus
 
-- [x] Integrate Async Runtime into LLVM Backend (Task 7.3 - **in progress**).
-    - Expose `AsyncRuntime` functions (`init`, `shutdown`, `spawn`, ``wait`) from `runtime/src/lib.rs` as C-callable functions.
-    - Declare these C-callable functions in the LLVM IR within `src/llvm_backend/mod.rs`.
-    - Generate LLVM code for `Statement::Concurrent` to leverage these runtime functions.
-- [ ] Verify Async I/O functionality with a new example (Task 7.4).
-- [ ] Implement `15-stdlib` and `16-networking` with asynchronous capabilities.
+- **Phase 8.3: LLVM Backend Implementation (Pending):**
+    - Generate context structs for captures.
+    - Outline concurrent blocks into separate functions.
+    - Generate `aether_spawn` and `aether_await` calls.
+
+### Achievements
+
+- **Phase 8.2: Compiler Analysis (Completed):**
+    - Implemented Capture Analysis to identify variables used inside `concurrent` blocks.
+    - Verified with unit tests covering simple and nested concurrent blocks.
+
+### Remaining Tasks
+
+- **Phase 8.3: LLVM Backend Implementation:**
+    - Generate context structs for captures.
+    - Outline concurrent blocks into separate functions.
+    - Generate `aether_spawn` and `aether_await` calls.
+- **Phase 8.4: Integration and Verification:**
+    - Verify `async_io` example with true parallelism.
+
+## Completed Phases
+
+- Phase 1: V2 Lexer
+- Phase 2: V2 Parser
+- Phase 3: Pipeline Integration
+- Phase 4: Example Verification
+- Phase 5: Test Suite Migration (Partial - Core Verified)
+- Phase 6: Cleanup and Documentation
+- Phase 7: Async Syntax & Semantics (Basic)
