@@ -1,15 +1,15 @@
-AETHER_COMPILER = ../../../../target/release/aether-compiler
-AETHER_RUNTIME = ../../../../runtime/target/release
+COMPILER = ../../../../target/debug/aether-compiler
+SOURCE = enum_with_data.aether
+OUTPUT = enum_with_data
+RUNTIME_PATH = $(shell pwd)/../../../../runtime/target/debug
 
-.PHONY: all clean run
+all: build
 
-all: main
+build:
+	export AETHER_RUNTIME_PATH=$(RUNTIME_PATH) && $(COMPILER) compile $(SOURCE) -o $(OUTPUT)
 
-main: main.aes
-	AETHER_RUNTIME_PATH=$(AETHER_RUNTIME) $(AETHER_COMPILER) compile $< -o $@
-
-run: main
-	./main
+run: build
+	./$(OUTPUT) || (echo "Exit code $$?"; exit 0)
 
 clean:
-	rm -f main *.ll *.o
+	rm -f $(OUTPUT) $(OUTPUT).o
