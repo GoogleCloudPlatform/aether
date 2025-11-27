@@ -10,13 +10,14 @@
     - 13-strings (string_basics, string_operations)
     - 14-ffi (c_functions)
 
-## Phase 8: True Asynchronous Backend Implementation (Active)
+## Phase 8: True Asynchronous Backend Implementation (Completed)
 
 ### Achievements
 
 - **Phase 8.1: Runtime Support (Completed):**
     - Implemented `runtime/src/async_runtime.rs` with `AetherFuture`, `ThreadPool`, and FFI exports.
     - Verified FFI via unit tests.
+    - Fixed race condition in `AsyncRuntime` shutdown using `Arc<AtomicUsize>`.
 - **Phase 8.2: Compiler Analysis (Completed):**
     - Implemented Capture Analysis.
 - **Phase 8.3: LLVM Backend Implementation (Completed):**
@@ -24,12 +25,10 @@
     - [x] Task 8.3.2: Function Outlining
     - [x] Task 8.3.3: Spawn Generation
     - [x] Task 8.3.4: Await Generation (Implicit await logic via `maybe_await_operand`)
-
-### Current Focus
-
-- **Phase 8.4: Integration and Verification (Active):**
-    - Verify `async_io` example with true parallelism.
-    - Ensure end-to-end execution works.
+- **Phase 8.4: Integration and Verification (Completed):**
+    - Verified `async_io` example with true parallelism.
+    - Confirmed `main` runs concurrently with spawned tasks.
+    - Confirmed clean shutdown of runtime thread pool.
 
 ## Completed Phases
 
@@ -40,3 +39,4 @@
 - Phase 5: Test Suite Migration (Partial - Core Verified)
 - Phase 6: Cleanup and Documentation
 - Phase 7: Async Syntax & Semantics (Basic)
+- Phase 8: True Asynchronous Backend Implementation

@@ -444,9 +444,20 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 } else {
                                     i32_type.const_int(0, false)
                                 };
+                            
+                            // Shutdown async runtime (waits for all tasks)
+                            if let Some(shutdown_fn) = self.module.get_function("aether_async_shutdown") {
+                                let _ = builder.build_call(shutdown_fn, &[], "call_async_shutdown");
+                            }
+                            
                             builder.build_return(Some(&return_value));
                         }
                         Err(_) => {
+                            // Shutdown async runtime even on error
+                            if let Some(shutdown_fn) = self.module.get_function("aether_async_shutdown") {
+                                let _ = builder.build_call(shutdown_fn, &[], "call_async_shutdown");
+                            }
+                            
                             // If call fails, just return 0
                             builder.build_return(Some(&i32_type.const_int(0, false)));
                         }

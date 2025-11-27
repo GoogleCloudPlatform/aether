@@ -196,7 +196,7 @@ static RUNTIME_INIT: std::sync::Once = std::sync::Once::new();
 
 struct AsyncRuntime {
     pool: ThreadPool,
-    active_tasks: AtomicUsize,
+    active_tasks: Arc<AtomicUsize>,
 }
 
 impl AsyncRuntime {
@@ -210,7 +210,7 @@ impl AsyncRuntime {
                 
                 RUNTIME = Some(AsyncRuntime {
                     pool: ThreadPool::new(threads),
-                    active_tasks: AtomicUsize::new(0),
+                    active_tasks: Arc::new(AtomicUsize::new(0)),
                 });
             });
             
@@ -262,6 +262,9 @@ pub extern "C" fn aether_spawn(
     let task_fn_addr = task_fn as usize;
     let cleanup_fn_addr = cleanup_fn.map(|f| f as usize).unwrap_or(0);
     
+    // Capture active_tasks Arc for the closure
+    let active_tasks = Arc::clone(&runtime.active_tasks);
+    
     runtime.pool.execute(move || {
         // Convert back to pointers inside the thread
         let ctx = ctx_addr as *mut c_void;
@@ -287,7 +290,7 @@ pub extern "C" fn aether_spawn(
             cleanup_func(ctx);
         }
         
-        AsyncRuntime::global().active_tasks.fetch_sub(1, Ordering::SeqCst);
+        active_tasks.fetch_sub(1, Ordering::SeqCst);
     });
     
     future_ptr

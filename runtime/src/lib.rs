@@ -28,6 +28,7 @@ use backtrace::Backtrace;
 #[no_mangle]
 pub extern "C" fn aether_runtime_init() {
     panic::set_hook(Box::new(aether_panic_handler));
+    crate::async_runtime::aether_async_init();
 }
 
 /// Custom panic handler for AetherScript runtime
