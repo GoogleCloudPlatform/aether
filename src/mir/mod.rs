@@ -224,6 +224,12 @@ pub enum Terminator {
         unwind: Option<BasicBlockId>,
     },
 
+    /// Concurrent block execution
+    Concurrent {
+        block_id: BasicBlockId,
+        target: BasicBlockId,
+    },
+
     /// Assert (runtime check)
     Assert {
         condition: Operand,
@@ -628,6 +634,11 @@ pub mod cfg {
                         preds.push(*pred_id);
                     }
                 }
+                Terminator::Concurrent { target, .. } => {
+                    if *target == block_id {
+                        preds.push(*pred_id);
+                    }
+                }
                 Terminator::Assert {
                     target, cleanup, ..
                 } => {
@@ -671,6 +682,7 @@ pub mod cfg {
                 }
                 succs
             }
+            Terminator::Concurrent { target, .. } => vec![*target],
             Terminator::Assert {
                 target, cleanup, ..
             } => {

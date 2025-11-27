@@ -407,6 +407,41 @@ impl LoweringContext {
                 }
                 self.builder.set_terminator(Terminator::Return);
             }
+            ast::Statement::Concurrent { block, .. } => {
+                // Create a new block for the concurrent execution
+                let concurrent_entry = self.builder.new_block();
+                let after_concurrent = self.builder.new_block();
+                
+                // Terminate current block with Concurrent
+                self.builder.set_terminator(Terminator::Concurrent {
+                    block_id: concurrent_entry,
+                    target: after_concurrent,
+                });
+                
+                // Lower the concurrent block
+                self.builder.switch_to_block(concurrent_entry);
+                // We need to ensure the block eventually terminates or returns
+                // For now, let's just compile the statements in the block
+                // Note: In a real implementation, we'd want to wrap this in a closure/async context
+                for stmt in &block.statements {
+                    self.lower_statement(stmt)?;
+                }
+                
+                // If the concurrent block falls through, it should return/end
+                // For MIR structure, we might want it to jump to 'after_concurrent' 
+                // but semantically 'Concurrent' implies it runs separately.
+                // The 'Concurrent' terminator in the parent block handles the "spawning".
+                // The body of the concurrent block needs to be self-contained or jump back?
+                // Actually, `Terminator::Concurrent` is a placeholder for "spawn this block".
+                // The spawned block should probably end with Return (if it's a task) or similar.
+                // Let's assume for now it just ends.
+                if !self.builder.current_block_diverges() {
+                     self.builder.set_terminator(Terminator::Return);
+                }
+
+                // Continue generation in the code after the concurrent block
+                self.builder.switch_to_block(after_concurrent);
+            }
 
             ast::Statement::If {
                 condition,

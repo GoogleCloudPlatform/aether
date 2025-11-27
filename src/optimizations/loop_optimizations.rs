@@ -452,6 +452,7 @@ impl LoopOptimizationPass {
                 }
                 targets
             }
+            Terminator::Concurrent { target, .. } => vec![*target],
             Terminator::Assert {
                 target, cleanup, ..
             } => {

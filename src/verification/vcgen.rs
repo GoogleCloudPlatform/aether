@@ -190,6 +190,10 @@ impl VcGenerator {
                     self.process_block(function, targets.otherwise, visited, vcs, contract)?;
                 }
             }
+            Terminator::Concurrent { target, .. } => {
+                // For verification, treat as simple control flow to target
+                self.process_block(function, *target, visited, vcs, contract)?;
+            }
             Terminator::Goto { target } => {
                 self.process_block(function, *target, visited, vcs, contract)?;
             }

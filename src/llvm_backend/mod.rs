@@ -878,6 +878,26 @@ impl<'ctx> LLVMBackend<'ctx> {
                         eprintln!("DEBUG: No target block for call");
                     }
                 }
+
+                mir::Terminator::Concurrent { block_id, target } => {
+                    // TODO: Implement true concurrent execution by outlining the block
+                    // For now, we execute synchronously to verify the control flow
+                    eprintln!("WARNING: Executing concurrent block synchronously (outlining not implemented)");
+                    
+                    let concurrent_block = llvm_blocks[block_id];
+                    builder.build_unconditional_branch(concurrent_block).map_err(|e| SemanticError::CodeGenError {
+                        message: e.to_string(),
+                    })?;
+                    
+                    // Note: The concurrent block currently ends with Return, which terminates the whole function.
+                    // This is wrong for a synchronous simulation if we want to continue to 'target'.
+                    // But correct for a spawned task (it returns from the task function).
+                    // Since we are simulating sync in the MAIN function, Return exits main.
+                    // This is broken.
+                    
+                    // However, since we can't implement outlining here without changing MIR lowering significantly,
+                    // we will accept this limitation for now and mark the task as partially complete / blocked on outlining.
+                }
             }
         }
 
