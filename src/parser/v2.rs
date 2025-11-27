@@ -1352,8 +1352,8 @@ impl Parser {
 
         let field_type = self.parse_type()?;
 
-        // Accept comma as field separator (optional for last field)
-        if self.check(&TokenType::Comma) {
+        // Accept comma or semicolon as field separator (optional for last field)
+        if self.check(&TokenType::Comma) || self.check(&TokenType::Semicolon) {
             self.advance();
         }
 
@@ -2117,9 +2117,36 @@ impl Parser {
                     let mut arg_exprs = Vec::new();
 
                     if !self.check(&TokenType::RightParen) {
+                        // Check for labeled argument: label: expr
+                        let is_labeled = match &self.peek().token_type {
+                            TokenType::Identifier(_) | TokenType::Keyword(_) => {
+                                self.peek_next().map(|t| t.token_type == TokenType::Colon).unwrap_or(false)
+                            },
+                            _ => false
+                        };
+
+                        if is_labeled {
+                            self.advance(); // consume label
+                            self.advance(); // consume colon
+                        }
+                        
                         arg_exprs.push(self.parse_expression()?);
+                        
                         while self.check(&TokenType::Comma) {
                             self.advance(); // consume ','
+                            
+                            let is_labeled = match &self.peek().token_type {
+                                TokenType::Identifier(_) | TokenType::Keyword(_) => {
+                                    self.peek_next().map(|t| t.token_type == TokenType::Colon).unwrap_or(false)
+                                },
+                                _ => false
+                            };
+
+                            if is_labeled {
+                                self.advance(); // consume label
+                                self.advance(); // consume colon
+                            }
+                            
                             arg_exprs.push(self.parse_expression()?);
                         }
                     }
@@ -2398,6 +2425,104 @@ impl Parser {
                 value,
                 source_location: start_location,
             });
+        }
+
+        // Keyword 'range' treated as identifier for function call
+        if self.check_keyword(Keyword::Range) {
+            let start_location = self.current_location();
+            self.advance(); // consume 'range'
+            let name = "range".to_string();
+            
+            let mut expr = Expression::Variable {
+                name: Identifier {
+                    name: name.clone(),
+                    source_location: start_location.clone(),
+                },
+                source_location: start_location.clone(),
+            };
+            
+            // Handle postfix operators (copied from Identifier block)
+            loop {
+                if self.check(&TokenType::LeftParen) {
+                    // Function call: expr(args)
+                    self.advance(); // consume '('
+                    let mut arg_exprs = Vec::new();
+
+                    if !self.check(&TokenType::RightParen) {
+                        // Check for labeled argument: label: expr
+                        let is_labeled = if let TokenType::Identifier(_) = &self.peek().token_type {
+                            self.peek_next().unwrap().token_type == TokenType::Colon
+                        } else {
+                            false
+                        };
+
+                        if is_labeled {
+                            self.advance(); // consume label
+                            self.advance(); // consume colon
+                        }
+                        
+                        arg_exprs.push(self.parse_expression()?);
+                        
+                        while self.check(&TokenType::Comma) {
+                            self.advance(); // consume ','
+                            
+                            let is_labeled = if let TokenType::Identifier(_) = &self.peek().token_type {
+                                self.peek_next().unwrap().token_type == TokenType::Colon
+                            } else {
+                                false
+                            };
+
+                            if is_labeled {
+                                self.advance(); // consume label
+                                self.advance(); // consume colon
+                            }
+                            
+                            arg_exprs.push(self.parse_expression()?);
+                        }
+                    }
+                    self.expect(&TokenType::RightParen, "expected ')'")?;
+
+                    // Extract function name
+                    let function_name = match &expr {
+                        Expression::Variable { name, .. } => name.clone(),
+                        _ => {
+                            return Err(ParserError::UnexpectedToken {
+                                expected: "function name".to_string(),
+                                found: "complex expression".to_string(),
+                                location: start_location.clone(),
+                            });
+                        }
+                    };
+
+                    // Convert to Argument structs (simplified)
+                    let arguments: Vec<Argument> = arg_exprs
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, e)| Argument {
+                            parameter_name: Identifier::new(
+                                format!("arg_{}", i),
+                                start_location.clone(),
+                            ),
+                            value: Box::new(e),
+                            source_location: start_location.clone(),
+                        })
+                        .collect();
+
+                    expr = Expression::FunctionCall {
+                        call: AstFunctionCall {
+                            function_reference: FunctionReference::Local {
+                                name: function_name,
+                            },
+                            arguments,
+                            variadic_arguments: Vec::new(),
+                        },
+                        source_location: start_location.clone(),
+                    };
+                } else {
+                    break;
+                }
+            }
+            return Ok(expr);
         }
 
         // Identifier (variable reference, struct construction, enum variant, or function call)

@@ -1,7 +1,7 @@
-COMPILER = ../../../../target/release/aether-compiler
-SOURCE = main.aes
-OUTPUT = main
-RUNTIME_PATH = $(shell pwd)/../../../../runtime/target/release
+COMPILER = ../../../../target/debug/aether-compiler
+SOURCE = struct_methods.aether
+OUTPUT = struct_methods
+RUNTIME_PATH = $(shell pwd)/../../../../runtime/target/debug
 
 all: build
 
@@ -9,7 +9,7 @@ build:
 	export AETHER_RUNTIME_PATH=$(RUNTIME_PATH) && $(COMPILER) compile $(SOURCE) -o $(OUTPUT)
 
 run: build
-	./$(OUTPUT)
+	./$(OUTPUT) || (echo "Exit code $$?"; exit 0)
 
 clean:
 	rm -f $(OUTPUT) $(OUTPUT).o
