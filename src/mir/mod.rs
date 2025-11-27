@@ -135,6 +135,9 @@ pub enum Rvalue {
         mutability: Mutability,
     },
 
+    /// Address-of operation (for raw pointers)
+    AddressOf(Place),
+
     /// Array/slice length
     Len(Place),
 

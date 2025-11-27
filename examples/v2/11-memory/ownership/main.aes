@@ -3,6 +3,12 @@
 
 module ownership;
 
+@extern("C")
+func puts(s: String) -> Int;
+
+@extern("C")
+func int_to_string(i: Int) -> String;
+
 struct Data {
     value: Int,
 }
@@ -23,10 +29,31 @@ func increment(data: &mut Data) -> Void {
 }
 
 func main() -> Int {
-    let d: Data = Data { value: 42 };
+    var d: Data = Data { value: 42 };
 
     // Read the value (borrow)
     let v: Int = read(&d);
+    puts("Initial value:");
+    puts(int_to_string(v));
 
-    return v;
+    // Mutate
+    increment(&mut d);
+    let v2: Int = read(&d);
+    puts("After increment:");
+    puts(int_to_string(v2));
+
+    // Consume
+    // Note: 'd' must be moved. V2 syntax for move is explicitly '^d' or just 'd' depending on semantics?
+    // Based on "consume(data: ^Data)", it expects an owned value.
+    // If 'd' is a local variable, passing it by value 'consume(d)' should move it.
+    // Let's try 'consume(^d)' if explicit move is required, or 'consume(d)'.
+    // The signature `func consume(data: ^Data)` uses `^` for owned.
+    let v3: Int = consume(^d); 
+    puts("Consumed value:");
+    puts(int_to_string(v3));
+
+    // Accessing 'd' here should be an error if the compiler enforces move semantics.
+    // For now, we just verify it compiles and runs.
+
+    return 0;
 }

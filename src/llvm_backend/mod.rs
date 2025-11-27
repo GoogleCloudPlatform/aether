@@ -132,101 +132,47 @@ impl<'ctx> LLVMBackend<'ctx> {
     /// Convert an AetherScript type to an LLVM basic type
     fn get_basic_type(&self, ty: &crate::types::Type) -> inkwell::types::BasicTypeEnum<'ctx> {
         match ty {
-            crate::types::Type::Primitive(prim) => match prim {
-                crate::ast::PrimitiveType::Integer => self.context.i32_type().into(),
-                crate::ast::PrimitiveType::Integer64 => self.context.i64_type().into(),
-                crate::ast::PrimitiveType::Float => self.context.f64_type().into(),
-                crate::ast::PrimitiveType::Boolean => self.context.i32_type().into(), // Use i32 for bool
-                crate::ast::PrimitiveType::String => self
-                    .context
-                    .i8_type()
-                    .ptr_type(AddressSpace::default())
-                    .into(),
-                crate::ast::PrimitiveType::Char => self.context.i8_type().into(), // Use i8 for char
-                _ => self.context.i32_type().into(), // Default fallback
+            crate::types::Type::Primitive(primitive) => match primitive {
+                crate::ast::PrimitiveType::Integer
+                | crate::ast::PrimitiveType::Integer32
+                | crate::ast::PrimitiveType::SizeT => self.context.i32_type().into(),
+                crate::ast::PrimitiveType::Integer64
+                | crate::ast::PrimitiveType::UIntPtrT => self.context.i64_type().into(),
+                crate::ast::PrimitiveType::Float | crate::ast::PrimitiveType::Float64 => {
+                    self.context.f64_type().into()
+                }
+                crate::ast::PrimitiveType::Float32 => self.context.f32_type().into(),
+                crate::ast::PrimitiveType::Boolean => self.context.bool_type().into(),
+                crate::ast::PrimitiveType::Char => self.context.i8_type().into(),
+                crate::ast::PrimitiveType::String => {
+                    self.context.i8_type().ptr_type(AddressSpace::default()).into()
+                }
+                crate::ast::PrimitiveType::Void => self.context.i8_type().into(),
             },
+            crate::types::Type::Named { .. } => {
+                // Structs and Enums are passed by pointer (reference)
+                self.context.i8_type().ptr_type(AddressSpace::default()).into()
+            }
             crate::types::Type::Array { .. } => {
-                // Arrays are represented as pointers to the array data structure
-                self.context
-                    .i8_type()
-                    .ptr_type(AddressSpace::default())
-                    .into()
+                // Arrays are passed by pointer
+                self.context.i8_type().ptr_type(AddressSpace::default()).into()
             }
             crate::types::Type::Map { .. } => {
-                // Maps are represented as pointers to the map data structure
-                self.context
-                    .i8_type()
-                    .ptr_type(AddressSpace::default())
-                    .into()
+                // Maps are passed by pointer
+                self.context.i8_type().ptr_type(AddressSpace::default()).into()
             }
-            crate::types::Type::Named { name, .. } => {
-                // For structs, we need to use the actual struct type if it's been defined
-                // For FFI, structs are always passed by pointer
-                if let Some(type_def) = self.type_definitions.get(name) {
-                    match type_def {
-                        crate::types::TypeDefinition::Struct { .. } => {
-                            // Return pointer to struct for FFI compatibility
-                            self.context
-                                .i8_type()
-                                .ptr_type(AddressSpace::default())
-                                .into()
-                        }
-                        crate::types::TypeDefinition::Enum { variants, .. } => {
-                            // Check if any variant has associated data
-                            let has_data = variants.iter().any(|v| !v.associated_types.is_empty());
-
-                            if has_data {
-                                // Enums with data are represented as pointers to tagged unions
-                                self.context
-                                    .i8_type()
-                                    .ptr_type(AddressSpace::default())
-                                    .into()
-                            } else {
-                                // Simple enums (no associated data) are represented as integers
-                                // Determine discriminant size based on number of variants
-                                let max_discriminant = variants.iter().map(|v| v.discriminant).max().unwrap_or(0);
-                                if max_discriminant <= 255 {
-                                    self.context.i8_type().into()
-                                } else if max_discriminant <= 65535 {
-                                    self.context.i16_type().into()
-                                } else {
-                                    self.context.i32_type().into()
-                                }
-                            }
-                        }
-                        _ => {
-                            // Other named types - use opaque pointer
-                            self.context
-                                .i8_type()
-                                .ptr_type(AddressSpace::default())
-                                .into()
-                        }
-                    }
-                } else {
-                    // Unknown type - use opaque pointer
-                    self.context
-                        .i8_type()
-                        .ptr_type(AddressSpace::default())
-                        .into()
-                }
-            }
-            crate::types::Type::Pointer { .. } => {
-                // Pointers are represented as i8*
-                self.context
-                    .i8_type()
-                    .ptr_type(AddressSpace::default())
-                    .into()
+            crate::types::Type::Pointer { .. } | crate::types::Type::Owned { .. } => {
+                // Pointers are passed by pointer
+                self.context.i8_type().ptr_type(AddressSpace::default()).into()
             }
             crate::types::Type::Function { .. } => {
-                // Function types are represented as function pointers
-                self.context
-                    .i8_type()
-                    .ptr_type(AddressSpace::default())
-                    .into()
+                // Function pointers
+                self.context.i8_type().ptr_type(AddressSpace::default()).into()
             }
-            _ => self.context.i32_type().into(), // Default for complex types
+            _ => self.context.i32_type().into(), // Default fallback
         }
     }
+
 
     /// Get the basic type from a local ID
     fn get_basic_type_from_local(
@@ -516,101 +462,21 @@ impl<'ctx> LLVMBackend<'ctx> {
                 let param_types: Vec<inkwell::types::BasicMetadataTypeEnum> = function
                     .parameters
                     .iter()
-                    .map(|param| {
-                        match &param.ty {
-                            crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer) => {
-                                self.context.i32_type().into()
-                            }
-                            crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer64) => {
-                                self.context.i64_type().into()
-                            }
-                            crate::types::Type::Primitive(crate::ast::PrimitiveType::Float) => {
-                                self.context.f64_type().into()
-                            }
-                            crate::types::Type::Primitive(crate::ast::PrimitiveType::Boolean) => {
-                                self.context.i32_type().into()
-                            }
-                            crate::types::Type::Primitive(crate::ast::PrimitiveType::String) => {
-                                self.context
-                                    .i8_type()
-                                    .ptr_type(AddressSpace::default())
-                                    .into()
-                            }
-                            crate::types::Type::Primitive(crate::ast::PrimitiveType::Char) => {
-                                self.context.i8_type().into()
-                            }
-                            crate::types::Type::Named { .. } => {
-                                // Named types (structs, enums) are passed as pointers
-                                self.context
-                                    .i8_type()
-                                    .ptr_type(AddressSpace::default())
-                                    .into()
-                            }
-                            crate::types::Type::Array { .. } => {
-                                // Arrays are passed as pointers (void*)
-                                self.context
-                                    .i8_type()
-                                    .ptr_type(AddressSpace::default())
-                                    .into()
-                            }
-                            crate::types::Type::Map { .. } => {
-                                // Maps are passed as pointers (void*)
-                                self.context
-                                    .i8_type()
-                                    .ptr_type(AddressSpace::default())
-                                    .into()
-                            }
-                            _ => self.context.i32_type().into(),
-                        }
-                    })
+                    .map(|param| self.get_basic_type(&param.ty).into())
                     .collect();
 
-                let fn_type = match &function.return_type {
-                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Void) => {
-                        self.context.void_type().fn_type(&param_types, false)
+                let fn_type = if let crate::types::Type::Primitive(crate::ast::PrimitiveType::Void) = &function.return_type {
+                    self.context.void_type().fn_type(&param_types, false)
+                } else {
+                    let return_type = self.get_basic_type(&function.return_type);
+                    match return_type {
+                        inkwell::types::BasicTypeEnum::IntType(t) => t.fn_type(&param_types, false),
+                        inkwell::types::BasicTypeEnum::FloatType(t) => t.fn_type(&param_types, false),
+                        inkwell::types::BasicTypeEnum::PointerType(t) => t.fn_type(&param_types, false),
+                        inkwell::types::BasicTypeEnum::ArrayType(t) => t.fn_type(&param_types, false),
+                        inkwell::types::BasicTypeEnum::StructType(t) => t.fn_type(&param_types, false),
+                        inkwell::types::BasicTypeEnum::VectorType(t) => t.fn_type(&param_types, false),
                     }
-                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer) => {
-                        self.context.i32_type().fn_type(&param_types, false)
-                    }
-                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Integer64) => {
-                        self.context.i64_type().fn_type(&param_types, false)
-                    }
-                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Float) => {
-                        self.context.f64_type().fn_type(&param_types, false)
-                    }
-                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Boolean) => {
-                        self.context.i32_type().fn_type(&param_types, false)
-                    }
-                    crate::types::Type::Primitive(crate::ast::PrimitiveType::String) => self
-                        .context
-                        .i8_type()
-                        .ptr_type(AddressSpace::default())
-                        .fn_type(&param_types, false),
-                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Char) => {
-                        self.context.i8_type().fn_type(&param_types, false)
-                    }
-                    crate::types::Type::Named { .. } => {
-                        // Named types (structs, enums) are returned as pointers
-                        self.context
-                            .i8_type()
-                            .ptr_type(AddressSpace::default())
-                            .fn_type(&param_types, false)
-                    }
-                    crate::types::Type::Array { .. } => {
-                        // Arrays are returned as pointers (void*)
-                        self.context
-                            .i8_type()
-                            .ptr_type(AddressSpace::default())
-                            .fn_type(&param_types, false)
-                    }
-                    crate::types::Type::Map { .. } => {
-                        // Maps are returned as pointers (void*)
-                        self.context
-                            .i8_type()
-                            .ptr_type(AddressSpace::default())
-                            .fn_type(&param_types, false)
-                    }
-                    _ => self.context.i32_type().fn_type(&param_types, false),
                 };
 
                 let llvm_func = self.module.add_function(name, fn_type, None);
@@ -741,12 +607,6 @@ impl<'ctx> LLVMBackend<'ctx> {
         // Process each basic block in order
         for &block_id in &block_order {
             let mir_block = &function.basic_blocks[&block_id];
-            eprintln!(
-                "Processing block {}: {} statements, terminator: {:?}",
-                block_id,
-                mir_block.statements.len(),
-                mir_block.terminator
-            );
             let llvm_block = llvm_blocks[&block_id];
             builder.position_at_end(llvm_block);
 
@@ -769,13 +629,15 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                         let result =
                             self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
-                        if let Some(&alloca) = local_allocas.get(&place.local) {
-                            builder.build_store(alloca, result).map_err(|e| {
-                                SemanticError::CodeGenError {
-                                    message: e.to_string(),
-                                }
-                            })?;
-                        }
+                        
+                        // Get the target address using get_place_pointer
+                        let target_ptr = self.get_place_pointer(place, &local_allocas, &builder, function)?;
+                        
+                        builder.build_store(target_ptr, result).map_err(|e| {
+                            SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            }
+                        })?;
                     }
                     mir::Statement::StorageLive(_) | mir::Statement::StorageDead(_) => {
                         // Ignore storage markers for now
@@ -1025,8 +887,13 @@ impl<'ctx> LLVMBackend<'ctx> {
         builder: &Builder<'ctx>,
         function: &mir::Function,
     ) -> Result<BasicValueEnum<'ctx>, SemanticError> {
-        eprintln!("DEBUG: generate_rvalue called with: {:?}", rvalue);
         match rvalue {
+            mir::Rvalue::AddressOf(place) => {
+                // Get the address of the place
+                let ptr = self.get_place_pointer(place, local_allocas, builder, function)?;
+                Ok(ptr.into())
+            }
+
             mir::Rvalue::Use(operand) => {
                 self.generate_operand(operand, local_allocas, builder, function)
             }
@@ -2479,7 +2346,140 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                 Ok(disc_i32)
             }
+            &mir::Rvalue::AddressOf(_) => todo!(),
         }
+    }
+
+    /// Get the pointer to a place (address of the value)
+    fn get_place_pointer(
+        &mut self,
+        place: &mir::Place,
+        local_allocas: &HashMap<mir::LocalId, PointerValue<'ctx>>,
+        builder: &Builder<'ctx>,
+        function: &mir::Function,
+    ) -> Result<PointerValue<'ctx>, SemanticError> {
+        // Start with the local variable's alloca
+        let mut current_ptr = *local_allocas.get(&place.local).ok_or_else(|| {
+            SemanticError::CodeGenError {
+                message: format!("Local {:?} not found in allocas", place.local),
+            }
+        })?;
+
+        // Track current type to calculate offsets
+        let mut current_type = function.locals.get(&place.local)
+            .map(|l| l.ty.clone())
+            .or_else(|| function.parameters.iter().find(|p| p.local_id == place.local).map(|p| p.ty.clone()))
+            .ok_or_else(|| SemanticError::CodeGenError {
+                message: format!("Local {:?} type not found", place.local),
+            })?;
+
+        // Apply projections
+        for proj in &place.projection {
+            match proj {
+                mir::PlaceElem::Deref => {
+                    // Load the pointer value to dereference it
+                    let loaded = builder.build_load(
+                        self.context.i8_type().ptr_type(AddressSpace::default()),
+                        current_ptr,
+                        "deref_ptr"
+                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                    current_ptr = loaded.into_pointer_value();
+                    
+                    // Update type: dereference pointer/owned
+                    match current_type {
+                        crate::types::Type::Pointer { target_type, .. } | 
+                        crate::types::Type::Owned { base_type: target_type, .. } => {
+                            current_type = *target_type;
+                        }
+                        _ => return Err(SemanticError::CodeGenError {
+                            message: format!("Cannot dereference type {:?}", current_type),
+                        }),
+                    }
+                }
+                mir::PlaceElem::Field { field, ty } => {
+                    // Struct field access - use manual GEP with offset
+                    let struct_name = match &current_type {
+                        crate::types::Type::Named { name, .. } => name,
+                        _ => return Err(SemanticError::CodeGenError {
+                            message: format!("Field access on non-named type {:?}", current_type),
+                        }),
+                    };
+                    
+                    let offset = self.calculate_field_offset(struct_name, *field as usize);
+                    
+                    // Cast to i8*
+                    let i8_ptr = builder.build_pointer_cast(
+                        current_ptr,
+                        self.context.i8_type().ptr_type(AddressSpace::default()),
+                        "i8_ptr"
+                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                    
+                    // GEP
+                    let field_ptr_i8 = unsafe {
+                        builder.build_gep(
+                            self.context.i8_type(),
+                            i8_ptr,
+                            &[self.context.i32_type().const_int(offset as u64, false)],
+                            &format!("field_{}_ptr", field),
+                        ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
+                    };
+                    
+                    // Cast to appropriate field pointer type (optional but good for debugging IR)
+                    // For now keep as opaque pointer (or i8*) since we just store to it.
+                    // But next operation might expect something else.
+                    // Let's keep it as i8* (ptr in opaque world).
+                    current_ptr = field_ptr_i8;
+                    
+                    current_type = ty.clone();
+                }
+                mir::PlaceElem::Index(index_local) => {
+                    // Array indexing
+                    let index_val = if let Some(idx_ptr) = local_allocas.get(index_local) {
+                         builder.build_load(self.context.i32_type(), *idx_ptr, "index_val")
+                            .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
+                            .into_int_value()
+                    } else {
+                        return Err(SemanticError::CodeGenError {
+                            message: format!("Index local {:?} not found", index_local),
+                        });
+                    };
+
+                    // Array element type size
+                    // Need to know element type size.
+                    let element_type = match &current_type {
+                        crate::types::Type::Array { element_type, .. } => element_type,
+                        _ => return Err(SemanticError::CodeGenError {
+                            message: format!("Index access on non-array type {:?}", current_type),
+                        }),
+                    };
+                    // We don't have easy size calculation here without type size map.
+                    // Assuming i32 array for now as fallback or 8 bytes if pointer?
+                    // Wait, generate_operand used 0, index GEP.
+                    // This assumes `current_ptr` is `[N x T]*` or `T*`.
+                    // If it is opaque `ptr`, `build_gep` needs element type.
+                    // We should use `get_basic_type` for element type.
+                    let elem_basic_type = self.get_basic_type(element_type);
+                    
+                    unsafe {
+                        current_ptr = builder.build_gep(
+                            elem_basic_type, 
+                            current_ptr,
+                            &[index_val], // For pointer to array, usually [0, index]. But if pointer to first element (slice), just [index].
+                            // Arrays are passed as pointers (to first element? or to struct?)
+                            // get_basic_type returns ptr.
+                            // Let's assume pointer to first element for now.
+                            "array_index"
+                        ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                    }
+                    current_type = *element_type.clone();
+                }
+                _ => return Err(SemanticError::CodeGenError {
+                    message: format!("Unsupported projection: {:?}", proj),
+                }),
+            }
+        }
+
+        Ok(current_ptr)
     }
 
     /// Create or get a global string constant
@@ -2531,7 +2531,6 @@ impl<'ctx> LLVMBackend<'ctx> {
         builder: &Builder<'ctx>,
         function: &mir::Function,
     ) -> Result<BasicValueEnum<'ctx>, SemanticError> {
-        eprintln!("DEBUG: generate_operand called with: {:?}", operand);
         match operand {
             mir::Operand::Copy(place) | mir::Operand::Move(place) => {
                 if let Some(&alloca) = local_allocas.get(&place.local) {

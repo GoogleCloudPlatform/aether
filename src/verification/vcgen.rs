@@ -370,7 +370,12 @@ impl VcGenerator {
                 // TODO: Model memory operations
                 Ok(Formula::Var("ref_value".to_string()))
             }
-            Rvalue::Len(_) => {
+            Rvalue::AddressOf(_) => {
+                // For now, treat address-of as uninterpreted or simple value
+                // TODO: Implement pointer logic in SMT
+                Ok(Formula::Var("pointer_val".to_string()))
+            }
+            Rvalue::Len(place) => {
                 // Array/slice length - return symbolic value
                 Ok(Formula::Var("array_length".to_string()))
             }

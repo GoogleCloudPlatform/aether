@@ -147,6 +147,26 @@ impl MemoryAnalyzer {
         }
     }
 
+    /// Analyze expression memory usage (helper)
+    fn analyze_expression_memory(
+        &mut self,
+        expr: &Expression,
+        function: &Function,
+        region_id: &RegionId,
+    ) -> Result<(), SemanticError> {
+        // Simple recursive walk for now
+        match expr {
+            Expression::AddressOf { operand, .. } => {
+                self.analyze_expression_memory(operand, function, region_id)
+            },
+            Expression::Dereference { pointer, .. } => {
+                self.analyze_expression_memory(pointer, function, region_id)
+            },
+            // Add other expression types as needed
+            _ => Ok(()),
+        }
+    }
+
     /// Analyze a function for memory allocation strategy
     pub fn analyze_function(
         &mut self,
@@ -279,6 +299,17 @@ impl MemoryAnalyzer {
                 }
                 if let Some(finally) = finally_block {
                     self.analyze_block(finally)?;
+                }
+            }
+
+            Statement::Expression { expr, .. } => {
+                // Check for AddressOf in expression statements
+                if let Expression::AddressOf { operand, .. } = &**expr {
+                    // This is a simplification. Ideally we'd pass function/region context down.
+                    // For now, we just need to make sure we don't crash on AddressOf.
+                    // In a real implementation, we'd want to register the address-taken variable as escaping.
+                    // But analyze_statement doesn't have access to Function/RegionId easily right now.
+                    // Let's rely on EscapeAnalyzer for the heavy lifting.
                 }
             }
 

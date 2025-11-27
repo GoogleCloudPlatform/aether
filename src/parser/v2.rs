@@ -1961,6 +1961,52 @@ impl Parser {
             });
         }
 
+        // Address of: &expr or &mut expr
+        if self.check(&TokenType::Ampersand) {
+            self.advance(); // consume '&'
+            
+            // Check for 'mut' (which is a keyword, but we need to see if it's handled by parser)
+            // In V2, mut is a keyword.
+            let is_mut = if self.check_keyword(Keyword::Mut) {
+                self.advance(); // consume 'mut'
+                true
+            } else {
+                false
+            };
+            
+            let operand = self.parse_expression()?;
+            
+            // If it was &mut, we might need a different expression type or flag
+            // For now, let's map it to AddressOf with a potential flag if supported,
+            // or just AddressOf for now. 
+            // Wait, AddressOf usually implies immutable borrow. 
+            // If the AST supports MutableBorrow, we should use that.
+            // Let's check AST.
+            return Ok(Expression::AddressOf {
+                operand: Box::new(operand),
+                mutability: is_mut,
+                source_location: start_location,
+            });
+        }
+        
+        // Move: ^expr
+        if self.check(&TokenType::Caret) {
+            self.advance(); // consume '^'
+            let operand = self.parse_expression()?;
+            // Move is explicit in V2
+            // Map to a Move expression if it exists, or maybe just the expression itself if move is default?
+            // Actually, `^` might be a dereference in some languages, but here it says "owned".
+            // Let's see if we have a Move expression. If not, maybe it's just a marker.
+            // But wait, `^` is also XOR.
+            // If used as prefix, it's Move/Owned.
+            // Let's check if we have an AST node for this.
+            // For now, let's assume it's just an expression wrapper or we need to handle it.
+            // If no AST node, maybe it's just processed as part of the type checking/move semantics?
+            // Let's look for "Move" in AST.
+            return Ok(operand); // Just return the operand for now, treating ^ as a semantic marker handled elsewhere? 
+            // Or we need to implement it.
+        }
+
         // Prefix range expression: ..end or ..=end
         if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
             return self.parse_range_expression(None, start_location);

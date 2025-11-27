@@ -796,6 +796,7 @@ pub enum Expression {
     // Pointer operations
     AddressOf {
         operand: Box<Expression>,
+        mutability: bool,
         source_location: SourceLocation,
     },
     Dereference {

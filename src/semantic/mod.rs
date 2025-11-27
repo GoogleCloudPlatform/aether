@@ -1346,10 +1346,33 @@ impl SemanticAnalyzer {
             } => {
                 // Get the type of the instance
                 let instance_type = self.analyze_expression(instance)?;
+                eprintln!("Semantic: Analyzing FieldAccess. Instance type: {:?}", instance_type);
+
+                // Unwrap owned/reference types for field access (auto-deref)
+                let mut current_type = &instance_type;
+                loop {
+                    match current_type {
+                        Type::Owned { base_type, .. } => {
+                            eprintln!("Semantic: Unwrapping Owned type");
+                            current_type = base_type;
+                        }
+                        Type::Pointer { target_type, .. } => {
+                            eprintln!("Semantic: Unwrapping Pointer type");
+                            current_type = target_type;
+                        }
+                        // TODO: Handle Reference if it exists distinct from Pointer
+                        _ => {
+                            eprintln!("Semantic: Unwrap loop hit default case for type: {:?}", current_type);
+                            break;
+                        }
+                    }
+                }
+                eprintln!("Semantic: Resolved type for field access: {:?}", current_type);
 
                 // Check if it's a named type (struct)
-                match &instance_type {
+                match current_type {
                     Type::Named { name, module } => {
+                        eprintln!("Semantic: Matched Type::Named: {} (module: {:?})", name, module);
                         // Look up the struct definition
                         let full_name = if let Some(mod_name) = module {
                             format!("{}::{}", mod_name, name)
@@ -1386,13 +1409,16 @@ impl SemanticAnalyzer {
                             })
                         }
                     }
-                    _ => Err(SemanticError::TypeMismatch {
-                        expected: "struct type".to_string(),
-                        found: instance_type.to_string(),
-                        location: source_location.clone(),
-                    }),
+                    _ => {
+                        Err(SemanticError::TypeMismatch {
+                            expected: "named struct type".to_string(),
+                            found: current_type.to_string(),
+                            location: source_location.clone(),
+                        })
+                    },
                 }
             }
+
 
             Expression::Equals {
                 left,
@@ -1613,11 +1639,22 @@ impl SemanticAnalyzer {
 
             Expression::AddressOf {
                 operand,
+                mutability,
                 source_location,
             } => {
                 let operand_type = self.analyze_expression(operand)?;
-                // Create a pointer type to the operand type
-                Ok(Type::pointer(operand_type, false))
+                // Create a borrowed type (reference) to the operand type
+                if *mutability {
+                    Ok(Type::Owned {
+                        ownership: crate::types::OwnershipKind::MutableBorrow,
+                        base_type: Box::new(operand_type),
+                    })
+                } else {
+                    Ok(Type::Owned {
+                        ownership: crate::types::OwnershipKind::Borrowed,
+                        base_type: Box::new(operand_type),
+                    })
+                }
             }
 
             Expression::Dereference {

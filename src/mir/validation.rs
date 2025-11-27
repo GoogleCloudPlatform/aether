@@ -183,6 +183,9 @@ impl Validator {
             Rvalue::Ref { place, .. } => {
                 used.insert((place.local, location));
             }
+            Rvalue::AddressOf(place) => {
+                used.insert((place.local, location));
+            }
             Rvalue::Len(place) | Rvalue::Discriminant(place) => {
                 used.insert((place.local, location));
             }

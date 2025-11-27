@@ -2835,6 +2835,7 @@ impl Parser {
                     self.consume_right_paren()?;
                     Ok(Expression::AddressOf {
                         operand,
+                        mutability: false,
                         source_location: start_location,
                     })
                 }

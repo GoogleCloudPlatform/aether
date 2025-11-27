@@ -1522,8 +1522,9 @@ impl LoweringContext {
 
             ast::Expression::AddressOf {
                 operand,
+                mutability,
                 source_location,
-            } => self.lower_address_of(operand, source_location),
+            } => self.lower_address_of(operand, *mutability, source_location),
 
             ast::Expression::Dereference {
                 pointer,
@@ -1592,7 +1593,7 @@ impl LoweringContext {
         }
     }
 
-    /// Lower a method call
+
     fn lower_method_call(
         &mut self,
         receiver: &ast::Expression,
@@ -2263,6 +2264,56 @@ impl LoweringContext {
         Ok(Rvalue::Use(operand))
     }
 
+    /// Resolve field index and type for a struct
+    fn resolve_field_index(
+        &self,
+        struct_type: &Type,
+        field_name: &str,
+    ) -> Result<(FieldIdx, Type), SemanticError> {
+        // Unwrap pointer/owned/reference types
+        let mut current_type = struct_type;
+        loop {
+            match current_type {
+                Type::Owned { base_type, .. } | Type::Pointer { target_type: base_type, .. } => {
+                    current_type = base_type;
+                }
+                _ => break,
+            }
+        }
+
+        match current_type {
+            Type::Named { name, module } => {
+                // Need symbol table to look up struct fields
+                if let Some(st) = &self.symbol_table {
+                    if let Some(type_def) = st.lookup_type_definition(name) {
+                        if let crate::types::TypeDefinition::Struct { fields, .. } = type_def {
+                            for (idx, (fname, ftype)) in fields.iter().enumerate() {
+                                if fname == field_name {
+                                    return Ok((idx as u32, ftype.clone()));
+                                }
+                            }
+                            return Err(SemanticError::UnknownField {
+                                struct_name: name.clone(),
+                                field_name: field_name.to_string(),
+                                location: SourceLocation::unknown(),
+                            });
+                        }
+                    }
+                }
+                // If symbol table not available or type not found (shouldn't happen after semantic analysis)
+                Err(SemanticError::UndefinedSymbol {
+                    symbol: name.clone(),
+                    location: SourceLocation::unknown(),
+                })
+            }
+            _ => Err(SemanticError::TypeMismatch {
+                expected: "struct".to_string(),
+                found: current_type.to_string(),
+                location: SourceLocation::unknown(),
+            }),
+        }
+    }
+
     /// Lower an assignment target
     fn lower_assignment_target(
         &mut self,
@@ -2281,6 +2332,79 @@ impl LoweringContext {
                         location: name.source_location.clone(),
                     })
                 }
+            }
+            ast::AssignmentTarget::StructField {
+                instance,
+                field_name,
+            } => {
+                // Lower the instance to a place
+                let instance_op = self.lower_expression(instance)?;
+                let mut place = match instance_op {
+                    Operand::Copy(p) | Operand::Move(p) => p,
+                    Operand::Constant(c) => {
+                        let temp = self.builder.new_local(c.ty.clone(), false);
+                        self.builder.push_statement(Statement::Assign {
+                            place: Place { local: temp, projection: vec![] },
+                            rvalue: Rvalue::Use(Operand::Constant(c)),
+                            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                        });
+                        Place { local: temp, projection: vec![] }
+                    }
+                };
+                
+                // Get the type of the instance
+                let instance_type = self.get_expression_type(instance)?;
+                
+                // Unwrap pointer/reference types and add Deref projections
+                let mut current_type = &instance_type;
+                loop {
+                    match current_type {
+                        Type::Owned { base_type, .. } | Type::Pointer { target_type: base_type, .. } => {
+                            place.projection.push(PlaceElem::Deref);
+                            current_type = base_type;
+                        }
+                        _ => break,
+                    }
+                }
+                
+                // Resolve field index
+                let (field_idx, field_type) = self.resolve_field_index(&instance_type, &field_name.name)?;
+                
+                // Add field projection
+                place.projection.push(PlaceElem::Field {
+                    field: field_idx,
+                    ty: field_type,
+                });
+                
+                Ok(place)
+            }
+            ast::AssignmentTarget::ArrayElement { array, index } => {
+                let array_op = self.lower_expression(array)?;
+                let mut place = match array_op {
+                    Operand::Copy(p) | Operand::Move(p) => p,
+                    Operand::Constant(_) => return Err(SemanticError::InvalidOperation {
+                        operation: "array assignment".to_string(),
+                        reason: "cannot assign to constant array".to_string(),
+                        location: SourceLocation::unknown(),
+                    }),
+                };
+                
+                let index_operand = self.lower_expression(index)?;
+                let index_local = match index_operand {
+                    Operand::Copy(p) | Operand::Move(p) => p.local,
+                    Operand::Constant(c) => {
+                        let temp = self.builder.new_local(c.ty.clone(), false);
+                        self.builder.push_statement(Statement::Assign {
+                            place: Place { local: temp, projection: vec![] },
+                            rvalue: Rvalue::Use(Operand::Constant(c)),
+                            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                        });
+                        temp
+                    }
+                };
+                
+                place.projection.push(PlaceElem::Index(index_local));
+                Ok(place)
             }
             ast::AssignmentTarget::MapValue { map, key } => {
                 // For map assignment, we can't return a place directly
@@ -2355,12 +2479,20 @@ impl LoweringContext {
             }
             ast::TypeSpecifier::Owned {
                 base_type,
-                ownership: _,
+                ownership,
                 ..
             } => {
-                // For now, treat owned types as their base type in MIR
-                // The ownership information is already tracked in the semantic layer
-                self.ast_type_to_mir_type(base_type)
+                let base = self.ast_type_to_mir_type(base_type)?;
+                let kind = match ownership {
+                    ast::OwnershipKind::Owned => crate::types::OwnershipKind::Owned,
+                    ast::OwnershipKind::Borrowed => crate::types::OwnershipKind::Borrowed,
+                    ast::OwnershipKind::BorrowedMut => crate::types::OwnershipKind::MutableBorrow,
+                    ast::OwnershipKind::Shared => crate::types::OwnershipKind::Shared,
+                };
+                Ok(Type::Owned {
+                    ownership: kind,
+                    base_type: Box::new(base),
+                })
             }
             _ => Err(SemanticError::UnsupportedFeature {
                 feature: format!("Type {:?} not yet supported in MIR", ast_type),
@@ -2976,44 +3108,53 @@ impl LoweringContext {
 
     /// Get the type of a place
     fn get_type_of_place(&self, place: &Place) -> Result<Type, SemanticError> {
-        // Start with the type of the local
-        let local_type = if let Some(func) = &self.builder.current_function {
-            if let Some(local_info) = func.locals.get(&place.local) {
-                local_info.ty.clone()
+        let mut current_type = if let Some(func) = &self.builder.current_function {
+            if let Some(local) = func.locals.get(&place.local) {
+                local.ty.clone()
             } else {
-                // Check if it's a parameter
-                for param in &func.parameters {
-                    if param.local_id == place.local {
-                        return Ok(param.ty.clone());
-                    }
-                }
-                return Err(SemanticError::InternalError {
-                    message: format!("Local {} not found", place.local),
-                    location: SourceLocation::unknown(),
+                return Err(SemanticError::Internal { 
+                    message: format!("Local {:?} not found", place.local),
                 });
             }
         } else {
-            return Err(SemanticError::InternalError {
-                message: "No current function in builder".to_string(),
-                location: SourceLocation::unknown(),
+            return Err(SemanticError::Internal { 
+                message: "No current function".to_string(),
             });
         };
 
-        // Apply projections
-        let mut current_type = local_type;
-        for projection in &place.projection {
-            match projection {
-                PlaceElem::Field { field: _, ty } => {
-                    // For field projections, the type is stored in the projection
+        for elem in &place.projection {
+            match elem {
+                PlaceElem::Deref => {
+                    match current_type {
+                        Type::Pointer { target_type, .. } | Type::Owned { base_type: target_type, .. } => {
+                            current_type = *target_type.clone();
+                        }
+                        _ => return Err(SemanticError::TypeMismatch {
+                            expected: "pointer type".to_string(),
+                            found: current_type.to_string(),
+                            location: SourceLocation::unknown(),
+                        }),
+                    }
+                }
+                PlaceElem::Field { ty, .. } => {
                     current_type = ty.clone();
                 }
-                _ => {
-                    // Other projections not implemented yet
-                    return Err(SemanticError::UnsupportedFeature {
-                        feature: "Non-field place projections".to_string(),
-                        location: SourceLocation::unknown(),
-                    });
+                PlaceElem::Index(_) => {
+                    match current_type {
+                        Type::Array { element_type, .. } => {
+                            current_type = *element_type.clone();
+                        }
+                        _ => return Err(SemanticError::TypeMismatch {
+                            expected: "array type".to_string(),
+                            found: current_type.to_string(),
+                            location: SourceLocation::unknown(),
+                        }),
+                    }
                 }
+                _ => return Err(SemanticError::UnsupportedFeature {
+                    feature: "Non-field place projections".to_string(),
+                    location: SourceLocation::unknown(),
+                }),
             }
         }
 
@@ -3028,100 +3169,64 @@ impl LoweringContext {
         }
     }
 
-    /// Lower a field access expression
+
+
+    /// Lower field access expression
     fn lower_field_access(
         &mut self,
         instance: &ast::Expression,
         field_name: &ast::Identifier,
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
-        // Lower the instance expression
-        let instance_operand = self.lower_expression(instance)?;
-
-        // Convert to a place if it's not already
-        let instance_place = match instance_operand {
-            Operand::Copy(place) | Operand::Move(place) => place,
-            Operand::Constant(_) => {
-                return Err(SemanticError::InvalidOperation {
-                    operation: "field access on constant".to_string(),
-                    reason: "Cannot access fields of a constant value".to_string(),
-                    location: source_location.clone(),
+        // Lower the instance to a place (or temp)
+        let instance_op = self.lower_expression(instance)?;
+        let mut place = match instance_op {
+            Operand::Copy(p) | Operand::Move(p) => p,
+            Operand::Constant(c) => {
+                let temp = self.builder.new_local(c.ty.clone(), false);
+                self.builder.push_statement(Statement::Assign {
+                    place: Place {
+                        local: temp,
+                        projection: vec![],
+                    },
+                    rvalue: Rvalue::Use(Operand::Constant(c)),
+                    source_info: SourceInfo {
+                        span: source_location.clone(),
+                        scope: 0,
+                    },
                 });
-            }
-        };
-
-        // Get the type of the instance to look up field information
-        let instance_type = self.get_type_of_place(&instance_place)?;
-
-        // Look up field index and type from the struct definition
-        let (field_idx, field_type) = match &instance_type {
-            Type::Named { name, .. } => {
-                // Look up the struct definition
-                let type_def = self
-                    .symbol_table
-                    .as_ref()
-                    .and_then(|st| st.lookup_type_definition(name))
-                    .ok_or_else(|| SemanticError::UndefinedSymbol {
-                        symbol: name.clone(),
-                        location: source_location.clone(),
-                    })?;
-
-                match type_def {
-                    TypeDefinition::Struct { fields, .. } => {
-                        // Find the field index by iterating through fields in declaration order
-                        let mut field_index = None;
-                        let mut field_ty = None;
-
-                        // Fields are now stored in declaration order (Vec)
-                        for (idx, (fname, ftype)) in fields.iter().enumerate() {
-                            if fname == &field_name.name {
-                                field_index = Some(idx as u32);
-                                field_ty = Some(ftype.clone());
-                                break;
-                            }
-                        }
-
-                        match (field_index, field_ty) {
-                            (Some(idx), Some(ty)) => (idx, ty),
-                            _ => {
-                                return Err(SemanticError::UndefinedSymbol {
-                                    symbol: format!("{}.{}", name, field_name.name),
-                                    location: source_location.clone(),
-                                })
-                            }
-                        }
-                    }
-                    _ => {
-                        return Err(SemanticError::TypeMismatch {
-                            expected: "struct type".to_string(),
-                            found: "non-struct type".to_string(),
-                            location: source_location.clone(),
-                        })
-                    }
+                Place {
+                    local: temp,
+                    projection: vec![],
                 }
             }
-            _ => {
-                return Err(SemanticError::TypeMismatch {
-                    expected: "named struct type".to_string(),
-                    found: instance_type.to_string(),
-                    location: source_location.clone(),
-                })
+        };
+
+        // Get the type of the instance
+        let instance_type = self.get_expression_type(instance)?;
+
+        // Unwrap pointer/reference types and add Deref projections
+        let mut current_type = &instance_type;
+        loop {
+            match current_type {
+                Type::Owned { base_type, .. } | Type::Pointer { target_type: base_type, .. } => {
+                    place.projection.push(PlaceElem::Deref);
+                    current_type = base_type;
+                }
+                _ => break,
             }
-        };
+        }
 
-        let field_place = Place {
-            local: instance_place.local,
-            projection: {
-                let mut proj = instance_place.projection.clone();
-                proj.push(PlaceElem::Field {
-                    field: field_idx,
-                    ty: field_type,
-                });
-                proj
-            },
-        };
+        // Resolve field index
+        let (field_idx, field_type) = self.resolve_field_index(&instance_type, &field_name.name)?;
 
-        Ok(Operand::Copy(field_place))
+        // Add field projection
+        place.projection.push(PlaceElem::Field {
+            field: field_idx,
+            ty: field_type,
+        });
+
+        Ok(Operand::Copy(place))
     }
 
     /// Lower enum variant construction with known type
@@ -3781,85 +3886,75 @@ impl LoweringContext {
         vec![]
     }
 
-    /// Get the type of an expression
+    /// Get type of an expression
     fn get_expression_type(&self, expr: &ast::Expression) -> Result<Type, SemanticError> {
-        // If we have a symbol table with type information, use it
-        if let Some(st) = &self.symbol_table {
-            // For now, we'll do basic type inference
-            match expr {
-                ast::Expression::IntegerLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Integer))
-                }
-                ast::Expression::FloatLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Float))
-                }
-                ast::Expression::BooleanLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Boolean))
-                }
-                ast::Expression::StringLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::String))
-                }
-                ast::Expression::CharacterLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Char))
-                }
-                ast::Expression::Variable { name, .. } => {
-                    // First check local var_types mapping
-                    if let Some(var_type) = self.var_types.get(&name.name) {
-                        Ok(var_type.clone())
-                    } else if let Some(symbol) = st.lookup_symbol(&name.name) {
-                        Ok(symbol.symbol_type.clone())
-                    } else {
-                        Ok(Type::primitive(ast::PrimitiveType::Integer)) // Default
+        match expr {
+            ast::Expression::Variable { name, .. } => {
+                if let Some(st) = &self.symbol_table {
+                    if let Some(symbol) = st.lookup_symbol(&name.name) {
+                        return Ok(symbol.symbol_type.clone());
                     }
                 }
-                ast::Expression::EnumVariant { enum_name, .. } => Ok(Type::Named {
-                    name: enum_name.name.clone(),
-                    module: self.current_module.clone(),
-                }),
-                ast::Expression::FunctionCall { call, .. } => {
-                    // Handle built-in functions
-                    if let ast::FunctionReference::Local { name } = &call.function_reference {
-                        match name.name.as_str() {
-                            "STRING_CONCAT" => Ok(Type::primitive(ast::PrimitiveType::String)),
-                            "TO_STRING" => Ok(Type::primitive(ast::PrimitiveType::String)),
-                            "int_to_string" => Ok(Type::primitive(ast::PrimitiveType::String)),
-                            _ => Ok(Type::primitive(ast::PrimitiveType::Integer)), // Default
+                // Fallback if no symbol table (should generally not happen in valid code)
+                // Or look up in local map if we track types there?
+                if let Some(&local_id) = self.var_map.get(&name.name) {
+                    if let Some(func) = &self.builder.current_function {
+                        if let Some(local) = func.locals.get(&local_id) {
+                            return Ok(local.ty.clone());
                         }
-                    } else {
-                        Ok(Type::primitive(ast::PrimitiveType::Integer))
                     }
                 }
-                // For other expressions, use a default
-                _ => Ok(Type::primitive(ast::PrimitiveType::String)), // Default to string for now
+                
+                Err(SemanticError::UndefinedSymbol {
+                    symbol: name.name.clone(),
+                    location: name.source_location.clone(),
+                })
             }
-        } else {
-            // Without symbol table, use basic inference
-            match expr {
-                ast::Expression::IntegerLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Integer))
-                }
-                ast::Expression::FloatLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Float))
-                }
-                ast::Expression::BooleanLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Boolean))
-                }
-                ast::Expression::StringLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::String))
-                }
-                ast::Expression::CharacterLiteral { .. } => {
-                    Ok(Type::primitive(ast::PrimitiveType::Char))
-                }
-                ast::Expression::Variable { name, .. } => {
-                    // Check local var_types mapping
-                    if let Some(var_type) = self.var_types.get(&name.name) {
-                        Ok(var_type.clone())
-                    } else {
-                        Ok(Type::primitive(ast::PrimitiveType::Integer)) // Default
-                    }
-                }
-                _ => Ok(Type::primitive(ast::PrimitiveType::Integer)), // Default
+            ast::Expression::FieldAccess {
+                instance,
+                field_name,
+                ..
+            } => {
+                let instance_type = self.get_expression_type(instance)?;
+                let (_, field_type) = self.resolve_field_index(&instance_type, &field_name.name)?;
+                Ok(field_type)
             }
+            ast::Expression::AddressOf {
+                operand,
+                mutability,
+                ..
+            } => {
+                let operand_type = self.get_expression_type(operand)?;
+                // Use Owned type with Borrowed/MutableBorrow ownership to match semantic analysis
+                if *mutability {
+                    Ok(Type::Owned {
+                        ownership: crate::types::OwnershipKind::MutableBorrow,
+                        base_type: Box::new(operand_type),
+                    })
+                } else {
+                    Ok(Type::Owned {
+                        ownership: crate::types::OwnershipKind::Borrowed,
+                        base_type: Box::new(operand_type),
+                    })
+                }
+            }
+            ast::Expression::Dereference { pointer, .. } => {
+                let pointer_type = self.get_expression_type(pointer)?;
+                match pointer_type {
+                    Type::Pointer { target_type, .. } | Type::Owned { base_type: target_type, .. } => Ok(*target_type),
+                    _ => Err(SemanticError::TypeMismatch {
+                        expected: "pointer type".to_string(),
+                        found: pointer_type.to_string(),
+                        location: SourceLocation::unknown(),
+                    }),
+                }
+            }
+            ast::Expression::IntegerLiteral { .. } => Ok(Type::primitive(PrimitiveType::Integer)),
+            ast::Expression::FloatLiteral { .. } => Ok(Type::primitive(PrimitiveType::Float)),
+            ast::Expression::BooleanLiteral { .. } => Ok(Type::primitive(PrimitiveType::Boolean)),
+            ast::Expression::StringLiteral { .. } => Ok(Type::primitive(PrimitiveType::String)),
+            // Add other cases as needed
+            _ => Ok(Type::primitive(PrimitiveType::Integer)) // Placeholder/Fallback
         }
     }
 
@@ -4215,54 +4310,75 @@ impl LoweringContext {
         Ok(())
     }
 
-    /// Lower address-of operation
+    /// Lower address-of operator
     fn lower_address_of(
         &mut self,
         operand: &ast::Expression,
+        mutability: bool,
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
-        // Get the place of the operand
-        let operand_op = self.lower_expression(operand)?;
-
-        // Convert operand to place
-        let place = match operand_op {
-            Operand::Copy(place) | Operand::Move(place) => place,
-            Operand::Constant(_) => {
-                return Err(SemanticError::InvalidOperation {
-                    operation: "address-of".to_string(),
-                    reason: "cannot take address of constant".to_string(),
-                    location: source_location.clone(),
-                });
-            }
+        // Check the type of the operand
+        let operand_type = self.get_expression_type(operand)?;
+        
+        // If it's a reference type (implicitly passed by pointer), &expr just returns the pointer
+        let is_reference_type = match &operand_type {
+            Type::Named { .. } | Type::Array { .. } | Type::Map { .. } | 
+            Type::Pointer { .. } | Type::Owned { .. } => true,
+            // Strings are primitives but might be treated as reference types depending on implementation.
+            // For now, assume Primitives are value types.
+            _ => false,
         };
 
-        // Get the type of the operand
-        let operand_type = self.get_expression_type(operand)?;
-        let ptr_type = Type::pointer(operand_type, false);
+        if is_reference_type {
+            // Just return the operand value (which is the pointer)
+            self.lower_expression(operand)
+        } else {
+            // Value type: take address
+            let operand_op = self.lower_expression(operand)?;
+            
+            let place = match operand_op {
+                Operand::Copy(p) | Operand::Move(p) => p,
+                Operand::Constant(c) => {
+                    // Cannot take address of constant directly, store in temp
+                    let temp = self.builder.new_local(c.ty.clone(), false);
+                    self.builder.push_statement(Statement::Assign {
+                        place: Place {
+                            local: temp,
+                            projection: vec![],
+                        },
+                        rvalue: Rvalue::Use(Operand::Constant(c)),
+                        source_info: SourceInfo {
+                            span: source_location.clone(),
+                            scope: 0,
+                        },
+                    });
+                    Place {
+                        local: temp,
+                        projection: vec![],
+                    }
+                }
+            };
 
-        // Create temporary for the address
-        let addr_local = self.builder.new_local(ptr_type, false);
+            // Create a temporary for the pointer
+            let temp = self.builder.new_local(Type::pointer(operand_type, mutability), false);
 
-        // Emit address-of operation
-        self.builder.push_statement(Statement::Assign {
-            place: Place {
-                local: addr_local,
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
+                    local: temp,
+                    projection: vec![],
+                },
+                rvalue: Rvalue::AddressOf(place),
+                source_info: SourceInfo {
+                    span: source_location.clone(),
+                    scope: 0,
+                },
+            });
+
+            Ok(Operand::Copy(Place {
+                local: temp,
                 projection: vec![],
-            },
-            rvalue: Rvalue::Ref {
-                place,
-                mutability: Mutability::Not,
-            },
-            source_info: SourceInfo {
-                span: source_location.clone(),
-                scope: 0,
-            },
-        });
-
-        Ok(Operand::Copy(Place {
-            local: addr_local,
-            projection: vec![],
-        }))
+            }))
+        }
     }
 
     /// Lower dereference operation
@@ -4396,6 +4512,8 @@ impl LoweringContext {
             projection: vec![],
         }))
     }
+
+
 
     /// Lower map literal
     fn lower_map_literal(

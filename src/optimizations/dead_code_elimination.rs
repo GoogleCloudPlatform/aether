@@ -147,7 +147,18 @@ impl DeadCodeEliminationPass {
                 .any(|operand| self.local_used_in_operand(operand, local)),
             Rvalue::Cast { operand, .. } => self.local_used_in_operand(operand, local),
             Rvalue::Ref { place, .. } => place.local == local,
-            Rvalue::Len(place) | Rvalue::Discriminant(place) => place.local == local,
+            Rvalue::AddressOf(place) => {
+                if place.local == local {
+                    return true;
+                }
+                place.projection.iter().any(|elem| match elem {
+                    crate::mir::PlaceElem::Index(idx) => *idx == local,
+                    _ => false,
+                })
+            }
+            Rvalue::Len(place) | Rvalue::Discriminant(place) => {
+                place.local == local
+            }
             Rvalue::Closure { captures, .. } => captures
                 .iter()
                 .any(|capture| self.local_used_in_operand(capture, local)),

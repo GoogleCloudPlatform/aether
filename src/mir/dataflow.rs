@@ -280,6 +280,15 @@ impl LivenessAnalysis {
             Rvalue::Ref { place, .. } => {
                 fact.insert(place.local);
             }
+            Rvalue::AddressOf(place) => {
+                fact.insert(place.local);
+                // Add uses from projection (e.g. index)
+                for elem in &place.projection {
+                    if let crate::mir::PlaceElem::Index(idx) = elem {
+                        fact.insert(*idx);
+                    }
+                }
+            }
             Rvalue::Len(place) | Rvalue::Discriminant(place) => {
                 fact.insert(place.local);
             }
