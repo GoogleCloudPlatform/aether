@@ -222,7 +222,7 @@ Implemented module parsing:
 
 ### Task 2.4: Implement Type Parsing
 - [x] **Write Tests**: Add tests for type specifiers
-  - Primitive types: `Int`, `Int64`, `Float`, `String`, `Bool`, `Void`, `SizeT`
+  - Primitive types: `Int`, `Int64`, `Float`, `String`, `Bool`, `Void`, `Array`, `Map`, `Pointer`, `MutPointer`, `SizeT`
   - Generic types: `Array<Int>`, `Map<String, Int>`, nested arrays
   - Ownership types: `^String`, `&Int`, `&mut Int`, `~Resource`
   - Pointer types: `Pointer<Int>`, `MutPointer<Void>`
@@ -508,6 +508,25 @@ Implemented function parsing:
 - [x] `04-functions/basic_functions` (returns 120, added Makefile)
 - [x] `03-types/primitives` (returns 42, added Makefile)
 - [x] `04-functions/parameters` (returns 42, added Makefile)
+- [x] **Collections/Arrays**: Verified (fixed runtime ABI and LLVM boolean logic).
+- [x] **Memory/Ownership**: Verified (`^T`, `&T`, auto-deref).
+- [x] **Memory/Pointers**: Verified (raw pointers, `AddressOf`).
+- [x] **Error Handling/Propagation**: Verified (`Result` enum, match).
+- [x] **FFI/C Functions**: Verified (string-to-pointer coercion).
+- [x] **01-basics/hello_world**: Verified
+- [x] **01-basics/module_system**: Verified
+- [x] **01-basics/simple_main**: Verified
+- [x] **02-variables/constants**: Verified
+- [x] **02-variables/let_bindings**: Verified
+- [x] **02-variables/mutability**: Verified
+- [x] **03-types/primitives**: Verified
+- [x] **04-functions/basic_functions**: Verified
+- [x] **04-functions/parameters**: Verified
+- [x] **05-operators/arithmetic**: Verified
+- [x] **06-control-flow/loops**: Verified
+- [x] **10-collections/maps**: Verified
+- [x] **13-strings/string_basics**: Verified
+- [x] **13-strings/string_operations**: Verified
 - [ ] **Iterate**: Go through each example folder in `examples/v2`.
 - [ ] **Verify**: Ensure it compiles and runs.
 - [ ] **Makefile**: Add standard Makefile.
@@ -582,6 +601,28 @@ Implemented function parsing:
 
 ---
 
+## Phase 7: Asynchronous I/O (New)
+
+### Task 7.1: Add `concurrent` Keyword
+- [x] **Lexer**: Add `concurrent` keyword to `src/lexer/v2.rs`.
+- [x] **Parser**: Update parser to recognize `concurrent` keyword and parse `concurrent { ... }` blocks.
+- [x] **AST**: Add `ConcurrentBlock` node to `src/ast/mod.rs`.
+
+### Task 7.2: Implement Semantic Analysis for Concurrency
+- [x] **Semantics**: Update `SemanticAnalyzer` to track "concurrent scope".
+- [x] **Type Checking**: Implement logic where functions inside `concurrent` block return `Future<T>` instead of `T`.
+- [x] **Resolution**: Implement logic to implicitly join/resolve futures at the end of the `concurrent` block.
+
+### Task 7.3: Integrate Async Runtime
+- [~] **Runtime**: Expose `AsyncRuntime` functions (`init`, `shutdown`, `spawn`, `wait`) from `runtime/src/lib.rs` as C-callable functions.
+- [ ] **LLVM Backend**: Declare `AsyncRuntime` C-callable functions in LLVM IR.
+- [ ] **LLVM Backend**: Generate code for `Statement::Concurrent` to call `AsyncRuntime::spawn` for each inner expression that returns a `Future`, and `AsyncRuntime::wait_for_task` at the block's end.
+
+### Task 7.4: Verify Async I/O
+- [ ] **Example**: Create and verify a new example `examples/v2/17-concurrency/async_io` demonstrating implicit await and explicit concurrency.
+
+---
+
 ## Summary
 
 | Phase | Tasks | Description |
@@ -592,7 +633,6 @@ Implemented function parsing:
 | 4 | 4.1 - 4.3 | Example Verification and Makefiles |
 | 5 | 5.1 - 5.3 | Test Suite Migration |
 | 6 | 6.1 - 6.3 | Cleanup and Documentation |
+| 7 | 7.1 - 7.4 | Asynchronous I/O Implementation |
 
-**Total Tasks:** 38
-
-```
+**Total Tasks:** 42

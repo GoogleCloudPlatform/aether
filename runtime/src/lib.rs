@@ -143,6 +143,7 @@ pub mod io;
 pub mod math;
 pub mod time;
 pub mod concurrency;
+pub mod async_runtime;
 pub mod ffi;
 pub mod ffi_structs;
 

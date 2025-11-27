@@ -562,14 +562,14 @@ mod tests {
             assert!(!ptr.is_null());
 
             // Write bytes at various offsets
-            aether_write_byte(ptr as isize, 0, 42);
-            aether_write_byte(ptr as isize, 10, 100);
-            aether_write_byte(ptr as isize, 63, 255);
+            aether_write_byte(ptr, 0, 42);
+            aether_write_byte(ptr, 10, 100);
+            aether_write_byte(ptr, 63, 255);
 
             // Read them back
-            assert_eq!(aether_read_byte(ptr as isize, 0), 42);
-            assert_eq!(aether_read_byte(ptr as isize, 10), 100);
-            assert_eq!(aether_read_byte(ptr as isize, 63), 255);
+            assert_eq!(aether_read_byte(ptr, 0), 42);
+            assert_eq!(aether_read_byte(ptr, 10), 100);
+            assert_eq!(aether_read_byte(ptr, 63), 255);
 
             aether_free(ptr_addr);
         }
@@ -583,14 +583,14 @@ mod tests {
             assert!(!ptr.is_null());
 
             // Write i32 values at various offsets
-            aether_write_i32(ptr as isize, 0, 12345);
-            aether_write_i32(ptr as isize, 4, -99999);
-            aether_write_i32(ptr as isize, 60, 2147483647); // Max i32
+            aether_write_i32(ptr, 0, 12345);
+            aether_write_i32(ptr, 4, -99999);
+            aether_write_i32(ptr, 60, 2147483647); // Max i32
 
             // Read them back
-            assert_eq!(aether_read_i32(ptr as isize, 0), 12345);
-            assert_eq!(aether_read_i32(ptr as isize, 4), -99999);
-            assert_eq!(aether_read_i32(ptr as isize, 60), 2147483647);
+            assert_eq!(aether_read_i32(ptr, 0), 12345);
+            assert_eq!(aether_read_i32(ptr, 4), -99999);
+            assert_eq!(aether_read_i32(ptr, 60), 2147483647);
 
             aether_free(ptr_addr);
         }
@@ -604,14 +604,14 @@ mod tests {
             assert!(!ptr.is_null());
 
             // Write i64 values at various offsets
-            aether_write_i64(ptr as isize, 0, 9223372036854775807); // Max i64
-            aether_write_i64(ptr as isize, 8, -1234567890123456);
-            aether_write_i64(ptr as isize, 56, 0);
+            aether_write_i64(ptr, 0, 9223372036854775807); // Max i64
+            aether_write_i64(ptr, 8, -1234567890123456);
+            aether_write_i64(ptr, 56, 0);
 
             // Read them back
-            assert_eq!(aether_read_i64(ptr as isize, 0), 9223372036854775807);
-            assert_eq!(aether_read_i64(ptr as isize, 8), -1234567890123456);
-            assert_eq!(aether_read_i64(ptr as isize, 56), 0);
+            assert_eq!(aether_read_i64(ptr, 0), 9223372036854775807);
+            assert_eq!(aether_read_i64(ptr, 8), -1234567890123456);
+            assert_eq!(aether_read_i64(ptr, 56), 0);
 
             aether_free(ptr_addr);
         }
@@ -631,20 +631,20 @@ mod tests {
             // Offset 16-23: partial_key (8 bytes)
             // Offset 24-27: keys (4 bytes)
 
-            aether_write_i32(ptr as isize, 0, 0); // node_type = NODE4
-            aether_write_i32(ptr as isize, 4, 2); // num_children = 2
-            aether_write_i64(ptr as isize, 8, 42); // version = 42
+            aether_write_i32(ptr, 0, 0); // node_type = NODE4
+            aether_write_i32(ptr, 4, 2); // num_children = 2
+            aether_write_i64(ptr, 8, 42); // version = 42
 
             // Write keys
-            aether_write_byte(ptr as isize, 24, b'a' as c_int);
-            aether_write_byte(ptr as isize, 25, b'z' as c_int);
+            aether_write_byte(ptr, 24, b'a' as c_int);
+            aether_write_byte(ptr, 25, b'z' as c_int);
 
             // Read back and verify
-            assert_eq!(aether_read_i32(ptr as isize, 0), 0);
-            assert_eq!(aether_read_i32(ptr as isize, 4), 2);
-            assert_eq!(aether_read_i64(ptr as isize, 8), 42);
-            assert_eq!(aether_read_byte(ptr as isize, 24), b'a' as c_int);
-            assert_eq!(aether_read_byte(ptr as isize, 25), b'z' as c_int);
+            assert_eq!(aether_read_i32(ptr, 0), 0);
+            assert_eq!(aether_read_i32(ptr, 4), 2);
+            assert_eq!(aether_read_i64(ptr, 8), 42);
+            assert_eq!(aether_read_byte(ptr, 24), b'a' as c_int);
+            assert_eq!(aether_read_byte(ptr, 25), b'z' as c_int);
 
             aether_free(ptr_addr);
         }
