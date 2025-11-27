@@ -138,3 +138,6 @@ hello_v2
 
 # Compiled example binaries
 examples/**/main
+
+# Main binary in root
+/main
