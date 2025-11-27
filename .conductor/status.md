@@ -21,14 +21,15 @@
 - **Phase 8.2: Compiler Analysis (Completed):**
     - Implemented Capture Analysis.
 - **Phase 8.3: LLVM Backend Implementation (Completed):**
-    - [x] Task 8.3.1: Context Struct Generation
-    - [x] Task 8.3.2: Function Outlining
-    - [x] Task 8.3.3: Spawn Generation
-    - [x] Task 8.3.4: Await Generation (Implicit await logic via `maybe_await_operand`)
+    - Implemented context struct generation, function outlining, spawn, and implicit await.
 - **Phase 8.4: Integration and Verification (Completed):**
     - Verified `async_io` example with true parallelism.
-    - Confirmed `main` runs concurrently with spawned tasks.
-    - Confirmed clean shutdown of runtime thread pool.
+
+## Phase 9: Ownership System Enforcement (Pending)
+
+- [ ] **Task 9.1: Ownership Analysis Pass**: Implement a borrow checker pass.
+- [ ] **Task 9.2: Lifetime Annotations**: Update parser to support lifetime annotations.
+- [ ] **Task 9.3: Verification**: Create test cases for ownership violations.
 
 ## Completed Phases
 
