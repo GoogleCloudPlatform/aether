@@ -228,6 +228,7 @@ pub enum Terminator {
     Concurrent {
         block_id: BasicBlockId,
         target: BasicBlockId,
+        captures: Vec<Operand>,
     },
 
     /// Assert (runtime check)

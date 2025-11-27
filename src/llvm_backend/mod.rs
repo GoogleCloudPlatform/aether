@@ -879,25 +879,58 @@ impl<'ctx> LLVMBackend<'ctx> {
                     }
                 }
 
-                mir::Terminator::Concurrent { block_id, target } => {
-                    // TODO: Implement true concurrent execution by outlining the block
-                    // For now, we execute synchronously to verify the control flow
-                    eprintln!("WARNING: Executing concurrent block synchronously (outlining not implemented)");
+                mir::Terminator::Concurrent { block_id, target, captures } => {
+                    // 1. Outline the concurrent block
+                    let task_func = self.outline_concurrent_block(*block_id, captures, function, *target)?;
                     
-                    let concurrent_block = llvm_blocks[block_id];
-                    builder.build_unconditional_branch(concurrent_block).map_err(|e| SemanticError::CodeGenError {
+                    // 2. Create context struct
+                    let context_struct_type = self.get_capture_struct_type(captures, function)?;
+                    let context_alloca = builder.build_alloca(context_struct_type, "task_context")
+                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                        
+                    // 3. Populate context struct
+                    for (i, capture) in captures.iter().enumerate() {
+                        let val = self.generate_operand(capture, &local_allocas, &builder, function)?;
+                        
+                        let field_ptr = unsafe {
+                            builder.build_struct_gep(context_struct_type, context_alloca, i as u32, &format!("capture_init_{}", i))
+                                .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
+                        };
+                        
+                        builder.build_store(field_ptr, val).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                    }
+                    
+                    // 4. Call aether_spawn(task_func, context)
+                    let i8_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
+                    
+                    // Cast function pointer to i8*
+                    let func_ptr_cast = builder.build_pointer_cast(
+                        task_func.as_global_value().as_pointer_value(),
+                        i8_ptr_type,
+                        "task_func_ptr"
+                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                    
+                    // Cast context pointer to i8*
+                    let context_ptr_cast = builder.build_pointer_cast(
+                        context_alloca,
+                        i8_ptr_type,
+                        "context_ptr"
+                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                    
+                    // Call spawn
+                    let spawn_fn = self.module.get_function("aether_async_spawn")
+                        .ok_or_else(|| SemanticError::CodeGenError { message: "aether_async_spawn not found".to_string() })?;
+                        
+                    let _handle = builder.build_call(spawn_fn, &[func_ptr_cast.into(), context_ptr_cast.into()], "spawn_call")
+                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                        
+                    // 5. Continue to target block
+                    let target_block = llvm_blocks[target];
+                    builder.build_unconditional_branch(target_block).map_err(|e| SemanticError::CodeGenError {
                         message: e.to_string(),
                     })?;
-                    
-                    // Note: The concurrent block currently ends with Return, which terminates the whole function.
-                    // This is wrong for a synchronous simulation if we want to continue to 'target'.
-                    // But correct for a spawned task (it returns from the task function).
-                    // Since we are simulating sync in the MAIN function, Return exits main.
-                    // This is broken.
-                    
-                    // However, since we can't implement outlining here without changing MIR lowering significantly,
-                    // we will accept this limitation for now and mark the task as partially complete / blocked on outlining.
                 }
+
             }
         }
 
@@ -3532,6 +3565,121 @@ impl<'ctx> LLVMBackend<'ctx> {
         function_declarations.insert("aether_async_wait".to_string(), async_wait_fn);
 
         Ok(())
+    }
+
+    /// Generate a struct type for captured variables
+    fn get_capture_struct_type(
+        &self,
+        captures: &[mir::Operand],
+        function: &mir::Function,
+    ) -> Result<inkwell::types::StructType<'ctx>, SemanticError> {
+        let mut field_types = Vec::new();
+        
+        for capture in captures {
+            let capture_type = match capture {
+                mir::Operand::Copy(place) | mir::Operand::Move(place) => {
+                    self.get_basic_type_from_local(place.local, function)?
+                }
+                mir::Operand::Constant(constant) => {
+                    self.get_basic_type(&constant.ty)
+                }
+            };
+            field_types.push(capture_type);
+        }
+        
+        Ok(self.context.struct_type(&field_types, false))
+    }
+
+    /// Outline a concurrent block into a separate function
+    fn outline_concurrent_block(
+        &mut self,
+        block_id: mir::BasicBlockId,
+        captures: &[mir::Operand],
+        function: &mir::Function,
+        _target_block: mir::BasicBlockId,
+    ) -> Result<FunctionValue<'ctx>, SemanticError> {
+        // 1. Create context struct type
+        let context_struct_type = self.get_capture_struct_type(captures, function)?;
+        
+        // 2. Create the new function signature: void task_func(void* context)
+        let void_type = self.context.void_type();
+        let i8_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
+        let fn_type = void_type.fn_type(&[i8_ptr_type.into()], false);
+        
+        let task_name = format!("{}_concurrent_{}", function.name, block_id);
+        let task_func = self.module.add_function(&task_name, fn_type, None);
+        
+        // 3. Generate function body
+        let basic_block = self.context.append_basic_block(task_func, "entry");
+        let builder = self.context.create_builder();
+        builder.position_at_end(basic_block);
+        
+        // Unpack context
+        let context_arg = task_func.get_first_param().unwrap().into_pointer_value();
+        let context_ptr = builder.build_pointer_cast(
+            context_arg,
+            context_struct_type.ptr_type(AddressSpace::default()),
+            "context_typed"
+        ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+        
+        // Create local allocas for captured variables within the new function
+        let mut local_allocas = HashMap::new();
+        
+        for (i, capture) in captures.iter().enumerate() {
+            if let mir::Operand::Copy(place) | mir::Operand::Move(place) = capture {
+                // Get field pointer
+                let field_ptr = unsafe {
+                    builder.build_struct_gep(context_struct_type, context_ptr, i as u32, &format!("capture_{}", i))
+                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
+                };
+                
+                // Load value
+                let field_val = builder.build_load(
+                    context_struct_type.get_field_types()[i],
+                    field_ptr,
+                    &format!("capture_val_{}", i)
+                ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                
+                // Create alloca in new function for this variable
+                let alloca = builder.build_alloca(
+                    context_struct_type.get_field_types()[i],
+                    &format!("local_{}", place.local)
+                ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                
+                builder.build_store(alloca, field_val).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                
+                local_allocas.insert(place.local, alloca);
+            }
+        }
+        
+        // Generate block content
+        if let Some(mir_block) = function.basic_blocks.get(&block_id) {
+             for stmt in &mir_block.statements {
+                match stmt {
+                    mir::Statement::Assign { place, rvalue, .. } => {
+                        // Allocate on demand if not exists
+                        if !local_allocas.contains_key(&place.local) {
+                             let local_ty = self.get_basic_type_from_local(place.local, function)?;
+                             let alloca = builder.build_alloca(local_ty, &format!("local_{}", place.local))
+                                .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                             local_allocas.insert(place.local, alloca);
+                        }
+                        
+                        let result = self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
+                        
+                        if let Some(alloca) = local_allocas.get(&place.local) {
+                             builder.build_store(*alloca, result).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            
+            // For concurrent tasks, we implicitly return void at the end
+            builder.build_return(None).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+        }
+        
+        Ok(task_func)
     }
 }
 

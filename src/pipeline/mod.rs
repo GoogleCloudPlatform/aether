@@ -318,7 +318,7 @@ impl CompilationPipeline {
         }
         let semantic_start = std::time::Instant::now();
 
-        let symbol_table = {
+        let (symbol_table, captures) = {
             let _timer = if self.options.enable_profiling {
                 Some(profiler.start_phase("semantic_analysis"))
             } else {
@@ -331,8 +331,9 @@ impl CompilationPipeline {
             let analysis_stats = analyzer.get_statistics().clone();
             stats.functions_compiled = analysis_stats.functions_analyzed;
 
-            // Extract symbol table for MIR lowering
-            analyzer.get_symbol_table()
+            // Extract symbol table and captures for MIR lowering
+            let captures = analyzer.captures.clone();
+            (analyzer.get_symbol_table(), captures)
         };
 
         stats.phase_times.insert(
@@ -393,7 +394,7 @@ impl CompilationPipeline {
                 }
             }
 
-            mir::lowering::lower_ast_to_mir_with_symbols(&program, symbol_table)?
+            mir::lowering::lower_ast_to_mir_with_symbols_and_captures(&program, symbol_table, captures)?
         };
 
         stats.phase_times.insert(

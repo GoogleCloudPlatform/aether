@@ -63,6 +63,9 @@ pub struct LoweringContext {
 
     /// Counter for generating unique lambda names
     lambda_counter: usize,
+
+    /// Map of concurrent block locations to captured variable names
+    concurrent_captures: Option<HashMap<SourceLocation, std::collections::HashSet<String>>>,
 }
 
 impl LoweringContext {
@@ -82,6 +85,7 @@ impl LoweringContext {
             loop_stack: Vec::new(),
             symbol_table: None,
             lambda_counter: 0,
+            concurrent_captures: None,
         }
     }
 
@@ -91,6 +95,12 @@ impl LoweringContext {
         ctx.symbol_table = Some(symbol_table);
         ctx
     }
+
+    /// Set the concurrent captures map
+    pub fn set_captures(&mut self, captures: HashMap<SourceLocation, std::collections::HashSet<String>>) {
+        self.concurrent_captures = Some(captures);
+    }
+
 
     /// Lower an AST program to MIR
     pub fn lower_program(&mut self, ast_program: &ast::Program) -> Result<Program, SemanticError> {
@@ -407,7 +417,31 @@ impl LoweringContext {
                 }
                 self.builder.set_terminator(Terminator::Return);
             }
-            ast::Statement::Concurrent { block, .. } => {
+            ast::Statement::Concurrent { block, source_location } => {
+                // Look up captures for this block
+                let captures = if let Some(captures_map) = &self.concurrent_captures {
+                    if let Some(captured_names) = captures_map.get(source_location) {
+                        let mut caps = Vec::new();
+                        // Sort names to ensure deterministic order
+                        let mut sorted_names: Vec<_> = captured_names.iter().collect();
+                        sorted_names.sort();
+                        
+                        for name in sorted_names {
+                            if let Some(&local_id) = self.var_map.get(name) {
+                                caps.push(Operand::Copy(Place {
+                                    local: local_id,
+                                    projection: vec![],
+                                }));
+                            }
+                        }
+                        caps
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                };
+
                 // Create a new block for the concurrent execution
                 let concurrent_entry = self.builder.new_block();
                 let after_concurrent = self.builder.new_block();
@@ -416,6 +450,7 @@ impl LoweringContext {
                 self.builder.set_terminator(Terminator::Concurrent {
                     block_id: concurrent_entry,
                     target: after_concurrent,
+                    captures,
                 });
                 
                 // Lower the concurrent block
@@ -4696,6 +4731,17 @@ pub fn lower_ast_to_mir_with_symbols(
     symbol_table: SymbolTable,
 ) -> Result<Program, SemanticError> {
     let mut context = LoweringContext::with_symbol_table(symbol_table);
+    context.lower_program(ast_program)
+}
+
+/// Lower an AST program to MIR with symbol table and capture information
+pub fn lower_ast_to_mir_with_symbols_and_captures(
+    ast_program: &ast::Program,
+    symbol_table: SymbolTable,
+    captures: HashMap<SourceLocation, std::collections::HashSet<String>>,
+) -> Result<Program, SemanticError> {
+    let mut context = LoweringContext::with_symbol_table(symbol_table);
+    context.set_captures(captures);
     context.lower_program(ast_program)
 }
 
