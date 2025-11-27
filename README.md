@@ -2,7 +2,7 @@
 
 **A modern systems programming language with LLM-first design principles**
 
-Aether combines memory safety through an ownership system with S-expression syntax for enhanced metaprogramming capabilities. Designed for high-performance applications while maintaining safety, expressiveness, and AI-friendly code generation.
+Aether combines memory safety through an ownership system with a clean, structured syntax optimized for LLM generation and human readability. Designed for high-performance applications while maintaining safety, expressiveness, and AI-friendly code generation.
 
 **NOTE**
 This project is a demonstration of vibe coding intended to provide a trustworthy and verifiable example that developers and researchers can use. It is not intended
@@ -31,23 +31,23 @@ cargo build --release
 ### Hello World
 
 ```aether
-(DEFINE_MODULE
-  (NAME 'hello_world')
-  (INTENT "Simple greeting program demonstrating Aether syntax")
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME 'main')
-      (RETURNS INTEGER)
-      (BODY
-        (EXPRESSION_STATEMENT
-          (CALL_FUNCTION 'printf' "Hello, Aether!\n"))
-        (RETURN_VALUE 0)))))
+module HelloWorld {
+    /// Simple greeting program demonstrating Aether syntax
+
+    @extern(library: "libc")
+    func puts(s: String) -> Int;
+
+    func main() -> Int {
+        puts("Hello, Aether!");
+        return 0;
+    }
+}
 ```
 
 Compile and run:
 
 ```bash
-./target/release/aether compile examples/hello_world.aether
+./target/release/aether compile examples/v2/01-basics/hello_world/main.aether
 ./hello_world
 ```
 
@@ -58,7 +58,7 @@ Compile and run:
 - **⚡ Performance**: Zero-cost abstractions with LLVM backend
 - **🌐 Web Ready**: Built-in HTTP server capabilities and FFI networking
 - **🔒 Verification**: Contract-based programming with preconditions and postconditions
-- **📝 S-Expression Syntax**: Consistent, parseable structure for metaprogramming
+- **📝 Clean Syntax**: Modern, C-like syntax with strict rules for reliability
 
 ## 📚 Documentation
 
