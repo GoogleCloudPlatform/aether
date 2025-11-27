@@ -1113,4 +1113,59 @@ mod tests {
             string_free(result);
         }
     }
+    
+    #[test]
+    fn test_async_runtime_ffi() {
+        use std::ffi::c_void;
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+        
+        // Initialize runtime
+        crate::async_runtime::aether_async_init();
+        
+        // Define a task function that mocks an Aether function
+        extern "C" fn mock_task(ctx: *mut c_void) -> *mut c_void {
+            unsafe {
+                // Context is a pointer to an integer
+                let val_ptr = ctx as *mut i32;
+                let val = *val_ptr;
+                
+                // Sleep to simulate work
+                std::thread::sleep(Duration::from_millis(10));
+                
+                // Return result (val * 2)
+                let result = Box::new(val * 2);
+                Box::into_raw(result) as *mut c_void
+            }
+        }
+        
+        // Define cleanup function
+        extern "C" fn mock_cleanup(ctx: *mut c_void) {
+            unsafe {
+                let _ = Box::from_raw(ctx as *mut i32);
+            }
+        }
+        
+        unsafe {
+            // Create context
+            let context = Box::new(21);
+            let ctx_ptr = Box::into_raw(context) as *mut c_void;
+            
+            // Spawn task
+            let future = crate::async_runtime::aether_spawn(mock_task, ctx_ptr, Some(mock_cleanup));
+            
+            // Wait for result
+            let result_ptr = crate::async_runtime::aether_await(future);
+            
+            // Verify result
+            let result = *(result_ptr as *mut i32);
+            assert_eq!(result, 42);
+            
+            // Cleanup result
+            let _ = Box::from_raw(result_ptr as *mut i32);
+            
+            // Release future
+            crate::async_runtime::aether_future_release(future);
+        }
+    }
 }
