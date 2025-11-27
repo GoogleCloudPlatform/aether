@@ -173,7 +173,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                         }
                         crate::types::TypeDefinition::Enum { variants, .. } => {
                             // Check if any variant has associated data
-                            let has_data = variants.iter().any(|v| v.associated_type.is_some());
+                            let has_data = variants.iter().any(|v| !v.associated_types.is_empty());
 
                             if has_data {
                                 // Enums with data are represented as pointers to tagged unions
@@ -317,7 +317,9 @@ impl<'ctx> LLVMBackend<'ctx> {
                     if field_index == 0 {
                         return 0; // Discriminant
                     } else {
-                        return 4; // Data field is after 4-byte discriminant
+                        // Hack: Assume 4-byte fields for enum data for now (matches Int/i32)
+                        // This allows Move(Int, Int) to work: Field 1 at 4, Field 2 at 8
+                        return 4 + (field_index as u64 - 1) * 4;
                     }
                 }
                 _ => {}
@@ -2089,14 +2091,28 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 }
                             })?;
 
-                            // Store the first operand (assumes single associated value)
-                            if let Some(operand) = operands.first() {
+                            // Store operands sequentially
+                            for (i, operand) in operands.iter().enumerate() {
                                 let value = self.generate_operand(
                                     operand,
                                     local_allocas,
                                     builder,
                                     function,
                                 )?;
+
+                                // Calculate offset: i * 4 (assuming 4 bytes per field)
+                                let offset = (i as u64) * 4;
+                                
+                                // Calculate pointer to this field
+                                let indices = vec![self.context.i32_type().const_int(offset, false)];
+                                let field_ptr = unsafe {
+                                    builder.build_gep(
+                                        self.context.i8_type(),
+                                        data_ptr,
+                                        &indices,
+                                        &format!("{}_field_{}_ptr", variant_name, i),
+                                    )
+                                }.map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
 
                                 // Cast data pointer to appropriate type
                                 let value_type_ptr = match value {
@@ -2116,9 +2132,9 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                                 let typed_data_ptr = builder
                                     .build_pointer_cast(
-                                        data_ptr,
+                                        field_ptr,
                                         value_type_ptr,
-                                        &format!("{}_data_typed_ptr", variant_name),
+                                        &format!("{}_data_typed_ptr_{}", variant_name, i),
                                     )
                                     .map_err(|e| SemanticError::CodeGenError {
                                         message: e.to_string(),
@@ -2136,7 +2152,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                         // If so, the enum type is a pointer type and we must return a pointer
                         let enum_has_data = if let Some(enum_def) = self.type_definitions.get(enum_name) {
                             if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
-                                variants.iter().any(|v| v.associated_type.is_some())
+                                variants.iter().any(|v| !v.associated_types.is_empty())
                             } else {
                                 false
                             }

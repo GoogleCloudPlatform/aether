@@ -463,7 +463,7 @@ pub struct TypeChecker {
 #[derive(Debug, Clone)]
 pub struct EnumVariantInfo {
     pub name: String,
-    pub associated_type: Option<Type>,
+    pub associated_types: Vec<Type>,
     pub discriminant: usize, // Index of the variant in the enum definition
 }
 

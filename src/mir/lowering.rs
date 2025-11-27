@@ -716,7 +716,7 @@ impl LoweringContext {
             // Check if this enum has associated data
             if let Some(enum_def) = self.program.type_definitions.get(&enum_ident.name) {
                 if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
-                    let has_data = variants.iter().any(|v| v.associated_type.is_some());
+                    let has_data = variants.iter().any(|v| !v.associated_types.is_empty());
                     if has_data {
                         // For enums with data, extract the discriminant from the pointer
                         let disc_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
@@ -764,8 +764,8 @@ impl LoweringContext {
             self.builder.switch_to_block(arm_bb);
 
             // Handle pattern bindings before lowering the body
-            if let ast::Pattern::EnumVariant { binding, .. } = &arm.pattern {
-                if binding.is_some() {
+            if let ast::Pattern::EnumVariant { bindings, .. } = &arm.pattern {
+                if !bindings.is_empty() {
                     // Get the discriminant value for this arm
                     let variant_idx = if i < switch_values_copy.len() {
                         switch_values_copy[i]
@@ -1503,9 +1503,9 @@ impl LoweringContext {
             ast::Expression::EnumVariant {
                 enum_name,
                 variant_name,
-                value,
+                values,
                 source_location,
-            } => self.lower_enum_variant(enum_name, variant_name, value, source_location),
+            } => self.lower_enum_variant(enum_name, variant_name, values, source_location),
 
             ast::Expression::Match {
                 value,
@@ -3015,15 +3015,14 @@ impl LoweringContext {
         &mut self,
         enum_type_name: &str,
         variant_name: &ast::Identifier,
-        value: &Option<Box<ast::Expression>>,
+        values: &[ast::Expression],
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
-        // Lower the associated value if present
-        let operands = if let Some(value_expr) = value {
-            vec![self.lower_expression(value_expr)?]
-        } else {
-            vec![]
-        };
+        // Lower the associated values
+        let mut operands = Vec::new();
+        for val in values {
+            operands.push(self.lower_expression(val)?);
+        }
 
         // Create the enum variant as an aggregate
         let result_local = self.builder.new_local(
@@ -3060,7 +3059,7 @@ impl LoweringContext {
         &mut self,
         enum_name: &ast::Identifier,
         variant_name: &ast::Identifier,
-        value: &Option<Box<ast::Expression>>,
+        values: &[ast::Expression],
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
         // Resolve the enum type properly
@@ -3098,7 +3097,7 @@ impl LoweringContext {
         };
 
         // Use the helper function
-        self.lower_enum_variant_with_type(&enum_type_name, variant_name, value, source_location)
+        self.lower_enum_variant_with_type(&enum_type_name, variant_name, values, source_location)
     }
 
     /// Lower match expression
@@ -3304,7 +3303,7 @@ impl LoweringContext {
             ast::Pattern::EnumVariant {
                 enum_name,
                 variant_name,
-                binding,
+                bindings,
                 nested_pattern,
                 source_location: _,
             } => {
@@ -3340,7 +3339,7 @@ impl LoweringContext {
                     match nested_pat.as_ref() {
                         ast::Pattern::EnumVariant {
                             variant_name: inner_variant,
-                            binding: inner_binding,
+                            bindings: inner_bindings,
                             ..
                         } => {
                             // Get the discriminant of the inner enum
@@ -3360,9 +3359,9 @@ impl LoweringContext {
                                 },
                             });
 
-                            // For now, we'll just handle the binding if it exists
+                            // For now, we'll just handle the binding if it exists (first one)
                             // Full nested matching would require generating additional switch statements
-                            if let Some(inner_bind) = inner_binding {
+                            if let Some(inner_bind) = inner_bindings.first() {
                                 // Extract the data from the inner variant
                                 let inner_data_place = Place {
                                     local: data_place.local,
@@ -3415,20 +3414,11 @@ impl LoweringContext {
                     }
                 }
 
-                // If there's a binding (and no nested pattern), extract the enum variant's associated data
-                if let Some(binding_name) = binding {
-                    if nested_pattern.is_none() {
-                        // Get the type of the associated data from the enum definition
-                        let binding_type = self.get_enum_variant_associated_type(enum_name, variant_name)
-                            .unwrap_or_else(|| {
-                                eprintln!(
-                                    "MIR: Could not find associated type for {:?}::{}",
-                                    enum_name.as_ref().map(|e| &e.name),
-                                    variant_name.name
-                                );
-                                Type::primitive(ast::PrimitiveType::Integer) // Default to Int
-                            });
-
+                // If there are bindings (without nested pattern), extract the enum variant's associated data
+                if !bindings.is_empty() && nested_pattern.is_none() {
+                    let associated_types = self.get_enum_variant_associated_types(enum_name, variant_name);
+                    
+                    for (i, (binding_name, binding_type)) in bindings.iter().zip(associated_types.iter()).enumerate() {
                         // Create a local for the binding
                         let binding_local = self.builder.new_local(binding_type.clone(), false);
 
@@ -3438,27 +3428,17 @@ impl LoweringContext {
                         self.var_types
                             .insert(binding_name.name.clone(), binding_type.clone());
 
-                        // Generate code to extract the associated data
-                        // The enum layout is: [discriminant: i32][data: variant data]
-                        // We need to offset by the discriminant size (4 bytes) to get to the data
-
-                        // For now, we'll use a simplified approach - cast the data area to the binding type
-                        // In a real implementation, we'd need to properly handle the enum variant's data layout
-
                         // Create a projection to access the data field
+                        // We use Field indices 1, 2, 3... mapping to data offsets
                         let data_place = Place {
                             local: value_place.local,
                             projection: vec![PlaceElem::Field {
-                                field: 1, // Field 1 is the data area (field 0 is discriminant)
-                                ty: binding_type,
+                                field: (i + 1) as u32, 
+                                ty: binding_type.clone(),
                             }],
                         };
 
                         // Copy the data to the binding local
-                        eprintln!(
-                            "MIR: Creating binding {} with type {:?} as local {}",
-                            binding_name.name, &data_place.projection[0], binding_local
-                        );
                         self.builder.push_statement(Statement::Assign {
                             place: Place {
                                 local: binding_local,
@@ -3616,7 +3596,9 @@ impl LoweringContext {
                 if let TypeDefinition::Enum { variants, .. } = type_def {
                     for variant in variants {
                         if variant.name == variant_name.name {
-                            return variant.associated_type.clone();
+                            // For now, return the first associated type or error if multiple/none
+                            // This is a temporary fix until we support tuples properly
+                            return variant.associated_types.first().cloned();
                         }
                     }
                 }
@@ -3638,7 +3620,8 @@ impl LoweringContext {
                 if let TypeDefinition::Enum { variants, .. } = type_def {
                     for variant in variants {
                         if variant.name == variant_name.name {
-                            return variant.associated_type.clone();
+                            // Return first associated type
+                            return variant.associated_types.first().cloned();
                         }
                     }
                 }
@@ -3647,6 +3630,41 @@ impl LoweringContext {
 
         // Fallback: search all enums for this variant (less precise)
         self.get_enum_variant_type(variant_name)
+    }
+
+    /// Get the associated types for a specific enum variant given the enum name
+    fn get_enum_variant_associated_types(
+        &self,
+        enum_name: &Option<ast::Identifier>,
+        variant_name: &ast::Identifier,
+    ) -> Vec<Type> {
+        // First try to look up by enum name if provided
+        if let Some(enum_ident) = enum_name {
+            // Check type_definitions from program (copied from symbol table)
+            if let Some(type_def) = self.program.type_definitions.get(&enum_ident.name) {
+                if let TypeDefinition::Enum { variants, .. } = type_def {
+                    for variant in variants {
+                        if variant.name == variant_name.name {
+                            return variant.associated_types.clone();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: search all enums for this variant (less precise)
+        if let Some(st) = &self.symbol_table {
+            for (_, type_def) in st.get_type_definitions() {
+                if let TypeDefinition::Enum { variants, .. } = type_def {
+                    for variant in variants {
+                        if variant.name == variant_name.name {
+                            return variant.associated_types.clone();
+                        }
+                    }
+                }
+            }
+        }
+        vec![]
     }
 
     /// Get the type of an expression

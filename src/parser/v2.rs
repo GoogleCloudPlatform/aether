@@ -1395,29 +1395,45 @@ impl Parser {
     }
 
     /// Parse an enum variant
-    /// Grammar: "case" IDENTIFIER ["(" type ")"] ";"
+    /// Grammar: ["case"] IDENTIFIER ["(" type ["," type]* ")"] [";" | ","]
     fn parse_enum_variant(&mut self) -> Result<EnumVariant, ParserError> {
         let start_location = self.current_location();
 
-        self.expect_keyword(Keyword::Case, "expected 'case'")?;
+        // "case" keyword is optional in comma-separated lists
+        if self.check_keyword(Keyword::Case) {
+            self.advance();
+        }
 
         let name = self.parse_identifier()?;
 
-        // Parse optional associated type
-        let associated_type = if self.check(&TokenType::LeftParen) {
+        // Parse optional associated types
+        let associated_types = if self.check(&TokenType::LeftParen) {
             self.advance();
-            let assoc_type = self.parse_type()?;
-            self.expect(&TokenType::RightParen, "expected ')' after associated type")?;
-            Some(Box::new(assoc_type))
+            let mut types = Vec::new();
+            loop {
+                types.push(self.parse_type()?);
+                if self.check(&TokenType::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            self.expect(&TokenType::RightParen, "expected ')' after associated types")?;
+            types
         } else {
-            None
+            Vec::new()
         };
 
-        self.expect(&TokenType::Semicolon, "expected ';' after enum variant")?;
+        // Consume delimiter if present (comma or semicolon)
+        if self.check(&TokenType::Semicolon) {
+            self.advance();
+        } else if self.check(&TokenType::Comma) {
+            self.advance();
+        }
 
         Ok(EnumVariant {
             name,
-            associated_type,
+            associated_types,
             source_location: start_location,
         })
     }
@@ -2763,13 +2779,23 @@ impl Parser {
         };
 
         // Check for associated value: Variant(value)
-        let value = if self.check(&TokenType::LeftParen) {
+        let values = if self.check(&TokenType::LeftParen) {
             self.advance(); // consume '('
-            let expr = self.parse_expression()?;
+            let mut exprs = Vec::new();
+            if !self.check(&TokenType::RightParen) {
+                loop {
+                    exprs.push(self.parse_expression()?);
+                    if self.check(&TokenType::Comma) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+            }
             self.expect(&TokenType::RightParen, "expected ')'")?;
-            Some(Box::new(expr))
+            exprs
         } else {
-            None
+            Vec::new()
         };
 
         Ok(Expression::EnumVariant {
@@ -2778,7 +2804,7 @@ impl Parser {
                 source_location: start_location.clone(),
             },
             variant_name,
-            value,
+            values,
             source_location: start_location,
         })
     }
@@ -3042,26 +3068,37 @@ impl Parser {
                 let variant_name = self.parse_identifier()?;
 
                 // Check for binding: EnumName::Variant(x) or EnumName::Variant(_)
-                let binding = if self.check(&TokenType::LeftParen) {
+                let bindings = if self.check(&TokenType::LeftParen) {
                     self.advance(); // consume '('
-                    let b = if self.check(&TokenType::Underscore) {
-                        self.advance();
-                        None // _ means discard
-                    } else if !self.check(&TokenType::RightParen) {
-                        Some(self.parse_identifier()?)
-                    } else {
-                        None
-                    };
+                    let mut bindings_vec = Vec::new();
+                    
+                    if !self.check(&TokenType::RightParen) {
+                        loop {
+                            if self.check(&TokenType::Underscore) {
+                                self.advance();
+                                // Represent wildcard binding as "_"
+                                bindings_vec.push(Identifier::new("_".to_string(), self.current_location()));
+                            } else {
+                                bindings_vec.push(self.parse_identifier()?);
+                            }
+                            
+                            if self.check(&TokenType::Comma) {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
                     self.expect(&TokenType::RightParen, "expected ')'")?;
-                    b
+                    bindings_vec
                 } else {
-                    None
+                    Vec::new()
                 };
 
                 return Ok(Pattern::EnumVariant {
                     enum_name: Some(Identifier::new(name, start_location.clone())),
                     variant_name,
-                    binding,
+                    bindings,
                     nested_pattern: None,
                     source_location: start_location,
                 });
@@ -3111,10 +3148,19 @@ impl Parser {
                 // Enum variant with parenthesized binding: Some(x)
                 self.advance(); // consume '('
 
-                let binding = if !self.check(&TokenType::RightParen) {
-                    Some(self.parse_identifier()?)
+                let bindings = if !self.check(&TokenType::RightParen) {
+                    let mut bindings_vec = Vec::new();
+                    loop {
+                        bindings_vec.push(self.parse_identifier()?);
+                        if self.check(&TokenType::Comma) {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    bindings_vec
                 } else {
-                    None
+                    Vec::new()
                 };
 
                 self.expect(&TokenType::RightParen, "expected ')'")?;
@@ -3122,18 +3168,18 @@ impl Parser {
                 return Ok(Pattern::EnumVariant {
                     enum_name: None,
                     variant_name: Identifier::new(name, start_location.clone()),
-                    binding,
+                    bindings,
                     nested_pattern: None,
                     source_location: start_location,
                 });
             } else if let TokenType::Identifier(_) = &self.peek().token_type {
                 // Enum variant with space binding: Some x
-                let binding = Some(self.parse_identifier()?);
+                let binding = self.parse_identifier()?;
 
                 return Ok(Pattern::EnumVariant {
                     enum_name: None,
                     variant_name: Identifier::new(name, start_location.clone()),
-                    binding,
+                    bindings: vec![binding],
                     nested_pattern: None,
                     source_location: start_location,
                 });

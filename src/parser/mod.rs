@@ -1479,9 +1479,13 @@ impl Parser {
                                 }
 
                                 variants.push(EnumVariant {
-                                    name: variant_name,
-                                    associated_type,
-                                    source_location: field_location.clone(),
+                                    name: variant_name.clone(),
+                                    associated_types: if let Some(ty) = associated_type {
+                                        vec![*ty]
+                                    } else {
+                                        vec![]
+                                    },
+                                    source_location: variant_name.source_location.clone(),
                                 });
 
                                 self.consume_right_paren()?; // Close variant
@@ -2890,14 +2894,14 @@ impl Parser {
                     self.advance(); // consume variant name
 
                     // Check if there's an associated value
-                    let value = if let Some(token) = self.current_token() {
+                    let values = if let Some(token) = self.current_token() {
                         if !matches!(token.token_type, TokenType::RightParen) {
-                            Some(Box::new(self.parse_expression()?))
+                            vec![self.parse_expression()?]
                         } else {
-                            None
+                            vec![]
                         }
                     } else {
-                        None
+                        vec![]
                     };
 
                     self.consume_right_paren()?;
@@ -2905,7 +2909,7 @@ impl Parser {
                     Ok(Expression::EnumVariant {
                         enum_name: Identifier::new("".to_string(), start_location.clone()), // Will be resolved during type checking
                         variant_name,
-                        value,
+                        values,
                         source_location: start_location,
                     })
                 }
@@ -4070,11 +4074,12 @@ impl Parser {
 
                 self.consume_right_paren()?;
 
+                // Enum variant pattern with binding
                 Ok(Pattern::EnumVariant {
-                    enum_name: None, // Unqualified for now
+                    enum_name: Some(Identifier::new(name.clone(), first_token.location.clone())),
                     variant_name,
-                    binding,
-                    nested_pattern,
+                    bindings: if let Some(b) = binding { vec![b] } else { vec![] },
+                    nested_pattern: None,
                     source_location: first_token.location.clone(),
                 })
             }

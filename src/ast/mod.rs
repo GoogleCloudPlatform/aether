@@ -115,7 +115,7 @@ pub struct StructField {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnumVariant {
     pub name: Identifier,
-    pub associated_type: Option<Box<TypeSpecifier>>, // Type held by the variant (HOLDS)
+    pub associated_types: Vec<TypeSpecifier>, // Types held by the variant
     pub source_location: SourceLocation,
 }
 
@@ -838,7 +838,7 @@ pub enum Expression {
     EnumVariant {
         enum_name: Identifier,
         variant_name: Identifier,
-        value: Option<Box<Expression>>,
+        values: Vec<Expression>,
         source_location: SourceLocation,
     },
 
@@ -975,7 +975,7 @@ pub enum Pattern {
     EnumVariant {
         enum_name: Option<Identifier>, // None for unqualified variant
         variant_name: Identifier,
-        binding: Option<Identifier>, // Variable to bind the associated value
+        bindings: Vec<Identifier>, // Variables to bind the associated values
         nested_pattern: Option<Box<Pattern>>, // For nested patterns like (Some (Ok x))
         source_location: SourceLocation,
     },

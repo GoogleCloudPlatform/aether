@@ -380,15 +380,14 @@ impl SemanticAnalyzer {
                 // Convert AST variants to type system variants
                 let mut variant_infos = Vec::new();
                 for (idx, variant) in variants.iter().enumerate() {
-                    let associated_type = if let Some(type_spec) = &variant.associated_type {
-                        Some(self.type_checker.borrow().ast_type_to_type(type_spec)?)
-                    } else {
-                        None
-                    };
+                    let mut associated_types = Vec::new();
+                    for type_spec in &variant.associated_types {
+                        associated_types.push(self.type_checker.borrow().ast_type_to_type(type_spec)?);
+                    }
 
                     variant_infos.push(crate::types::EnumVariantInfo {
                         name: variant.name.name.clone(),
-                        associated_type,
+                        associated_types,
                         discriminant: idx, // Variants get indices based on declaration order
                     });
                 }
@@ -1440,7 +1439,7 @@ impl SemanticAnalyzer {
             Expression::EnumVariant {
                 enum_name,
                 variant_name,
-                value,
+                values,
                 source_location,
             } => {
                 eprintln!(
@@ -1448,7 +1447,13 @@ impl SemanticAnalyzer {
                     variant_name.name
                 );
 
-                // For now, we need to find the enum type by looking through all types
+                // Check if enum name is provided (qualified variant)
+                // Note: The parser currently returns enum_name for unqualified variants too (via symbol table lookup?)
+                // Actually, parser passes enum_name. If it's unqualified, parser might pass empty?
+                // Checking how parser behaves: parse_enum_variant_expression takes enum_name.
+                // Wait, unqualified variants are parsed as Identifier first, then maybe converted?
+                // Let's assume enum_name is valid or we find it via variant name.
+
                 // In the future, we should improve this by having better variant lookup
                 let module_name = self.current_module.clone().unwrap_or_default();
                 let enum_type = self
@@ -1468,28 +1473,30 @@ impl SemanticAnalyzer {
                     }
                 })?;
 
-                // Type check the associated value if present
-                if let Some(expected_type) = &variant.associated_type {
-                    if let Some(value_expr) = value {
-                        let value_type = self.analyze_expression(value_expr)?;
-                        self.type_checker.borrow().check_type_compatibility(
-                            expected_type,
-                            &value_type,
-                            source_location,
-                        )?;
-                    } else {
-                        return Err(SemanticError::MissingEnumVariantValue {
-                            variant: variant_name.name.clone(),
-                            enum_name: enum_type.name.clone(),
+                // Check argument count
+                if variant.associated_types.len() != values.len() {
+                    return Err(SemanticError::ArgumentCountMismatch {
+                        function: variant_name.name.clone(), // Reusing this error type
+                        expected: variant.associated_types.len(),
+                        found: values.len(),
+                        location: source_location.clone(),
+                    });
+                }
+
+                // Type check associated values
+                for (expected_type, val) in variant.associated_types.iter().zip(values.iter()) {
+                    let value_type = self.analyze_expression(val)?;
+                    if !self
+                        .type_checker
+                        .borrow()
+                        .types_compatible(expected_type, &value_type)
+                    {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: expected_type.to_string(),
+                            found: value_type.to_string(),
                             location: source_location.clone(),
                         });
                     }
-                } else if value.is_some() {
-                    return Err(SemanticError::UnexpectedEnumVariantValue {
-                        variant: variant_name.name.clone(),
-                        enum_name: enum_type.name.clone(),
-                        location: source_location.clone(),
-                    });
                 }
 
                 // Return the enum type
@@ -2805,7 +2812,7 @@ impl SemanticAnalyzer {
             Pattern::EnumVariant {
                 enum_name: _,
                 variant_name,
-                binding,
+                bindings,
                 nested_pattern,
                 source_location,
             } => {
@@ -2838,7 +2845,7 @@ impl SemanticAnalyzer {
 
                         // Handle nested pattern
                         if let Some(ref nested_pat) = nested_pattern {
-                            if let Some(ref associated_type) = variant.associated_type {
+                            if let Some(ref associated_type) = variant.associated_types.first() {
                                 // Recursively analyze the nested pattern with the associated type
                                 self.analyze_pattern(nested_pat, associated_type)?;
                             } else {
@@ -2853,10 +2860,19 @@ impl SemanticAnalyzer {
                             }
                         }
 
-                        // If there's a binding (without nested pattern), add it to the symbol table
-                        if let Some(binding_id) = binding {
+                        // If there are bindings (without nested pattern), add them to the symbol table
+                        if !bindings.is_empty() {
                             if nested_pattern.is_none() {
-                                if let Some(ref associated_type) = variant.associated_type {
+                                if bindings.len() != variant.associated_types.len() {
+                                    return Err(SemanticError::ArgumentCountMismatch {
+                                        function: variant_name.name.clone(), // Using function for variant name
+                                        expected: variant.associated_types.len(),
+                                        found: bindings.len(),
+                                        location: source_location.clone(),
+                                    });
+                                }
+
+                                for (binding_id, associated_type) in bindings.iter().zip(variant.associated_types.iter()) {
                                     self.symbol_table.add_symbol(Symbol {
                                         name: binding_id.name.clone(),
                                         symbol_type: associated_type.clone(),
