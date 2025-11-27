@@ -67,6 +67,9 @@ pub struct SemanticAnalyzer {
     /// Whether we're currently in a finally block (affects throw analysis)
     in_finally_block: bool,
 
+    /// Whether we're currently in a concurrent block (affects function return types)
+    in_concurrent_block: bool,
+
     /// Analyzed modules cache to prevent double-analysis
     analyzed_modules: HashMap<String, LoadedModule>,
 }
@@ -102,6 +105,7 @@ impl SemanticAnalyzer {
             stats: AnalysisStats::default(),
             current_exceptions: Vec::new(),
             in_finally_block: false,
+            in_concurrent_block: false,
             analyzed_modules: HashMap::new(),
         }
     }
@@ -934,6 +938,20 @@ impl SemanticAnalyzer {
                     }
                     let _ = self.symbol_table.exit_scope();
                 }
+            }
+
+            Statement::Concurrent { block, .. } => {
+                // Save previous state
+                let prev_concurrent = self.in_concurrent_block;
+                
+                // Enter concurrent context
+                self.in_concurrent_block = true;
+                
+                // Analyze the block
+                self.analyze_block(block)?;
+                
+                // Restore state
+                self.in_concurrent_block = prev_concurrent;
             }
         }
 
@@ -2314,26 +2332,117 @@ impl SemanticAnalyzer {
         }
     }
 
+    /// Resolve a function reference to a symbol
+    fn resolve_function(
+        &self,
+        reference: &FunctionReference,
+        source_location: &SourceLocation,
+    ) -> Result<Symbol, SemanticError> {
+        match reference {
+            FunctionReference::Local { name } => {
+                self.symbol_table
+                    .lookup_symbol(&name.name)
+                    .cloned()
+                    .ok_or_else(|| SemanticError::UndefinedSymbol {
+                        symbol: name.name.clone(),
+                        location: source_location.clone(),
+                    })
+            }
+            FunctionReference::External { name } => {
+                self.symbol_table
+                    .lookup_symbol(&name.name)
+                    .cloned()
+                    .ok_or_else(|| SemanticError::UndefinedSymbol {
+                        symbol: name.name.clone(),
+                        location: source_location.clone(),
+                    })
+            }
+            FunctionReference::Qualified { module, name } => {
+                // TODO: Implement qualified lookup
+                // For now, try fully qualified name "module.name"
+                let qualified_name = format!("{}.{}", module.name, name.name);
+                self.symbol_table
+                    .lookup_symbol(&qualified_name)
+                    .cloned()
+                    .ok_or_else(|| SemanticError::UndefinedSymbol {
+                        symbol: qualified_name,
+                        location: source_location.clone(),
+                    })
+            }
+        }
+    }
+
     /// Analyze a function call expression
     fn analyze_function_call_expression(
         &mut self,
         call: &FunctionCall,
         source_location: &SourceLocation,
     ) -> Result<Type, SemanticError> {
-        self.analyze_function_call(call).map_err(|mut e| {
-            // Update the source location if it's missing
-            match &mut e {
-                SemanticError::UndefinedSymbol { location, .. }
-                | SemanticError::TypeMismatch { location, .. }
-                | SemanticError::ArgumentCountMismatch { location, .. } => {
-                    if location.file == "<unknown>" {
-                        *location = source_location.clone();
-                    }
-                }
-                _ => {}
+        // Resolve the function
+        let func_symbol = self.resolve_function(&call.function_reference, source_location)?;
+
+        // Extract parameter types and return type
+        let (param_types, return_type) = match &func_symbol.symbol_type {
+            Type::Function {
+                parameter_types,
+                return_type,
+            } => (parameter_types, return_type),
+            _ => {
+                return Err(SemanticError::TypeMismatch {
+                    expected: "function type".to_string(),
+                    found: func_symbol.symbol_type.to_string(),
+                    location: source_location.clone(),
+                });
             }
-            e
-        })
+        };
+
+        // Check argument count
+        if call.arguments.len() != param_types.len() {
+            // TODO: Handle variadic functions properly if needed
+            // For now assuming exact match
+            // Except if variadic arguments are present
+            if !call.variadic_arguments.is_empty() {
+                // TODO: Check variadic
+            } else {
+                return Err(SemanticError::ArgumentCountMismatch {
+                    function: func_symbol.name.clone(),
+                    expected: param_types.len(),
+                    found: call.arguments.len(),
+                    location: source_location.clone(),
+                });
+            }
+        }
+
+        // Check argument types
+        for (i, arg) in call.arguments.iter().enumerate() {
+            if i >= param_types.len() {
+                break; // Variadic?
+            }
+            
+            let arg_type = self.analyze_expression(&arg.value)?;
+            let param_type = &param_types[i];
+
+            if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
+                return Err(SemanticError::TypeMismatch {
+                    expected: param_type.to_string(),
+                    found: arg_type.to_string(),
+                    location: arg.source_location.clone(),
+                });
+            }
+        }
+
+        let final_return_type = if self.in_concurrent_block {
+            // Inside concurrent block, function calls return Future<T>
+            Type::GenericInstance {
+                base_type: "Future".to_string(),
+                type_arguments: vec![*return_type.clone()],
+                module: Some("std.concurrency".to_string()),
+            }
+        } else {
+            *return_type.clone()
+        };
+
+        Ok(final_return_type)
     }
 
     /// Analyze an if statement
