@@ -334,7 +334,7 @@ car go fmt && car go clippy && car go test
     - Enforce "use after move" errors.
     - Enforce mutable borrow exclusivity.
 - [x] **Task 9.2: Lifetime Annotations**: Update parser to support lifetime annotations `'a` in function signatures and struct definitions.
-- [ ] **Task 9.3: Verification**: Create test cases for ownership violations and valid borrowing patterns.
+- [x] **Task 9.3: Verification**: Create test cases for ownership violations and valid borrowing patterns.
 
 ## Phase 10: Language Server Protocol (LSP)
 

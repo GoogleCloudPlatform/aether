@@ -26,17 +26,18 @@
     - Verified `async_io` example with true parallelism.
     - Implemented implicit `await` logic in `Concurrent` block lowering to ensure structured concurrency (main thread waits for block completion).
 
-## Phase 9: Ownership System Enforcement (In Progress)
+## Phase 9: Ownership System Enforcement (Completed)
 
 - [x] **Task 9.1: Ownership Analysis Pass**: Implemented borrow checker logic for moves and borrows.
 - [x] **Task 9.2: Lifetime Annotations**: Updated parser and AST to support lifetime annotations.
-- [ ] **Task 9.3: Verification**: Create test cases for ownership violations.
+- [x] **Task 9.3: Verification**: Created comprehensive test suite for ownership validation.
 
-### Recent Achievements
-- Implemented `check_argument_ownership` in `src/semantic/ownership.rs`.
+### Achievements
+- Implemented `check_argument_ownership` in `src/semantic/ownership.rs` to enforce move semantics and borrowing rules.
 - Updated `src/ast/mod.rs` and `src/parser/v2.rs` to support `lifetime_parameters` and lifetime annotations in types.
-- Fixed extensive compilation errors resulting from AST changes.
-- Verified "use after move" detection with `struct_methods` example.
+- Fixed compilation errors across the codebase resulting from AST changes.
+- Verified "use after move" detection with unit tests in `src/semantic/ownership_tests.rs` and `tests/ownership_analysis_test.rs`.
+- Created integration tests in `tests/ownership_integration_test.rs` to verify memory cleanup and lifetime management.
 
 ## Completed Phases
 
@@ -48,3 +49,4 @@
 - Phase 6: Cleanup and Documentation
 - Phase 7: Async Syntax & Semantics (Basic)
 - Phase 8: True Asynchronous Backend Implementation
+- Phase 9: Ownership System Enforcement

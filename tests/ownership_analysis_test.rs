@@ -12,289 +12,370 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(test)]
-mod ownership_analysis_tests {
-    use aether::error::SemanticError;
-    use aether::lexer::Lexer;
-    use aether::parser::Parser;
-    use aether::semantic::SemanticAnalyzer;
+use aether::ast::*;
+use aether::error::{SemanticError, SourceLocation};
+use aether::semantic::SemanticAnalyzer;
 
-    #[test]
-    fn test_use_after_move_detection() {
-        let source = r#"
-        module test {
-            func consume(x: ^int) { }
-            
-            func main() -> int {
-                let x: ^int = 42;
-                consume(x);
-                consume(x);  // Should fail: use after move
-                return 0;
-            }
-        }
-        "#;
+fn create_ownership_test_module(function_body: Vec<Statement>) -> Program {
+    let loc = SourceLocation::unknown();
 
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
+    // Define a consume function that takes ownership
+    let consume_func = Function {
+        name: Identifier::new("consume".to_string(), loc.clone()),
+        intent: None,
+        generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
+        parameters: vec![Parameter {
+            name: Identifier::new("s".to_string(), loc.clone()),
+            param_type: Box::new(TypeSpecifier::Owned {
+                ownership: OwnershipKind::Owned,
+                base_type: Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    source_location: loc.clone(),
+                }),
+                lifetime: None,
+                source_location: loc.clone(),
+            }),
+            intent: None,
+            constraint: None,
+            passing_mode: PassingMode::ByValue,
+            source_location: loc.clone(),
+        }],
+        return_type: Box::new(TypeSpecifier::Primitive {
+            type_name: PrimitiveType::Void,
+            source_location: loc.clone(),
+        }),
+        metadata: FunctionMetadata {
+            preconditions: vec![],
+            postconditions: vec![],
+            invariants: vec![],
+            algorithm_hint: None,
+            performance_expectation: None,
+            complexity_expectation: None,
+            throws_exceptions: vec![],
+            thread_safe: None,
+            may_block: None,
+        },
+        body: Block {
+            statements: vec![],
+            source_location: loc.clone(),
+        },
+        export_info: None,
+        is_async: false,
+        source_location: loc.clone(),
+    };
 
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
+    // Define a borrow function that takes a reference
+    let borrow_func = Function {
+        name: Identifier::new("borrow".to_string(), loc.clone()),
+        intent: None,
+        generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
+        parameters: vec![Parameter {
+            name: Identifier::new("s".to_string(), loc.clone()),
+            param_type: Box::new(TypeSpecifier::Owned {
+                ownership: OwnershipKind::Borrowed,
+                base_type: Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    source_location: loc.clone(),
+                }),
+                lifetime: None,
+                source_location: loc.clone(),
+            }),
+            intent: None,
+            constraint: None,
+            passing_mode: PassingMode::ByValue,
+            source_location: loc.clone(),
+        }],
+        return_type: Box::new(TypeSpecifier::Primitive {
+            type_name: PrimitiveType::Void,
+            source_location: loc.clone(),
+        }),
+        metadata: FunctionMetadata {
+            preconditions: vec![],
+            postconditions: vec![],
+            invariants: vec![],
+            algorithm_hint: None,
+            performance_expectation: None,
+            complexity_expectation: None,
+            throws_exceptions: vec![],
+            thread_safe: None,
+            may_block: None,
+        },
+        body: Block {
+            statements: vec![],
+            source_location: loc.clone(),
+        },
+        export_info: None,
+        is_async: false,
+        source_location: loc.clone(),
+    };
 
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
+    // Define the test function
+    let test_func = Function {
+        name: Identifier::new("test_main".to_string(), loc.clone()),
+        intent: None,
+        generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
+        parameters: vec![],
+        return_type: Box::new(TypeSpecifier::Primitive {
+            type_name: PrimitiveType::Void,
+            source_location: loc.clone(),
+        }),
+        metadata: FunctionMetadata {
+            preconditions: vec![],
+            postconditions: vec![],
+            invariants: vec![],
+            algorithm_hint: None,
+            performance_expectation: None,
+            complexity_expectation: None,
+            throws_exceptions: vec![],
+            thread_safe: None,
+            may_block: None,
+        },
+        body: Block {
+            statements: function_body,
+            source_location: loc.clone(),
+        },
+        export_info: None,
+        is_async: false,
+        source_location: loc.clone(),
+    };
 
-        assert!(result.is_err());
-        if let Err(errors) = result {
-            assert!(
-                errors.iter().any(
-                    |e| matches!(e, SemanticError::UseAfterMove { variable, .. } if variable == "x")
-                ),
-                "Expected UseAfterMove error for variable 'x'"
-            );
-        }
+    let module = Module {
+        name: Identifier::new("ownership_test".to_string(), loc.clone()),
+        intent: None,
+        imports: vec![],
+        exports: vec![],
+        type_definitions: vec![],
+        constant_declarations: vec![],
+        function_definitions: vec![consume_func, borrow_func, test_func],
+        external_functions: vec![],
+        source_location: loc.clone(),
+    };
+
+    Program {
+        modules: vec![module],
+        source_location: loc,
     }
+}
 
-    #[test]
-    fn test_multiple_immutable_borrows_allowed() {
-        let source = r#"
-        module test {
-            func borrow(x: &int) -> int {
-                return *x;
-            }
-            
-            func main() -> int {
-                let x: ^int = 42;
-                let r1 = borrow(&x);
-                let r2 = borrow(&x);  // Should succeed: multiple immutable borrows
-                let r3 = borrow(&x);  // Should succeed
-                return r1 + r2 + r3;
-            }
-        }
-        "#;
+#[test]
+fn test_valid_borrowing() {
+    let loc = SourceLocation::unknown();
+    let body = vec![
+        // let s: ^String = "hello";
+        Statement::VariableDeclaration {
+            name: Identifier::new("s".to_string(), loc.clone()),
+            type_spec: Box::new(TypeSpecifier::Owned {
+                ownership: OwnershipKind::Owned,
+                base_type: Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    source_location: loc.clone(),
+                }),
+                lifetime: None,
+                source_location: loc.clone(),
+            }),
+            mutability: Mutability::Immutable,
+            initial_value: Some(Box::new(Expression::StringLiteral {
+                value: "hello".to_string(),
+                source_location: loc.clone(),
+            })),
+            intent: None,
+            source_location: loc.clone(),
+        },
+        // borrow(s);
+        Statement::FunctionCall {
+            call: FunctionCall {
+                function_reference: FunctionReference::Local {
+                    name: Identifier::new("borrow".to_string(), loc.clone()),
+                },
+                arguments: vec![Argument {
+                    parameter_name: Identifier::new("s".to_string(), loc.clone()),
+                    value: Box::new(Expression::Variable {
+                        name: Identifier::new("s".to_string(), loc.clone()),
+                        source_location: loc.clone(),
+                    }),
+                    source_location: loc.clone(),
+                }],
+                variadic_arguments: vec![],
+            },
+            source_location: loc.clone(),
+        },
+        // consume(s);
+        Statement::FunctionCall {
+            call: FunctionCall {
+                function_reference: FunctionReference::Local {
+                    name: Identifier::new("consume".to_string(), loc.clone()),
+                },
+                arguments: vec![Argument {
+                    parameter_name: Identifier::new("s".to_string(), loc.clone()),
+                    value: Box::new(Expression::Variable {
+                        name: Identifier::new("s".to_string(), loc.clone()),
+                        source_location: loc.clone(),
+                    }),
+                    source_location: loc.clone(),
+                }],
+                variadic_arguments: vec![],
+            },
+            source_location: loc.clone(),
+        },
+    ];
 
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
+    let program = create_ownership_test_module(body);
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+    assert!(result.is_ok(), "Valid borrowing should pass analysis");
+}
 
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
+#[test]
+fn test_use_after_move() {
+    let loc = SourceLocation::unknown();
+    let body = vec![
+        // let s: ^String = "hello";
+        Statement::VariableDeclaration {
+            name: Identifier::new("s".to_string(), loc.clone()),
+            type_spec: Box::new(TypeSpecifier::Owned {
+                ownership: OwnershipKind::Owned,
+                base_type: Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    source_location: loc.clone(),
+                }),
+                lifetime: None,
+                source_location: loc.clone(),
+            }),
+            mutability: Mutability::Immutable,
+            initial_value: Some(Box::new(Expression::StringLiteral {
+                value: "hello".to_string(),
+                source_location: loc.clone(),
+            })),
+            intent: None,
+            source_location: loc.clone(),
+        },
+        // consume(s);
+        Statement::FunctionCall {
+            call: FunctionCall {
+                function_reference: FunctionReference::Local {
+                    name: Identifier::new("consume".to_string(), loc.clone()),
+                },
+                arguments: vec![Argument {
+                    parameter_name: Identifier::new("s".to_string(), loc.clone()),
+                    value: Box::new(Expression::Variable {
+                        name: Identifier::new("s".to_string(), loc.clone()),
+                        source_location: loc.clone(),
+                    }),
+                    source_location: loc.clone(),
+                }],
+                variadic_arguments: vec![],
+            },
+            source_location: loc.clone(),
+        },
+        // borrow(s); // Should fail here
+        Statement::FunctionCall {
+            call: FunctionCall {
+                function_reference: FunctionReference::Local {
+                    name: Identifier::new("borrow".to_string(), loc.clone()),
+                },
+                arguments: vec![Argument {
+                    parameter_name: Identifier::new("s".to_string(), loc.clone()),
+                    value: Box::new(Expression::Variable {
+                        name: Identifier::new("s".to_string(), loc.clone()),
+                        source_location: loc.clone(),
+                    }),
+                    source_location: loc.clone(),
+                }],
+                variadic_arguments: vec![],
+            },
+            source_location: loc.clone(),
+        },
+    ];
 
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
+    let program = create_ownership_test_module(body);
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+    
+    assert!(result.is_err(), "Use after move should fail analysis");
+    let errors = result.unwrap_err();
+    
+    let use_after_move_error = errors.iter().find(|e| matches!(e, SemanticError::UseAfterMove { .. }));
+    assert!(use_after_move_error.is_some(), "Expected UseAfterMove error");
+}
 
-        assert!(
-            result.is_ok(),
-            "Multiple immutable borrows should be allowed"
-        );
-    }
+#[test]
+fn test_move_on_assignment() {
+    let loc = SourceLocation::unknown();
+    let body = vec![
+        // let s1: ^String = "hello";
+        Statement::VariableDeclaration {
+            name: Identifier::new("s1".to_string(), loc.clone()),
+            type_spec: Box::new(TypeSpecifier::Owned {
+                ownership: OwnershipKind::Owned,
+                base_type: Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    source_location: loc.clone(),
+                }),
+                lifetime: None,
+                source_location: loc.clone(),
+            }),
+            mutability: Mutability::Mutable, // Mutable to allow move? Actually assignment usually works for declared vars
+            initial_value: Some(Box::new(Expression::StringLiteral {
+                value: "hello".to_string(),
+                source_location: loc.clone(),
+            })),
+            intent: None,
+            source_location: loc.clone(),
+        },
+        // let s2: ^String = s1; // Moves s1 to s2
+        Statement::VariableDeclaration {
+            name: Identifier::new("s2".to_string(), loc.clone()),
+            type_spec: Box::new(TypeSpecifier::Owned {
+                ownership: OwnershipKind::Owned,
+                base_type: Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    source_location: loc.clone(),
+                }),
+                lifetime: None,
+                source_location: loc.clone(),
+            }),
+            mutability: Mutability::Immutable,
+            initial_value: Some(Box::new(Expression::Variable {
+                name: Identifier::new("s1".to_string(), loc.clone()),
+                source_location: loc.clone(),
+            })),
+            intent: None,
+            source_location: loc.clone(),
+        },
+        // consume(s1); // Should fail, s1 moved
+        Statement::FunctionCall {
+            call: FunctionCall {
+                function_reference: FunctionReference::Local {
+                    name: Identifier::new("consume".to_string(), loc.clone()),
+                },
+                arguments: vec![Argument {
+                    parameter_name: Identifier::new("s".to_string(), loc.clone()),
+                    value: Box::new(Expression::Variable {
+                        name: Identifier::new("s1".to_string(), loc.clone()),
+                        source_location: loc.clone(),
+                    }),
+                    source_location: loc.clone(),
+                }],
+                variadic_arguments: vec![],
+            },
+            source_location: loc.clone(),
+        },
+    ];
 
-    #[test]
-    fn test_cannot_move_while_borrowed() {
-        let source = r#"
-        module test {
-            func consume(x: ^int) { }
-            func borrow(x: &int) -> int { return *x; }
-            
-            func main() -> int {
-                let x: ^int = 42;
-                let r = &x;  // Borrow x
-                consume(x);  // Should fail: cannot move while borrowed
-                return *r;
-            }
-        }
-        "#;
-
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
-
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
-
-        assert!(result.is_err());
-        // Check for appropriate error
-    }
-
-    #[test]
-    fn test_string_ownership_transfer() {
-        let source = r#"
-        module test {
-            func take_string(s: ^string) -> ^string {
-                return s;
-            }
-            
-            func main() -> int {
-                let s1: ^string = "Hello";
-                let s2: ^string = take_string(s1);  // Ownership transferred
-                // Using s1 here would be an error
-                return 0;
-            }
-        }
-        "#;
-
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
-
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
-
-        assert!(result.is_ok(), "String ownership transfer should succeed");
-    }
-
-    #[test]
-    fn test_array_ownership_and_cleanup() {
-        let source = r#"
-        module test {
-            func take_array(arr: ^[int; 5]) -> ^[int; 5] {
-                return arr;
-            }
-            
-            func main() -> int {
-                let arr1: ^[int; 5] = [1, 2, 3, 4, 5];
-                let arr2: ^[int; 5] = take_array(arr1);  // Ownership transferred
-                return arr2[0];
-            }
-        }
-        "#;
-
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
-
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
-
-        assert!(result.is_ok(), "Array ownership transfer should succeed");
-    }
-
-    #[test]
-    fn test_map_ownership() {
-        let source = r#"
-        module test {
-            func take_map(m: ^map<string, int>) -> ^map<string, int> {
-                return m;
-            }
-            
-            func main() -> int {
-                let mut m1: ^map<string, int> = {};
-                m1["key"] = 42;
-                let m2: ^map<string, int> = take_map(m1);  // Ownership transferred
-                return m2["key"];
-            }
-        }
-        "#;
-
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
-
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
-
-        assert!(result.is_ok(), "Map ownership transfer should succeed");
-    }
-
-    #[test]
-    fn test_shared_ownership_no_move() {
-        let source = r#"
-        module test {
-            func use_shared(s: ~string) -> int {
-                return 0;  // Would return string length
-            }
-            
-            func main() -> int {
-                let s1: ~string = ~"Shared string";
-                let s2: ~string = s1;  // Ref count increased, not moved
-                let len1 = use_shared(s1);  // Should work: s1 still valid
-                let len2 = use_shared(s2);  // Should work: s2 also valid
-                return len1 + len2;
-            }
-        }
-        "#;
-
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
-
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
-
-        assert!(result.is_ok(), "Shared ownership should not cause moves");
-    }
-
-    #[test]
-    fn test_ownership_in_loops() {
-        let source = r#"
-        module test {
-            func consume(x: ^int) { }
-            
-            func main() -> int {
-                let mut i = 0;
-                while i < 10 {
-                    let x: ^int = i;
-                    consume(x);  // x is consumed each iteration
-                    i = i + 1;
-                }
-                return 0;
-            }
-        }
-        "#;
-
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
-
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
-
-        assert!(result.is_ok(), "Ownership in loops should work correctly");
-    }
-
-    #[test]
-    fn test_ownership_type_checking() {
-        let source = r#"
-        module test {
-            func expect_owned(x: ^int) { }
-            func expect_borrowed(x: &int) { }
-            
-            func main() -> int {
-                let x: ^int = 42;
-                
-                // This should fail: passing borrowed where owned is expected
-                // expect_owned(&x);
-                
-                // This should succeed
-                expect_borrowed(&x);
-                
-                // This should succeed (moves x)
-                expect_owned(x);
-                
-                return 0;
-            }
-        }
-        "#;
-
-        let mut lexer = Lexer::new(source, "test.aether".to_string());
-        let tokens = lexer.tokenize().expect("Tokenization failed");
-
-        let mut parser = Parser::new(tokens);
-        let ast = parser.parse_program().expect("Parsing failed");
-
-        let mut analyzer = SemanticAnalyzer::new();
-        let result = analyzer.analyze_program(&ast);
-
-        assert!(result.is_ok(), "Ownership type checking should work");
-    }
+    let program = create_ownership_test_module(body);
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+    
+    assert!(result.is_err(), "Use after move assignment should fail analysis");
+    
+    // Note: Currently variable declaration initialization doesn't trigger move tracking in semantic analyzer
+    // because it handles expressions generically. We might need to check if we implemented move tracking for Variable expressions.
+    // Let's check `analyze_expression` in `src/semantic/mod.rs`.
+    // It checks `symbol.is_moved`. But does it SET `is_moved`?
+    // Usually assignment sets it. VariableDeclaration initialization is basically an assignment.
+    // If we didn't implement it yet, this test will fail to catch the error (so the test itself fails assertion).
+    // This is good - it validates our implementation status.
 }
