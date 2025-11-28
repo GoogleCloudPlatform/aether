@@ -346,6 +346,7 @@ car go fmt && car go clippy && car go test
 - [x] **Task 10.3: Go to Definition**: Implement symbol resolution lookup for `textDocument/definition`.
     - Traverse AST to find definition location of a symbol.
 - [x] **Task 10.4: Hover**: Implement type info and documentation on hover.
+    - Show variable/function definition type.
 
 ## Phase 11: Optimization Passes
 

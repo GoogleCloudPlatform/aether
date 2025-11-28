@@ -14,7 +14,7 @@
 
 #[cfg(test)]
 mod lsp_tests {
-    use aether::lsp::Backend;
+    use aether::lsp::server::Backend;
     use tower_lsp::lsp_types::*;
     use tower_lsp::LanguageServer;
 

@@ -19,6 +19,7 @@
 
 pub mod common_subexpression;
 pub mod constant_folding;
+pub mod constant_propagation;
 pub mod dead_code_elimination;
 pub mod inlining;
 
@@ -119,6 +120,9 @@ impl OptimizationManager {
 
         // Add optimization passes in order
         manager.add_pass(Box::new(constant_folding::ConstantFoldingPass::new()));
+        manager.add_pass(Box::new(
+            constant_propagation::ConstantPropagationPass::new(),
+        ));
         manager.add_pass(Box::new(
             dead_code_elimination::DeadCodeEliminationPass::new(),
         ));

@@ -36,8 +36,8 @@
 
 - [x] **Task 10.1: Basic LSP Server**: Implemented basic LSP server structure using `tower-lsp`.
 - [x] **Task 10.2: Diagnostics**: Integrated compiler error reporting with LSP diagnostics.
-- [x] **Task 10.3: Go to Definition**: Implement symbol lookup.
-- [x] **Task 10.4: Hover**: Implement type info on hover.
+- [x] **Task 10.3: Go to Definition**: Implement symbol lookup via identifier extraction and symbol table query.
+- [x] **Task 10.4: Hover**: Implemented hover support showing type and signature information for symbols.
 
 ## Phase 11: Optimization Passes (In Progress)
 
@@ -47,11 +47,10 @@
 - [ ] **Task 11.4: Inlining**: Implement function inlining pass.
 
 ### Recent Achievements
-- Implemented basic LSP server scaffolding.
-- Successfully added `tower-lsp` dependency and resolved conflicts with `tokio`.
-- Created ownership examples including `examples/v2/11-memory/lifetimes/main.aes`.
-- Implemented `goto_definition` and `hover` in LSP with AST traversal for identifier lookup.
-- Verified `DeadCodeEliminationPass` functionality.
+- Implemented full LSP backend with diagnostics, definition, and hover support.
+- Added text storage to document state to enable precise identifier lookup.
+- Implemented robust symbol resolution logic using `SymbolTable` and AST traversal (identifier scanning).
+- Resolved thread-safety issues with `SemanticAnalyzer` by running analysis in blocking tasks.
 
 ## Completed Phases
 
