@@ -36,7 +36,8 @@
 
 - [x] **Task 10.1: Basic LSP Server**: Implemented basic LSP server structure using `tower-lsp`.
 - [x] **Task 10.2: Diagnostics**: Integrated compiler error reporting with LSP diagnostics.
-- [ ] **Task 10.3: Go to Definition**: Implement symbol lookup.
+- [x] **Task 10.3: Go to Definition**: Implement symbol lookup.
+    - Note: Implemented basic symbol location tracking and AST traversal.
 - [ ] **Task 10.4: Hover**: Implement type info on hover.
 
 ### Recent Achievements

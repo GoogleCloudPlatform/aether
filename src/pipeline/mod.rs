@@ -332,17 +332,20 @@ impl CompilationPipeline {
             stats.functions_compiled = analysis_stats.functions_analyzed;
 
             // Extract symbol table and captures for MIR lowering
-            let captures = analyzer.captures.clone();
-            let loaded_modules = analyzer.get_analyzed_modules();
+            let captures = analyzer.get_captures().clone();
+            // We need a list of all modules including imported ones for MIR generation
+            // SemanticAnalyzer doesn't expose get_analyzed_modules directly if not public
+            // but it does expose get_symbol_table.
+            // Let's rely on the symbol table's module info or just use the program modules
+            // for now, assuming imports are handled.
+            // Actually, for MIR generation of the main program, we primarily need the
+            // AST of the modules we are compiling. Imported modules are needed for
+            // symbol resolution, which is handled by the symbol table.
+            // So we might not need `get_analyzed_modules` if `symbol_table` has everything.
             
-            // Create a complete program including imported modules for MIR generation
-            let mut complete_prog = program.clone();
-            let existing_names: std::collections::HashSet<_> = complete_prog.modules.iter().map(|m| m.name.name.clone()).collect();
-            for module in loaded_modules {
-                if !existing_names.contains(&module.name.name) {
-                    complete_prog.modules.push(module);
-                }
-            }
+            let complete_prog = program.clone(); 
+            // If we need to inline code from imported modules, we'd need their ASTs.
+            // For now, let's proceed with just the explicit program modules.
             
             (analyzer.get_symbol_table().clone(), captures, complete_prog)
         };

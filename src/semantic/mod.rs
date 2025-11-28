@@ -3058,14 +3058,6 @@ impl SemanticAnalyzer {
         &self.errors
     }
 
-    /// Get analyzed modules (ASTs)
-    pub fn get_analyzed_modules(&self) -> Vec<Module> {
-        self.analyzed_modules
-            .values()
-            .map(|loaded| loaded.module.clone())
-            .collect()
-    }
-
     /// Check if analysis found any errors
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()

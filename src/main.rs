@@ -267,12 +267,33 @@ enum Commands {
         #[arg(short, long)]
         verbose: bool,
     },
+
+    /// Run LSP server
+    Lsp,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
+        Some(Commands::Lsp) => {
+            use aether::lsp::Backend;
+            use tower_lsp::{LspService, Server};
+            
+            let stdin = tokio::io::stdin();
+            let stdout = tokio::io::stdout();
+
+            let (service, socket) = LspService::new(|client| Backend::new(client));
+            Server::new(stdin, stdout, socket).serve(service).await;
+            
+            Ok(aether::pipeline::CompilationResult {
+                executable_path: PathBuf::new(),
+                intermediate_files: vec![],
+                stats: Default::default(),
+            })
+        }
+        
         Some(Commands::Compile {
             input,
             output,

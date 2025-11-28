@@ -343,7 +343,8 @@ car go fmt && car go clippy && car go test
     - Support `textDocument/didOpen`, `didChange`.
 - [x] **Task 10.2: Diagnostics**: Integrate compiler error reporting with LSP diagnostics.
     - Report syntax errors and semantic errors in real-time.
-- [ ] **Task 10.3: Go to Definition**: Implement symbol resolution lookup for `textDocument/definition`.
+- [x] **Task 10.3: Go to Definition**: Implement symbol resolution lookup for `textDocument/definition`.
+    - Traverse AST to find definition location of a symbol.
 - [ ] **Task 10.4: Hover**: Implement type info and documentation on hover.
 
 ## Phase 11: Optimization Passes
