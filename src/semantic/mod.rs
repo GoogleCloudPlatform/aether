@@ -18,8 +18,9 @@
 
 pub mod metadata;
 pub mod capture_analysis;
-// #[cfg(test)]
-// mod ownership_tests;
+pub mod ownership;
+#[cfg(test)]
+mod ownership_tests;
 
 use crate::ast::*;
 use crate::contracts::{ContractContext, ContractValidator};
@@ -2311,124 +2312,40 @@ impl SemanticAnalyzer {
 
                 // Check ownership transfers for each argument
                 for (i, arg) in call.arguments.iter().enumerate() {
-                    let arg_type = self.analyze_expression(arg.value.as_ref())?;
+                    let arg_type = self.analyze_expression(&arg.value)?;
 
                     if let Some(param_type) = parameter_types.get(i) {
-                        // Check ownership compatibility
-                        let arg_ownership = arg_type.get_ownership();
-                        let param_ownership = param_type.get_ownership();
-
-                        match (arg_ownership, param_ownership) {
-                            // Ownership transfer: owned to owned
-                            (Some(OwnershipKind::Owned), Some(OwnershipKind::Owned)) => {
-                                // Record move if argument is a variable
-                                if let Expression::Variable { name: var_name, .. } =
-                                    arg.value.as_ref()
-                                {
-                                    if arg_type.requires_ownership() {
-                                        self.symbol_table.mark_variable_moved(&var_name.name)?;
-                                    }
-                                }
-                            }
-                            // Borrowing: owned to borrowed
-                            (Some(OwnershipKind::Owned), Some(OwnershipKind::Borrowed))
-                            | (None, Some(OwnershipKind::Borrowed)) => {
-                                // Record immutable borrow if argument is a variable
-                                if let Expression::Variable { name: var_name, .. } =
-                                    arg.value.as_ref()
-                                {
-                                    if arg_type.requires_ownership() {
-                                        self.symbol_table.borrow_variable(&var_name.name)?;
-                                    }
-                                }
-                            }
-                            // Mutable borrowing: owned to mutable borrow
-                            (Some(OwnershipKind::Owned), Some(OwnershipKind::MutableBorrow))
-                            | (None, Some(OwnershipKind::MutableBorrow)) => {
-                                // Record mutable borrow if argument is a variable
-                                if let Expression::Variable { name: var_name, .. } =
-                                    arg.value.as_ref()
-                                {
-                                    if arg_type.requires_ownership() {
-                                        self.symbol_table.borrow_variable_mut(&var_name.name)?;
-                                    }
-                                }
-                            }
-                            // Default case: no ownership tracking needed
-                            _ => {}
-                        }
-
-                        // Check type compatibility
-                        if !self
-                            .type_checker
-                            .borrow()
-                            .types_compatible(param_type, &arg_type)
-                        {
+                        if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
                             return Err(SemanticError::TypeMismatch {
                                 expected: param_type.to_string(),
                                 found: arg_type.to_string(),
-                                location: SourceLocation::unknown(),
+                                location: arg.source_location.clone(),
                             });
                         }
+
+                        // Check ownership transfer
+                        self.check_argument_ownership(&arg.value, param_type)?;
                     }
                 }
 
-                // Handle variadic arguments ownership
+                // Handle variadic arguments
                 for (i, arg) in call.variadic_arguments.iter().enumerate() {
                     let arg_type = self.analyze_expression(arg.as_ref())?;
                     let param_index = call.arguments.len() + i;
 
                     if let Some(param_type) = parameter_types.get(param_index) {
-                        // Check ownership compatibility
-                        let arg_ownership = arg_type.get_ownership();
-                        let param_ownership = param_type.get_ownership();
-
-                        match (arg_ownership, param_ownership) {
-                            // Ownership transfer: owned to owned
-                            (Some(OwnershipKind::Owned), Some(OwnershipKind::Owned)) => {
-                                // Record move if argument is a variable
-                                if let Expression::Variable { name: var_name, .. } = arg.as_ref() {
-                                    if arg_type.requires_ownership() {
-                                        self.symbol_table.mark_variable_moved(&var_name.name)?;
-                                    }
-                                }
-                            }
-                            // Borrowing: owned to borrowed
-                            (Some(OwnershipKind::Owned), Some(OwnershipKind::Borrowed))
-                            | (None, Some(OwnershipKind::Borrowed)) => {
-                                // Record immutable borrow if argument is a variable
-                                if let Expression::Variable { name: var_name, .. } = arg.as_ref() {
-                                    if arg_type.requires_ownership() {
-                                        self.symbol_table.borrow_variable(&var_name.name)?;
-                                    }
-                                }
-                            }
-                            // Mutable borrowing
-                            (Some(OwnershipKind::Owned), Some(OwnershipKind::MutableBorrow))
-                            | (None, Some(OwnershipKind::MutableBorrow)) => {
-                                // Record mutable borrow if argument is a variable
-                                if let Expression::Variable { name: var_name, .. } = arg.as_ref() {
-                                    if arg_type.requires_ownership() {
-                                        self.symbol_table.borrow_variable_mut(&var_name.name)?;
-                                    }
-                                }
-                            }
-                            // Other cases don't require special handling
-                            _ => {}
-                        }
-
-                        // Check type compatibility
-                        if !self
-                            .type_checker
-                            .borrow()
-                            .types_compatible(param_type, &arg_type)
-                        {
+                        if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
                             return Err(SemanticError::TypeMismatch {
                                 expected: param_type.to_string(),
                                 found: arg_type.to_string(),
                                 location: SourceLocation::unknown(),
                             });
                         }
+                        
+                        // Check ownership transfer for variadic args that happen to match a parameter
+                        // (e.g. if parameter_types includes them but they were passed as variadic in AST?)
+                        // Note: usually parameter_types only has fixed args.
+                        self.check_argument_ownership(arg.as_ref(), param_type)?;
                     }
                 }
 
@@ -2537,6 +2454,9 @@ impl SemanticAnalyzer {
                     location: arg.source_location.clone(),
                 });
             }
+
+            // Check ownership transfer
+            self.check_argument_ownership(&arg.value, param_type)?;
         }
 
         let final_return_type = if self.in_concurrent_block {

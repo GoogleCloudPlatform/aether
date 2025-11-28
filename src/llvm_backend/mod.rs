@@ -935,7 +935,17 @@ impl<'ctx> LLVMBackend<'ctx> {
                     // Pass null for cleanup_fn
                     let null_ptr = i8_ptr_type.const_null();
                     
-                    let _handle = builder.build_call(spawn_fn, &[func_ptr_cast.into(), context_ptr_cast.into(), null_ptr.into()], "spawn_call")
+                    let handle_call = builder.build_call(spawn_fn, &[func_ptr_cast.into(), context_ptr_cast.into(), null_ptr.into()], "spawn_call")
+                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                        
+                    let handle_val = handle_call.try_as_basic_value().left()
+                        .ok_or_else(|| SemanticError::CodeGenError { message: "Failed to get handle value".to_string() })?;
+
+                    // Call await(handle)
+                    let await_fn = self.module.get_function("aether_await")
+                         .ok_or_else(|| SemanticError::CodeGenError { message: "aether_await not found".to_string() })?;
+                    
+                    builder.build_call(await_fn, &[handle_val.into()], "await_call")
                         .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
                         
                     // 5. Continue to target block

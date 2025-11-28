@@ -83,6 +83,7 @@ pub enum TypeDefinition {
         name: Identifier,
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
+        lifetime_parameters: Vec<LifetimeParameter>,
         fields: Vec<StructField>,
         export_as: Option<String>, // For FFI
         source_location: SourceLocation,
@@ -91,6 +92,7 @@ pub enum TypeDefinition {
         name: Identifier,
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
+        lifetime_parameters: Vec<LifetimeParameter>,
         variants: Vec<EnumVariant>,
         source_location: SourceLocation,
     },
@@ -99,6 +101,7 @@ pub enum TypeDefinition {
         original_type: Box<TypeSpecifier>,
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
+        lifetime_parameters: Vec<LifetimeParameter>,
         source_location: SourceLocation,
     },
 }
@@ -192,6 +195,7 @@ pub enum TypeSpecifier {
     Owned {
         base_type: Box<TypeSpecifier>,
         ownership: OwnershipKind,
+        lifetime: Option<Identifier>,
         source_location: SourceLocation,
     },
 }
@@ -272,6 +276,13 @@ pub struct ConstantDeclaration {
     pub source_location: SourceLocation,
 }
 
+/// Lifetime parameter for functions and types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LifetimeParameter {
+    pub name: Identifier,
+    pub source_location: SourceLocation,
+}
+
 /// Generic type parameter for functions and types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenericParameter {
@@ -287,6 +298,7 @@ pub struct Function {
     pub name: Identifier,
     pub intent: Option<String>,
     pub generic_parameters: Vec<GenericParameter>,
+    pub lifetime_parameters: Vec<LifetimeParameter>,
     pub parameters: Vec<Parameter>,
     pub return_type: Box<TypeSpecifier>,
     pub metadata: FunctionMetadata,
@@ -1227,6 +1239,7 @@ impl ASTPrettyPrinter {
             TypeSpecifier::Owned {
                 ownership,
                 base_type,
+                lifetime,
                 ..
             } => {
                 let prefix = match ownership {
@@ -1235,7 +1248,12 @@ impl ASTPrettyPrinter {
                     OwnershipKind::BorrowedMut => "&mut ",
                     OwnershipKind::Shared => "~",
                 };
-                format!("{}{}", prefix, self.print_type_specifier(base_type))
+                let lifetime_str = if let Some(lt) = lifetime {
+                    format!("'{}", lt.name)
+                } else {
+                    "".to_string()
+                };
+                format!("{}{}{}", prefix, lifetime_str, self.print_type_specifier(base_type))
             }
             TypeSpecifier::TypeParameter {
                 name, constraints, ..

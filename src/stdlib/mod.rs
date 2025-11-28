@@ -165,7 +165,8 @@ pub(crate) fn create_function_stub(
     Function {
         name: Identifier::new(name.to_string(), SourceLocation::unknown()),
         intent: None,
-        generic_parameters: vec![],
+        generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
         parameters: parameters
             .into_iter()
             .map(|(name, ty)| Parameter {
@@ -194,6 +195,7 @@ pub(crate) fn create_function_stub(
             source_location: SourceLocation::unknown(),
         },
         export_info: None,
+        is_async: false,
         source_location: SourceLocation::unknown(),
     }
 }

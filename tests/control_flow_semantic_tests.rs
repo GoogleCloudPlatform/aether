@@ -25,6 +25,7 @@ fn create_control_flow_ast() -> Program {
         name: Identifier::new("test_if".to_string(), loc.clone()),
         intent: Some("Test if statement".to_string()),
         generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
         parameters: vec![Parameter {
             name: Identifier::new("x".to_string(), loc.clone()),
             param_type: Box::new(TypeSpecifier::Primitive {
@@ -90,6 +91,7 @@ fn create_control_flow_ast() -> Program {
             source_location: loc.clone(),
         },
         export_info: None,
+        is_async: false,
         source_location: loc.clone(),
     };
 
@@ -98,6 +100,7 @@ fn create_control_flow_ast() -> Program {
         name: Identifier::new("test_while".to_string(), loc.clone()),
         intent: Some("Test while loop".to_string()),
         generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
         parameters: vec![Parameter {
             name: Identifier::new("n".to_string(), loc.clone()),
             param_type: Box::new(TypeSpecifier::Primitive {
@@ -187,6 +190,7 @@ fn create_control_flow_ast() -> Program {
             source_location: loc.clone(),
         },
         export_info: None,
+        is_async: false,
         source_location: loc.clone(),
     };
 
@@ -233,6 +237,7 @@ fn test_non_boolean_condition_error() {
         name: Identifier::new("bad_if".to_string(), loc.clone()),
         intent: Some("Test non-boolean condition".to_string()),
         generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Void,
@@ -269,6 +274,7 @@ fn test_non_boolean_condition_error() {
             source_location: loc.clone(),
         },
         export_info: None,
+        is_async: false,
         source_location: loc.clone(),
     };
 
@@ -308,6 +314,7 @@ fn test_loop_variable_scope() {
         name: Identifier::new("test_foreach".to_string(), loc.clone()),
         intent: Some("Test for-each loop scope".to_string()),
         generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,
@@ -375,6 +382,7 @@ fn test_loop_variable_scope() {
             source_location: loc.clone(),
         },
         export_info: None,
+        is_async: false,
         source_location: loc.clone(),
     };
 
@@ -414,6 +422,7 @@ fn test_break_continue_statements() {
         name: Identifier::new("test_break_continue".to_string(), loc.clone()),
         intent: Some("Test break and continue".to_string()),
         generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Void,
@@ -468,6 +477,7 @@ fn test_break_continue_statements() {
             source_location: loc.clone(),
         },
         export_info: None,
+        is_async: false,
         source_location: loc.clone(),
     };
 
@@ -503,6 +513,7 @@ fn test_try_catch_analysis() {
         name: Identifier::new("test_try_catch".to_string(), loc.clone()),
         intent: Some("Test try-catch block".to_string()),
         generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,
@@ -555,6 +566,7 @@ fn test_try_catch_analysis() {
             source_location: loc.clone(),
         },
         export_info: None,
+        is_async: false,
         source_location: loc.clone(),
     };
 

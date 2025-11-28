@@ -213,6 +213,11 @@ impl Type {
         }
     }
 
+    /// Check if this type is a primitive type
+    pub fn is_primitive(&self) -> bool {
+        matches!(self, Type::Primitive(_))
+    }
+
     /// Check if this type is a numeric type
     pub fn is_numeric(&self) -> bool {
         match self {
@@ -855,21 +860,25 @@ impl TypeChecker {
                 match (o1, o2) {
                     // Same ownership kind with compatible base types
                     (a, b) if a == b => self.types_compatible(b1, b2),
-                    // Mutable borrow can be used where immutable borrow is expected
-                    (OwnershipKind::MutableBorrow, OwnershipKind::Borrowed) => {
+                    
+                    // Owned can be borrowed (Expected: Borrowed, Actual: Owned)
+                    (OwnershipKind::Borrowed, OwnershipKind::Owned) => {
                         self.types_compatible(b1, b2)
                     }
-                    // Owned can be temporarily borrowed
-                    (OwnershipKind::Owned, OwnershipKind::Borrowed) => {
+                    (OwnershipKind::MutableBorrow, OwnershipKind::Owned) => {
                         self.types_compatible(b1, b2)
                     }
-                    (OwnershipKind::Owned, OwnershipKind::MutableBorrow) => {
+                    
+                    // Mutable borrow can be used where immutable borrow is expected (Expected: Borrowed, Actual: MutableBorrow)
+                    (OwnershipKind::Borrowed, OwnershipKind::MutableBorrow) => {
                         self.types_compatible(b1, b2)
                     }
-                    // Shared can be borrowed immutably
-                    (OwnershipKind::Shared, OwnershipKind::Borrowed) => {
+                    
+                    // Shared can be borrowed immutably (Expected: Borrowed, Actual: Shared)
+                    (OwnershipKind::Borrowed, OwnershipKind::Shared) => {
                         self.types_compatible(b1, b2)
                     }
+                    
                     _ => false,
                 }
             }
@@ -1598,6 +1607,7 @@ mod tests {
         let owned_spec = TypeSpecifier::Owned {
             ownership: crate::ast::OwnershipKind::Owned,
             base_type: Box::new(int_spec.clone()),
+            lifetime: None,
             source_location: SourceLocation::unknown(),
         };
 
@@ -1608,7 +1618,11 @@ mod tests {
         // Test borrowed type conversion
         let borrowed_spec = TypeSpecifier::Owned {
             ownership: crate::ast::OwnershipKind::Borrowed,
-            base_type: Box::new(int_spec.clone()),
+            base_type: Box::new(TypeSpecifier::Primitive {
+                type_name: PrimitiveType::String,
+                source_location: SourceLocation::unknown(),
+            }),
+            lifetime: None,
             source_location: SourceLocation::unknown(),
         };
 

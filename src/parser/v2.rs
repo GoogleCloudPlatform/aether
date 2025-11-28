@@ -832,6 +832,7 @@ impl Parser {
             return Ok(TypeSpecifier::Owned {
                 base_type: Box::new(base_type),
                 ownership: OwnershipKind::Owned,
+                lifetime: None,
                 source_location: start_location,
             });
         }
@@ -842,19 +843,19 @@ impl Parser {
             if self.check_keyword(Keyword::Mut) {
                 self.advance();
                 let base_type = self.parse_type()?;
-                return Ok(TypeSpecifier::Owned {
-                    base_type: Box::new(base_type),
-                    ownership: OwnershipKind::BorrowedMut,
-                    source_location: start_location,
-                });
-            }
+                            return Ok(TypeSpecifier::Owned {
+                                base_type: Box::new(base_type),
+                                ownership: OwnershipKind::BorrowedMut,
+                                lifetime: None,
+                                source_location: start_location,
+                            });            }
             let base_type = self.parse_type()?;
-            return Ok(TypeSpecifier::Owned {
-                base_type: Box::new(base_type),
-                ownership: OwnershipKind::Borrowed,
-                source_location: start_location,
-            });
-        }
+                            return Ok(TypeSpecifier::Owned {
+                                base_type: Box::new(base_type),
+                                ownership: OwnershipKind::Borrowed,
+                                lifetime: None,
+                                source_location: start_location,
+                            });        }
 
         if self.check(&TokenType::Tilde) {
             self.advance();
@@ -862,6 +863,7 @@ impl Parser {
             return Ok(TypeSpecifier::Owned {
                 base_type: Box::new(base_type),
                 ownership: OwnershipKind::Shared,
+                lifetime: None,
                 source_location: start_location,
             });
         }
@@ -1073,6 +1075,7 @@ impl Parser {
             name,
             intent: None,
             generic_parameters: Vec::new(),
+            lifetime_parameters: Vec::new(),
             parameters,
             return_type: Box::new(return_type),
             metadata: FunctionMetadata {
@@ -1088,6 +1091,7 @@ impl Parser {
             },
             body,
             export_info: None,
+            is_async: false,
             source_location: start_location,
         })
     }
@@ -1394,6 +1398,7 @@ impl Parser {
             name,
             intent: None,
             generic_parameters: vec![],
+            lifetime_parameters: vec![],
             fields,
             export_as: None,
             source_location: start_location,
@@ -1448,6 +1453,7 @@ impl Parser {
             name,
             intent: None,
             generic_parameters: vec![],
+            lifetime_parameters: vec![],
             variants,
             source_location: start_location,
         })

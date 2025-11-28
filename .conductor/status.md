@@ -24,12 +24,19 @@
     - Implemented context struct generation, function outlining, spawn, and implicit await.
 - **Phase 8.4: Integration and Verification (Completed):**
     - Verified `async_io` example with true parallelism.
+    - Implemented implicit `await` logic in `Concurrent` block lowering to ensure structured concurrency (main thread waits for block completion).
 
-## Phase 9: Ownership System Enforcement (Pending)
+## Phase 9: Ownership System Enforcement (In Progress)
 
-- [ ] **Task 9.1: Ownership Analysis Pass**: Implement a borrow checker pass.
-- [ ] **Task 9.2: Lifetime Annotations**: Update parser to support lifetime annotations.
+- [x] **Task 9.1: Ownership Analysis Pass**: Implemented borrow checker logic for moves and borrows.
+- [x] **Task 9.2: Lifetime Annotations**: Updated parser and AST to support lifetime annotations.
 - [ ] **Task 9.3: Verification**: Create test cases for ownership violations.
+
+### Recent Achievements
+- Implemented `check_argument_ownership` in `src/semantic/ownership.rs`.
+- Updated `src/ast/mod.rs` and `src/parser/v2.rs` to support `lifetime_parameters` and lifetime annotations in types.
+- Fixed extensive compilation errors resulting from AST changes.
+- Verified "use after move" detection with `struct_methods` example.
 
 ## Completed Phases
 

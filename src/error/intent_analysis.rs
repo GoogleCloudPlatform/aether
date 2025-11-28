@@ -643,7 +643,9 @@ mod tests {
             source_location: SourceLocation::unknown(),
             intent: Some("Perform safe division".to_string()),
             generic_parameters: vec![],
+            lifetime_parameters: vec![],
             export_info: None,
+            is_async: false,
         };
 
         let result = analyzer.analyze_function(&function);

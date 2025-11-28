@@ -36,6 +36,7 @@ fn create_test_module_with_struct() -> Module {
             name: Identifier::new("Point2D".to_string(), SourceLocation::unknown()),
             intent: Some("2D point structure".to_string()),
             generic_parameters: vec![],
+            lifetime_parameters: vec![],
             fields: vec![
                 StructField {
                     name: Identifier::new("x".to_string(), SourceLocation::unknown()),
@@ -62,6 +63,7 @@ fn create_test_module_with_struct() -> Module {
             name: Identifier::new("test_struct_passing".to_string(), SourceLocation::unknown()),
             intent: Some("Test struct passing".to_string()),
             generic_parameters: vec![],
+            lifetime_parameters: vec![],
             parameters: vec![Parameter {
                 name: Identifier::new("p".to_string(), SourceLocation::unknown()),
                 param_type: Box::new(TypeSpecifier::Named {
@@ -103,6 +105,7 @@ fn create_test_module_with_struct() -> Module {
                 source_location: SourceLocation::unknown(),
             },
             export_info: None,
+            is_async: false,
             source_location: SourceLocation::unknown(),
         }],
         external_functions: vec![ExternalFunction {
@@ -307,6 +310,7 @@ fn test_nested_struct_generation() {
                 name: Identifier::new("Point2D".to_string(), SourceLocation::unknown()),
                 intent: None,
                 generic_parameters: vec![],
+                lifetime_parameters: vec![],
                 fields: vec![
                     StructField {
                         name: Identifier::new("x".to_string(), SourceLocation::unknown()),
@@ -332,6 +336,7 @@ fn test_nested_struct_generation() {
                 name: Identifier::new("Rectangle".to_string(), SourceLocation::unknown()),
                 intent: None,
                 generic_parameters: vec![],
+                lifetime_parameters: vec![],
                 fields: vec![
                     StructField {
                         name: Identifier::new("top_left".to_string(), SourceLocation::unknown()),

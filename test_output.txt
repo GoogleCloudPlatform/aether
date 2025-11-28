@@ -1,0 +1,2065 @@
+warning: unused import: `ExampleType`
+  --> src/docs/tutorial.rs:21:46
+   |
+21 |     CodeExample, DifficultyLevel, DocConfig, ExampleType, Exercise, Tutorial, TutorialSection,
+   |                                              ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::path::Path`
+  --> src/error/enhancement.rs:24:5
+   |
+24 | use std::path::Path;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `BehavioralSpec`
+  --> src/error/intent_analysis.rs:22:33
+   |
+22 | use crate::semantic::metadata::{BehavioralSpec, IntentSpec};
+   |                                 ^^^^^^^^^^^^^^
+
+warning: unused imports: `Expression`, `Statement`, and `TypeSpecifier`
+  --> src/error/structured.rs:20:18
+   |
+20 | use crate::ast::{Expression, Statement, TypeSpecifier};
+   |                  ^^^^^^^^^^  ^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `HashSet`
+  --> src/llvm_backend/mod.rs:37:33
+   |
+37 | use std::collections::{HashMap, HashSet};
+   |                                 ^^^^^^^
+
+warning: unused imports: `BasicBlockId`, `LocalId`, `Place`, and `SourceInfo`
+  --> src/optimizations/inlining.rs:22:5
+   |
+22 |     BasicBlockId, Function, LocalId, Operand, Place, Program, Rvalue, SourceInfo, Statement,
+   |     ^^^^^^^^^^^^            ^^^^^^^           ^^^^^                   ^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/optimizations/inlining.rs:25:5
+   |
+25 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Constant`
+  --> src/optimizations/interprocedural.rs:22:17
+   |
+22 |     BasicBlock, Constant, Function, Operand, Place, Program, Rvalue, Statement, Terminator,
+   |                 ^^^^^^^^
+
+warning: unused import: `BuildConfiguration`
+  --> src/package/builder.rs:21:32
+   |
+21 | use crate::package::manifest::{BuildConfiguration, PackageManifest};
+   |                                ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `CacheStats`
+  --> src/package/builder.rs:22:35
+   |
+22 | use crate::package::{BuildConfig, CacheStats};
+   |                                   ^^^^^^^^^^
+
+warning: unused imports: `BinaryOp` and `Expression as ContractExpr`
+  --> src/patterns/catalog.rs:20:38
+   |
+20 | use crate::verification::contracts::{BinaryOp, Expression as ContractExpr};
+   |                                      ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Block`, `Expression`, `Function`, and `Statement`
+  --> src/patterns/composition.rs:20:18
+   |
+20 | use crate::ast::{Block, Expression, Function, Statement};
+   |                  ^^^^^  ^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+  --> src/patterns/composition.rs:21:5
+   |
+21 | use crate::error::SourceLocation;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Function`
+  --> src/patterns/mod.rs:23:37
+   |
+23 | use crate::ast::{Block, Expression, Function, Statement};
+   |                                     ^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+  --> src/patterns/mod.rs:24:5
+   |
+24 | use crate::error::SourceLocation;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `FailoverConfig`, `FailoverThreshold`, `RecoveryConfig`, and `self`
+  --> src/release/distribution.rs:23:22
+   |
+23 | use crate::release::{self, DistributionConfig, FailoverConfig, FailoverThreshold, RecoveryConfig};
+   |                      ^^^^                      ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `crate::error::SemanticError`
+  --> src/release/mod.rs:26:5
+   |
+26 | use crate::error::SemanticError;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `OwnershipKind`
+  --> src/semantic/mod.rs:32:20
+   |
+32 | use crate::types::{OwnershipKind, Type, TypeChecker};
+   |                    ^^^^^^^^^^^^^
+
+warning: unused import: `crate::types::Type`
+  --> src/verification/contract_to_smt.rs:20:5
+   |
+20 | use crate::types::Type;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `AggregateOp` and `TemporalOp`
+  --> src/verification/contract_to_smt.rs:22:5
+   |
+22 |     AggregateOp, BinaryOp, ConstantValue, Expression, QuantifierKind, TemporalOp, UnaryOp,
+   |     ^^^^^^^^^^^                                                       ^^^^^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+  --> src/verification/contracts.rs:30:13
+   |
+30 | use serde::{Deserialize, Serialize};
+   |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `crate::ast::PrimitiveType`
+  --> src/verification/vcgen.rs:23:5
+   |
+23 | use crate::ast::PrimitiveType;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::types::Type`
+  --> src/verification/vcgen.rs:26:5
+   |
+26 | use crate::types::Type;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `receiver`
+   --> src/concurrency/actors.rs:377:22
+    |
+377 |         let (sender, receiver) = mpsc::channel();
+    |                      ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_receiver`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `strategy`
+   --> src/concurrency/actors.rs:622:12
+    |
+622 |     fn new(strategy: SupervisionStrategy) -> Self {
+    |            ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_strategy`
+
+warning: unused variable: `worker_id`
+   --> src/concurrency/async_runtime.rs:350:13
+    |
+350 |         for worker_id in 0..self.config.worker_threads {
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_worker_id`
+
+warning: unused variable: `start_time`
+   --> src/concurrency/sync_primitives.rs:568:13
+    |
+568 |         let start_time = Instant::now();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `metrics`
+   --> src/concurrency/sync_primitives.rs:711:23
+    |
+711 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_metrics`
+
+warning: variable does not need to be mutable
+   --> src/concurrency/sync_primitives.rs:711:19
+    |
+711 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                   ----^^^^^^^
+    |                   |
+    |                   help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `metrics`
+   --> src/concurrency/sync_primitives.rs:718:23
+    |
+718 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_metrics`
+
+warning: variable does not need to be mutable
+   --> src/concurrency/sync_primitives.rs:718:19
+    |
+718 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                   ----^^^^^^^
+    |                   |
+    |                   help: remove this `mut`
+
+warning: unused variable: `response_receiver`
+   --> src/debug/debugger.rs:390:31
+    |
+390 |         let (response_sender, response_receiver) = channel();
+    |                               ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_response_receiver`
+
+warning: unused variable: `debugger_process`
+   --> src/debug/debugger.rs:393:13
+    |
+393 |         let debugger_process = self.start_debugger_process(&program_path)?;
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_debugger_process`
+
+warning: unused variable: `target_info`
+   --> src/debug/debugger.rs:401:13
+    |
+401 |         let target_info = TargetInfo {
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_target_info`
+
+warning: unused variable: `diagnostic`
+   --> src/debug/lsp.rs:593:21
+    |
+593 |                 let diagnostic = Diagnostic {
+    |                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_diagnostic`
+
+warning: unused variable: `name`
+   --> src/debug/lsp.rs:636:18
+    |
+636 |             for (name, symbol) in &semantic_info.symbols {
+    |                  ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `uri`
+   --> src/debug/lsp.rs:789:35
+    |
+789 |     pub fn get_diagnostics(&self, uri: &str) -> Vec<Diagnostic> {
+    |                                   ^^^ help: if this is intentional, prefix it with an underscore: `_uri`
+
+warning: unused variable: `categories`
+   --> src/docs/examples.rs:132:13
+    |
+132 |         let categories = Self::create_example_categories();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_categories`
+
+warning: unused variable: `templates`
+   --> src/docs/examples.rs:133:13
+    |
+133 |         let templates = Self::create_example_templates();
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_templates`
+
+warning: unused variable: `config`
+   --> src/docs/examples.rs:131:16
+    |
+131 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `output_dir`
+  --> src/docs/generator.rs:21:16
+   |
+21 |     pub fn new(output_dir: String) -> Self {
+   |                ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_output_dir`
+
+warning: unused variable: `comment_parser`
+   --> src/docs/parser.rs:132:13
+    |
+132 |         let comment_parser = CommentParser::new();
+    |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_comment_parser`
+
+warning: unused variable: `signature_parser`
+   --> src/docs/parser.rs:133:13
+    |
+133 |         let signature_parser = SignatureParser::new();
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_signature_parser`
+
+warning: unused variable: `config`
+   --> src/docs/parser.rs:131:16
+    |
+131 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `themes`
+   --> src/docs/renderer.rs:368:13
+    |
+368 |         let themes = ThemeManager::new()?;
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_themes`
+
+warning: unused variable: `search_paths`
+   --> src/docs/renderer.rs:539:13
+    |
+539 |         let search_paths = vec![base_dir.join("templates"), PathBuf::from("templates")];
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_search_paths`
+
+warning: unused variable: `helpers`
+   --> src/docs/renderer.rs:558:13
+    |
+558 |         let helpers = Self::create_default_helpers();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_helpers`
+
+warning: unused variable: `processors`
+   --> src/docs/renderer.rs:879:13
+    |
+879 |         let processors: Vec<&dyn Fn(&str) -> String> = vec![];
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_processors`
+
+warning: unused variable: `options`
+    --> src/docs/renderer.rs:1185:13
+     |
+1185 |         let options = MarkdownOptions {
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `toc_generator`
+    --> src/docs/renderer.rs:1192:13
+     |
+1192 |         let toc_generator = TocGenerator {};
+     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_toc_generator`
+
+warning: unused variable: `options`
+    --> src/docs/renderer.rs:1347:13
+     |
+1347 |         let options = PdfOptions {
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `layout`
+    --> src/docs/renderer.rs:1354:13
+     |
+1354 |         let layout = PageLayout {
+     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_layout`
+
+warning: unused variable: `templates`
+  --> src/docs/tutorial.rs:98:13
+   |
+98 |         let templates = Self::create_tutorial_templates();
+   |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_templates`
+
+warning: unused variable: `config`
+  --> src/docs/tutorial.rs:97:16
+   |
+97 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+   |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `function`
+   --> src/error/intent_analysis.rs:142:9
+    |
+142 |         function: &Function,
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `error`
+   --> src/error/structured.rs:434:26
+    |
+434 |     fn fix_type_mismatch(error: &CompilerError) -> Vec<FixSuggestion> {
+    |                          ^^^^^ help: if this is intentional, prefix it with an underscore: `_error`
+
+warning: unused variable: `error`
+   --> src/error/structured.rs:455:29
+    |
+455 |     fn fix_undefined_symbol(error: &CompilerError) -> Vec<FixSuggestion> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_error`
+
+warning: unused variable: `function`
+   --> src/llvm_backend/codegen.rs:157:13
+    |
+157 |         let function = self.module.add_function(name, fn_type, None);
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `i`
+   --> src/llvm_backend/mod.rs:625:18
+    |
+625 |             for (i, stmt) in mir_block.statements.iter().enumerate() {
+    |                  ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unnecessary `unsafe` block
+   --> src/llvm_backend/mod.rs:906:41
+    |
+906 |                         let field_ptr = unsafe {
+    |                                         ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+    --> src/llvm_backend/mod.rs:2393:13
+     |
+ 973 |             mir::Rvalue::AddressOf(place) => {
+     |             ----------------------------- matches all the relevant values
+...
+2393 |             &mir::Rvalue::AddressOf(_) => todo!(),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `int_val`
+    --> src/llvm_backend/mod.rs:1528:58
+     |
+1528 | ...                   BasicValueEnum::IntValue(int_val) => {
+     |                                                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_int_val`
+
+warning: unused variable: `field_names`
+    --> src/llvm_backend/mod.rs:1792:61
+     |
+1792 |                     mir::AggregateKind::Struct(struct_name, field_names) => {
+     |                                                             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_field_names`
+
+warning: value assigned to `struct_size` is never read
+    --> src/llvm_backend/mod.rs:1816:33
+     |
+1816 |                         let mut struct_size = 0u64;
+     |                                 ^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> src/llvm_backend/mod.rs:2108:29
+     |
+2108 |                         let mut current_type =
+     |                             ----^^^^^^^^^^^^
+     |                             |
+     |                             help: remove this `mut`
+
+warning: unused variable: `i64_type`
+    --> src/llvm_backend/mod.rs:3166:13
+     |
+3166 |         let i64_type = self.context.i64_type();
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_i64_type`
+
+warning: unused variable: `void_type`
+    --> src/llvm_backend/mod.rs:3169:13
+     |
+3169 |         let void_type = self.context.void_type();
+     |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_void_type`
+
+warning: unnecessary `unsafe` block
+    --> src/llvm_backend/mod.rs:3618:33
+     |
+3618 |                 let field_ptr = unsafe {
+     |                                 ^^^^^^ unnecessary `unsafe` block
+
+warning: unused variable: `parent`
+   --> src/memory/mod.rs:110:37
+    |
+110 |     pub fn create_region(&mut self, parent: Option<RegionId>) -> RegionId {
+    |                                     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parent`
+
+warning: unused variable: `operand`
+   --> src/memory/mod.rs:307:48
+    |
+307 |                 if let Expression::AddressOf { operand, .. } = &**expr {
+    |                                                ^^^^^^^-
+    |                                                |
+    |                                                help: try removing the field
+
+warning: unused variable: `region_id`
+   --> src/memory/mod.rs:441:38
+    |
+441 |     fn get_region_allocations(&self, region_id: &RegionId) -> Vec<AllocationInfo> {
+    |                                      ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_region_id`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:586:17
+    |
+586 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:599:17
+    |
+599 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:653:17
+    |
+653 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:663:17
+    |
+663 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `module`
+    --> src/mir/lowering.rs:2541:33
+     |
+2541 |             Type::Named { name, module } => {
+     |                                 ^^^^^^ help: try ignoring the field: `module: _`
+
+warning: unused variable: `map`
+    --> src/mir/lowering.rs:2665:47
+     |
+2665 |             ast::AssignmentTarget::MapValue { map, key } => {
+     |                                               ^^^ help: try ignoring the field: `map: _`
+
+warning: unused variable: `key`
+    --> src/mir/lowering.rs:2665:52
+     |
+2665 |             ast::AssignmentTarget::MapValue { map, key } => {
+     |                                                    ^^^ help: try ignoring the field: `key: _`
+
+warning: unreachable pattern
+    --> src/mir/lowering.rs:3995:13
+     |
+3931 |               ast::Pattern::Wildcard { binding, .. } => {
+     |               -------------------------------------- matches all the relevant values
+...
+3995 | /             ast::Pattern::Wildcard {
+3996 | |                 binding: Some(binding_name),
+3997 | |                 source_location,
+3998 | |             } => {
+     | |_____________^ no value can reach this
+
+warning: unreachable pattern
+    --> src/mir/lowering.rs:4058:13
+     |
+3931 |             ast::Pattern::Wildcard { binding, .. } => {
+     |             -------------------------------------- matches all the relevant values
+...
+4058 |             ast::Pattern::Wildcard { binding: None, .. } => {
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unused variable: `st`
+    --> src/mir/lowering.rs:3789:49
+     |
+3789 |                     let data_type = if let Some(st) = &self.symbol_table {
+     |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_st`
+
+warning: unused variable: `inner_variant`
+    --> src/mir/lowering.rs:3816:43
+     |
+3816 | ...                   variant_name: inner_variant,
+     |                                     ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inner_variant`
+
+warning: unused variable: `target_type`
+    --> src/mir/lowering.rs:4662:13
+     |
+4662 |         let target_type = match pointer_type {
+     |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_target_type`
+
+warning: unused variable: `cycle`
+   --> src/module_loader.rs:265:17
+    |
+265 |             let cycle: Vec<String> = stack[cycle_start..].to_vec();
+    |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_cycle`
+
+warning: unused variable: `depth`
+  --> src/optimizations/inlining.rs:52:44
+   |
+52 |     pub fn set_max_inline_depth(&mut self, depth: usize) {}
+   |                                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_depth`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:667:14
+    |
+667 |         for (function_name, summary) in summaries {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:782:14
+    |
+782 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function`
+   --> src/optimizations/interprocedural.rs:782:29
+    |
+782 |         for (function_name, function) in &program.functions {
+    |                             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:799:14
+    |
+799 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:821:14
+    |
+821 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `constant`
+   --> src/optimizations/interprocedural.rs:856:21
+    |
+856 |         for (place, constant) in assignments {
+    |                     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_constant`
+
+warning: unused variable: `var_name`
+   --> src/optimizations/interprocedural.rs:857:17
+    |
+857 |             let var_name = format!("{}::{}", function.name, place.local);
+    |                 ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_var_name`
+
+warning: unused variable: `end_loc`
+    --> src/parser/v2.rs:2956:17
+     |
+2956 |             let end_loc = self.current_location();
+     |                 ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_end_loc`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:1344:37
+     |
+1344 | ...                   let mut constraints = Vec::new();
+     |                           ----^^^^^^^^^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: unused variable: `field_location`
+    --> src/parser/mod.rs:1442:17
+     |
+1442 |             let field_location = field_keyword.location.clone();
+     |                 ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_field_location`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:1509:37
+     |
+1509 | ...                   let mut constraints = Vec::new();
+     |                           ----^^^^^^^^^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: unused variable: `nested_pattern`
+    --> src/parser/mod.rs:4057:22
+     |
+4057 |                 let (nested_pattern, binding) = if let Some(token) = self.current_token() {
+     |                      ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_nested_pattern`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:4474:13
+     |
+4474 |         let mut invariants = Vec::new();
+     |             ----^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:132:21
+    |
+132 |                 let mut contract = create_pattern_contract("safe_array_access");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:392:21
+    |
+392 |                 let mut contract = create_pattern_contract("binary_search");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:536:21
+    |
+536 |                 let mut contract = create_pattern_contract("map_filter_reduce");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:804:21
+    |
+804 |                 let mut contract = create_pattern_contract("raii_wrapper");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:931:21
+    |
+931 |                 let mut contract = create_pattern_contract("result_type");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/patterns/catalog.rs:1049:21
+     |
+1049 |                 let mut contract = create_pattern_contract("input_validation");
+     |                     ----^^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: unused variable: `data_flow`
+   --> src/patterns/composition.rs:519:9
+    |
+519 |         data_flow: &DataFlowSpec,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_data_flow`
+
+warning: unused variable: `config`
+   --> src/release/distribution.rs:947:16
+    |
+947 |     pub fn new(config: DistributionConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `cache_config`
+    --> src/release/distribution.rs:1135:13
+     |
+1135 |         let cache_config = CacheConfig {
+     |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cache_config`
+
+warning: unused variable: `c_string`
+   --> src/runtime/mod.rs:170:9
+    |
+170 |     let c_string = result.as_ptr() as *mut c_char;
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_c_string`
+
+warning: unused variable: `constraint`
+   --> src/semantic/metadata.rs:462:25
+    |
+462 |             if let Some(constraint) = &sem_type.constraint {
+    |                         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_constraint`
+
+warning: unused variable: `e`
+  --> src/semantic/ownership.rs:39:32
+   |
+39 |                     if let Err(e) = self.symbol_table.mark_variable_moved(&name.name) {
+   |                                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+  --> src/semantic/ownership.rs:64:36
+   |
+64 |                         if let Err(e) = self.symbol_table.mark_variable_moved(&name.name) {
+   |                                    ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `enum_name`
+    --> src/semantic/mod.rs:1549:17
+     |
+1549 |                 enum_name,
+     |                 ^^^^^^^^^ help: try ignoring the field: `enum_name: _`
+
+warning: unused variable: `source_location`
+    --> src/semantic/mod.rs:1726:17
+     |
+1726 |                 source_location,
+     |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+    --> src/semantic/mod.rs:1921:17
+     |
+1921 |                 source_location,
+     |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `size_type`
+  --> src/stdlib/network.rs:41:9
+   |
+41 |     let size_type = TypeSpecifier::Primitive {
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_size_type`
+
+warning: unused variable: `contract`
+   --> src/verification/contracts.rs:811:13
+    |
+811 |     let mut contract = FunctionContract::new(function.name.name.clone());
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_contract`
+
+warning: variable does not need to be mutable
+   --> src/verification/contracts.rs:811:9
+    |
+811 |     let mut contract = FunctionContract::new(function.name.name.clone());
+    |         ----^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `place`
+   --> src/verification/vcgen.rs:382:25
+    |
+382 |             Rvalue::Len(place) => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_place`
+
+warning: field `associated_mutex` is never read
+  --> src/concurrency/sync_primitives.rs:89:5
+   |
+84 | pub struct AetherCondVar {
+   |            ------------- field in this struct
+...
+89 |     associated_mutex: Option<String>,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `AetherCondVar` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `BarrierState` is never constructed
+   --> src/concurrency/sync_primitives.rs:137:8
+    |
+137 | struct BarrierState {
+    |        ^^^^^^^^^^^^
+
+warning: field `barrier_cycles` is never read
+   --> src/concurrency/sync_primitives.rs:200:5
+    |
+198 | struct BarrierMetrics {
+    |        -------------- field in this struct
+199 |     wait_count: u64,
+200 |     barrier_cycles: u64,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `BarrierMetrics` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `acquired_at` is never read
+   --> src/concurrency/sync_primitives.rs:236:5
+    |
+234 | pub struct ReadGuard<'a> {
+    |            --------- field in this struct
+235 |     rw_lock: &'a AetherRwLock,
+236 |     acquired_at: Instant,
+    |     ^^^^^^^^^^^
+
+warning: field `acquired_at` is never read
+   --> src/concurrency/sync_primitives.rs:242:5
+    |
+240 | pub struct WriteGuard<'a> {
+    |            ---------- field in this struct
+241 |     rw_lock: &'a AetherRwLock,
+242 |     acquired_at: Instant,
+    |     ^^^^^^^^^^^
+
+warning: fields `target_pid` and `breakpoints` are never read
+  --> src/debug/debugger.rs:51:5
+   |
+49 | pub struct DebugSession {
+   |            ------------ fields in this struct
+50 |     /// Target process ID
+51 |     target_pid: Option<u32>,
+   |     ^^^^^^^^^^
+...
+57 |     breakpoints: Arc<Mutex<HashMap<String, Vec<Breakpoint>>>>,
+   |     ^^^^^^^^^^^
+   |
+   = note: `DebugSession` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `diagnostics_provider` and `shutdown` are never read
+  --> src/debug/lsp.rs:45:5
+   |
+34 | pub struct LanguageServer {
+   |            -------------- fields in this struct
+...
+45 |     diagnostics_provider: DiagnosticsProvider,
+   |     ^^^^^^^^^^^^^^^^^^^^
+...
+51 |     shutdown: Arc<AtomicBool>,
+   |     ^^^^^^^^
+   |
+   = note: `LanguageServer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `diagnostics` is never read
+   --> src/debug/lsp.rs:333:5
+    |
+331 | pub struct DiagnosticEngine {
+    |            ---------------- field in this struct
+332 |     /// Active diagnostics by document
+333 |     diagnostics: HashMap<String, Vec<Diagnostic>>,
+    |     ^^^^^^^^^^^
+    |
+    = note: `DiagnosticEngine` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `snippets` is never read
+   --> src/debug/lsp.rs:343:5
+    |
+338 | pub struct CompletionProvider {
+    |            ------------------ field in this struct
+...
+343 |     snippets: HashMap<String, String>,
+    |     ^^^^^^^^
+    |
+    = note: `CompletionProvider` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `source_parser` and `markdown_parser` are never read
+  --> src/docs/parser.rs:39:5
+   |
+37 | pub struct DocParser {
+   |            --------- fields in this struct
+38 |     /// Source code parser
+39 |     source_parser: SourceParser,
+   |     ^^^^^^^^^^^^^
+...
+42 |     markdown_parser: MarkdownParser,
+   |     ^^^^^^^^^^^^^^^
+   |
+   = note: `DocParser` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `patterns` is never read
+  --> src/docs/parser.rs:74:5
+   |
+72 | pub struct CommentParser {
+   |            ------------- field in this struct
+73 |     /// Comment prefix patterns
+74 |     patterns: CommentPatterns,
+   |     ^^^^^^^^
+   |
+   = note: `CommentParser` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `location` is never read
+   --> src/docs/parser.rs:725:5
+    |
+714 | struct ParsedItem {
+    |        ---------- field in this struct
+...
+725 |     location: SourceLocation,
+    |     ^^^^^^^^
+    |
+    = note: `ParsedItem` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: variants `Module`, `Enum`, `Trait`, `TypeAlias`, `Import`, and `Macro` are never constructed
+   --> src/docs/parser.rs:731:5
+    |
+730 | enum ItemType {
+    |      -------- variants in this enum
+731 |     Module,
+    |     ^^^^^^
+...
+734 |     Enum,
+    |     ^^^^
+735 |     Trait,
+    |     ^^^^^
+736 |     TypeAlias,
+    |     ^^^^^^^^^
+737 |     Constant,
+738 |     Import,
+    |     ^^^^^^
+739 |     Macro,
+    |     ^^^^^
+    |
+    = note: `ItemType` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: methods `parse_documentation`, `clean_comment_line`, `extract_tag`, `tag_to_section`, and `finalize_section` are never used
+   --> src/docs/parser.rs:774:8
+    |
+761 | impl CommentParser {
+    | ------------------ methods in this implementation
+...
+774 |     fn parse_documentation(&self, raw_docs: &str) -> Result<ParsedDoc, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+837 |     fn clean_comment_line(&self, line: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+850 |     fn extract_tag(&self, line: &str) -> Option<String> {
+    |        ^^^^^^^^^^^
+...
+862 |     fn tag_to_section(&self, tag: &str) -> DocSection {
+    |        ^^^^^^^^^^^^^^
+...
+872 |     fn finalize_section(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: variant `Tag` is never constructed
+   --> src/docs/parser.rs:933:5
+    |
+927 | enum DocSection {
+    |      ---------- variant in this enum
+...
+933 |     Tag(String),
+    |     ^^^
+    |
+    = note: `DocSection` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: methods `parse_function_signature`, `parse_type_definition`, `extract_function_name`, and `extract_type_name` are never used
+   --> src/docs/parser.rs:941:8
+    |
+936 | impl SignatureParser {
+    | -------------------- methods in this implementation
+...
+941 |     fn parse_function_signature(&self, source: &str) -> Result<FunctionSignature, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+957 |     fn parse_type_definition(&self, source: &str) -> Result<TypeInfo, SemanticError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+970 |     fn extract_function_name(&self, source: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+981 |     fn extract_type_name(&self, source: &str) -> String {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: fields `template_engine` and `output_format` are never read
+  --> src/docs/renderer.rs:32:5
+   |
+30 | pub struct DocRenderer {
+   |            ----------- fields in this struct
+31 |     /// Template engine for rendering
+32 |     template_engine: TemplateEngine,
+   |     ^^^^^^^^^^^^^^^
+...
+38 |     output_format: OutputFormat,
+   |     ^^^^^^^^^^^^^
+   |
+   = note: `DocRenderer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `templates` is never read
+  --> src/docs/renderer.rs:45:5
+   |
+43 | pub struct TemplateEngine {
+   |            -------------- field in this struct
+44 |     /// Loaded templates
+45 |     templates: HashMap<String, String>,
+   |     ^^^^^^^^^
+   |
+   = note: `TemplateEngine` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `doc` is never read
+   --> src/docs/renderer.rs:227:5
+    |
+225 | pub struct HtmlRenderer<'a> {
+    |            ------------ field in this struct
+226 |     /// Documentation to render
+227 |     doc: &'a Documentation,
+    |     ^^^
+    |
+    = note: `HtmlRenderer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `render_template` is never used
+   --> src/docs/renderer.rs:849:8
+    |
+536 | impl TemplateEngine {
+    | ------------------- method in this implementation
+...
+849 |     fn render_template(
+    |        ^^^^^^^^^^^^^^^
+
+warning: field `intent_keywords` is never read
+   --> src/error/intent_analysis.rs:234:5
+    |
+233 | struct IntentPattern {
+    |        ------------- field in this struct
+234 |     intent_keywords: Vec<String>,
+    |     ^^^^^^^^^^^^^^^
+
+warning: field `patterns` is never read
+   --> src/error/structured.rs:397:5
+    |
+396 | pub struct ErrorPatterns {
+    |            ------------- field in this struct
+397 |     patterns: HashMap<String, ErrorPattern>,
+    |     ^^^^^^^^
+
+warning: fields `code_prefix`, `matcher`, and `fixer` are never read
+   --> src/error/structured.rs:402:5
+    |
+401 | struct ErrorPattern {
+    |        ------------ fields in this struct
+402 |     code_prefix: String,
+    |     ^^^^^^^^^^^
+403 |     matcher: fn(&CompilerError) -> bool,
+    |     ^^^^^^^
+404 |     fixer: fn(&CompilerError) -> Vec<FixSuggestion>,
+    |     ^^^^^
+    |
+    = note: `ErrorPattern` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `include_snippets` is never read
+   --> src/error/structured.rs:510:5
+    |
+509 | pub struct LLMErrorFormatter {
+    |            ----------------- field in this struct
+510 |     include_snippets: bool,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: method `read_quoted_identifier` is never used
+   --> src/lexer/mod.rs:505:8
+    |
+ 89 | impl Lexer {
+    | ---------- method in this implementation
+...
+505 |     fn read_quoted_identifier(&mut self) -> Result<Token, LexerError> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `get_type_id` is never used
+  --> src/llvm_backend/mod.rs:96:8
+   |
+65 | impl CleanupInfo {
+   | ---------------- method in this implementation
+...
+96 |     fn get_type_id(&self, local_id: &mir::LocalId) -> TypeId {
+   |        ^^^^^^^^^^^
+
+warning: fields `start`, `size`, `permissions`, and `status` are never read
+  --> src/memory/mod.rs:61:5
+   |
+59 | struct MemoryRegion {
+   |        ------------ fields in this struct
+60 |     /// Start address
+61 |     start: usize,
+   |     ^^^^^
+...
+64 |     size: usize,
+   |     ^^^^
+...
+67 |     permissions: MemoryPermissions,
+   |     ^^^^^^^^^^^
+...
+70 |     status: AllocationStatus,
+   |     ^^^^^^
+   |
+   = note: `MemoryRegion` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `analyze_expression_memory` is never used
+   --> src/memory/mod.rs:151:8
+    |
+ 95 | impl MemoryAnalyzer {
+    | ------------------- method in this implementation
+...
+151 |     fn analyze_expression_memory(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `parent` is never read
+   --> src/mir/mod.rs:446:5
+    |
+445 | struct Scope {
+    |        ----- field in this struct
+446 |     parent: Option<ScopeId>,
+    |     ^^^^^^
+
+warning: method `get_enum_variant_associated_type` is never used
+    --> src/mir/lowering.rs:4086:8
+     |
+  74 | impl LoweringContext {
+     | -------------------- method in this implementation
+...
+4086 |     fn get_enum_variant_associated_type(
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `inlined_functions` is never read
+  --> src/optimizations/inlining.rs:35:5
+   |
+30 | pub struct InliningPass {
+   |            ------------ field in this struct
+...
+35 |     inlined_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^
+   |
+   = note: `InliningPass` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `summaries` and `global_constants` are never read
+  --> src/optimizations/interprocedural.rs:34:5
+   |
+29 | pub struct InterproceduralAnalysisPass {
+   |            --------------------------- fields in this struct
+...
+34 |     summaries: HashMap<String, FunctionSummary>,
+   |     ^^^^^^^^^
+...
+37 |     global_constants: GlobalConstantAnalysis,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `InterproceduralAnalysisPass` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `pure_functions`, `readonly_functions`, `modifying_functions`, `throwing_functions`, and `nonterminating_functions` are never read
+  --> src/optimizations/interprocedural.rs:63:5
+   |
+61 | pub struct SideEffectAnalysis {
+   |            ------------------ fields in this struct
+62 |     /// Functions that are pure (no side effects)
+63 |     pure_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^
+...
+66 |     readonly_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^
+...
+69 |     modifying_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^^
+...
+72 |     throwing_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^
+...
+75 |     nonterminating_functions: HashSet<String>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `SideEffectAnalysis` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `induction_variable` is never read
+   --> src/optimizations/vectorization.rs:662:5
+    |
+659 | struct LoopInfo {
+    |        -------- field in this struct
+...
+662 |     induction_variable: Option<Place>,
+    |     ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `LoopInfo` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `artifacts` is never read
+  --> src/package/builder.rs:35:5
+   |
+30 | pub struct PackageBuilder {
+   |            -------------- field in this struct
+...
+35 |     artifacts: Vec<BuildArtifact>,
+   |     ^^^^^^^^^
+   |
+   = note: `PackageBuilder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `artifacts`, `source_timestamps`, `dependency_timestamps`, `config_hash`, and `stats` are never read
+  --> src/package/builder.rs:51:5
+   |
+49 | pub struct BuildCache {
+   |            ---------- fields in this struct
+50 |     /// Cached build artifacts
+51 |     artifacts: HashMap<String, CachedArtifact>,
+   |     ^^^^^^^^^
+...
+54 |     source_timestamps: HashMap<PathBuf, std::time::SystemTime>,
+   |     ^^^^^^^^^^^^^^^^^
+...
+57 |     dependency_timestamps: HashMap<String, std::time::SystemTime>,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+...
+60 |     config_hash: Option<String>,
+   |     ^^^^^^^^^^^
+...
+63 |     stats: BuildCacheStats,
+   |     ^^^^^
+   |
+   = note: `BuildCache` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `sandbox_config` is never read
+   --> src/package/builder.rs:284:5
+    |
+282 | pub struct BuildScriptRunner {
+    |            ----------------- field in this struct
+283 |     /// Sandbox configuration
+284 |     sandbox_config: SandboxConfig,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `BuildScriptRunner` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `clear` is never used
+   --> src/package/builder.rs:882:8
+    |
+881 | impl BuildCache {
+    | --------------- method in this implementation
+882 |     fn clear(&mut self) {
+    |        ^^^^^
+
+warning: methods `execute_shell_script`, `execute_python_script`, `execute_node_script`, `execute_custom_script`, and `execute_external_script` are never used
+   --> src/package/builder.rs:949:8
+    |
+891 | impl BuildScriptRunner {
+    | ---------------------- methods in this implementation
+...
+949 |     fn execute_shell_script(
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+960 |     fn execute_python_script(
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+971 |     fn execute_node_script(
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+982 |     fn execute_custom_script(
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+994 |     fn execute_external_script(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `client` is never read
+   --> src/package/registry.rs:109:5
+    |
+107 | pub struct HttpClient {
+    |            ---------- field in this struct
+108 |     /// HTTP client
+109 |     client: reqwest::Client,
+    |     ^^^^^^
+    |
+    = note: `HttpClient` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: multiple methods are never used
+   --> src/parser/v2.rs:210:8
+    |
+ 80 | impl Parser {
+    | ----------- methods in this implementation
+...
+210 |     fn synchronize(&mut self) {
+    |        ^^^^^^^^^^^
+...
+245 |     fn synchronize_to_block_end(&mut self) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+384 |     fn syntax_error(&self, message: &str, suggestion: Option<&str>) -> ParserError {
+    |        ^^^^^^^^^^^^
+...
+393 |     fn missing_semicolon_error(&self) -> ParserError {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+401 |     fn missing_type_error(&self, context: &str) -> ParserError {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+409 |     fn unexpected_token_error(&self, context: &str) -> ParserError {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+443 |     fn expected_expression_hint(&self) -> &'static str {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `cache` and `resolver` are never read
+  --> src/patterns/composition.rs:31:5
+   |
+26 | pub struct CompositionEngine {
+   |            ----------------- fields in this struct
+...
+31 |     cache: HashMap<String, ComposedPattern>,
+   |     ^^^^^
+...
+34 |     resolver: ConflictResolver,
+   |     ^^^^^^^^
+
+warning: field `strategies` is never read
+   --> src/patterns/composition.rs:149:5
+    |
+147 | pub struct ConflictResolver {
+    |            ---------------- field in this struct
+148 |     /// Resolution strategies
+149 |     strategies: HashMap<ConflictType, ResolutionStrategy>,
+    |     ^^^^^^^^^^
+
+warning: variant `Sequential` is never constructed
+    --> src/patterns/composition.rs:1075:5
+     |
+1073 | enum PatternRelationship {
+     |      ------------------- variant in this enum
+1074 |     Independent,
+1075 |     Sequential,
+     |     ^^^^^^^^^^
+     |
+     = note: `PatternRelationship` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `stdlib` is never read
+   --> src/pipeline/mod.rs:183:5
+    |
+181 | pub struct CompilationPipeline {
+    |            ------------------- field in this struct
+182 |     options: CompileOptions,
+183 |     stdlib: StandardLibrary,
+    |     ^^^^^^
+
+warning: fields `project_info`, `history`, `automation`, `artifacts`, `distribution`, and `packaging` are never read
+  --> src/release/mod.rs:38:5
+   |
+36 | pub struct ReleaseManager {
+   |            -------------- fields in this struct
+37 |     /// Project information
+38 |     project_info: ProjectInfo,
+   |     ^^^^^^^^^^^^
+...
+41 |     history: ReleaseHistory,
+   |     ^^^^^^^
+...
+44 |     automation: automation::AutomationPipeline,
+   |     ^^^^^^^^^^
+...
+47 |     artifacts: artifacts::ArtifactManager,
+   |     ^^^^^^^^^
+...
+50 |     distribution: distribution::DistributionManager,
+   |     ^^^^^^^^^^^^
+...
+53 |     packaging: packaging::PackageBuilder,
+   |     ^^^^^^^^^
+   |
+   = note: `ReleaseManager` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: method `get_content_type` is never used
+    --> src/release/distribution.rs:1077:8
+     |
+ 945 | impl DistributionManager {
+     | ------------------------ method in this implementation
+...
+1077 |     fn get_content_type(&self, format: &PackageFormat) -> String {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: fields `formats` and `compression` are never read
+  --> src/release/packaging.rs:38:5
+   |
+27 | pub struct PackageBuilder {
+   |            -------------- fields in this struct
+...
+38 |     formats: Vec<PackageFormat>,
+   |     ^^^^^^^
+...
+41 |     compression: CompressionSettings,
+   |     ^^^^^^^^^^^
+   |
+   = note: `PackageBuilder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `settings` is never read
+   --> src/release/updates.rs:644:5
+    |
+633 | pub struct UpdateCache<T> {
+    |            ----------- field in this struct
+...
+644 |     settings: CacheSettings,
+    |     ^^^^^^^^
+    |
+    = note: `UpdateCache` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `trusted_certs`, `signature_verification`, and `cert_validation` are never read
+   --> src/release/updates.rs:878:5
+    |
+873 | pub struct UpdateSecurity {
+    |            -------------- fields in this struct
+...
+878 |     trusted_certs: Vec<Certificate>,
+    |     ^^^^^^^^^^^^^
+...
+881 |     signature_verification: SignatureVerificationConfig,
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+...
+884 |     cert_validation: CertificateValidation,
+    |     ^^^^^^^^^^^^^^^
+    |
+    = note: `UpdateSecurity` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `pools` is never read
+  --> src/resource/analysis.rs:37:5
+   |
+26 | pub struct ResourceAnalyzer {
+   |            ---------------- field in this struct
+...
+37 |     pools: HashMap<String, ResourcePool>,
+   |     ^^^^^
+
+warning: fields `depth` and `location` are never read
+  --> src/resource/analysis.rs:48:5
+   |
+45 | struct ScopeInfo {
+   |        --------- fields in this struct
+...
+48 |     depth: usize,
+   |     ^^^^^
+49 |     location: SourceLocation,
+   |     ^^^^^^^^
+   |
+   = note: `ScopeInfo` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: function `create_external_function` is never used
+  --> src/stdlib/mod.rs:95:15
+   |
+95 | pub(crate) fn create_external_function(
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `assertions` and `variables` are never read
+  --> src/verification/solver.rs:26:5
+   |
+24 | pub struct SmtSolver {
+   |            --------- fields in this struct
+25 |     /// SMT-LIB assertions
+26 |     assertions: Vec<String>,
+   |     ^^^^^^^^^^
+...
+29 |     variables: HashMap<String, String>,
+   |     ^^^^^^^^^
+   |
+   = note: `SmtSolver` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> src/concurrency/sync_primitives.rs:395:17
+    |
+395 |     pub fn lock(&self) -> LockResult<MutexGuard> {
+    |                 ^^^^^                ^^^^^^^^^^ the same lifetime is hidden here
+    |                 |
+    |                 the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+395 |     pub fn lock(&self) -> LockResult<MutexGuard<'_>> {
+    |                                                ++++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> src/concurrency/sync_primitives.rs:434:21
+    |
+434 |     pub fn try_lock(&self) -> LockResult<MutexGuard> {
+    |                     ^^^^^                ^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+    |
+434 |     pub fn try_lock(&self) -> LockResult<MutexGuard<'_>> {
+    |                                                    ++++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> src/concurrency/sync_primitives.rs:615:17
+    |
+615 |     pub fn read(&self) -> LockResult<ReadGuard> {
+    |                 ^^^^^                ^^^^^^^^^ the same lifetime is hidden here
+    |                 |
+    |                 the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+    |
+615 |     pub fn read(&self) -> LockResult<ReadGuard<'_>> {
+    |                                               ++++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> src/concurrency/sync_primitives.rs:634:18
+    |
+634 |     pub fn write(&self) -> LockResult<WriteGuard> {
+    |                  ^^^^^                ^^^^^^^^^^ the same lifetime is hidden here
+    |                  |
+    |                  the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+    |
+634 |     pub fn write(&self) -> LockResult<WriteGuard<'_>> {
+    |                                                 ++++
+
+warning: unused `Result` that must be used
+   --> src/llvm_backend/mod.rs:453:29
+    |
+453 | ...                   builder.build_return(Some(&return_value));
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+453 |                             let _ = builder.build_return(Some(&return_value));
+    |                             +++++++
+
+warning: unused `Result` that must be used
+   --> src/llvm_backend/mod.rs:462:29
+    |
+462 | ...                   builder.build_return(Some(&i32_type.const_int(0, false)));
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+462 |                             let _ = builder.build_return(Some(&i32_type.const_int(0, false)));
+    |                             +++++++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+  --> src/llvm_backend/context.rs:47:26
+   |
+47 |     pub fn create_module(&self, name: &str) -> Module {
+   |                          ^^^^^                 ^^^^^^ the same lifetime is hidden here
+   |                          |
+   |                          the lifetime is elided here
+   |
+   = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+   |
+47 |     pub fn create_module(&self, name: &str) -> Module<'_> {
+   |                                                      ++++
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+  --> src/llvm_backend/context.rs:58:27
+   |
+58 |     pub fn create_builder(&self) -> Builder {
+   |                           ^^^^^     ^^^^^^^ the same lifetime is hidden here
+   |                           |
+   |                           the lifetime is elided here
+   |
+   = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+   |
+58 |     pub fn create_builder(&self) -> Builder<'_> {
+   |                                            ++++
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:538:61
+    |
+538 |                 Ok(compatible_versions.iter().max().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+    |
+    = note: `#[warn(suspicious_double_ref_op)]` on by default
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:541:61
+    |
+541 |                 Ok(compatible_versions.iter().min().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:545:61
+    |
+545 |                 Ok(compatible_versions.iter().min().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: using `.clone()` on a double reference, which returns `&version::Version` instead of cloning the inner type
+   --> src/package/resolver.rs:549:61
+    |
+549 |                 Ok(compatible_versions.iter().max().unwrap().clone().clone())
+    |                                                             ^^^^^^^^
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+  --> src/profiling/mod.rs:91:24
+   |
+91 |     pub fn start_phase(&mut self, phase_name: &str) -> PhaseTimer {
+   |                        ^^^^^^^^^                       ^^^^^^^^^^ the same lifetime is hidden here
+   |                        |
+   |                        the lifetime is elided here
+   |
+   = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+help: use `'_` for type paths
+   |
+91 |     pub fn start_phase(&mut self, phase_name: &str) -> PhaseTimer<'_> {
+   |                                                                  ++++
+
+warning: unused `Result` that must be used
+    --> src/semantic/mod.rs:2915:9
+     |
+2915 |         self.symbol_table.exit_scope();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+     |
+2915 |         let _ = self.symbol_table.exit_scope();
+     |         +++++++
+
+warning: `aether` (lib) generated 186 warnings (run `cargo fix --lib -p aether` to apply 44 suggestions)
+   Compiling aether v0.1.0 (/Users/keithballinger/Desktop/projects/aether-v2-syntax)
+warning: unused import: `std::path::PathBuf`
+  --> tests/test_pointer_codegen.rs:20:5
+   |
+20 | use std::path::PathBuf;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `aether::ast`
+  --> tests/test_enhanced_verification.rs:16:5
+   |
+16 | use aether::ast;
+   |     ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `aether::types::Type`
+  --> tests/test_enhanced_verification.rs:19:5
+   |
+19 | use aether::types::Type;
+   |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `aether::types::TypeChecker`
+  --> tests/test_ffi_struct_codegen.rs:25:5
+   |
+25 | use aether::types::TypeChecker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::cell::RefCell`
+  --> tests/test_ffi_struct_codegen.rs:26:5
+   |
+26 | use std::cell::RefCell;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::rc::Rc`
+  --> tests/test_ffi_struct_codegen.rs:27:5
+   |
+27 | use std::rc::Rc;
+   |     ^^^^^^^^^^^
+
+warning: unused variable: `result`
+  --> tests/test_pointer_codegen.rs:45:9
+   |
+45 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `result`
+  --> tests/test_pointer_codegen.rs:69:9
+   |
+69 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `result`
+  --> tests/test_pointer_codegen.rs:92:9
+   |
+92 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `result`
+  --> tests/test_stdlib_collections.rs:30:9
+   |
+30 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `result`
+  --> tests/test_stdlib_math.rs:30:9
+   |
+30 |     let result = compiler.compile_file(test_file)?;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+error[E0063]: missing field `is_async` in initializer of `aether::ast::Function`
+  --> tests/test_ffi_struct_codegen.rs:61:36
+   |
+61 |         function_definitions: vec![Function {
+   |                                    ^^^^^^^^ missing `is_async`
+
+warning: unused import: `aether::ast::*`
+  --> tests/test_parser_contracts.rs:17:9
+   |
+17 |     use aether::ast::*;
+   |         ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `aether::error::SourceLocation`
+  --> tests/test_parser_contracts.rs:18:9
+   |
+18 |     use aether::error::SourceLocation;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:154:9
+    |
+154 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:202:9
+    |
+202 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:245:9
+    |
+245 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:300:9
+    |
+300 |     let mut module = Module {
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> tests/test_ffi_struct_codegen.rs:371:9
+    |
+371 |     let mut program = Program {
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+For more information about this error, try `rustc --explain E0063`.
+warning: `aether` (test "test_ffi_struct_codegen") generated 8 warnings
+error: could not compile `aether` (test "test_ffi_struct_codegen") due to 1 previous error; 8 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: function `count_constants` is never used
+   --> tests/optimization_tests.rs:443:4
+    |
+443 | fn count_constants(function: &Function) -> usize {
+    |    ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0063]: missing field `is_async` in initializer of `aether::ast::Function`
+  --> tests/control_flow_semantic_tests.rs:24:19
+   |
+24 |     let if_func = Function {
+   |                   ^^^^^^^^ missing `is_async`
+
+error[E0063]: missing field `is_async` in initializer of `aether::ast::Function`
+  --> tests/control_flow_semantic_tests.rs:97:22
+   |
+97 |     let while_func = Function {
+   |                      ^^^^^^^^ missing `is_async`
+
+error[E0063]: missing field `is_async` in initializer of `aether::ast::Function`
+   --> tests/control_flow_semantic_tests.rs:232:20
+    |
+232 |     let bad_func = Function {
+    |                    ^^^^^^^^ missing `is_async`
+
+error[E0063]: missing field `is_async` in initializer of `aether::ast::Function`
+   --> tests/control_flow_semantic_tests.rs:307:24
+    |
+307 |     let foreach_func = Function {
+    |                        ^^^^^^^^ missing `is_async`
+
+error[E0063]: missing field `is_async` in initializer of `aether::ast::Function`
+   --> tests/control_flow_semantic_tests.rs:413:21
+    |
+413 |     let loop_func = Function {
+    |                     ^^^^^^^^ missing `is_async`
+
+error[E0063]: missing field `is_async` in initializer of `aether::ast::Function`
+   --> tests/control_flow_semantic_tests.rs:502:20
+    |
+502 |     let try_func = Function {
+    |                    ^^^^^^^^ missing `is_async`
+
+error: could not compile `aether` (test "control_flow_semantic_tests") due to 6 previous errors
+warning: `aether` (test "test_parser_contracts") generated 2 warnings (run `cargo fix --test "test_parser_contracts"` to apply 2 suggestions)
+warning: `aether` (test "test_enhanced_verification") generated 2 warnings (run `cargo fix --test "test_enhanced_verification"` to apply 2 suggestions)
+warning: `aether` (test "optimization_tests") generated 1 warning
+warning: `aether` (test "test_stdlib_math") generated 1 warning
+warning: `aether` (test "test_pointer_codegen") generated 4 warnings (run `cargo fix --test "test_pointer_codegen"` to apply 1 suggestion)
+warning: `aether` (test "test_stdlib_collections") generated 1 warning
+error[E0425]: cannot find value `location` in this scope
+   --> src/error/intent_analysis.rs:648:30
+    |
+648 |             source_location: location.clone(),
+    |                              ^^^^^^^^ not found in this scope
+
+error[E0603]: struct import `SourceLocation` is private
+    --> src/mir/lowering.rs:4977:35
+     |
+4977 |             source_location: ast::SourceLocation::unknown(),
+     |                                   ^^^^^^^^^^^^^^ private struct import
+     |
+note: the struct import `SourceLocation` is defined here...
+    --> src/ast/mod.rs:19:5
+     |
+  19 | use crate::error::SourceLocation;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the struct `SourceLocation` which is defined here
+    --> src/error/mod.rs:32:1
+     |
+  32 | pub struct SourceLocation {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^ you could import this directly
+help: consider importing this struct through its public re-export instead
+     |
+4977 -             source_location: ast::SourceLocation::unknown(),
+4977 +             source_location: crate::mir::SourceLocation::unknown(),
+     |
+help: import `SourceLocation` directly
+     |
+4977 -             source_location: ast::SourceLocation::unknown(),
+4977 +             source_location: error::SourceLocation(),
+     |
+
+warning: unused imports: `Builder` and `Program`
+   --> src/debug/dwarf.rs:546:22
+    |
+546 |     use crate::mir::{Builder, Program};
+    |                      ^^^^^^^  ^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::collections::HashMap`
+   --> src/debug/dwarf.rs:548:9
+    |
+548 |     use std::collections::HashMap;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Builder`
+   --> src/debug/source_map.rs:489:22
+    |
+489 |     use crate::mir::{Builder, Program};
+    |                      ^^^^^^^
+
+warning: unused import: `ExampleType`
+  --> src/docs/tutorial.rs:21:46
+   |
+21 |     CodeExample, DifficultyLevel, DocConfig, ExampleType, Exercise, Tutorial, TutorialSection,
+   |                                              ^^^^^^^^^^^
+
+warning: unused imports: `FunctionCall` and `FunctionReference`
+   --> src/error/intent_analysis.rs:596:16
+    |
+596 |         Block, FunctionCall, FunctionReference, Identifier, PrimitiveType, TypeSpecifier,
+    |                ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+    --> src/optimizations/loop_optimizations.rs:1301:9
+     |
+1301 |     use crate::error::SourceLocation;
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Builder`, `Rvalue`, and `SourceInfo`
+    --> src/optimizations/loop_optimizations.rs:1303:9
+     |
+1303 |         Builder, Constant, ConstantValue, Operand, Place, Rvalue, SourceInfo, Statement,
+     |         ^^^^^^^                                           ^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+   --> src/optimizations/vectorization.rs:787:9
+    |
+787 |     use crate::error::SourceLocation;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Rvalue`, `SourceInfo`, and `Statement`
+   --> src/optimizations/vectorization.rs:789:59
+    |
+789 |         Builder, Constant, ConstantValue, Operand, Place, Rvalue, SourceInfo, Statement,
+    |                                                           ^^^^^^  ^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `VersionRequirement`
+   --> src/package/resolver.rs:776:44
+    |
+776 |     use crate::package::version::{Version, VersionRequirement};
+    |                                            ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `self`
+  --> src/release/distribution.rs:23:22
+   |
+23 | use crate::release::{self, DistributionConfig, FailoverConfig, FailoverThreshold, RecoveryConfig};
+   |                      ^^^^
+
+warning: unused imports: `AudienceConfig`, `AuthConfig`, `ChannelMetadata`, `ChannelType`, `ChannelVisibility`, `HealthCheckConfig`, and `OptOutConfig`
+    --> src/release/distribution.rs:1318:29
+     |
+1318 |         AnnouncementConfig, AudienceConfig, AuthConfig, ChangelogConfig, ChangelogFormat,
+     |                             ^^^^^^^^^^^^^^  ^^^^^^^^^^
+1319 |         ChannelMetadata, ChannelType, ChannelVisibility, CommitParsingConfig, HealthCheckConfig,
+     |         ^^^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^                       ^^^^^^^^^^^^^^^^^
+1320 |         LoadBalancingConfig, LoadBalancingStrategy, MirrorConfig, OptOutConfig, ReleaseNotesConfig,
+     |                                                                   ^^^^^^^^^^^^
+
+warning: unused import: `UploadConfig as ReleaseUploadConfig`
+    --> src/release/distribution.rs:1326:61
+     |
+1326 |     use crate::release::{RetryConfig as ReleaseRetryConfig, UploadConfig as ReleaseUploadConfig};
+     |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::*`
+    --> src/release/updates.rs:2156:9
+     |
+2156 |     use super::*;
+     |         ^^^^^^^^
+
+warning: unused imports: `FunctionCall` and `FunctionReference`
+   --> src/resource/analysis.rs:630:22
+    |
+630 |     use crate::ast::{FunctionCall, FunctionReference, Identifier};
+    |                      ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Identifier` and `Module`
+   --> src/resource/mod.rs:217:22
+    |
+217 |     use crate::ast::{Identifier, Module};
+    |                      ^^^^^^^^^^  ^^^^^^
+
+warning: unused import: `Identifier`
+    --> src/types/mod.rs:1593:26
+     |
+1593 |         use crate::ast::{Identifier, TypeSpecifier};
+     |                          ^^^^^^^^^^
+
+error[E0062]: field `source_location` specified more than once
+   --> src/error/intent_analysis.rs:648:13
+    |
+643 |             source_location: SourceLocation::unknown(),
+    |             ------------------------------------------ first use of `source_location`
+...
+648 |             source_location: location.clone(),
+    |             ^^^^^^^^^^^^^^^ used more than once
+
+warning: unused variable: `id1`
+   --> src/debug/breakpoints.rs:887:13
+    |
+887 |         let id1 = manager
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_id1`
+
+warning: unused variable: `parser`
+    --> src/docs/parser.rs:1020:17
+     |
+1020 |         let mut parser = DocParser::new(&config).unwrap();
+     |                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parser`
+
+warning: variable does not need to be mutable
+    --> src/docs/parser.rs:1020:13
+     |
+1020 |         let mut parser = DocParser::new(&config).unwrap();
+     |             ----^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: unused variable: `manager`
+    --> src/docs/renderer.rs:1431:13
+     |
+1431 |         let manager = AssetManager::new(&base_dir).unwrap();
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_manager`
+
+warning: unused variable: `renderer`
+    --> src/docs/renderer.rs:1444:13
+     |
+1444 |         let renderer = MarkdownRenderer::new().unwrap();
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_renderer`
+
+warning: unused variable: `renderer`
+    --> src/docs/renderer.rs:1450:13
+     |
+1450 |         let renderer = PdfRenderer::new().unwrap();
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_renderer`
+
+warning: variable does not need to be mutable
+   --> src/llvm_backend/context.rs:153:13
+    |
+153 |         let mut ctx = LLVMContext::new();
+    |             ----^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/llvm_backend/types.rs:294:13
+    |
+294 |         let mut converter = TypeConverter::new(&context);
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/mir/validation.rs:428:13
+    |
+428 |         let mut block = BasicBlock {
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/module_loader.rs:301:13
+    |
+301 |         let mut loader = ModuleLoader::new();
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `builder`
+   --> src/optimizations/vectorization.rs:899:17
+    |
+899 |         let mut builder = Builder::new();
+    |                 ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_builder`
+
+warning: variable does not need to be mutable
+   --> src/optimizations/vectorization.rs:899:13
+    |
+899 |         let mut builder = Builder::new();
+    |             ----^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `builder`
+    --> src/package/builder.rs:1034:13
+     |
+1034 |         let builder = PackageBuilder::new(config);
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_builder`
+
+warning: unused variable: `condition`
+    --> src/release/automation.rs:1272:13
+     |
+1272 |         let condition = StageCondition {
+     |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_condition`
+
+warning: unused variable: `array_ptr`
+   --> src/runtime/mod.rs:292:17
+    |
+292 |             let array_ptr = array as *mut AetherArray;
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_array_ptr`
+
+warning: unused variable: `checker`
+    --> src/types/mod.rs:1519:13
+     |
+1519 |         let checker = TypeChecker::new();
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_checker`
+
+Some errors have detailed explanations: E0062, E0425, E0603.
+For more information about an error, try `rustc --explain E0062`.
+warning: `aether` (lib test) generated 144 warnings (111 duplicates)
+error: could not compile `aether` (lib test) due to 3 previous errors; 144 warnings emitted

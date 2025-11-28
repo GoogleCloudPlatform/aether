@@ -231,6 +231,7 @@ pub enum KeywordType {
     ByReference,
     ExportAs,
     GenericParameters,
+    LifetimeParameters,
     Constraints,
     Param,
 
@@ -418,6 +419,7 @@ impl Parser {
             ("BY_REFERENCE", KeywordType::ByReference),
             ("EXPORT_AS", KeywordType::ExportAs),
             ("GENERIC_PARAMETERS", KeywordType::GenericParameters),
+            ("LIFETIME_PARAMETERS", KeywordType::LifetimeParameters),
             ("CONSTRAINTS", KeywordType::Constraints),
             ("PARAM", KeywordType::Param),
             ("CONTENT", KeywordType::Content),
@@ -502,6 +504,13 @@ impl Parser {
             Some(token) => matches!(token.token_type, TokenType::Eof),
             None => true,
         }
+    }
+
+    /// Get the current source location
+    fn current_location(&self) -> SourceLocation {
+        self.current_token()
+            .map(|t| t.location.clone())
+            .unwrap_or_else(SourceLocation::unknown)
     }
 
     /// Consume a left parenthesis
@@ -1253,11 +1262,7 @@ impl Parser {
                     }
                     Some(KeywordType::DefineTypeAlias) => {
                         self.advance(); // consume DEFINE_TYPE_ALIAS keyword
-                                        // TODO: Implement parse_type_alias
-                        Err(ParserError::Unimplemented {
-                            feature: "Type aliases".to_string(),
-                            location: start_location,
-                        })
+                        self.parse_type_alias(start_location)
                     }
                     _ => Err(ParserError::UnexpectedToken {
                         found: keyword.clone(),
@@ -1284,6 +1289,7 @@ impl Parser {
         let mut fields = Vec::new();
         let mut export_as = None;
         let mut generic_parameters = Vec::new();
+        let mut lifetime_parameters = Vec::new();
 
         // Parse struct fields
         while let Some(token) = self.current_token() {
@@ -1329,41 +1335,11 @@ impl Parser {
                         }
                         Some(KeywordType::GenericParameters) => {
                             self.advance(); // consume GENERIC_PARAMETERS keyword
-
-                            // Parse list of generic parameters
-                            while let Some(token) = self.current_token() {
-                                if matches!(token.token_type, TokenType::RightParen) {
-                                    break;
-                                }
-
-                                let param_location = token.location.clone();
-                                self.consume_left_paren()?;
-                                let param_name = self.consume_identifier()?;
-
-                                // Parse optional constraints
-                                let mut constraints = Vec::new();
-                                if self.peek_keyword(KeywordType::Constraints) {
-                                    self.advance(); // consume CONSTRAINTS keyword
-
-                                    while let Some(token) = self.current_token() {
-                                        if matches!(token.token_type, TokenType::RightParen) {
-                                            break;
-                                        }
-                                        // For now, skip type constraints
-                                        // TODO: Implement parse_type_constraint
-                                        self.advance();
-                                    }
-                                }
-
-                                generic_parameters.push(GenericParameter {
-                                    name: param_name,
-                                    constraints,
-                                    default_type: None, // TODO: Parse default types
-                                    source_location: param_location,
-                                });
-
-                                self.consume_right_paren()?; // Close generic parameter
-                            }
+                            generic_parameters = self.parse_generic_parameters()?;
+                        }
+                        Some(KeywordType::LifetimeParameters) => {
+                            self.advance(); // consume LIFETIME_PARAMETERS keyword
+                            lifetime_parameters = self.parse_lifetime_parameters()?;
                         }
                         _ => {
                             return Err(ParserError::UnexpectedToken {
@@ -1409,6 +1385,7 @@ impl Parser {
             name,
             intent,
             generic_parameters,
+            lifetime_parameters,
             fields,
             export_as,
             source_location: start_location,
@@ -1425,6 +1402,7 @@ impl Parser {
         let mut intent = None;
         let mut variants = Vec::new();
         let mut generic_parameters = Vec::new();
+        let mut lifetime_parameters = Vec::new();
 
         // Parse enum fields
         while let Some(token) = self.current_token() {
@@ -1493,42 +1471,11 @@ impl Parser {
                         }
                         Some(KeywordType::GenericParameters) => {
                             self.advance(); // consume GENERIC_PARAMETERS keyword
-
-                            while let Some(token) = self.current_token() {
-                                if matches!(token.token_type, TokenType::RightParen) {
-                                    break;
-                                }
-
-                                self.consume_left_paren()?;
-                                self.consume_keyword(KeywordType::Parameter)?;
-
-                                let param_name = self.consume_identifier()?;
-                                let param_location = param_name.source_location.clone();
-
-                                // Parse optional constraints
-                                let mut constraints = Vec::new();
-                                if self.peek_keyword(KeywordType::Constraints) {
-                                    self.advance(); // consume CONSTRAINTS keyword
-
-                                    while let Some(token) = self.current_token() {
-                                        if matches!(token.token_type, TokenType::RightParen) {
-                                            break;
-                                        }
-                                        // For now, skip type constraints
-                                        // TODO: Implement parse_type_constraint
-                                        self.advance();
-                                    }
-                                }
-
-                                generic_parameters.push(GenericParameter {
-                                    name: param_name,
-                                    constraints,
-                                    default_type: None, // TODO: Parse default types
-                                    source_location: param_location,
-                                });
-
-                                self.consume_right_paren()?; // Close generic parameter
-                            }
+                            generic_parameters = self.parse_generic_parameters()?;
+                        }
+                        Some(KeywordType::LifetimeParameters) => {
+                            self.advance(); // consume LIFETIME_PARAMETERS keyword
+                            lifetime_parameters = self.parse_lifetime_parameters()?;
                         }
                         _ => {
                             return Err(ParserError::UnexpectedToken {
@@ -1569,7 +1516,98 @@ impl Parser {
             name,
             intent,
             generic_parameters,
+            lifetime_parameters,
             variants,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a type alias definition
+    fn parse_type_alias(
+        &mut self,
+        start_location: SourceLocation,
+    ) -> Result<TypeDefinition, ParserError> {
+        let mut new_name = None;
+        let mut original_type = None;
+        let mut intent = None;
+        let mut generic_parameters = Vec::new();
+        let mut lifetime_parameters = Vec::new();
+
+        // Parse fields
+        while let Some(token) = self.current_token() {
+            if matches!(token.token_type, TokenType::RightParen) {
+                break;
+            }
+
+            self.consume_left_paren()?;
+            let field_keyword = self
+                .current_token()
+                .ok_or_else(|| ParserError::UnexpectedEof {
+                    expected: "type alias field keyword".to_string(),
+                })?;
+
+            match &field_keyword.token_type {
+                TokenType::Keyword(keyword) => {
+                    match self.keywords.get(keyword) {
+                        Some(KeywordType::Name) => {
+                            self.advance(); // consume NAME
+                            new_name = Some(self.consume_identifier()?);
+                        }
+                        Some(KeywordType::Type) => {
+                            self.advance(); // consume TYPE
+                            original_type = Some(Box::new(self.parse_type_specifier()?));
+                        }
+                        Some(KeywordType::Intent) => {
+                            self.advance(); // consume INTENT
+                            intent = Some(self.consume_string()?);
+                        }
+                        Some(KeywordType::GenericParameters) => {
+                            self.advance(); // consume GENERIC_PARAMETERS
+                            generic_parameters = self.parse_generic_parameters()?;
+                        }
+                        Some(KeywordType::LifetimeParameters) => {
+                            self.advance(); // consume LIFETIME_PARAMETERS
+                            lifetime_parameters = self.parse_lifetime_parameters()?;
+                        }
+                        _ => {
+                            return Err(ParserError::UnexpectedToken {
+                                found: keyword.clone(),
+                                expected: "type alias field keyword (NAME, TYPE, INTENT, GENERIC_PARAMETERS, LIFETIME_PARAMETERS)".to_string(),
+                                location: field_keyword.location.clone(),
+                            });
+                        }
+                    }
+                }
+                _ => {
+                    return Err(ParserError::UnexpectedToken {
+                        found: format!("{:?}", field_keyword.token_type),
+                        expected: "type alias field keyword".to_string(),
+                        location: field_keyword.location.clone(),
+                    });
+                }
+            }
+
+            self.consume_right_paren()?; // Close field
+        }
+
+        let new_name = new_name.ok_or_else(|| ParserError::MissingRequiredField {
+            field: "NAME".to_string(),
+            construct: "DEFINE_TYPE_ALIAS".to_string(),
+            location: start_location.clone(),
+        })?;
+
+        let original_type = original_type.ok_or_else(|| ParserError::MissingRequiredField {
+            field: "TYPE".to_string(),
+            construct: "DEFINE_TYPE_ALIAS".to_string(),
+            location: start_location.clone(),
+        })?;
+
+        Ok(TypeDefinition::Alias {
+            new_name,
+            original_type,
+            intent,
+            generic_parameters,
+            lifetime_parameters,
             source_location: start_location,
         })
     }
@@ -1810,6 +1848,74 @@ impl Parser {
         })
     }
 
+    /// Parse a list of generic parameters
+    fn parse_generic_parameters(&mut self) -> Result<Vec<GenericParameter>, ParserError> {
+        let mut generic_params = Vec::new();
+
+        self.consume_left_paren()?;
+
+        while let Some(token) = self.current_token() {
+            if matches!(token.token_type, TokenType::RightParen) {
+                break;
+            }
+            generic_params.push(self.parse_generic_parameter()?);
+        }
+
+        self.consume_right_paren()?;
+        Ok(generic_params)
+    }
+
+    /// Parse a single generic parameter
+    fn parse_generic_parameter(&mut self) -> Result<GenericParameter, ParserError> {
+        let start_location = self.current_location();
+        self.consume_left_paren()?;
+        self.consume_keyword(KeywordType::Param)?;
+        let name = self.consume_identifier()?;
+        
+        let mut constraints = Vec::new();
+        // TODO: Parse constraints if any
+
+        self.consume_right_paren()?;
+
+        Ok(GenericParameter {
+            name,
+            constraints,
+            default_type: None,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a list of lifetime parameters
+    fn parse_lifetime_parameters(&mut self) -> Result<Vec<LifetimeParameter>, ParserError> {
+        let mut lifetime_params = Vec::new();
+
+        self.consume_left_paren()?;
+
+        while let Some(token) = self.current_token() {
+            if matches!(token.token_type, TokenType::RightParen) {
+                break;
+            }
+            lifetime_params.push(self.parse_lifetime_parameter()?);
+        }
+
+        self.consume_right_paren()?;
+        Ok(lifetime_params)
+    }
+
+    /// Parse a single lifetime parameter
+    fn parse_lifetime_parameter(&mut self) -> Result<LifetimeParameter, ParserError> {
+        let start_location = self.current_location();
+        self.consume_left_paren()?;
+        self.expect_keyword("LIFETIME")?;
+        let name = self.consume_identifier()?;
+        self.consume_right_paren()?;
+
+        Ok(LifetimeParameter {
+            name,
+            source_location: start_location,
+        })
+    }
+
     /// Parse a function definition (stub implementation)
     fn parse_function_definition(&mut self) -> Result<Function, ParserError> {
         eprintln!("Parser: Entering parse_function_definition");
@@ -1818,6 +1924,8 @@ impl Parser {
 
         let mut name = None;
         let mut intent = None;
+        let mut generic_parameters = Vec::new();
+        let mut lifetime_parameters = Vec::new();
         let mut parameters = Vec::new();
         let mut return_type = None;
         let mut body = None;
@@ -1864,9 +1972,13 @@ impl Parser {
                             self.advance(); // consume NAME
                             name = Some(self.consume_identifier()?);
                         }
-                        Some(KeywordType::Intent) => {
-                            self.advance(); // consume INTENT
-                            intent = Some(self.consume_string()?);
+                        Some(KeywordType::GenericParameters) => {
+                            self.advance(); // consume GENERIC_PARAMETERS
+                            generic_parameters = self.parse_generic_parameters()?;
+                        }
+                        Some(KeywordType::LifetimeParameters) => {
+                            self.advance(); // consume LIFETIME_PARAMETERS
+                            lifetime_parameters = self.parse_lifetime_parameters()?;
                         }
                         Some(KeywordType::AcceptsParameter) | Some(KeywordType::Param) => {
                             self.advance(); // consume ACCEPTS_PARAMETER or PARAM
@@ -1960,11 +2072,13 @@ impl Parser {
             name,
             intent,
             generic_parameters: Vec::new(),
+            lifetime_parameters: Vec::new(), // TODO: Parse actual lifetime parameters
             parameters,
             return_type: Box::new(return_type),
             metadata,
             body,
             export_info: None,
+            is_async: false,
             source_location: start_location,
         })
     }
@@ -2009,6 +2123,17 @@ impl Parser {
     fn parse_type_specifier(&mut self) -> Result<TypeSpecifier, ParserError> {
         // Check for ownership annotations first
         let (ownership_kind, ownership_location) = self.parse_ownership_annotation()?;
+        let mut lifetime_id: Option<Identifier> = None;
+
+        // If we have an ownership kind, check for an optional lifetime parameter like &'a String
+        if ownership_kind.is_some() {
+            if let Some(token) = self.current_token() {
+                if let TokenType::Lifetime(name) = &token.token_type {
+                    lifetime_id = Some(Identifier::new(name.clone(), token.location.clone()));
+                    self.advance(); // consume lifetime token
+                }
+            }
+        }
 
         let token = self
             .current_token()
@@ -2092,6 +2217,7 @@ impl Parser {
             Ok(TypeSpecifier::Owned {
                 base_type: Box::new(base_type),
                 ownership,
+                lifetime: lifetime_id,
                 source_location: ownership_location.unwrap(),
             })
         } else {

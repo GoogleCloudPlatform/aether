@@ -4943,9 +4943,10 @@ mod tests {
 
         // Create a simple AST function
         let ast_func = ast::Function {
-            name: Identifier::new("test".to_string(), SourceLocation::unknown()),
+            name: ast::Identifier::new("test".to_string(), crate::error::SourceLocation::unknown()),
             intent: None,
             generic_parameters: vec![],
+            lifetime_parameters: vec![],
             parameters: vec![],
             return_type: Box::new(ast::TypeSpecifier::Primitive {
                 type_name: PrimitiveType::Integer,
@@ -4973,7 +4974,8 @@ mod tests {
                 source_location: SourceLocation::unknown(),
             },
             export_info: None,
-            source_location: SourceLocation::unknown(),
+            is_async: false,
+            source_location: crate::error::SourceLocation::unknown(),
         };
 
         ctx.lower_function(&ast_func)
