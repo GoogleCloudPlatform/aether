@@ -32,6 +32,7 @@ struct State {
 
 #[derive(Debug)]
 struct DocumentState {
+    text: String,
     module: Option<Module>,
     symbol_table: Option<SymbolTable>,
 }
@@ -164,23 +165,102 @@ impl LanguageServer for Backend {
     async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
          let uri = params.text_document_position_params.text_document.uri;
          let position = params.text_document_position_params.position;
-         
-         // Similar logic to hover, but we want to go to definition.
-         // If we are ON a definition, return itself?
-         // If we are on a usage, we need to find the definition.
-         // We lack usage->def map currently without deeper AST traversal.
-         
-         // For Task 10.3 "Go to Definition", "Implement symbol resolution lookup".
-         // We can implement a basic lookup if we can identify the identifier at cursor.
-         // Since we don't have the source text readily available in `hover` (unless we store it in state),
-         // we can't easily extract the word under cursor.
-         // But `did_open` stores text. Let's store text in DocumentState.
+
+         let state = self.state.read().unwrap();
+         if let Some(doc_state) = state.documents.get(&uri) {
+             if let Some(symbol_table) = &doc_state.symbol_table {
+                 let target_line = position.line as usize + 1;
+                 let target_col = position.character as usize + 1;
+                 
+                 // First check if we are hovering over a definition
+                 for symbol in symbol_table.get_all_symbols() {
+                    if symbol.declaration_location.line == target_line &&
+                       symbol.declaration_location.column <= target_col &&
+                       symbol.declaration_location.column + symbol.name.len() >= target_col {
+                           
+                        let range = Self::location_to_range_static(&symbol.declaration_location);
+                        return Ok(Some(GotoDefinitionResponse::Scalar(Location {
+                            uri: uri.clone(),
+                            range,
+                        })));
+                    }
+                 }
+                 
+                 // If not a definition, try to find the identifier at the cursor position from the text
+                 let identifier_at_cursor = Self::find_identifier_at_position(&doc_state.text, position);
+                 
+                 if let Some(ident_name) = identifier_at_cursor {
+                     // Look up the symbol in the symbol table
+                     if let Some(symbol) = symbol_table.lookup_symbol(&ident_name) {
+                         let range = Self::location_to_range_static(&symbol.declaration_location);
+                         return Ok(Some(GotoDefinitionResponse::Scalar(Location {
+                             uri: uri.clone(),
+                             range,
+                         })));
+                     }
+                 }
+             }
+         }
          
          Ok(None)
     }
+    
+    fn semantic_error_to_diagnostic_static(error: &crate::error::SemanticError) -> Diagnostic {
 }
 
 impl Backend {
+    fn find_identifier_at_position(text: &str, position: Position) -> Option<String> {
+        let line_idx = position.line as usize;
+        if let Some(line) = text.lines().nth(line_idx) {
+            let col_idx = position.character as usize;
+            
+            // Simple check: find word boundaries around cursor
+            // This is a heuristic; a proper lexer would be better but requires state
+            
+            if col_idx >= line.len() {
+                return None;
+            }
+            
+            // Logic replaced with simpler loop
+            // Scan backwards
+            let mut start_idx = col_idx;
+            let chars: Vec<char> = line.chars().collect();
+            
+            if col_idx >= chars.len() {
+                 return None;
+            }
+
+            let char_at_pos = chars[col_idx];
+             if !char_at_pos.is_alphanumeric() && char_at_pos != '_' {
+                return None;
+            }
+            
+            while start_idx > 0 {
+                let prev = start_idx - 1;
+                let c = chars[prev];
+                 if !c.is_alphanumeric() && c != '_' {
+                     break;
+                 }
+                 start_idx = prev;
+            }
+            
+            // Scan forwards
+            let mut end_idx = col_idx;
+            while end_idx < chars.len() {
+                let c = chars[end_idx];
+                if !c.is_alphanumeric() && c != '_' {
+                    break;
+                }
+                end_idx += 1;
+            }
+            
+            if start_idx < end_idx {
+                return Some(line[start_idx..end_idx].to_string());
+            }
+        }
+        None
+    }
+
     async fn validate_document(&self, uri: Url, text: String) {
         let client = self.client.clone();
         let state = self.state.clone();
@@ -211,6 +291,7 @@ impl Backend {
                             {
                                 let mut state_lock = state.write().unwrap();
                                 state_lock.documents.insert(uri_clone.clone(), DocumentState {
+                                    text: text.clone(),
                                     module: Some(module),
                                     symbol_table: Some(analyzer.get_symbol_table().clone()),
                                 });
@@ -229,6 +310,7 @@ impl Backend {
                              {
                                 let mut state_lock = state.write().unwrap();
                                 state_lock.documents.insert(uri_clone.clone(), DocumentState {
+                                    text: text.clone(),
                                     module: Some(module),
                                     symbol_table: Some(analyzer.get_symbol_table().clone()), // Symbol table might be partial
                                 });
