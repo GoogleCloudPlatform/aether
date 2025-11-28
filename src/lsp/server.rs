@@ -156,6 +156,19 @@ impl LanguageServer for Backend {
                         }));
                     }
                 }
+                
+                // Check for usages by finding identifier at cursor
+                let identifier_at_cursor = Self::find_identifier_at_position(&doc_state.text, position);
+                 
+                if let Some(ident_name) = identifier_at_cursor {
+                     // Look up the symbol in the symbol table
+                     if let Some(symbol) = symbol_table.lookup_symbol(&ident_name) {
+                         return Ok(Some(Hover {
+                            contents: HoverContents::Scalar(MarkedString::String(format!("{}: {}", symbol.name, symbol.symbol_type))),
+                            range: None,
+                        }));
+                     }
+                }
             }
         }
         
@@ -204,8 +217,6 @@ impl LanguageServer for Backend {
          
          Ok(None)
     }
-    
-    fn semantic_error_to_diagnostic_static(error: &crate::error::SemanticError) -> Diagnostic {
 }
 
 impl Backend {

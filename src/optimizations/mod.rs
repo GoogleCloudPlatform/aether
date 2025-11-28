@@ -119,9 +119,9 @@ impl OptimizationManager {
 
         // Add optimization passes in order
         manager.add_pass(Box::new(constant_folding::ConstantFoldingPass::new()));
-        // manager.add_pass(Box::new(
-        //     dead_code_elimination::DeadCodeEliminationPass::new(),
-        // ));
+        manager.add_pass(Box::new(
+            dead_code_elimination::DeadCodeEliminationPass::new(),
+        ));
         manager.add_pass(Box::new(
             common_subexpression::CommonSubexpressionEliminationPass::new(),
         ));

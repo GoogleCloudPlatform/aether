@@ -39,11 +39,19 @@
 - [x] **Task 10.3: Go to Definition**: Implement symbol lookup.
 - [x] **Task 10.4: Hover**: Implement type info on hover.
 
+## Phase 11: Optimization Passes (In Progress)
+
+- [x] **Task 11.1: Optimization Manager**: Implemented `OptimizationManager` and pipeline creation.
+- [x] **Task 11.2: Dead Code Elimination**: Enabled and verified `DeadCodeEliminationPass`.
+- [ ] **Task 11.3: Constant Propagation**: Implement constant propagation pass.
+- [ ] **Task 11.4: Inlining**: Implement function inlining pass.
+
 ### Recent Achievements
-- Implemented full LSP backend with diagnostics, definition, and hover support.
-- Added text storage to document state to enable precise identifier lookup.
-- Implemented robust symbol resolution logic using `SymbolTable` and AST traversal (identifier scanning).
-- Resolved thread-safety issues with `SemanticAnalyzer` by running analysis in blocking tasks.
+- Implemented basic LSP server scaffolding.
+- Successfully added `tower-lsp` dependency and resolved conflicts with `tokio`.
+- Created ownership examples including `examples/v2/11-memory/lifetimes/main.aes`.
+- Implemented `goto_definition` and `hover` in LSP with AST traversal for identifier lookup.
+- Verified `DeadCodeEliminationPass` functionality.
 
 ## Completed Phases
 
