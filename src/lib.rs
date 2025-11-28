@@ -27,6 +27,7 @@ pub mod error;
 pub mod ffi;
 pub mod lexer;
 pub mod llvm_backend;
+pub mod lsp;
 pub mod memory;
 pub mod mir;
 pub mod module_loader;

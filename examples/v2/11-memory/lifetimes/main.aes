@@ -1,0 +1,35 @@
+// Lifetime Annotations Example
+// Demonstrates explicit lifetime annotations for references
+
+module lifetimes;
+
+struct StringWrapper<'a> {
+    data: &'a String,
+}
+
+// Function with lifetime parameters
+func get_wrapper<'a>(s: &'a String) -> StringWrapper<'a> {
+    return StringWrapper { data: s };
+}
+
+// Function with multiple lifetimes
+func longest<'a, 'b>(x: &'a String, y: &'b String) -> &'a String {
+    // Note: In a real implementation, we'd need more complex lifetime logic
+    // to return one or the other based on length, and the return lifetime
+    // would need to be the intersection of 'a and 'b.
+    // For this example, we just return 'x' to satisfy the signature.
+    return x;
+}
+
+func main() -> Int {
+    let s1: String = "Hello";
+    let w: StringWrapper = get_wrapper(&s1);
+    
+    // In a block to limit scope
+    {
+        let s2: String = "World";
+        // let l = longest(&s1, &s2); // this would be valid
+    }
+    
+    return 0;
+}

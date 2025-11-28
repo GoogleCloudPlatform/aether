@@ -43,12 +43,8 @@ func main() -> Int {
     puts(int_to_string(v2));
 
     // Consume
-    // Note: 'd' must be moved. V2 syntax for move is explicitly '^d' or just 'd' depending on semantics?
-    // Based on "consume(data: ^Data)", it expects an owned value.
-    // If 'd' is a local variable, passing it by value 'consume(d)' should move it.
-    // Let's try 'consume(^d)' if explicit move is required, or 'consume(d)'.
-    // The signature `func consume(data: ^Data)` uses `^` for owned.
-    let v3: Int = consume(^d); 
+    // 'd' is moved here because 'consume' takes an owned parameter (^Data)
+    let v3: Int = consume(d); 
     puts("Consumed value:");
     puts(int_to_string(v3));
 

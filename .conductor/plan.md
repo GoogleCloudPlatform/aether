@@ -338,7 +338,7 @@ car go fmt && car go clippy && car go test
 
 ## Phase 10: Language Server Protocol (LSP)
 
-- [ ] **Task 10.1: Basic LSP Server**: Implement a basic LSP server using `tower-lsp` crate.
+- [x] **Task 10.1: Basic LSP Server**: Implement a basic LSP server using `tower-lsp` crate.
     - Support `initialize` and `shutdown`.
     - Support `textDocument/didOpen`, `didChange`.
 - [ ] **Task 10.2: Diagnostics**: Integrate compiler error reporting with LSP diagnostics.

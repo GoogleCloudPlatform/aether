@@ -32,12 +32,20 @@
 - [x] **Task 9.2: Lifetime Annotations**: Updated parser and AST to support lifetime annotations.
 - [x] **Task 9.3: Verification**: Created comprehensive test suite for ownership validation.
 
-### Achievements
-- Implemented `check_argument_ownership` in `src/semantic/ownership.rs` to enforce move semantics and borrowing rules.
-- Updated `src/ast/mod.rs` and `src/parser/v2.rs` to support `lifetime_parameters` and lifetime annotations in types.
-- Fixed compilation errors across the codebase resulting from AST changes.
-- Verified "use after move" detection with unit tests in `src/semantic/ownership_tests.rs` and `tests/ownership_analysis_test.rs`.
-- Created integration tests in `tests/ownership_integration_test.rs` to verify memory cleanup and lifetime management.
+## Phase 10: Language Server Protocol (In Progress)
+
+- [x] **Task 10.1: Basic LSP Server**: Implemented basic LSP server structure using `tower-lsp`.
+    - Created `src/lsp/mod.rs` and `src/lsp/server.rs`.
+    - Added `tower-lsp` and `tokio` dependencies.
+    - Implemented `initialize`, `shutdown`, `did_open`, `did_change`.
+- [ ] **Task 10.2: Diagnostics**: Integrate compiler error reporting.
+- [ ] **Task 10.3: Go to Definition**: Implement symbol lookup.
+- [ ] **Task 10.4: Hover**: Implement type info on hover.
+
+### Recent Achievements
+- Implemented basic LSP server scaffolding.
+- Successfully added `tower-lsp` dependency and resolved conflicts with `tokio`.
+- Created ownership examples including `examples/v2/11-memory/lifetimes/main.aes`.
 
 ## Completed Phases
 
