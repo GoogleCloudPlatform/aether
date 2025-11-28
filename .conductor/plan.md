@@ -352,5 +352,5 @@ car go fmt && car go clippy && car go test
 
 - [x] **Task 11.1: Optimization Manager**: Create `src/optimizations/mod.rs` to manage MIR transformation passes.
 - [x] **Task 11.2: Dead Code Elimination**: Implement a pass to remove unreachable blocks and unused locals.
-- [ ] **Task 11.3: Constant Propagation**: Implement a pass to fold constants and propagate values.
+- [x] **Task 11.3: Constant Propagation**: Implement a pass to fold constants and propagate values.
 - [ ] **Task 11.4: Inlining**: Implement function inlining for small functions.

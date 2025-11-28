@@ -43,7 +43,7 @@
 
 - [x] **Task 11.1: Optimization Manager**: Implemented `OptimizationManager` and pipeline creation.
 - [x] **Task 11.2: Dead Code Elimination**: Enabled and verified `DeadCodeEliminationPass`.
-- [ ] **Task 11.3: Constant Propagation**: Implement constant propagation pass.
+- [x] **Task 11.3: Constant Propagation**: Implemented `ConstantPropagationPass` to propagate constant values.
 - [ ] **Task 11.4: Inlining**: Implement function inlining pass.
 
 ### Recent Achievements
@@ -51,6 +51,8 @@
 - Added text storage to document state to enable precise identifier lookup.
 - Implemented robust symbol resolution logic using `SymbolTable` and AST traversal (identifier scanning).
 - Resolved thread-safety issues with `SemanticAnalyzer` by running analysis in blocking tasks.
+- Implemented and verified `DeadCodeEliminationPass`.
+- Implemented and verified `ConstantPropagationPass`.
 
 ## Completed Phases
 
