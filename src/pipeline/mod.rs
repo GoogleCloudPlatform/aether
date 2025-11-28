@@ -198,7 +198,7 @@ impl CompilationPipeline {
     }
 
     /// Parse source code using V2 parser (static for use in parallel contexts)
-    fn parse_source(path: &Path, source: &str, verbose: bool) -> Result<Module, CompilerError> {
+    pub fn parse_source(path: &Path, source: &str, verbose: bool) -> Result<Module, CompilerError> {
         let filename = path.to_string_lossy().to_string();
 
         // Use V2 lexer and parser (Swift/Rust-like syntax)
@@ -344,7 +344,7 @@ impl CompilationPipeline {
                 }
             }
             
-            (analyzer.get_symbol_table(), captures, complete_prog)
+            (analyzer.get_symbol_table().clone(), captures, complete_prog)
         };
 
         stats.phase_times.insert(

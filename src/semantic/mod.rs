@@ -3043,9 +3043,14 @@ impl SemanticAnalyzer {
         &self.stats
     }
 
-    /// Get the symbol table (consumes the analyzer)
-    pub fn get_symbol_table(self) -> SymbolTable {
-        self.symbol_table
+    /// Get the symbol table
+    pub fn get_symbol_table(&self) -> &SymbolTable {
+        &self.symbol_table
+    }
+
+    /// Get capture analysis results
+    pub fn get_captures(&self) -> &HashMap<SourceLocation, std::collections::HashSet<String>> {
+        &self.captures
     }
 
     /// Get collected errors

@@ -341,7 +341,7 @@ car go fmt && car go clippy && car go test
 - [x] **Task 10.1: Basic LSP Server**: Implement a basic LSP server using `tower-lsp` crate.
     - Support `initialize` and `shutdown`.
     - Support `textDocument/didOpen`, `didChange`.
-- [ ] **Task 10.2: Diagnostics**: Integrate compiler error reporting with LSP diagnostics.
+- [x] **Task 10.2: Diagnostics**: Integrate compiler error reporting with LSP diagnostics.
     - Report syntax errors and semantic errors in real-time.
 - [ ] **Task 10.3: Go to Definition**: Implement symbol resolution lookup for `textDocument/definition`.
 - [ ] **Task 10.4: Hover**: Implement type info and documentation on hover.

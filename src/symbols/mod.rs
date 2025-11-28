@@ -137,6 +137,7 @@ impl Scope {
 }
 
 /// Symbol table with hierarchical scopes
+#[derive(Debug, Clone)]
 pub struct SymbolTable {
     /// Stack of scopes (index 0 is global scope)
     scopes: Vec<Scope>,
@@ -249,6 +250,11 @@ impl SymbolTable {
         } else {
             None
         }
+    }
+
+    /// Get all symbols across all scopes
+    pub fn get_all_symbols(&self) -> Vec<&Symbol> {
+        self.scopes.iter().flat_map(|scope| scope.symbols.values()).collect()
     }
 
     /// Add a type definition

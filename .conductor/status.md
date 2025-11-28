@@ -35,17 +35,15 @@
 ## Phase 10: Language Server Protocol (In Progress)
 
 - [x] **Task 10.1: Basic LSP Server**: Implemented basic LSP server structure using `tower-lsp`.
-    - Created `src/lsp/mod.rs` and `src/lsp/server.rs`.
-    - Added `tower-lsp` and `tokio` dependencies.
-    - Implemented `initialize`, `shutdown`, `did_open`, `did_change`.
-- [ ] **Task 10.2: Diagnostics**: Integrate compiler error reporting.
+- [x] **Task 10.2: Diagnostics**: Integrated compiler error reporting with LSP diagnostics.
 - [ ] **Task 10.3: Go to Definition**: Implement symbol lookup.
 - [ ] **Task 10.4: Hover**: Implement type info on hover.
 
 ### Recent Achievements
-- Implemented basic LSP server scaffolding.
-- Successfully added `tower-lsp` dependency and resolved conflicts with `tokio`.
-- Created ownership examples including `examples/v2/11-memory/lifetimes/main.aes`.
+- Implemented basic LSP server using `tower-lsp` and `tokio`.
+- Integrated `SemanticAnalyzer` into LSP for real-time diagnostics on `did_open` and `did_change`.
+- Added state management to LSP backend to persist analysis results.
+- Created `lsp_test` to verify LSP type handling.
 
 ## Completed Phases
 
