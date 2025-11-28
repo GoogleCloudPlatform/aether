@@ -1,0 +1,1015 @@
+    Checking stable_deref_trait v1.2.0
+    Checking cfg-if v1.0.1
+    Checking core-foundation-sys v0.8.7
+    Checking once_cell v1.21.3
+    Checking pin-project-lite v0.2.16
+    Checking bytes v1.10.1
+    Checking itoa v1.0.15
+    Checking libc v0.2.173
+    Checking litemap v0.8.0
+    Checking typenum v1.18.0
+    Checking writeable v0.6.1
+    Checking zerofrom v0.1.6
+   Compiling getrandom v0.3.3
+    Checking futures-core v0.3.31
+    Checking subtle v2.6.1
+    Checking bitflags v2.9.1
+   Compiling serde v1.0.219
+    Checking fnv v1.0.7
+    Checking yoke v0.8.0
+    Checking icu_normalizer_data v2.0.0
+    Checking icu_properties_data v2.0.1
+    Checking tracing-core v0.1.34
+   Compiling anyhow v1.0.98
+    Checking futures-sink v0.3.31
+   Compiling jobserver v0.1.33
+    Checking hashbrown v0.15.4
+    Checking socket2 v0.5.10
+    Checking mio v1.0.4
+    Checking core-foundation v0.9.4
+    Checking errno v0.3.12
+    Checking cpufeatures v0.2.17
+    Checking zerovec v0.11.2
+    Checking zerotrie v0.2.2
+    Checking rustix v1.0.7
+   Compiling cc v1.2.27
+    Checking http v0.2.12
+    Checking generic-array v0.14.7
+    Checking security-framework-sys v2.14.0
+    Checking pin-utils v0.1.0
+    Checking tokio v1.45.1
+    Checking futures-task v0.3.31
+    Checking smallvec v1.15.1
+   Compiling lazy_static v1.5.0
+    Checking fastrand v2.3.0
+    Checking equivalent v1.0.2
+    Checking security-framework v2.11.1
+    Checking futures-util v0.3.31
+    Checking tracing v0.1.41
+    Checking indexmap v2.10.0
+    Checking crossbeam-utils v0.8.21
+    Checking slab v0.4.11
+    Checking percent-encoding v2.3.1
+    Checking try-lock v0.2.5
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+    Checking utf8parse v0.2.2
+    Checking form_urlencoded v1.2.1
+    Checking tinystr v0.8.1
+    Checking potential_utf v0.1.2
+    Checking want v0.3.1
+    Checking tempfile v3.20.0
+    Checking anstyle-parse v0.2.7
+    Checking digest v0.10.7
+    Checking inout v0.1.4
+    Checking icu_collections v2.0.0
+    Checking http-body v0.4.6
+    Checking icu_locale_core v2.0.0
+    Checking crossbeam-epoch v0.9.18
+   Compiling num-traits v0.2.19
+    Checking httparse v1.10.1
+    Checking futures-channel v0.3.31
+    Checking httpdate v1.0.3
+    Checking is_terminal_polyfill v1.70.1
+    Checking native-tls v0.2.14
+    Checking powerfmt v0.2.0
+    Checking anstyle v1.0.11
+    Checking anstyle-query v1.1.3
+    Checking colorchoice v1.0.4
+    Checking tower-service v0.3.3
+    Checking base64ct v1.8.0
+    Checking rand_core v0.6.4
+    Checking ryu v1.0.20
+    Checking adler2 v2.0.1
+    Checking utf8_iter v1.0.4
+    Checking deranged v0.4.0
+    Checking anstream v0.6.19
+    Checking crossbeam-deque v0.8.6
+    Checking sha2 v0.10.9
+    Checking miniz_oxide v0.8.9
+    Checking hmac v0.12.1
+    Checking cipher v0.4.4
+    Checking icu_provider v2.0.0
+    Checking system-configuration-sys v0.5.0
+    Checking crc32fast v1.4.2
+    Checking password-hash v0.4.2
+    Checking either v1.15.0
+    Checking strsim v0.11.1
+    Checking time-core v0.1.4
+    Checking base64 v0.21.7
+    Checking bitflags v1.3.2
+    Checking icu_normalizer v2.0.0
+    Checking icu_properties v2.0.1
+    Checking num-conv v0.1.0
+    Checking clap_lex v0.7.5
+    Checking memchr v2.7.5
+    Checking flate2 v1.1.2
+    Checking system-configuration v0.5.1
+   Compiling zstd-sys v2.0.15+zstd.1.5.7
+   Compiling llvm-sys v170.2.0
+   Compiling bzip2-sys v0.1.13+1.0.8
+    Checking clap_builder v4.5.40
+    Checking rustls-pemfile v1.0.4
+    Checking time v0.3.41
+    Checking pbkdf2 v0.11.0
+    Checking aes v0.8.4
+    Checking thiserror v1.0.69
+    Checking rayon-core v1.12.1
+    Checking sha1 v0.10.6
+    Checking iana-time-zone v0.1.63
+    Checking encoding_rs v0.8.35
+    Checking mime v0.3.17
+    Checking constant_time_eq v0.1.5
+    Checking sync_wrapper v0.1.2
+    Checking ipnet v2.11.0
+    Checking log v0.4.27
+    Checking byteorder v1.5.0
+    Checking num_cpus v1.17.0
+    Checking unicode-segmentation v1.12.0
+    Checking broadcast v0.1.0
+    Checking rayon v1.10.0
+    Checking idna_adapter v1.2.1
+    Checking bzip2 v0.4.4
+    Checking idna v1.0.3
+    Checking serde_urlencoded v0.7.1
+    Checking serde_json v1.0.140
+    Checking chrono v0.4.41
+    Checking url v2.5.4
+    Checking tokio-util v0.7.15
+    Checking tokio-native-tls v0.3.1
+    Checking clap v4.5.40
+    Checking h2 v0.3.27
+   Compiling inkwell v0.4.0
+    Checking hyper v0.14.32
+   Compiling zstd-safe v5.0.2+zstd.1.5.2
+    Checking hyper-tls v0.5.0
+    Checking reqwest v0.11.27
+    Checking zstd v0.11.2+zstd.1.5.2
+    Checking zip v0.6.6
+    Checking aether v0.1.0 (/Users/keithballinger/Desktop/projects/aether-v2-syntax)
+error[E0408]: variable `left` is not bound in all patterns
+   --> src/semantic/capture_analysis.rs:323:13
+    |
+313 |             Expression::Add { left, right, .. } |
+    |                               ---- variable not in all patterns
+314 |             Expression::Subtract { left, right, .. } |
+    |                                    ---- variable not in all patterns
+315 |             Expression::Multiply { left, right, .. } |
+    |                                    ---- variable not in all patterns
+316 |             Expression::Divide { left, right, .. } |
+    |                                  ---- variable not in all patterns
+317 |             Expression::Equals { left, right, .. } |
+    |                                  ---- variable not in all patterns
+318 |             Expression::NotEquals { left, right, .. } |
+    |                                     ---- variable not in all patterns
+319 |             Expression::LessThan { left, right, .. } |
+    |                                    ---- variable not in all patterns
+320 |             Expression::LessThanOrEqual { left, right, .. } |
+    |                                           ---- variable not in all patterns
+321 |             Expression::GreaterThan { left, right, .. } |
+    |                                       ---- variable not in all patterns
+322 |             Expression::GreaterThanOrEqual { left, right, .. } |
+    |                                              ---- variable not in all patterns
+323 |             Expression::StringConcat { operands: _, source_location: _ } => { // Wait operands is Vec
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ pattern doesn't bind `left`
+
+error[E0408]: variable `right` is not bound in all patterns
+   --> src/semantic/capture_analysis.rs:323:13
+    |
+313 |             Expression::Add { left, right, .. } |
+    |                                     ----- variable not in all patterns
+314 |             Expression::Subtract { left, right, .. } |
+    |                                          ----- variable not in all patterns
+315 |             Expression::Multiply { left, right, .. } |
+    |                                          ----- variable not in all patterns
+316 |             Expression::Divide { left, right, .. } |
+    |                                        ----- variable not in all patterns
+317 |             Expression::Equals { left, right, .. } |
+    |                                        ----- variable not in all patterns
+318 |             Expression::NotEquals { left, right, .. } |
+    |                                           ----- variable not in all patterns
+319 |             Expression::LessThan { left, right, .. } |
+    |                                          ----- variable not in all patterns
+320 |             Expression::LessThanOrEqual { left, right, .. } |
+    |                                                 ----- variable not in all patterns
+321 |             Expression::GreaterThan { left, right, .. } |
+    |                                             ----- variable not in all patterns
+322 |             Expression::GreaterThanOrEqual { left, right, .. } |
+    |                                                    ----- variable not in all patterns
+323 |             Expression::StringConcat { operands: _, source_location: _ } => { // Wait operands is Vec
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ pattern doesn't bind `right`
+
+warning: unused import: `ExampleType`
+  --> src/docs/tutorial.rs:21:46
+   |
+21 |     CodeExample, DifficultyLevel, DocConfig, ExampleType, Exercise, Tutorial, TutorialSection,
+   |                                              ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::path::Path`
+  --> src/error/enhancement.rs:24:5
+   |
+24 | use std::path::Path;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `BehavioralSpec`
+  --> src/error/intent_analysis.rs:22:33
+   |
+22 | use crate::semantic::metadata::{BehavioralSpec, IntentSpec};
+   |                                 ^^^^^^^^^^^^^^
+
+warning: unused imports: `Expression`, `Statement`, and `TypeSpecifier`
+  --> src/error/structured.rs:20:18
+   |
+20 | use crate::ast::{Expression, Statement, TypeSpecifier};
+   |                  ^^^^^^^^^^  ^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `HashSet`
+  --> src/llvm_backend/mod.rs:37:33
+   |
+37 | use std::collections::{HashMap, HashSet};
+   |                                 ^^^^^^^
+
+warning: unused imports: `BasicBlockId`, `LocalId`, `Place`, and `SourceInfo`
+  --> src/optimizations/inlining.rs:22:5
+   |
+22 |     BasicBlockId, Function, LocalId, Operand, Place, Program, Rvalue, SourceInfo, Statement,
+   |     ^^^^^^^^^^^^            ^^^^^^^           ^^^^^                   ^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/optimizations/inlining.rs:25:5
+   |
+25 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Constant`
+  --> src/optimizations/interprocedural.rs:22:17
+   |
+22 |     BasicBlock, Constant, Function, Operand, Place, Program, Rvalue, Statement, Terminator,
+   |                 ^^^^^^^^
+
+warning: unused import: `BuildConfiguration`
+  --> src/package/builder.rs:21:32
+   |
+21 | use crate::package::manifest::{BuildConfiguration, PackageManifest};
+   |                                ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `CacheStats`
+  --> src/package/builder.rs:22:35
+   |
+22 | use crate::package::{BuildConfig, CacheStats};
+   |                                   ^^^^^^^^^^
+
+warning: unused imports: `BinaryOp` and `Expression as ContractExpr`
+  --> src/patterns/catalog.rs:20:38
+   |
+20 | use crate::verification::contracts::{BinaryOp, Expression as ContractExpr};
+   |                                      ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Block`, `Expression`, `Function`, and `Statement`
+  --> src/patterns/composition.rs:20:18
+   |
+20 | use crate::ast::{Block, Expression, Function, Statement};
+   |                  ^^^^^  ^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+  --> src/patterns/composition.rs:21:5
+   |
+21 | use crate::error::SourceLocation;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Function`
+  --> src/patterns/mod.rs:23:37
+   |
+23 | use crate::ast::{Block, Expression, Function, Statement};
+   |                                     ^^^^^^^^
+
+warning: unused import: `crate::error::SourceLocation`
+  --> src/patterns/mod.rs:24:5
+   |
+24 | use crate::error::SourceLocation;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `FailoverConfig`, `FailoverThreshold`, `RecoveryConfig`, and `self`
+  --> src/release/distribution.rs:23:22
+   |
+23 | use crate::release::{self, DistributionConfig, FailoverConfig, FailoverThreshold, RecoveryConfig};
+   |                      ^^^^                      ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `crate::error::SemanticError`
+  --> src/release/mod.rs:26:5
+   |
+26 | use crate::error::SemanticError;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::types::Type`
+  --> src/verification/contract_to_smt.rs:20:5
+   |
+20 | use crate::types::Type;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `AggregateOp` and `TemporalOp`
+  --> src/verification/contract_to_smt.rs:22:5
+   |
+22 |     AggregateOp, BinaryOp, ConstantValue, Expression, QuantifierKind, TemporalOp, UnaryOp,
+   |     ^^^^^^^^^^^                                                       ^^^^^^^^^^
+
+warning: unused imports: `Deserialize` and `Serialize`
+  --> src/verification/contracts.rs:30:13
+   |
+30 | use serde::{Deserialize, Serialize};
+   |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `crate::ast::PrimitiveType`
+  --> src/verification/vcgen.rs:23:5
+   |
+23 | use crate::ast::PrimitiveType;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::types::Type`
+  --> src/verification/vcgen.rs:26:5
+   |
+26 | use crate::types::Type;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `receiver`
+   --> src/concurrency/actors.rs:377:22
+    |
+377 |         let (sender, receiver) = mpsc::channel();
+    |                      ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_receiver`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `strategy`
+   --> src/concurrency/actors.rs:622:12
+    |
+622 |     fn new(strategy: SupervisionStrategy) -> Self {
+    |            ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_strategy`
+
+warning: unused variable: `worker_id`
+   --> src/concurrency/async_runtime.rs:350:13
+    |
+350 |         for worker_id in 0..self.config.worker_threads {
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_worker_id`
+
+warning: unused variable: `start_time`
+   --> src/concurrency/sync_primitives.rs:568:13
+    |
+568 |         let start_time = Instant::now();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `metrics`
+   --> src/concurrency/sync_primitives.rs:711:23
+    |
+711 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_metrics`
+
+warning: variable does not need to be mutable
+   --> src/concurrency/sync_primitives.rs:711:19
+    |
+711 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                   ----^^^^^^^
+    |                   |
+    |                   help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `metrics`
+   --> src/concurrency/sync_primitives.rs:718:23
+    |
+718 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_metrics`
+
+warning: variable does not need to be mutable
+   --> src/concurrency/sync_primitives.rs:718:19
+    |
+718 |         if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+    |                   ----^^^^^^^
+    |                   |
+    |                   help: remove this `mut`
+
+warning: unused variable: `response_receiver`
+   --> src/debug/debugger.rs:390:31
+    |
+390 |         let (response_sender, response_receiver) = channel();
+    |                               ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_response_receiver`
+
+warning: unused variable: `debugger_process`
+   --> src/debug/debugger.rs:393:13
+    |
+393 |         let debugger_process = self.start_debugger_process(&program_path)?;
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_debugger_process`
+
+warning: unused variable: `target_info`
+   --> src/debug/debugger.rs:401:13
+    |
+401 |         let target_info = TargetInfo {
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_target_info`
+
+warning: unused variable: `diagnostic`
+   --> src/debug/lsp.rs:593:21
+    |
+593 |                 let diagnostic = Diagnostic {
+    |                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_diagnostic`
+
+warning: unused variable: `name`
+   --> src/debug/lsp.rs:636:18
+    |
+636 |             for (name, symbol) in &semantic_info.symbols {
+    |                  ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: unused variable: `uri`
+   --> src/debug/lsp.rs:789:35
+    |
+789 |     pub fn get_diagnostics(&self, uri: &str) -> Vec<Diagnostic> {
+    |                                   ^^^ help: if this is intentional, prefix it with an underscore: `_uri`
+
+warning: unused variable: `categories`
+   --> src/docs/examples.rs:132:13
+    |
+132 |         let categories = Self::create_example_categories();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_categories`
+
+warning: unused variable: `templates`
+   --> src/docs/examples.rs:133:13
+    |
+133 |         let templates = Self::create_example_templates();
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_templates`
+
+warning: unused variable: `config`
+   --> src/docs/examples.rs:131:16
+    |
+131 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `output_dir`
+  --> src/docs/generator.rs:21:16
+   |
+21 |     pub fn new(output_dir: String) -> Self {
+   |                ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_output_dir`
+
+warning: unused variable: `comment_parser`
+   --> src/docs/parser.rs:132:13
+    |
+132 |         let comment_parser = CommentParser::new();
+    |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_comment_parser`
+
+warning: unused variable: `signature_parser`
+   --> src/docs/parser.rs:133:13
+    |
+133 |         let signature_parser = SignatureParser::new();
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_signature_parser`
+
+warning: unused variable: `config`
+   --> src/docs/parser.rs:131:16
+    |
+131 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `themes`
+   --> src/docs/renderer.rs:368:13
+    |
+368 |         let themes = ThemeManager::new()?;
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_themes`
+
+warning: unused variable: `search_paths`
+   --> src/docs/renderer.rs:539:13
+    |
+539 |         let search_paths = vec![base_dir.join("templates"), PathBuf::from("templates")];
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_search_paths`
+
+warning: unused variable: `helpers`
+   --> src/docs/renderer.rs:558:13
+    |
+558 |         let helpers = Self::create_default_helpers();
+    |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_helpers`
+
+warning: unused variable: `processors`
+   --> src/docs/renderer.rs:879:13
+    |
+879 |         let processors: Vec<&dyn Fn(&str) -> String> = vec![];
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_processors`
+
+warning: unused variable: `options`
+    --> src/docs/renderer.rs:1185:13
+     |
+1185 |         let options = MarkdownOptions {
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `toc_generator`
+    --> src/docs/renderer.rs:1192:13
+     |
+1192 |         let toc_generator = TocGenerator {};
+     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_toc_generator`
+
+warning: unused variable: `options`
+    --> src/docs/renderer.rs:1347:13
+     |
+1347 |         let options = PdfOptions {
+     |             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `layout`
+    --> src/docs/renderer.rs:1354:13
+     |
+1354 |         let layout = PageLayout {
+     |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_layout`
+
+warning: unused variable: `templates`
+  --> src/docs/tutorial.rs:98:13
+   |
+98 |         let templates = Self::create_tutorial_templates();
+   |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_templates`
+
+warning: unused variable: `config`
+  --> src/docs/tutorial.rs:97:16
+   |
+97 |     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
+   |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `function`
+   --> src/error/intent_analysis.rs:142:9
+    |
+142 |         function: &Function,
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `error`
+   --> src/error/structured.rs:434:26
+    |
+434 |     fn fix_type_mismatch(error: &CompilerError) -> Vec<FixSuggestion> {
+    |                          ^^^^^ help: if this is intentional, prefix it with an underscore: `_error`
+
+warning: unused variable: `error`
+   --> src/error/structured.rs:455:29
+    |
+455 |     fn fix_undefined_symbol(error: &CompilerError) -> Vec<FixSuggestion> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_error`
+
+warning: unused variable: `function`
+   --> src/llvm_backend/codegen.rs:157:13
+    |
+157 |         let function = self.module.add_function(name, fn_type, None);
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `i`
+   --> src/llvm_backend/mod.rs:614:18
+    |
+614 |             for (i, stmt) in mir_block.statements.iter().enumerate() {
+    |                  ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `target`
+   --> src/llvm_backend/mod.rs:882:57
+    |
+882 |                 mir::Terminator::Concurrent { block_id, target } => {
+    |                                                         ^^^^^^ help: try ignoring the field: `target: _`
+
+warning: unreachable pattern
+    --> src/llvm_backend/mod.rs:2374:13
+     |
+ 916 |             mir::Rvalue::AddressOf(place) => {
+     |             ----------------------------- matches all the relevant values
+...
+2374 |             &mir::Rvalue::AddressOf(_) => todo!(),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `int_val`
+    --> src/llvm_backend/mod.rs:1499:58
+     |
+1499 | ...                   BasicValueEnum::IntValue(int_val) => {
+     |                                                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_int_val`
+
+warning: unused variable: `field_names`
+    --> src/llvm_backend/mod.rs:1773:61
+     |
+1773 |                     mir::AggregateKind::Struct(struct_name, field_names) => {
+     |                                                             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_field_names`
+
+warning: value assigned to `struct_size` is never read
+    --> src/llvm_backend/mod.rs:1797:33
+     |
+1797 |                         let mut struct_size = 0u64;
+     |                                 ^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> src/llvm_backend/mod.rs:2089:29
+     |
+2089 |                         let mut current_type =
+     |                             ----^^^^^^^^^^^^
+     |                             |
+     |                             help: remove this `mut`
+
+warning: unused variable: `i64_type`
+    --> src/llvm_backend/mod.rs:3147:13
+     |
+3147 |         let i64_type = self.context.i64_type();
+     |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_i64_type`
+
+warning: unused variable: `void_type`
+    --> src/llvm_backend/mod.rs:3150:13
+     |
+3150 |         let void_type = self.context.void_type();
+     |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_void_type`
+
+warning: unused variable: `parent`
+   --> src/memory/mod.rs:110:37
+    |
+110 |     pub fn create_region(&mut self, parent: Option<RegionId>) -> RegionId {
+    |                                     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parent`
+
+warning: unused variable: `operand`
+   --> src/memory/mod.rs:307:48
+    |
+307 |                 if let Expression::AddressOf { operand, .. } = &**expr {
+    |                                                ^^^^^^^-
+    |                                                |
+    |                                                help: try removing the field
+
+warning: unused variable: `region_id`
+   --> src/memory/mod.rs:441:38
+    |
+441 |     fn get_region_allocations(&self, region_id: &RegionId) -> Vec<AllocationInfo> {
+    |                                      ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_region_id`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:494:17
+    |
+494 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:507:17
+    |
+507 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:561:17
+    |
+561 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+   --> src/mir/lowering.rs:571:17
+    |
+571 |                 source_location,
+    |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `module`
+    --> src/mir/lowering.rs:2320:33
+     |
+2320 |             Type::Named { name, module } => {
+     |                                 ^^^^^^ help: try ignoring the field: `module: _`
+
+warning: unused variable: `map`
+    --> src/mir/lowering.rs:2444:47
+     |
+2444 |             ast::AssignmentTarget::MapValue { map, key } => {
+     |                                               ^^^ help: try ignoring the field: `map: _`
+
+warning: unused variable: `key`
+    --> src/mir/lowering.rs:2444:52
+     |
+2444 |             ast::AssignmentTarget::MapValue { map, key } => {
+     |                                                    ^^^ help: try ignoring the field: `key: _`
+
+warning: unreachable pattern
+    --> src/mir/lowering.rs:3774:13
+     |
+3710 |               ast::Pattern::Wildcard { binding, .. } => {
+     |               -------------------------------------- matches all the relevant values
+...
+3774 | /             ast::Pattern::Wildcard {
+3775 | |                 binding: Some(binding_name),
+3776 | |                 source_location,
+3777 | |             } => {
+     | |_____________^ no value can reach this
+
+warning: unreachable pattern
+    --> src/mir/lowering.rs:3837:13
+     |
+3710 |             ast::Pattern::Wildcard { binding, .. } => {
+     |             -------------------------------------- matches all the relevant values
+...
+3837 |             ast::Pattern::Wildcard { binding: None, .. } => {
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no value can reach this
+
+warning: unused variable: `st`
+    --> src/mir/lowering.rs:3568:49
+     |
+3568 |                     let data_type = if let Some(st) = &self.symbol_table {
+     |                                                 ^^ help: if this is intentional, prefix it with an underscore: `_st`
+
+warning: unused variable: `inner_variant`
+    --> src/mir/lowering.rs:3595:43
+     |
+3595 | ...                   variant_name: inner_variant,
+     |                                     ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inner_variant`
+
+warning: unused variable: `target_type`
+    --> src/mir/lowering.rs:4441:13
+     |
+4441 |         let target_type = match pointer_type {
+     |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_target_type`
+
+warning: unused variable: `cycle`
+   --> src/module_loader.rs:274:17
+    |
+274 |             let cycle: Vec<String> = stack[cycle_start..].to_vec();
+    |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_cycle`
+
+warning: unused variable: `depth`
+  --> src/optimizations/inlining.rs:52:44
+   |
+52 |     pub fn set_max_inline_depth(&mut self, depth: usize) {}
+   |                                            ^^^^^ help: if this is intentional, prefix it with an underscore: `_depth`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:667:14
+    |
+667 |         for (function_name, summary) in summaries {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:782:14
+    |
+782 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function`
+   --> src/optimizations/interprocedural.rs:782:29
+    |
+782 |         for (function_name, function) in &program.functions {
+    |                             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:799:14
+    |
+799 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `function_name`
+   --> src/optimizations/interprocedural.rs:821:14
+    |
+821 |         for (function_name, function) in &program.functions {
+    |              ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_function_name`
+
+warning: unused variable: `constant`
+   --> src/optimizations/interprocedural.rs:856:21
+    |
+856 |         for (place, constant) in assignments {
+    |                     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_constant`
+
+warning: unused variable: `var_name`
+   --> src/optimizations/interprocedural.rs:857:17
+    |
+857 |             let var_name = format!("{}::{}", function.name, place.local);
+    |                 ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_var_name`
+
+warning: unused variable: `end_loc`
+    --> src/parser/v2.rs:2896:17
+     |
+2896 |             let end_loc = self.current_location();
+     |                 ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_end_loc`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:1344:37
+     |
+1344 | ...                   let mut constraints = Vec::new();
+     |                           ----^^^^^^^^^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: unused variable: `field_location`
+    --> src/parser/mod.rs:1442:17
+     |
+1442 |             let field_location = field_keyword.location.clone();
+     |                 ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_field_location`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:1509:37
+     |
+1509 | ...                   let mut constraints = Vec::new();
+     |                           ----^^^^^^^^^^^
+     |                           |
+     |                           help: remove this `mut`
+
+warning: unused variable: `nested_pattern`
+    --> src/parser/mod.rs:4056:22
+     |
+4056 |                 let (nested_pattern, binding) = if let Some(token) = self.current_token() {
+     |                      ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_nested_pattern`
+
+warning: variable does not need to be mutable
+    --> src/parser/mod.rs:4473:13
+     |
+4473 |         let mut invariants = Vec::new();
+     |             ----^^^^^^^^^^
+     |             |
+     |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:132:21
+    |
+132 |                 let mut contract = create_pattern_contract("safe_array_access");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:392:21
+    |
+392 |                 let mut contract = create_pattern_contract("binary_search");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:536:21
+    |
+536 |                 let mut contract = create_pattern_contract("map_filter_reduce");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:804:21
+    |
+804 |                 let mut contract = create_pattern_contract("raii_wrapper");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/patterns/catalog.rs:931:21
+    |
+931 |                 let mut contract = create_pattern_contract("result_type");
+    |                     ----^^^^^^^^
+    |                     |
+    |                     help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> src/patterns/catalog.rs:1049:21
+     |
+1049 |                 let mut contract = create_pattern_contract("input_validation");
+     |                     ----^^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+
+warning: unused variable: `data_flow`
+   --> src/patterns/composition.rs:519:9
+    |
+519 |         data_flow: &DataFlowSpec,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_data_flow`
+
+warning: unused variable: `config`
+   --> src/release/distribution.rs:947:16
+    |
+947 |     pub fn new(config: DistributionConfig) -> Result<Self, SemanticError> {
+    |                ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `cache_config`
+    --> src/release/distribution.rs:1135:13
+     |
+1135 |         let cache_config = CacheConfig {
+     |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cache_config`
+
+warning: unused variable: `c_string`
+   --> src/runtime/mod.rs:170:9
+    |
+170 |     let c_string = result.as_ptr() as *mut c_char;
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_c_string`
+
+warning: unused variable: `constraint`
+   --> src/semantic/metadata.rs:462:25
+    |
+462 |             if let Some(constraint) = &sem_type.constraint {
+    |                         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_constraint`
+
+warning: unused variable: `left`
+   --> src/semantic/capture_analysis.rs:313:31
+    |
+313 |             Expression::Add { left, right, .. } |
+    |                               ^^^^
+314 |             Expression::Subtract { left, right, .. } |
+    |                                    ^^^^
+315 |             Expression::Multiply { left, right, .. } |
+    |                                    ^^^^
+316 |             Expression::Divide { left, right, .. } |
+    |                                  ^^^^
+317 |             Expression::Equals { left, right, .. } |
+    |                                  ^^^^
+318 |             Expression::NotEquals { left, right, .. } |
+    |                                     ^^^^
+319 |             Expression::LessThan { left, right, .. } |
+    |                                    ^^^^
+320 |             Expression::LessThanOrEqual { left, right, .. } |
+    |                                           ^^^^
+321 |             Expression::GreaterThan { left, right, .. } |
+    |                                       ^^^^
+322 |             Expression::GreaterThanOrEqual { left, right, .. } |
+    |                                              ^^^^
+    |
+help: try ignoring the field
+    |
+313 ~             Expression::Add { left: _, right, .. } |
+314 ~             Expression::Subtract { left: _, right, .. } |
+315 ~             Expression::Multiply { left: _, right, .. } |
+316 ~             Expression::Divide { left: _, right, .. } |
+317 ~             Expression::Equals { left: _, right, .. } |
+318 ~             Expression::NotEquals { left: _, right, .. } |
+319 ~             Expression::LessThan { left: _, right, .. } |
+320 ~             Expression::LessThanOrEqual { left: _, right, .. } |
+321 ~             Expression::GreaterThan { left: _, right, .. } |
+322 ~             Expression::GreaterThanOrEqual { left: _, right, .. } |
+    |
+
+warning: unused variable: `right`
+   --> src/semantic/capture_analysis.rs:313:37
+    |
+313 |             Expression::Add { left, right, .. } |
+    |                                     ^^^^^
+314 |             Expression::Subtract { left, right, .. } |
+    |                                          ^^^^^
+315 |             Expression::Multiply { left, right, .. } |
+    |                                          ^^^^^
+316 |             Expression::Divide { left, right, .. } |
+    |                                        ^^^^^
+317 |             Expression::Equals { left, right, .. } |
+    |                                        ^^^^^
+318 |             Expression::NotEquals { left, right, .. } |
+    |                                           ^^^^^
+319 |             Expression::LessThan { left, right, .. } |
+    |                                          ^^^^^
+320 |             Expression::LessThanOrEqual { left, right, .. } |
+    |                                                 ^^^^^
+321 |             Expression::GreaterThan { left, right, .. } |
+    |                                             ^^^^^
+322 |             Expression::GreaterThanOrEqual { left, right, .. } |
+    |                                                    ^^^^^
+    |
+help: try ignoring the field
+    |
+313 ~             Expression::Add { left, right: _, .. } |
+314 ~             Expression::Subtract { left, right: _, .. } |
+315 ~             Expression::Multiply { left, right: _, .. } |
+316 ~             Expression::Divide { left, right: _, .. } |
+317 ~             Expression::Equals { left, right: _, .. } |
+318 ~             Expression::NotEquals { left, right: _, .. } |
+319 ~             Expression::LessThan { left, right: _, .. } |
+320 ~             Expression::LessThanOrEqual { left, right: _, .. } |
+321 ~             Expression::GreaterThan { left, right: _, .. } |
+322 ~             Expression::GreaterThanOrEqual { left, right: _, .. } |
+    |
+
+warning: unused variable: `enum_name`
+    --> src/semantic/mod.rs:1485:17
+     |
+1485 |                 enum_name,
+     |                 ^^^^^^^^^ help: try ignoring the field: `enum_name: _`
+
+warning: unused variable: `source_location`
+    --> src/semantic/mod.rs:1662:17
+     |
+1662 |                 source_location,
+     |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `source_location`
+    --> src/semantic/mod.rs:1813:17
+     |
+1813 |                 source_location,
+     |                 ^^^^^^^^^^^^^^^ help: try ignoring the field: `source_location: _`
+
+warning: unused variable: `size_type`
+  --> src/stdlib/network.rs:41:9
+   |
+41 |     let size_type = TypeSpecifier::Primitive {
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_size_type`
+
+warning: unused variable: `contract`
+   --> src/verification/contracts.rs:811:13
+    |
+811 |     let mut contract = FunctionContract::new(function.name.name.clone());
+    |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_contract`
+
+warning: variable does not need to be mutable
+   --> src/verification/contracts.rs:811:9
+    |
+811 |     let mut contract = FunctionContract::new(function.name.name.clone());
+    |         ----^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `place`
+   --> src/verification/vcgen.rs:382:25
+    |
+382 |             Rvalue::Len(place) => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_place`
+
+For more information about this error, try `rustc --explain E0408`.
+warning: `aether` (lib) generated 116 warnings
+error: could not compile `aether` (lib) due to 2 previous errors; 116 warnings emitted

@@ -18,7 +18,7 @@
 
 use crate::ast::{
     Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode,
-    ConstantDeclaration, ElseIf, EnumVariant, Expression, ExternalFunction, FieldValue, Function,
+    ConstantDeclaration, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction, FieldValue, Function,
     FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, Identifier,
     ImportStatement, LambdaBody, MatchArm, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
     Statement, StructField, TypeDefinition, TypeSpecifier,
@@ -490,6 +490,7 @@ impl Parser {
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
         let mut constant_declarations = Vec::new();
+        let mut exports = Vec::new();
 
         // Support both "module name;" (file-scoped) and "module name { }" (inline)
         if self.check(&TokenType::Semicolon) {
@@ -502,6 +503,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut constant_declarations,
+                    &mut exports,
                 ) {
                     self.add_error(e);
                     self.synchronize_to_module_item();
@@ -517,6 +519,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut constant_declarations,
+                    &mut exports,
                 ) {
                     self.add_error(e);
                     self.synchronize_to_module_item();
@@ -538,7 +541,7 @@ impl Parser {
             name,
             intent: None,
             imports,
-            exports: Vec::new(),
+            exports,
             type_definitions,
             constant_declarations,
             function_definitions,
@@ -567,6 +570,7 @@ impl Parser {
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
         let mut constant_declarations = Vec::new();
+        let mut exports = Vec::new();
 
         // Support both "module name;" (file-scoped) and "module name { }" (inline)
         if self.check(&TokenType::Semicolon) {
@@ -581,6 +585,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut constant_declarations,
+                    &mut exports,
                 ) {
                     self.add_error(e);
                     self.synchronize_to_module_item();
@@ -597,6 +602,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut constant_declarations,
+                    &mut exports,
                 ) {
                     self.add_error(e);
                     self.synchronize_to_module_item();
@@ -623,7 +629,7 @@ impl Parser {
             name,
             intent: None,
             imports,
-            exports: Vec::new(),
+            exports,
             type_definitions,
             constant_declarations,
             function_definitions,
@@ -640,7 +646,16 @@ impl Parser {
         external_functions: &mut Vec<ExternalFunction>,
         type_definitions: &mut Vec<TypeDefinition>,
         constant_declarations: &mut Vec<ConstantDeclaration>,
+        exports: &mut Vec<ExportStatement>,
     ) -> Result<(), ParserError> {
+        // Skip visibility modifier if present
+        let is_public = if self.check_keyword(Keyword::Pub) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+
         // Check for annotation (could be @extern)
         if self.check(&TokenType::At) {
             let annotation = self.parse_annotation()?;
@@ -652,6 +667,12 @@ impl Parser {
                 // Annotated function - parse but ignore annotation for now
                 // (AST Function struct doesn't have annotations field)
                 let func = self.parse_function()?;
+                if is_public {
+                    exports.push(ExportStatement::Function {
+                        name: func.name.clone(),
+                        source_location: func.source_location.clone(),
+                    });
+                }
                 function_definitions.push(func);
             } else {
                 return Err(ParserError::UnexpectedToken {
@@ -663,13 +684,51 @@ impl Parser {
         } else if self.check_keyword(Keyword::Import) {
             imports.push(self.parse_import()?);
         } else if self.check_keyword(Keyword::Func) {
-            function_definitions.push(self.parse_function()?);
+            let func = self.parse_function()?;
+            if is_public {
+                exports.push(ExportStatement::Function {
+                    name: func.name.clone(),
+                    source_location: func.source_location.clone(),
+                });
+            }
+            function_definitions.push(func);
         } else if self.check_keyword(Keyword::Struct) {
-            type_definitions.push(self.parse_struct()?);
+            let type_def = self.parse_struct()?;
+            if is_public {
+                match &type_def {
+                    TypeDefinition::Structured { name, source_location, .. } => {
+                        exports.push(ExportStatement::Type {
+                            name: name.clone(),
+                            source_location: source_location.clone(),
+                        });
+                    }
+                    _ => {}
+                }
+            }
+            type_definitions.push(type_def);
         } else if self.check_keyword(Keyword::Enum) {
-            type_definitions.push(self.parse_enum()?);
+            let type_def = self.parse_enum()?;
+            if is_public {
+                match &type_def {
+                    TypeDefinition::Enumeration { name, source_location, .. } => {
+                        exports.push(ExportStatement::Type {
+                            name: name.clone(),
+                            source_location: source_location.clone(),
+                        });
+                    }
+                    _ => {}
+                }
+            }
+            type_definitions.push(type_def);
         } else if self.check_keyword(Keyword::Const) {
-            constant_declarations.push(self.parse_constant_declaration()?);
+            let constant = self.parse_constant_declaration()?;
+            if is_public {
+                exports.push(ExportStatement::Constant {
+                    name: constant.name.clone(),
+                    source_location: constant.source_location.clone(),
+                });
+            }
+            constant_declarations.push(constant);
         } else {
             return Err(ParserError::UnexpectedToken {
                 expected: "import, func, struct, enum, const, or annotation".to_string(),

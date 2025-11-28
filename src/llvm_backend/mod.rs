@@ -1406,14 +1406,8 @@ impl<'ctx> LLVMBackend<'ctx> {
             }
 
             mir::Rvalue::Call { func, args } => {
-                eprintln!("DEBUG: Processing Rvalue::Call case");
-                eprintln!("DEBUG: Function operand: {:?}", func);
-                eprintln!("DEBUG: Arguments: {:?}", args);
-
                 // Check if this is an indirect call through a function pointer (closure)
                 if let mir::Operand::Copy(place) | mir::Operand::Move(place) = func {
-                    eprintln!("DEBUG: Indirect call through function pointer");
-
                     // Load the function pointer from the local
                     let func_ptr = if let Some(&alloca) = local_allocas.get(&place.local) {
                         builder
@@ -1480,11 +1474,9 @@ impl<'ctx> LLVMBackend<'ctx> {
                 let function_name = match func {
                     mir::Operand::Constant(constant) => match &constant.value {
                         mir::ConstantValue::String(name) => {
-                            eprintln!("DEBUG: Extracted function name: {}", name);
                             name.clone()
                         }
                         _ => {
-                            eprintln!("DEBUG: Function operand is not a string constant");
                             return Err(SemanticError::CodeGenError {
                                 message: "Function call with non-string function reference"
                                     .to_string(),
@@ -1492,7 +1484,6 @@ impl<'ctx> LLVMBackend<'ctx> {
                         }
                     },
                     _ => {
-                        eprintln!("DEBUG: Function operand is not a constant");
                         return Err(SemanticError::CodeGenError {
                             message: "Function call with non-constant function reference"
                                 .to_string(),
@@ -1501,16 +1492,6 @@ impl<'ctx> LLVMBackend<'ctx> {
                 };
 
                 // Get the LLVM function first (to avoid borrowing conflicts)
-                eprintln!("DEBUG: Looking up function: {}", function_name);
-                if let Some(decls) = self.function_declarations.as_ref() {
-                    eprintln!(
-                        "DEBUG: Available function declarations: {:?}",
-                        decls.keys().collect::<Vec<_>>()
-                    );
-                } else {
-                    eprintln!("DEBUG: No function declarations available");
-                }
-
                 let llvm_func_value = self
                     .function_declarations
                     .as_ref()
@@ -1520,24 +1501,15 @@ impl<'ctx> LLVMBackend<'ctx> {
                         message: format!("Function {} not found", function_name),
                     })?;
 
-                eprintln!("DEBUG: Found LLVM function: {:?}", llvm_func_value);
-
                 // Generate argument values
                 let mut arg_values = Vec::new();
 
                 // Special handling for map functions that need pointer arguments
                 if function_name == "map_insert" || function_name == "map_get" {
-                    eprintln!(
-                        "DEBUG: Special handling for map function: {}",
-                        function_name
-                    );
-
                     // For map functions, we need to pass pointers to the key and value
                     for (i, arg) in args.iter().enumerate() {
-                        eprintln!("DEBUG: Processing argument {}: {:?}", i, arg);
                         let arg_value =
                             self.generate_operand(arg, local_allocas, builder, function)?;
-                        eprintln!("DEBUG: Generated argument value: {:?}", arg_value);
 
                         if i == 0 {
                             // First argument is the map pointer, pass as-is
@@ -1546,7 +1518,6 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 BasicValueEnum::IntValue(int_val) => {
                                     // This is likely a map pointer that was loaded incorrectly
                                     // We need to treat it as a pointer
-                                    eprintln!("DEBUG: Map argument loaded as integer, need to handle specially");
                                     // The value in local_1 should be a pointer, not an integer
                                     // Let's load it as a pointer instead
                                     if let mir::Operand::Copy(place) | mir::Operand::Move(place) =
@@ -1677,10 +1648,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                     }
                 }
 
-                eprintln!("DEBUG: Generated {} argument values", arg_values.len());
-
                 // Generate the call
-                eprintln!("DEBUG: Generating LLVM call to function: {}", function_name);
                 let call_result = builder
                     .build_call(
                         llvm_func_value,
@@ -1691,12 +1659,8 @@ impl<'ctx> LLVMBackend<'ctx> {
                         message: e.to_string(),
                     })?;
 
-                eprintln!("DEBUG: Call generated successfully: {:?}", call_result);
-
                 // Extract return value
                 if let Some(basic_value) = call_result.try_as_basic_value().left() {
-                    eprintln!("DEBUG: Call has return value: {:?}", basic_value);
-
                     // Special handling for map_get return value
                     if function_name == "map_get" {
                         // map_get returns a void* pointer to the value
@@ -1728,7 +1692,6 @@ impl<'ctx> LLVMBackend<'ctx> {
                         Ok(basic_value)
                     }
                 } else {
-                    eprintln!("DEBUG: Call has void return, returning dummy value");
                     // Void return - return a dummy value
                     Ok(self.context.i32_type().const_int(0, false).into())
                 }
@@ -1769,7 +1732,6 @@ impl<'ctx> LLVMBackend<'ctx> {
                 ty,
             } => {
                 // Handle type casts
-                eprintln!("DEBUG: Processing cast to type: {:?}", ty);
 
                 // Get the operand value
                 let operand_value =

@@ -117,6 +117,8 @@ pub enum Keyword {
     Break,
     Continue,
     Concurrent, // New async/await alternative
+    Async,      // Future async/await support
+    Await,      // Future async/await support
 
     // Error Handling
     Try,
@@ -236,6 +238,8 @@ impl Lexer {
             .insert("continue".to_string(), Keyword::Continue);
         self.keywords
             .insert("concurrent".to_string(), Keyword::Concurrent);
+        self.keywords.insert("async".to_string(), Keyword::Async);
+        self.keywords.insert("await".to_string(), Keyword::Await);
 
         // Error handling keywords
         self.keywords.insert("try".to_string(), Keyword::Try);

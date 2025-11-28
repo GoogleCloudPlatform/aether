@@ -18,11 +18,12 @@
 
 use crate::ast::{PrimitiveType, TypeConstraint, TypeConstraintKind, TypeSpecifier};
 use crate::error::{SemanticError, SourceLocation};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
 /// Ownership kind for AetherScript's ownership system
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OwnershipKind {
     /// ^T - Single owner, value is moved on assignment
     Owned,
@@ -35,7 +36,7 @@ pub enum OwnershipKind {
 }
 
 /// Type constraint information for generic parameters
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TypeConstraintInfo {
     /// Type must implement a trait/interface
     TraitBound {
@@ -55,7 +56,7 @@ pub enum TypeConstraintInfo {
 }
 
 /// Type representation in the type system
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Type {
     /// Primitive types
     Primitive(PrimitiveType),
@@ -65,6 +66,9 @@ pub enum Type {
         name: String,
         module: Option<String>,
     },
+
+    /// Module type (for imports)
+    Module(String),
 
     /// Array types
     Array {
@@ -345,7 +349,8 @@ impl Type {
             Type::Error
             | Type::Variable(_)
             | Type::Generic { .. }
-            | Type::GenericInstance { .. } => false,
+            | Type::GenericInstance { .. }
+            | Type::Module(_) => false,
         }
     }
 }
@@ -429,12 +434,13 @@ impl fmt::Display for Type {
                 write!(f, "{}{}", prefix, base_type)
             }
             Type::Error => write!(f, "<error>"),
+            Type::Module(name) => write!(f, "module {}", name),
         }
     }
 }
 
 /// Type variable for type inference
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TypeVariable {
     pub id: usize,
     pub constraints: Vec<Type>,

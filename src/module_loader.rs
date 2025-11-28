@@ -18,7 +18,8 @@
 
 use crate::ast::Module;
 use crate::error::{SemanticError, SourceLocation};
-use crate::parser::Parser;
+use crate::lexer::v2::Lexer;
+use crate::parser::v2::Parser;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -186,30 +187,20 @@ impl ModuleLoader {
             ModuleSource::Memory(code) => code.clone(),
         };
 
-        // Tokenize and parse the module
-        let mut lexer = crate::lexer::Lexer::new(&source_code, module_name.to_string());
+        // Tokenize and parse the module using V2 lexer/parser
+        let mut lexer = Lexer::new(&source_code, module_name.to_string());
         let tokens = lexer.tokenize().map_err(|e| SemanticError::Internal {
             message: format!("Failed to tokenize module '{}': {}", module_name, e),
         })?;
 
         let mut parser = Parser::new(tokens);
-        let program = parser
-            .parse_program()
+        let module = parser
+            .parse_module()
             .map_err(|e| SemanticError::Internal {
                 message: format!("Failed to parse module '{}': {}", module_name, e),
             })?;
 
-        // Extract the module (assuming single-module files for now)
-        if program.modules.len() != 1 {
-            return Err(SemanticError::Internal {
-                message: format!(
-                    "Module file '{}' must contain exactly one module",
-                    module_name
-                ),
-            });
-        }
-
-        Ok(program.modules.into_iter().next().unwrap())
+        Ok(module)
     }
 
     /// Register standard library modules

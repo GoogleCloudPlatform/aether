@@ -1,0 +1,33 @@
+module network_io;
+
+import io;
+import net;
+
+func main() -> Int {
+  io.println("Starting network requests...");
+
+  concurrent {
+    io.println("Attempting connection to google.com...");
+    let sock = net.connect("google.com", 80);
+    
+    when (sock.is_connected) {
+       io.println("Connected to google.com!");
+       
+       // Send HTTP GET request
+       let req = "GET / HTTP/1.1\r\nHost: google.com\r\nConnection: close\r\n\r\n";
+       net.send(sock, req);
+       
+       // Receive response (first 100 bytes)
+       let response = net.receive(sock, 100);
+       io.print("Received: ");
+       io.println(response);
+       
+       net.close(sock);
+    } else {
+       io.println("Failed to connect.");
+    }
+  }
+  
+  io.println("Request dispatched.");
+  return 0;
+}

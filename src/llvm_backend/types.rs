@@ -161,6 +161,12 @@ impl<'ctx> TypeConverter<'ctx> {
                 // The ownership is tracked at compile time, not runtime
                 self.convert_type(base_type)
             }
+
+            Type::Module(_) => Err(SemanticError::InvalidType {
+                type_name: "module".to_string(),
+                reason: "Modules cannot be used as values during code generation".to_string(),
+                location: crate::error::SourceLocation::unknown(),
+            }),
         }
     }
 

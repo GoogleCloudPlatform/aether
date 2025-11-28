@@ -292,6 +292,7 @@ pub struct Function {
     pub metadata: FunctionMetadata,
     pub body: Block,
     pub export_info: Option<ExportInfo>,
+    pub is_async: bool, // New async support
     pub source_location: SourceLocation,
 }
 

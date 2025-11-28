@@ -1,55 +1,38 @@
-module AsyncIO {
-  // import std.io; // Disabled due to module loading error
+module async_io;
 
-  // Extern declarations
-  @extern(library: "aether_runtime", symbol: "aether_print")
-  func aether_print(text: String) -> Void;
+import io;
 
-  @extern(library: "aether_runtime", symbol: "print_int")
-  func print_int(value: Int) -> Void;
+// Extern for int conversion if not in io
+@extern(library: "aether_runtime", symbol: "int_to_string")
+func int_to_string(value: Int) -> String;
 
-  func print(text: String) -> Void {
-    aether_print(text);
+func slow_task(id: Int) -> Int {
+  io.print("Starting task ");
+  io.println(int_to_string(id));
+  
+  // Simulate work
+  let mut sum: Int = 0;
+  let mut i: Int = 0;
+  while ({i < 1000}) {
+    sum = {sum + i};
+    i = {i + 1};
   }
 
-  func println(text: String) -> Void {
-    aether_print(text);
-    aether_print("\n");
+  io.print("Finished task ");
+  io.println(int_to_string(id));
+  return sum;
+}
+
+func main() -> Int {
+  io.println("Starting async I/O example");
+
+  // Concurrent block - tasks inside start concurrently
+  concurrent {
+    let res1 = slow_task(1);
+    let res2 = slow_task(2);
   }
 
-  func slow_task(id: Int) -> Int {
-    print("Starting task ");
-    print_int(id);
-    // print("\n"); already printed by print_int? No, print_int uses println in Rust.
-    // Rust println! adds newline.
-    
-    // Simulate work
-    let mut sum: Int = 0;
-    let mut i: Int = 0;
-    while ({i < 1000}) {
-      sum = {sum + i};
-      i = {i + 1};
-    }
-
-    print("Finished task ");
-    print_int(id); 
-    // print_int adds newline in Rust implementation
-    return sum;
-  }
-
-  func main() -> Int {
-    println("Starting async I/O example");
-
-    // Concurrent block - tasks inside start concurrently
-    concurrent {
-      let res1 = slow_task(1);
-      let res2 = slow_task(2);
-      
-      // For verification, we rely on side effects (printing)
-    }
-
-    println("Concurrent block finished");
-    
-    return 0;
-  }
+  io.println("Concurrent block finished");
+  
+  return 0;
 }

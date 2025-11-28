@@ -1,0 +1,36 @@
+module file_io;
+
+import io;
+
+func main() -> Int {
+  io.println("Setting up files...");
+  // Write files synchronously to prepare
+  let w1 = io.write_file("file_a.txt", "Hello from File A\nThis is content A.");
+  let w2 = io.write_file("file_b.txt", "Hello from File B\nThis is content B.");
+  
+  when { !w1 } {
+     io.println("Failed to write file A!");
+     return 1;
+  }
+  when { !w2 } {
+     io.println("Failed to write file B!");
+     return 1;
+  }
+
+  io.println("Reading files concurrently...");
+  
+  concurrent {
+    let content_a = io.read_file("file_a.txt");
+    io.print("Read A: ");
+    io.println(content_a);
+  }
+
+  concurrent {
+    let content_b = io.read_file("file_b.txt");
+    io.print("Read B: ");
+    io.println(content_b);
+  }
+  
+  io.println("Main execution continuing (non-blocking)...");
+  return 0;
+}

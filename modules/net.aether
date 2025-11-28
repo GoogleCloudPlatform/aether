@@ -1,0 +1,48 @@
+module net;
+
+pub struct Socket {
+  id: Int,
+  is_connected: Bool,
+}
+
+@extern(library: "aether_runtime", symbol: "tcp_connect")
+func tcp_connect(host: String, port: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "tcp_close")
+func tcp_close(socket_id: Int) -> Void;
+
+@extern(library: "aether_runtime", symbol: "tcp_write")
+func tcp_write(socket_id: Int, data: String, size: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "tcp_read")
+func tcp_read(socket_id: Int, buffer: String, size: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "tcp_read_string")
+func tcp_read_string(socket_id: Int, max_size: Int) -> String;
+
+@extern(library: "aether_runtime", symbol: "string_length")
+func string_length(str: String) -> Int;
+
+// Wrappers
+
+pub func connect(host: String, port: Int) -> Socket {
+  let id = tcp_connect(host, port);
+  let connected = { id > 0 };
+  return Socket { id: id, is_connected: connected };
+}
+
+pub func close(socket: Socket) -> Void {
+  when (socket.is_connected) {
+    tcp_close(socket.id);
+  }
+}
+
+pub func send(socket: Socket, data: String) -> Int {
+  when ({ !socket.is_connected }) { return -1; }
+  return tcp_write(socket.id, data, string_length(data));
+}
+
+pub func receive(socket: Socket, max_size: Int) -> String {
+  when ({ !socket.is_connected }) { return ""; }
+  return tcp_read_string(socket.id, max_size);
+}

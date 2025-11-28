@@ -66,6 +66,9 @@ pub struct LoweringContext {
 
     /// Map of concurrent block locations to captured variable names
     concurrent_captures: Option<HashMap<SourceLocation, std::collections::HashSet<String>>>,
+
+    /// Imported modules in the current module (alias -> module name)
+    imported_modules: HashMap<String, String>,
 }
 
 impl LoweringContext {
@@ -86,6 +89,7 @@ impl LoweringContext {
             symbol_table: None,
             lambda_counter: 0,
             concurrent_captures: None,
+            imported_modules: HashMap::new(),
         }
     }
 
@@ -148,6 +152,17 @@ impl LoweringContext {
     /// Lower a module
     fn lower_module(&mut self, module: &ast::Module) -> Result<(), SemanticError> {
         self.current_module = Some(module.name.name.clone());
+        self.imported_modules.clear();
+
+        // Register imports
+        for import in &module.imports {
+            let alias = if let Some(alias) = &import.alias {
+                alias.name.clone()
+            } else {
+                import.module_name.name.clone()
+            };
+            self.imported_modules.insert(alias, import.module_name.name.clone());
+        }
 
         // Lower constants
         for constant in &module.constant_declarations {
@@ -196,6 +211,7 @@ impl LoweringContext {
             ext_func.name.name.clone(),
             ExternalFunction {
                 name: ext_func.name.name.clone(),
+                symbol: ext_func.symbol.clone(),
                 parameters: param_types,
                 return_type: self.ast_type_to_mir_type(&ext_func.return_type)?,
                 calling_convention: self.convert_calling_convention(&ext_func.calling_convention),
@@ -222,9 +238,19 @@ impl LoweringContext {
 
         let return_type = self.ast_type_to_mir_type(&function.return_type)?;
 
+        let function_name = if let Some(mod_name) = &self.current_module {
+            if function.name.name == "main" {
+                "main".to_string()
+            } else {
+                format!("{}.{}", mod_name, function.name.name)
+            }
+        } else {
+            function.name.name.clone()
+        };
+
         // Start building the function
         self.builder
-            .start_function(function.name.name.clone(), params, return_type.clone());
+            .start_function(function_name.clone(), params, return_type.clone());
 
         // Create a local for the return value if not void
         let return_local = match &return_type {
@@ -271,7 +297,7 @@ impl LoweringContext {
         mir_function.return_local = self.return_local;
         self.program
             .functions
-            .insert(function.name.name.clone(), mir_function);
+            .insert(function_name, mir_function);
 
         Ok(())
     }
@@ -1746,6 +1772,71 @@ impl LoweringContext {
         arguments: &[ast::Argument],
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
+        // Check for module function call (e.g. io.println)
+        if let ast::Expression::Variable { name, .. } = receiver {
+            if let Some(module_name) = self.imported_modules.get(&name.name) {
+                // It's a module function call
+                let qualified_name = format!("{}.{}", module_name, method_name.name);
+                
+                // Look up return type from symbol table if available, otherwise void
+                let return_type = if let Some(st) = &self.symbol_table {
+                    if let Some(func_sym) = st.lookup_symbol(&qualified_name) {
+                        if let crate::types::Type::Function { parameter_types, return_type } = &func_sym.symbol_type {
+                            // Register as external function if not already known
+                            if !self.program.functions.contains_key(&qualified_name) && !self.program.external_functions.contains_key(&qualified_name) {
+                                let ext_func = crate::mir::ExternalFunction {
+                                    name: qualified_name.clone(),
+                                    symbol: None, // Or lookup from somewhere? But for now None.
+                                    parameters: parameter_types.clone(),
+                                    return_type: *return_type.clone(),
+                                    calling_convention: crate::mir::CallingConvention::C,
+                                    variadic: false,
+                                };
+                                self.program.external_functions.insert(qualified_name.clone(), ext_func);
+                            }
+                            *return_type.clone()
+                        } else {
+                            crate::types::Type::primitive(ast::PrimitiveType::Void)
+                        }
+                    } else {
+                        crate::types::Type::primitive(ast::PrimitiveType::Void)
+                    }
+                } else {
+                    crate::types::Type::primitive(ast::PrimitiveType::Void)
+                };
+
+                let mut lowered_args = Vec::new();
+                for arg in arguments {
+                    lowered_args.push(self.lower_expression(&arg.value)?);
+                }
+
+                let result_local = self.builder.new_local(return_type, false);
+
+                self.builder.push_statement(Statement::Assign {
+                    place: Place {
+                        local: result_local,
+                        projection: vec![],
+                    },
+                    rvalue: Rvalue::Call {
+                        func: Operand::Constant(Constant {
+                            ty: crate::types::Type::primitive(ast::PrimitiveType::String),
+                            value: ConstantValue::String(qualified_name),
+                        }),
+                        args: lowered_args,
+                    },
+                    source_info: SourceInfo {
+                        span: source_location.clone(),
+                        scope: 0,
+                    },
+                });
+
+                return Ok(Operand::Copy(Place {
+                    local: result_local,
+                    projection: vec![],
+                }));
+            }
+        }
+
         // For map methods "insert" and "get", lower to map_insert/map_get runtime calls
         // In a real compiler, this would look up the type of receiver and dispatch appropriately
         // For now, we'll assume it's a map if the method name matches map operations
@@ -2250,12 +2341,28 @@ impl LoweringContext {
         eprintln!("lower_function_call: entering for call {:?}", call);
         // For now, only support local function references
         let function_name = match &call.function_reference {
-            ast::FunctionReference::Local { name } => &name.name,
-            _ => {
-                return Err(SemanticError::UnsupportedFeature {
-                    feature: "Non-local function references not yet supported".to_string(),
-                    location: source_location.clone(),
-                });
+            ast::FunctionReference::Local { name, .. } => {
+                if let Some(mod_name) = &self.current_module {
+                     let qualified = format!("{}.{}", mod_name, name.name);
+                     
+                     // Check if it's an external function (lowered before functions in lower_module)
+                     if self.program.external_functions.contains_key(&name.name) {
+                         name.name.clone()
+                     } else if name.name == "main" {
+                         "main".to_string()
+                     } else {
+                         // Assume it's a local function in this module (forward or backward ref)
+                         qualified
+                     }
+                } else {
+                    name.name.clone()
+                }
+            }
+            ast::FunctionReference::Qualified { module, name, .. } => {
+                format!("{}.{}", module.name, name.name)
+            }
+            ast::FunctionReference::External { name, .. } => {
+                name.name.clone()
             }
         };
         eprintln!("lower_function_call: function name = {}", function_name);
@@ -2274,7 +2381,7 @@ impl LoweringContext {
         }
 
         // Check if this is a call to a local variable (closure call)
-        if let Some(&local_id) = self.var_map.get(function_name) {
+        if let Some(&local_id) = self.var_map.get(&function_name) {
             eprintln!("lower_function_call: {} is a local variable (closure)", function_name);
 
             // Get the closure function pointer from the local variable
@@ -2284,7 +2391,7 @@ impl LoweringContext {
             });
 
             // Get the return type from the variable's function type
-            let result_type = if let Some(var_type) = self.var_types.get(function_name) {
+            let result_type = if let Some(var_type) = self.var_types.get(&function_name) {
                 match var_type {
                     Type::Function { return_type, .. } => (**return_type).clone(),
                     _ => Type::primitive(ast::PrimitiveType::Integer),
@@ -2328,7 +2435,7 @@ impl LoweringContext {
         });
 
         // Determine the return type of the function
-        let result_type = if let Some(ext_func) = self.program.external_functions.get(function_name)
+        let result_type = if let Some(ext_func) = self.program.external_functions.get(&function_name)
         {
             // External function - use its declared return type
             eprintln!(
@@ -2336,7 +2443,7 @@ impl LoweringContext {
                 function_name, ext_func.return_type
             );
             ext_func.return_type.clone()
-        } else if let Some(func) = self.program.functions.get(function_name) {
+        } else if let Some(func) = self.program.functions.get(&function_name) {
             // Regular function - use its declared return type
             eprintln!(
                 "lower_function_call: found regular function {} with return type {:?}",
@@ -2353,7 +2460,7 @@ impl LoweringContext {
         } else {
             // Try to look up in symbol table if available
             if let Some(ref symbol_table) = self.symbol_table {
-                if let Some(symbol) = symbol_table.lookup_symbol(function_name) {
+                if let Some(symbol) = symbol_table.lookup_symbol(&function_name) {
                     match &symbol.kind {
                         SymbolKind::Function => {
                             eprintln!("lower_function_call: found function {} in symbol table with return type {:?}", function_name, symbol.symbol_type);

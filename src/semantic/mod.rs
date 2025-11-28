@@ -267,6 +267,28 @@ impl SemanticAnalyzer {
                     message: format!("Module {} not found in analyzed modules cache", module_name),
                 })?;
 
+        let mut exported_symbols = HashMap::new();
+
+        // Add the module itself as a symbol so "io.println" works if "io" is used as prefix
+        let module_symbol_name = if let Some(alias_name) = alias {
+            alias_name.clone()
+        } else {
+            module_name.to_string()
+        };
+
+        let module_symbol = Symbol::new(
+            module_symbol_name.clone(),
+            Type::Module(module_name.to_string()),
+            SymbolKind::Module,
+            false,
+            true,
+            location.clone(),
+        );
+        self.symbol_table.add_symbol(module_symbol.clone())?;
+        
+        // Also add module symbol to imports map for global lookup
+        exported_symbols.insert(module_symbol_name, module_symbol);
+
         // Process exports from the imported module
         for export in &loaded_module.module.exports {
             match export {
@@ -278,14 +300,34 @@ impl SemanticAnalyzer {
                         format!("{}.{}", module_name, name.name)
                     };
 
-                    // Look up the function type from the module's symbol table
-                    // For now, we'll add a placeholder - full implementation would need
-                    // to maintain module-specific symbol tables
+                    // Resolve function signature from AST
+                    let (parameter_types, return_type) = {
+                        if let Some(func) = loaded_module.module.function_definitions.iter().find(|f| f.name.name == name.name) {
+                            let mut params = Vec::new();
+                            for param in &func.parameters {
+                                let p_type = self.type_checker.borrow().ast_type_to_type(&param.param_type).unwrap_or(Type::Error);
+                                params.push(p_type);
+                            }
+                            let ret_type = self.type_checker.borrow().ast_type_to_type(&func.return_type).unwrap_or(Type::Error);
+                            (params, Box::new(ret_type))
+                        } else if let Some(func) = loaded_module.module.external_functions.iter().find(|f| f.name.name == name.name) {
+                            let mut params = Vec::new();
+                            for param in &func.parameters {
+                                let p_type = self.type_checker.borrow().ast_type_to_type(&param.param_type).unwrap_or(Type::Error);
+                                params.push(p_type);
+                            }
+                            let ret_type = self.type_checker.borrow().ast_type_to_type(&func.return_type).unwrap_or(Type::Error);
+                            (params, Box::new(ret_type))
+                        } else {
+                            (vec![], Box::new(Type::Primitive(PrimitiveType::Void)))
+                        }
+                    };
+
                     let symbol = Symbol::new(
-                        qualified_name,
+                        qualified_name.clone(),
                         Type::Function {
-                            parameter_types: vec![],
-                            return_type: Box::new(Type::Primitive(crate::ast::PrimitiveType::Void)),
+                            parameter_types,
+                            return_type,
                         },
                         SymbolKind::Function,
                         false,
@@ -293,7 +335,8 @@ impl SemanticAnalyzer {
                         location.clone(),
                     );
 
-                    self.symbol_table.add_symbol(symbol)?;
+                    self.symbol_table.add_symbol(symbol.clone())?;
+                    exported_symbols.insert(qualified_name, symbol);
                 }
                 ExportStatement::Type { name, .. } => {
                     // Add exported type to type system
@@ -307,7 +350,7 @@ impl SemanticAnalyzer {
                     let symbol = Symbol::new(
                         qualified_name.clone(),
                         Type::Named {
-                            name: qualified_name,
+                            name: qualified_name.clone(),
                             module: Some(module_name.to_string()),
                         },
                         SymbolKind::Type,
@@ -316,7 +359,8 @@ impl SemanticAnalyzer {
                         location.clone(),
                     );
 
-                    self.symbol_table.add_symbol(symbol)?;
+                    self.symbol_table.add_symbol(symbol.clone())?;
+                    exported_symbols.insert(qualified_name, symbol);
                 }
                 ExportStatement::Constant { name, .. } => {
                     // Add exported constant to symbol table
@@ -329,7 +373,7 @@ impl SemanticAnalyzer {
                     // For now, add with Unknown type - full implementation would
                     // need to track constant values and types
                     let symbol = Symbol::new(
-                        qualified_name,
+                        qualified_name.clone(),
                         Type::Error, // Use Error type as placeholder for unknown constant type
                         SymbolKind::Constant,
                         false,
@@ -337,11 +381,13 @@ impl SemanticAnalyzer {
                         location.clone(),
                     );
 
-                    self.symbol_table.add_symbol(symbol)?;
+                    self.symbol_table.add_symbol(symbol.clone())?;
+                    exported_symbols.insert(qualified_name, symbol);
                 }
             }
         }
 
+        self.symbol_table.add_import(module_name.to_string(), exported_symbols);
         Ok(())
     }
 
@@ -637,16 +683,24 @@ impl SemanticAnalyzer {
                 name,
                 source_location,
             }
-            | ExportStatement::Type {
-                name,
-                source_location,
-            }
             | ExportStatement::Constant {
                 name,
                 source_location,
             } => {
                 // Check that the exported symbol exists
                 if self.symbol_table.lookup_symbol(&name.name).is_none() {
+                    return Err(SemanticError::UndefinedSymbol {
+                        symbol: name.name.clone(),
+                        location: source_location.clone(),
+                    });
+                }
+            }
+            ExportStatement::Type {
+                name,
+                source_location,
+            } => {
+                // Check that the exported type exists
+                if self.symbol_table.lookup_type_definition(&name.name).is_none() {
                     return Err(SemanticError::UndefinedSymbol {
                         symbol: name.name.clone(),
                         location: source_location.clone(),
@@ -1804,8 +1858,52 @@ impl SemanticAnalyzer {
                             })
                         }
                     }
+                    Type::Module(module_name) => {
+                        let qualified_name = format!("{}.{}", module_name, method_name.name);
+                        
+                        // Clone the function type info to avoid holding a borrow on symbol_table
+                        let (parameter_types, return_type) = if let Some(symbol) = self.symbol_table.lookup_symbol(&qualified_name) {
+                            if let Type::Function { parameter_types, return_type } = &symbol.symbol_type {
+                                (parameter_types.clone(), return_type.clone())
+                            } else {
+                                return Err(SemanticError::InvalidOperation {
+                                    operation: format!("call '{}'", qualified_name),
+                                    reason: "symbol is not a function".to_string(),
+                                    location: source_location.clone(),
+                                });
+                            }
+                        } else {
+                            return Err(SemanticError::UndefinedSymbol {
+                                symbol: qualified_name,
+                                location: source_location.clone(),
+                            });
+                        };
+
+                        // Check arguments
+                        if parameter_types.len() != arguments.len() {
+                            return Err(SemanticError::ArgumentCountMismatch {
+                                function: qualified_name,
+                                expected: parameter_types.len(),
+                                found: arguments.len(),
+                                location: source_location.clone(),
+                            });
+                        }
+                        
+                        for (param_type, arg) in parameter_types.iter().zip(arguments.iter()) {
+                            let arg_type = self.analyze_expression(&arg.value)?;
+                            if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
+                                return Err(SemanticError::TypeMismatch {
+                                    expected: param_type.to_string(),
+                                    found: arg_type.to_string(),
+                                    location: arg.source_location.clone(),
+                                });
+                            }
+                        }
+                        
+                        Ok(*return_type)
+                    }
                     _ => {
-                        // For now, only Maps have methods supported here
+                        // For now, only Maps and Modules have methods supported here
                         Err(SemanticError::InvalidOperation {
                             operation: format!("method call '{}'", method_name.name),
                             reason: format!("type '{}' does not support methods", receiver_type),
@@ -3033,6 +3131,14 @@ impl SemanticAnalyzer {
     /// Get collected errors
     pub fn get_errors(&self) -> &[SemanticError] {
         &self.errors
+    }
+
+    /// Get analyzed modules (ASTs)
+    pub fn get_analyzed_modules(&self) -> Vec<Module> {
+        self.analyzed_modules
+            .values()
+            .map(|loaded| loaded.module.clone())
+            .collect()
     }
 
     /// Check if analysis found any errors

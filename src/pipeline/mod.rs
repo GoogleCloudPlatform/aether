@@ -318,7 +318,7 @@ impl CompilationPipeline {
         }
         let semantic_start = std::time::Instant::now();
 
-        let (symbol_table, captures) = {
+        let (symbol_table, captures, complete_program) = {
             let _timer = if self.options.enable_profiling {
                 Some(profiler.start_phase("semantic_analysis"))
             } else {
@@ -333,7 +333,18 @@ impl CompilationPipeline {
 
             // Extract symbol table and captures for MIR lowering
             let captures = analyzer.captures.clone();
-            (analyzer.get_symbol_table(), captures)
+            let loaded_modules = analyzer.get_analyzed_modules();
+            
+            // Create a complete program including imported modules for MIR generation
+            let mut complete_prog = program.clone();
+            let existing_names: std::collections::HashSet<_> = complete_prog.modules.iter().map(|m| m.name.name.clone()).collect();
+            for module in loaded_modules {
+                if !existing_names.contains(&module.name.name) {
+                    complete_prog.modules.push(module);
+                }
+            }
+            
+            (analyzer.get_symbol_table(), captures, complete_prog)
         };
 
         stats.phase_times.insert(
@@ -374,8 +385,8 @@ impl CompilationPipeline {
                 None
             };
 
-            eprintln!("AST has {} modules", program.modules.len());
-            for module in &program.modules {
+            eprintln!("AST has {} modules", complete_program.modules.len());
+            for module in &complete_program.modules {
                 eprintln!(
                     "  Module '{}' has {} functions",
                     module.name.name,
@@ -394,7 +405,7 @@ impl CompilationPipeline {
                 }
             }
 
-            mir::lowering::lower_ast_to_mir_with_symbols_and_captures(&program, symbol_table, captures)?
+            mir::lowering::lower_ast_to_mir_with_symbols_and_captures(&complete_program, symbol_table, captures)?
         };
 
         stats.phase_times.insert(

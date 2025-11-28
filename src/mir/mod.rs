@@ -24,6 +24,7 @@ pub mod validation;
 
 use crate::error::SourceLocation;
 use crate::types::Type;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -395,9 +396,10 @@ impl std::hash::Hash for ConstantValue {
 }
 
 /// External function declaration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExternalFunction {
     pub name: String,
+    pub symbol: Option<String>,
     pub parameters: Vec<Type>,
     pub return_type: Type,
     pub calling_convention: CallingConvention,
@@ -405,7 +407,7 @@ pub struct ExternalFunction {
 }
 
 /// Calling conventions
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CallingConvention {
     Rust,
     C,
