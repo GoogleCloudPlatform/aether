@@ -641,14 +641,27 @@ impl<'ctx> LLVMBackend<'ctx> {
                         let result =
                             self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
                         
-                        // Get the target address using get_place_pointer
-                        let target_ptr = self.get_place_pointer(place, &local_allocas, &builder, function)?;
-                        
-                        builder.build_store(target_ptr, result).map_err(|e| {
-                            SemanticError::CodeGenError {
-                                message: e.to_string(),
+                        // Check if we should skip storing the result (e.g. for Void types)
+                        let should_store = if place.projection.is_empty() {
+                            if let Some(local) = function.locals.get(&place.local) {
+                                !matches!(local.ty, crate::types::Type::Primitive(crate::ast::PrimitiveType::Void))
+                            } else {
+                                true
                             }
-                        })?;
+                        } else {
+                            true
+                        };
+
+                        if should_store {
+                            // Get the target address using get_place_pointer
+                            let target_ptr = self.get_place_pointer(place, &local_allocas, &builder, function)?;
+                            
+                            builder.build_store(target_ptr, result).map_err(|e| {
+                                SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                }
+                            })?;
+                        }
                     }
                     mir::Statement::StorageLive(_) | mir::Statement::StorageDead(_) => {
                         // Ignore storage markers for now
@@ -1782,8 +1795,39 @@ impl<'ctx> LLVMBackend<'ctx> {
                         })
                     }
                 } else {
-                    // For other casts, just pass through for now
-                    Ok(operand_value)
+                    // Handle numeric casts
+                    let target_type = self.get_basic_type(ty);
+                    
+                    match operand_value {
+                        inkwell::values::BasicValueEnum::IntValue(int_val) => {
+                            if target_type.is_int_type() {
+                                let target_int_type = target_type.into_int_type();
+                                let src_width = int_val.get_type().get_bit_width();
+                                let dst_width = target_int_type.get_bit_width();
+                                
+                                if src_width < dst_width {
+                                    // Sign extend
+                                    builder.build_int_s_extend(int_val, target_int_type, "sext")
+                                        .map(|v| v.into())
+                                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })
+                                } else if src_width > dst_width {
+                                    // Truncate
+                                    Ok(builder.build_int_truncate(int_val, target_int_type, "trunc")
+                                        .unwrap().into())
+                                } else {
+                                    Ok(operand_value)
+                                }
+                            } else if target_type.is_float_type() {
+                                // Int to Float
+                                builder.build_signed_int_to_float(int_val, target_type.into_float_type(), "sitofp")
+                                    .map(|v| v.into())
+                                    .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })
+                            } else {
+                                Ok(operand_value)
+                            }
+                        },
+                        _ => Ok(operand_value)
+                    }
                 }
             }
 

@@ -189,8 +189,8 @@ impl DeadCodeEliminationPass {
         }
     }
 
-    /// Find all locals that are used (not just assigned to)
-    fn find_used_locals(&self, function: &Function) -> HashSet<LocalId> {
+    /// Find all locals that are used
+    fn find_used_locals(&self, function: &Function, check_assignments: bool) -> HashSet<LocalId> {
         let mut used = HashSet::new();
 
         // Function parameters are always considered used
@@ -202,11 +202,20 @@ impl DeadCodeEliminationPass {
             // Check statements
             for statement in &block.statements {
                 match statement {
-                    Statement::Assign { rvalue, .. } => {
+                    Statement::Assign { place, rvalue, .. } => {
+                        if check_assignments {
+                            used.insert(place.local);
+                        }
                         // Check rvalue for used locals
                         for local_id in function.locals.keys() {
                             if self.local_used_in_rvalue(rvalue, *local_id) {
                                 used.insert(*local_id);
+                            }
+                        }
+                        // Also check array index in place projection
+                        for elem in &place.projection {
+                            if let crate::mir::PlaceElem::Index(idx) = elem {
+                                used.insert(*idx);
                             }
                         }
                     }
@@ -230,7 +239,8 @@ impl DeadCodeEliminationPass {
 
     /// Remove assignments to unused locals
     fn remove_dead_assignments(&mut self, function: &mut Function) -> bool {
-        let used_locals = self.find_used_locals(function);
+        // For dead assignment removal, we only care about READS (not assignments)
+        let used_locals = self.find_used_locals(function, false);
         let mut changed = false;
 
         for block in function.basic_blocks.values_mut() {
@@ -264,7 +274,8 @@ impl DeadCodeEliminationPass {
 
     /// Remove unused locals from the function
     fn remove_unused_locals(&mut self, function: &mut Function) -> bool {
-        let used_locals = self.find_used_locals(function);
+        // For removing locals, we need to keep any that are referenced anywhere, including assignments
+        let used_locals = self.find_used_locals(function, true);
         let original_count = function.locals.len();
 
         // Remove unused locals

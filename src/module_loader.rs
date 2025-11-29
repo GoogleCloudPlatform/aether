@@ -129,12 +129,27 @@ impl ModuleLoader {
         }
 
         // 2. Check file system paths
-        let module_filename = format!("{}.aether", module_name.replace('.', "/"));
+        // Try multiple filename variations to support different naming conventions
+        let exact_name = module_name.replace('.', "/");
+        let snake_name = to_snake_case(&exact_name);
+        let pascal_name = to_pascal_case(&exact_name);
+        
+        // Prefer exact match, then snake_case, then PascalCase
+        let mut variants = vec![exact_name.clone()];
+        if snake_name != exact_name {
+            variants.push(snake_name);
+        }
+        if pascal_name != exact_name {
+            variants.push(pascal_name);
+        }
 
-        for search_path in &self.search_paths {
-            let full_path = search_path.join(&module_filename);
-            if full_path.exists() {
-                return Ok(ModuleSource::File(full_path));
+        for name in variants {
+            let module_filename = format!("{}.aether", name);
+            for search_path in &self.search_paths {
+                let full_path = search_path.join(&module_filename);
+                if full_path.exists() {
+                    return Ok(ModuleSource::File(full_path));
+                }
             }
         }
 
@@ -348,4 +363,33 @@ mod tests {
         // We can't directly compare pointers due to borrow checker,
         // but we know caching works if both loads succeed
     }
+}
+
+/// Convert string to snake_case (e.g., "MyModule" -> "my_module")
+fn to_snake_case(s: &str) -> String {
+    let mut result = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() {
+            if i > 0 && s.chars().nth(i-1).map(|p| !p.is_uppercase()).unwrap_or(true) {
+                result.push('_');
+            }
+            result.push(c.to_ascii_lowercase());
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Convert string to PascalCase (e.g., "my_module" -> "MyModule")
+fn to_pascal_case(s: &str) -> String {
+    s.split(|c| c == '_' || c == '/')
+        .map(|part| {
+            let mut c = part.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+            }
+        })
+        .collect()
 }

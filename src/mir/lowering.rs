@@ -106,7 +106,7 @@ impl LoweringContext {
     }
 
 
-    /// Ensure operand is compatible with target type (awaiting if necessary)
+    /// Ensure operand is compatible with target type (awaiting or casting if necessary)
     fn ensure_compatible_operand(
         &mut self,
         operand: Operand,
@@ -130,6 +130,28 @@ impl LoweringContext {
                     return self.maybe_await_operand(operand);
                 }
             }
+        }
+
+        // Check for Numeric Casting (Int -> Int64)
+        match (&op_type, target_type) {
+            (Type::Primitive(ast::PrimitiveType::Integer), Type::Primitive(ast::PrimitiveType::Integer64)) |
+            (Type::Primitive(ast::PrimitiveType::Integer32), Type::Primitive(ast::PrimitiveType::Integer64)) => {
+                 let temp = self.builder.new_local(target_type.clone(), false);
+                 self.builder.push_statement(Statement::Assign {
+                     place: Place { local: temp, projection: vec![] },
+                     rvalue: Rvalue::Cast {
+                         kind: CastKind::Numeric,
+                         operand: operand,
+                         ty: target_type.clone(),
+                     },
+                     source_info: SourceInfo {
+                         span: SourceLocation::unknown(),
+                         scope: 0,
+                     },
+                 });
+                 return Ok(Operand::Copy(Place { local: temp, projection: vec![] }));
+            }
+            _ => {}
         }
         
         Ok(operand)
@@ -2339,7 +2361,7 @@ impl LoweringContext {
         source_location: &SourceLocation,
     ) -> Result<Operand, SemanticError> {
         eprintln!("lower_function_call: entering for call {:?}", call);
-        // For now, only support local function references
+        // Resolve function name and reference
         let function_name = match &call.function_reference {
             ast::FunctionReference::Local { name, .. } => {
                 if let Some(mod_name) = &self.current_module {
@@ -2367,10 +2389,48 @@ impl LoweringContext {
         };
         eprintln!("lower_function_call: function name = {}", function_name);
 
+        // Determine parameter types and return type
+        let (parameter_types, result_type) = if let Some(ext_func) = self.program.external_functions.get(&function_name) {
+             eprintln!("lower_function_call: found external function {}", function_name);
+             (Some(ext_func.parameters.clone()), ext_func.return_type.clone())
+        } else if let Some(func) = self.program.functions.get(&function_name) {
+             eprintln!("lower_function_call: found regular function {}", function_name);
+             let params: Vec<Type> = func.parameters.iter().map(|p| p.ty.clone()).collect();
+             (Some(params), func.return_type.clone())
+        } else {
+             // Check builtin printf
+             if function_name == "printf" {
+                 (None, Type::primitive(ast::PrimitiveType::Integer))
+             } else {
+                 // Try symbol table
+                 let mut resolved = None;
+                 if let Some(ref symbol_table) = self.symbol_table {
+                     if let Some(symbol) = symbol_table.lookup_symbol(&function_name) {
+                         if let Type::Function { parameter_types, return_type } = &symbol.symbol_type {
+                             eprintln!("lower_function_call: found in symbol table {}", function_name);
+                             resolved = Some((Some(parameter_types.clone()), *return_type.clone()));
+                         }
+                     }
+                 }
+                 resolved.unwrap_or_else(|| {
+                     eprintln!("lower_function_call: WARNING - function {} not found, using default types", function_name);
+                     (None, Type::primitive(ast::PrimitiveType::Integer))
+                 })
+             }
+        };
+
         // Lower arguments
         let mut arg_operands = Vec::new();
-        for arg in &call.arguments {
-            let arg_operand = self.lower_expression(&arg.value)?;
+        for (i, arg) in call.arguments.iter().enumerate() {
+            let mut arg_operand = self.lower_expression(&arg.value)?;
+            
+            // Check for implicit cast if expected type is known
+            if let Some(ref params) = parameter_types {
+                if let Some(expected_type) = params.get(i) {
+                    arg_operand = self.ensure_compatible_operand(arg_operand, expected_type)?;
+                }
+            }
+            
             arg_operands.push(arg_operand);
         }
 
@@ -2425,67 +2485,10 @@ impl LoweringContext {
         }
 
         // Create function reference operand using the function name
-        // We'll store the function name as a string constant for now
-        // Skip validation for built-in functions
-        let is_builtin = function_name == "printf";
-
         let func_operand = Operand::Constant(Constant {
             ty: Type::primitive(ast::PrimitiveType::String),
             value: ConstantValue::String(function_name.clone()),
         });
-
-        // Determine the return type of the function
-        let result_type = if let Some(ext_func) = self.program.external_functions.get(&function_name)
-        {
-            // External function - use its declared return type
-            eprintln!(
-                "lower_function_call: found external function {} with return type {:?}",
-                function_name, ext_func.return_type
-            );
-            ext_func.return_type.clone()
-        } else if let Some(func) = self.program.functions.get(&function_name) {
-            // Regular function - use its declared return type
-            eprintln!(
-                "lower_function_call: found regular function {} with return type {:?}",
-                function_name, func.return_type
-            );
-            func.return_type.clone()
-        } else if is_builtin {
-            // Built-in function - for now assume integer
-            eprintln!(
-                "lower_function_call: built-in function {}, assuming integer return",
-                function_name
-            );
-            Type::primitive(ast::PrimitiveType::Integer)
-        } else {
-            // Try to look up in symbol table if available
-            if let Some(ref symbol_table) = self.symbol_table {
-                if let Some(symbol) = symbol_table.lookup_symbol(&function_name) {
-                    match &symbol.kind {
-                        SymbolKind::Function => {
-                            eprintln!("lower_function_call: found function {} in symbol table with return type {:?}", function_name, symbol.symbol_type);
-                            // For functions, the symbol_type represents the function type
-                            // We need to extract the return type from it
-                            // For now, assume the symbol_type is the return type
-                            symbol.symbol_type.clone()
-                        }
-                        _ => {
-                            return Err(SemanticError::InvalidType {
-                                type_name: function_name.clone(),
-                                reason: "Symbol is not a function".to_string(),
-                                location: source_location.clone(),
-                            });
-                        }
-                    }
-                } else {
-                    eprintln!("lower_function_call: WARNING - function {} not found anywhere, defaulting to integer", function_name);
-                    Type::primitive(ast::PrimitiveType::Integer)
-                }
-            } else {
-                eprintln!("lower_function_call: WARNING - no symbol table, defaulting to integer for function {}", function_name);
-                Type::primitive(ast::PrimitiveType::Integer)
-            }
-        };
 
         let result_local = self.builder.new_local(result_type, false);
 

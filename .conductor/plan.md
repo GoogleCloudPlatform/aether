@@ -354,3 +354,26 @@ car go fmt && car go clippy && car go test
 - [x] **Task 11.2: Dead Code Elimination**: Implement a pass to remove unreachable blocks and unused locals.
 - [x] **Task 11.3: Constant Propagation**: Implement a pass to fold constants and propagate values.
 - [ ] **Task 11.4: Inlining**: Implement function inlining for small functions.
+
+## Phase 12: Tango Project Fixes
+
+### Task 12.1: Implement Labeled Arguments
+- [x] **Parser**: Update `parse_call_expression()` to correctly handle labeled arguments.
+- [x] **Semantic Analysis**: Verify that labeled arguments are correctly resolved and type-checked.
+- [x] **LLVM Backend**: Ensure labeled arguments are passed correctly to functions.
+- [x] **Tests**: Add new test cases for function calls with labeled arguments.
+
+### Task 12.2: Fix Void Return Bug
+- [x] **LLVM Backend**: Investigate and fix the internal error when handling `Void` return values in expression statements.
+- [x] **Tests**: Add specific test cases for functions returning `Void` used in expression statements.
+
+### Task 12.3: Resolve Type Safety (Int vs Int64)
+- [x] **Semantic Analysis**: Implement explicit type checking and casting for integer literals assigned to `Int64` parameters.
+- [x] **LLVM Backend**: Ensure correct LLVM IR generation for `Int` and `Int64` literal assignments and parameter passing.
+- [x] **Tests**: Add test cases to verify correct type handling for `Int` and `Int64` literals and parameters.
+
+### Task 12.4: Implement File Renaming and Import Resolution
+- [x] **Compiler**: Update the module and import resolution logic to handle PascalCase filenames matching module names.
+- [x] **Tests**: Add integration tests with PascalCase filenames and imports to verify resolution.
+- [x] **Documentation**: Update any relevant documentation regarding file and module naming conventions.
+

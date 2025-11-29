@@ -2015,6 +2015,42 @@ impl Parser {
 
     // ==================== EXPRESSION PARSING ====================
 
+    /// Parse function arguments with optional labels: (val, label: val)
+    /// Returns vector of (label, value) tuples
+    fn parse_argument_list(&mut self) -> Result<Vec<(Option<String>, Expression)>, ParserError> {
+        self.expect(&TokenType::LeftParen, "expected '('")?;
+        let mut args = Vec::new();
+
+        if !self.check(&TokenType::RightParen) {
+            loop {
+                // Check for label: label: expr
+                // Need to look ahead: identifier + colon
+                let mut label = None;
+                if let TokenType::Identifier(name) = &self.peek().token_type {
+                    if let Some(next) = self.peek_next() {
+                        if matches!(next.token_type, TokenType::Colon) {
+                            label = Some(name.clone());
+                            self.advance(); // consume label
+                            self.advance(); // consume colon
+                        }
+                    }
+                }
+
+                let value = self.parse_expression()?;
+                args.push((label, value));
+
+                if self.check(&TokenType::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        self.expect(&TokenType::RightParen, "expected ')'")?;
+        Ok(args)
+    }
+
     /// Parse an expression
     /// Supports: literals, identifiers, braced binary expressions `{a + b}`
     pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
@@ -2182,44 +2218,7 @@ impl Parser {
             loop {
                 if self.check(&TokenType::LeftParen) {
                     // Function call: expr(args)
-                    self.advance(); // consume '('
-                    let mut arg_exprs = Vec::new();
-
-                    if !self.check(&TokenType::RightParen) {
-                        // Check for labeled argument: label: expr
-                        let is_labeled = match &self.peek().token_type {
-                            TokenType::Identifier(_) | TokenType::Keyword(_) => {
-                                self.peek_next().map(|t| t.token_type == TokenType::Colon).unwrap_or(false)
-                            },
-                            _ => false
-                        };
-
-                        if is_labeled {
-                            self.advance(); // consume label
-                            self.advance(); // consume colon
-                        }
-                        
-                        arg_exprs.push(self.parse_expression()?);
-                        
-                        while self.check(&TokenType::Comma) {
-                            self.advance(); // consume ','
-                            
-                            let is_labeled = match &self.peek().token_type {
-                                TokenType::Identifier(_) | TokenType::Keyword(_) => {
-                                    self.peek_next().map(|t| t.token_type == TokenType::Colon).unwrap_or(false)
-                                },
-                                _ => false
-                            };
-
-                            if is_labeled {
-                                self.advance(); // consume label
-                                self.advance(); // consume colon
-                            }
-                            
-                            arg_exprs.push(self.parse_expression()?);
-                        }
-                    }
-                    self.expect(&TokenType::RightParen, "expected ')'")?;
+                    let args_with_labels = self.parse_argument_list()?;
 
                     // Extract function name from variable expression
                     let function_name = match &expr {
@@ -2233,16 +2232,16 @@ impl Parser {
                         }
                     };
 
-                    // Convert expressions to Argument structs with placeholder names
-                    let arguments: Vec<Argument> = arg_exprs
+                    // Convert expressions to Argument structs
+                    let arguments: Vec<Argument> = args_with_labels
                         .into_iter()
                         .enumerate()
-                        .map(|(i, e)| Argument {
+                        .map(|(i, (label, value))| Argument {
                             parameter_name: Identifier::new(
-                                format!("arg_{}", i),
+                                label.unwrap_or_else(|| format!("arg_{}", i)),
                                 start_location.clone(),
                             ),
-                            value: Box::new(e),
+                            value: Box::new(value),
                             source_location: start_location.clone(),
                         })
                         .collect();
@@ -2278,34 +2277,18 @@ impl Parser {
                         // Check if this is a method call (followed by '(')
                         if self.check(&TokenType::LeftParen) {
                             // Method call: expr.method(args)
-                            self.advance(); // consume '('
-                            let mut arg_exprs = Vec::new();
-
-                            if !self.check(&TokenType::RightParen) {
-                                // Parse first argument
-                                arg_exprs.push(self.parse_expression()?);
-
-                                // Parse remaining arguments
-                                while self.check(&TokenType::Comma) {
-                                    self.advance(); // consume ','
-                                    arg_exprs.push(self.parse_expression()?);
-                                }
-                            }
-                            self.expect(
-                                &TokenType::RightParen,
-                                "expected ')' after method arguments",
-                            )?;
+                            let args_with_labels = self.parse_argument_list()?;
 
                             // Convert expressions to Argument structs
-                            let arguments: Vec<Argument> = arg_exprs
+                            let arguments: Vec<Argument> = args_with_labels
                                 .into_iter()
                                 .enumerate()
-                                .map(|(i, e)| Argument {
+                                .map(|(i, (label, value))| Argument {
                                     parameter_name: Identifier::new(
-                                        format!("arg_{}", i),
+                                        label.unwrap_or_else(|| format!("arg_{}", i)),
                                         start_location.clone(),
                                     ),
-                                    value: Box::new(e),
+                                    value: Box::new(value),
                                     source_location: start_location.clone(),
                                 })
                                 .collect();
@@ -2514,42 +2497,7 @@ impl Parser {
             loop {
                 if self.check(&TokenType::LeftParen) {
                     // Function call: expr(args)
-                    self.advance(); // consume '('
-                    let mut arg_exprs = Vec::new();
-
-                    if !self.check(&TokenType::RightParen) {
-                        // Check for labeled argument: label: expr
-                        let is_labeled = if let TokenType::Identifier(_) = &self.peek().token_type {
-                            self.peek_next().unwrap().token_type == TokenType::Colon
-                        } else {
-                            false
-                        };
-
-                        if is_labeled {
-                            self.advance(); // consume label
-                            self.advance(); // consume colon
-                        }
-                        
-                        arg_exprs.push(self.parse_expression()?);
-                        
-                        while self.check(&TokenType::Comma) {
-                            self.advance(); // consume ','
-                            
-                            let is_labeled = if let TokenType::Identifier(_) = &self.peek().token_type {
-                                self.peek_next().unwrap().token_type == TokenType::Colon
-                            } else {
-                                false
-                            };
-
-                            if is_labeled {
-                                self.advance(); // consume label
-                                self.advance(); // consume colon
-                            }
-                            
-                            arg_exprs.push(self.parse_expression()?);
-                        }
-                    }
-                    self.expect(&TokenType::RightParen, "expected ')'")?;
+                    let args_with_labels = self.parse_argument_list()?;
 
                     // Extract function name
                     let function_name = match &expr {
@@ -2564,15 +2512,15 @@ impl Parser {
                     };
 
                     // Convert to Argument structs (simplified)
-                    let arguments: Vec<Argument> = arg_exprs
+                    let arguments: Vec<Argument> = args_with_labels
                         .into_iter()
                         .enumerate()
-                        .map(|(i, e)| Argument {
+                        .map(|(i, (label, value))| Argument {
                             parameter_name: Identifier::new(
-                                format!("arg_{}", i),
+                                label.unwrap_or_else(|| format!("arg_{}", i)),
                                 start_location.clone(),
                             ),
-                            value: Box::new(e),
+                            value: Box::new(value),
                             source_location: start_location.clone(),
                         })
                         .collect();
@@ -2622,17 +2570,7 @@ impl Parser {
             loop {
                 if self.check(&TokenType::LeftParen) {
                     // Function call: expr(args)
-                    self.advance(); // consume '('
-                    let mut arg_exprs = Vec::new();
-
-                    if !self.check(&TokenType::RightParen) {
-                        arg_exprs.push(self.parse_expression()?);
-                        while self.check(&TokenType::Comma) {
-                            self.advance(); // consume ','
-                            arg_exprs.push(self.parse_expression()?);
-                        }
-                    }
-                    self.expect(&TokenType::RightParen, "expected ')'")?;
+                    let args_with_labels = self.parse_argument_list()?;
 
                     // Extract function name from variable expression
                     let function_name = match &expr {
@@ -2646,16 +2584,16 @@ impl Parser {
                         }
                     };
 
-                    // Convert expressions to Argument structs with placeholder names
-                    let arguments: Vec<Argument> = arg_exprs
+                    // Convert to Argument structs
+                    let arguments: Vec<Argument> = args_with_labels
                         .into_iter()
                         .enumerate()
-                        .map(|(i, e)| Argument {
+                        .map(|(i, (label, value))| Argument {
                             parameter_name: Identifier::new(
-                                format!("arg_{}", i),
+                                label.unwrap_or_else(|| format!("arg_{}", i)),
                                 start_location.clone(),
                             ),
-                            value: Box::new(e),
+                            value: Box::new(value),
                             source_location: start_location.clone(),
                         })
                         .collect();
@@ -2691,34 +2629,18 @@ impl Parser {
                         // Check if this is a method call (followed by '(')
                         if self.check(&TokenType::LeftParen) {
                             // Method call: expr.method(args)
-                            self.advance(); // consume '('
-                            let mut arg_exprs = Vec::new();
-
-                            if !self.check(&TokenType::RightParen) {
-                                // Parse first argument
-                                arg_exprs.push(self.parse_expression()?);
-
-                                // Parse remaining arguments
-                                while self.check(&TokenType::Comma) {
-                                    self.advance(); // consume ','
-                                    arg_exprs.push(self.parse_expression()?);
-                                }
-                            }
-                            self.expect(
-                                &TokenType::RightParen,
-                                "expected ')' after method arguments",
-                            )?;
+                            let args_with_labels = self.parse_argument_list()?;
 
                             // Convert expressions to Argument structs
-                            let arguments: Vec<Argument> = arg_exprs
+                            let arguments: Vec<Argument> = args_with_labels
                                 .into_iter()
                                 .enumerate()
-                                .map(|(i, e)| Argument {
+                                .map(|(i, (label, value))| Argument {
                                     parameter_name: Identifier::new(
-                                        format!("arg_{}", i),
+                                        label.unwrap_or_else(|| format!("arg_{}", i)),
                                         start_location.clone(),
                                     ),
-                                    value: Box::new(e),
+                                    value: Box::new(value),
                                     source_location: start_location.clone(),
                                 })
                                 .collect();
@@ -7427,6 +7349,22 @@ func next_item() -> Int {
             assert_eq!(captures.len(), 0);
         } else {
             panic!("Expected Lambda expression");
+        }
+    }
+
+    #[test]
+    fn test_function_call_with_labeled_arguments() {
+        let source = "myFunc(label: value, other: 123)";
+        let mut parser = parser_from_source(source);
+        let result = parser.parse_expression();
+        assert!(result.is_ok());
+        let expr = result.unwrap();
+        if let Expression::FunctionCall { call, .. } = expr {
+            assert_eq!(call.arguments.len(), 2);
+            assert_eq!(call.arguments[0].parameter_name.name, "label");
+            assert_eq!(call.arguments[1].parameter_name.name, "other");
+        } else {
+            panic!("Expected FunctionCall expression");
         }
     }
 }
