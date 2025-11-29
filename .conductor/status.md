@@ -46,13 +46,17 @@
 - [x] **Task 11.3: Constant Propagation**: Implemented `ConstantPropagationPass` to propagate constant values.
 - [ ] **Task 11.4: Inlining**: Implement function inlining pass.
 
+## Phase 12: Tango Project Fixes (Completed)
+
+- [x] **Task 12.1: Implement Labeled Arguments**: Parser now preserves labeled arguments.
+- [x] **Task 12.2: Fix Void Return Bug**: LLVM Backend now handles Void returns correctly (skips invalid stores).
+- [x] **Task 12.3: Resolve Type Safety**: Implemented implicit numeric casting in MIR lowering.
+- [x] **Task 12.4: Implement File Renaming**: Module loader supports flexible filename matching (snake_case/PascalCase).
+
 ### Recent Achievements
-- Implemented full LSP backend with diagnostics, definition, and hover support.
-- Added text storage to document state to enable precise identifier lookup.
-- Implemented robust symbol resolution logic using `SymbolTable` and AST traversal (identifier scanning).
-- Resolved thread-safety issues with `SemanticAnalyzer` by running analysis in blocking tasks.
-- Implemented and verified `DeadCodeEliminationPass`.
-- Implemented and verified `ConstantPropagationPass`.
+- Addressed multiple compiler issues reported from the Tango project.
+- Fixed critical bugs in backend (stack corruption) and optimization (DCE removing necessary locals).
+- Improved usability with flexible import resolution and implicit casting.
 
 ## Completed Phases
 
@@ -66,3 +70,4 @@
 - Phase 8: True Asynchronous Backend Implementation
 - Phase 9: Ownership System Enforcement
 - Phase 10: Language Server Protocol
+- Phase 12: Tango Project Fixes
