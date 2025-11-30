@@ -1,26 +1,13 @@
-(DEFINE_MODULE (NAME function_with_contracts)
-  (INTENT "Test module with function contracts and metadata")
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME test_division)
-      (INTENT "Divides two numbers with precondition and postcondition")
-      (ACCEPTS_PARAMETER (NAME "x") (TYPE INTEGER))
-      (ACCEPTS_PARAMETER (NAME "y") (TYPE INTEGER))
-      (RETURNS INTEGER)
-      (PRECONDITION (PREDICATE_NOT_EQUALS y (INTEGER 0)))
-      (POSTCONDITION (PREDICATE_EQUALS (EXPRESSION_MULTIPLY RETURN_VALUE y) x))
-      (ALGORITHM_HINT "division")
-      (PERFORMANCE_EXPECTATION
-        (METRIC "LatencyMs")
-        (TARGET 1.0)
-        (CONTEXT "Simple integer division"))
-      (COMPLEXITY_EXPECTATION
-        (TYPE "Time")
-        (NOTATION "BigO")
-        (VALUE "O(1)"))
-      (BODY
-        (RETURN_VALUE (EXPRESSION_DIVIDE x y))
-      )
-    )
-  )
-)
+module function_with_contracts {
+  // Intent: Test module with function contracts and metadata
+
+  @intent("Divides two numbers with precondition and postcondition")
+  @pre(y != 0)
+  @post(return_value * y == x)
+  @algo("division")
+  @perf(metric="LatencyMs", target=1.0, context="Simple integer division")
+  @complexity(type="Time", notation="BigO", value="O(1)")
+  func test_division(x: Int, y: Int) -> Int {
+    return x / y;
+  }
+}

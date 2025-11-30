@@ -149,7 +149,7 @@ fn test_cli_ast_command() {
     assert!(stdout.contains("Program {"));
     assert!(stdout.contains("Module 'simple_module'"));
     assert!(stdout.contains("const VERSION: String"));
-    assert!(stdout.contains("const MAX_ITEMS: Integer"));
+    assert!(stdout.contains("const MAX_ITEMS: Int"));
 }
 
 #[test]
@@ -190,10 +190,10 @@ fn test_cli_tokens_command() {
 
     assert_eq!(exit_code, 0, "Stderr: {}", stderr);
     assert!(stdout.contains("Tokens for"));
-    assert!(stdout.contains("LeftParen"));
-    assert!(stdout.contains("Keyword(\"DEFINE_MODULE\")"));
+    assert!(stdout.contains("LeftBrace"));
+    assert!(stdout.contains("Keyword(Module)"));
     assert!(stdout.contains("Identifier(\"simple_module\")"));
-    assert!(stdout.contains("RightParen"));
+    assert!(stdout.contains("RightBrace"));
 }
 
 #[test]
@@ -220,8 +220,8 @@ fn test_cli_tokens_output_to_directory() {
     assert!(output_file.exists(), "Tokens output file should exist");
 
     let tokens_content = fs::read_to_string(&output_file).unwrap();
-    assert!(tokens_content.contains("LeftParen"));
-    assert!(tokens_content.contains("Keyword(\"DEFINE_MODULE\")"));
+    assert!(tokens_content.contains("LeftBrace"));
+    assert!(tokens_content.contains("Keyword(Module)"));
 
     // Clean up
     let _ = fs::remove_dir_all(output_dir);

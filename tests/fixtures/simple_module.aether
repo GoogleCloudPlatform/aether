@@ -1,25 +1,8 @@
-(DEFINE_MODULE
-  (NAME 'simple_module')
-  (INTENT "A simple test module")
-  (CONTENT
-    (DECLARE_CONSTANT
-      (NAME 'VERSION')
-      (TYPE STRING)
-      (VALUE "1.0.0")
-      (INTENT "Module version")
-    )
-    (DECLARE_CONSTANT
-      (NAME 'MAX_ITEMS')
-      (TYPE INTEGER)
-      (VALUE 100)
-      (INTENT "Maximum number of items")
-    )
-    (DEFINE_FUNCTION
-      (NAME 'main')
-      (RETURNS INTEGER)
-      (BODY
-        (RETURN_VALUE 0)
-      )
-    )
-  )
-)
+module simple_module {
+  const VERSION: String = "1.0.0";
+  const MAX_ITEMS: Int = 100;
+
+  func main() -> Int {
+    return 0;
+  }
+}
