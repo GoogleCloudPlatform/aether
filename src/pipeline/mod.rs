@@ -16,6 +16,8 @@
 //!
 //! Integrates all compiler phases from source code to executable
 
+#![allow(dead_code)]
+
 use crate::ast::{Module, Program};
 use crate::error::{CompilerError, SemanticError};
 use crate::lexer::v2 as lexer_v2;

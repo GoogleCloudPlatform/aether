@@ -154,7 +154,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             }
         };
 
-        let function = self.module.add_function(name, fn_type, None);
+        let _function = self.module.add_function(name, fn_type, None);
 
         // Set calling convention
         match ext_func.calling_convention {
@@ -164,7 +164,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             MirCallingConvention::System => {
                 // Platform-specific system calling convention
                 #[cfg(target_os = "windows")]
-                function.set_call_conventions(64); // Win64 calling convention
+                _function.set_call_conventions(64); // Win64 calling convention
             }
             MirCallingConvention::Rust => {
                 // Use default (C) calling convention for now

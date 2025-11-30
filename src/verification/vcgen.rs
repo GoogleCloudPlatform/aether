@@ -20,10 +20,8 @@ use super::contracts::{
     BinaryOp as ContractBinOp, ConstantValue, Expression as ContractExpr, FunctionContract,
 };
 use super::solver::{Formula, VerificationCondition};
-use crate::ast::PrimitiveType;
 use crate::error::{SemanticError, SourceLocation};
 use crate::mir::{self, BasicBlockId, Operand, Rvalue, Statement, Terminator};
-use crate::types::Type;
 use std::collections::{HashMap, HashSet};
 
 /// Verification condition generator
@@ -379,7 +377,7 @@ impl VcGenerator {
                 // TODO: Implement pointer logic in SMT
                 Ok(Formula::Var("pointer_val".to_string()))
             }
-            Rvalue::Len(place) => {
+            Rvalue::Len(_place) => {
                 // Array/slice length - return symbolic value
                 Ok(Formula::Var("array_length".to_string()))
             }
@@ -538,7 +536,9 @@ impl VcGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::PrimitiveType;
     use crate::mir::{BasicBlock, Function};
+    use crate::types::Type;
 
     #[test]
     fn test_vc_generator_creation() {

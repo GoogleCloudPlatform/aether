@@ -459,7 +459,7 @@ impl MetadataRepository {
     /// Check if a type is semantically valid
     pub fn validate_semantic_type(&self, type_name: &str, value: &str) -> Result<(), String> {
         if let Some(sem_type) = self.types.get(type_name) {
-            if let Some(constraint) = &sem_type.constraint {
+            if let Some(_constraint) = &sem_type.constraint {
                 // TODO: Implement regex validation
                 // For now, just check if it's not empty
                 if value.is_empty() {

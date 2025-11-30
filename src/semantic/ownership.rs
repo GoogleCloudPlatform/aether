@@ -38,7 +38,7 @@ impl SemanticAnalyzer {
                 } => {
                     eprintln!("Marking variable {} as moved", name.name);
                     // Transfer ownership (move)
-                    if let Err(e) = self.symbol_table.mark_variable_moved(&name.name) {
+                    if let Err(_e) = self.symbol_table.mark_variable_moved(&name.name) {
                         return Err(SemanticError::UseAfterMove {
                             variable: name.name.clone(),
                             location: source_location.clone(),
@@ -63,7 +63,7 @@ impl SemanticAnalyzer {
                     // For types not explicitly wrapped in Owned, default to Move for non-primitives
                     // and Copy for primitives.
                     if !param_type.is_primitive() {
-                        if let Err(e) = self.symbol_table.mark_variable_moved(&name.name) {
+                        if let Err(_e) = self.symbol_table.mark_variable_moved(&name.name) {
                             return Err(SemanticError::UseAfterMove {
                                 variable: name.name.clone(),
                                 location: source_location.clone(),

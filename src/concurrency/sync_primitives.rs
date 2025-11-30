@@ -85,9 +85,6 @@ pub struct AetherCondVar {
     /// Condition variable
     inner: Condvar,
 
-    /// Associated mutex name
-    associated_mutex: Option<String>,
-
     /// Name
     name: String,
 
@@ -131,13 +128,6 @@ struct MutexState {
 /// RwLock state
 #[derive(Debug, Default)]
 struct RwLockState {}
-
-/// Barrier state
-#[derive(Debug)]
-struct BarrierState {
-    waiting: usize,
-    generation: usize,
-}
 
 /// Synchronization statistics
 #[derive(Debug, Default)]
@@ -197,7 +187,6 @@ struct RwLockMetrics {
 #[derive(Debug, Default)]
 struct BarrierMetrics {
     wait_count: u64,
-    barrier_cycles: u64,
     total_wait_time_ms: f64,
     max_wait_time_ms: f64,
 }
@@ -232,14 +221,12 @@ pub struct MutexGuard<'a> {
 
 /// Read guard
 pub struct ReadGuard<'a> {
-    rw_lock: &'a AetherRwLock,
-    acquired_at: Instant,
+    _rw_lock: &'a AetherRwLock,
 }
 
 /// Write guard
 pub struct WriteGuard<'a> {
-    rw_lock: &'a AetherRwLock,
-    acquired_at: Instant,
+    _rw_lock: &'a AetherRwLock,
 }
 
 impl SyncPrimitiveManager {
@@ -392,7 +379,7 @@ impl AetherMutex {
     }
 
     /// Lock the mutex
-    pub fn lock(&self) -> LockResult<MutexGuard> {
+    pub fn lock(&self) -> LockResult<MutexGuard<'_>> {
         let start_time = Instant::now();
 
         match self.inner.lock() {
@@ -431,7 +418,7 @@ impl AetherMutex {
     }
 
     /// Try to lock the mutex without blocking
-    pub fn try_lock(&self) -> LockResult<MutexGuard> {
+    pub fn try_lock(&self) -> LockResult<MutexGuard<'_>> {
         match self.inner.try_lock() {
             Ok(mut state) => {
                 if state.locked {
@@ -554,10 +541,9 @@ impl AetherSemaphore {
 }
 
 impl AetherCondVar {
-    pub fn new(name: String, associated_mutex: Option<String>) -> Self {
+    pub fn new(name: String, _associated_mutex: Option<String>) -> Self {
         Self {
             inner: Condvar::new(),
-            associated_mutex,
             name,
             metrics: Mutex::new(CondVarMetrics::default()),
         }
@@ -565,8 +551,6 @@ impl AetherCondVar {
 
     /// Wait on the condition variable
     pub fn wait<'a>(&self, guard: MutexGuard<'a>) -> LockResult<MutexGuard<'a>> {
-        let start_time = Instant::now();
-
         // In a real implementation, this would properly integrate with the mutex guard
         // For now, we'll simulate the wait
         std::thread::sleep(Duration::from_millis(1));
@@ -612,9 +596,7 @@ impl AetherRwLock {
     }
 
     /// Acquire a read lock
-    pub fn read(&self) -> LockResult<ReadGuard> {
-        let start_time = Instant::now();
-
+    pub fn read(&self) -> LockResult<ReadGuard<'_>> {
         match self.inner.read() {
             Ok(_guard) => {
                 if let Ok(mut metrics) = self.metrics.lock() {
@@ -622,8 +604,7 @@ impl AetherRwLock {
                 }
 
                 Ok(ReadGuard {
-                    rw_lock: self,
-                    acquired_at: start_time,
+                    _rw_lock: self,
                 })
             }
             Err(_) => Err(LockError::Poisoned),
@@ -631,9 +612,7 @@ impl AetherRwLock {
     }
 
     /// Acquire a write lock
-    pub fn write(&self) -> LockResult<WriteGuard> {
-        let start_time = Instant::now();
-
+    pub fn write(&self) -> LockResult<WriteGuard<'_>> {
         match self.inner.write() {
             Ok(_guard) => {
                 if let Ok(mut metrics) = self.metrics.lock() {
@@ -641,8 +620,7 @@ impl AetherRwLock {
                 }
 
                 Ok(WriteGuard {
-                    rw_lock: self,
-                    acquired_at: start_time,
+                    _rw_lock: self,
                 })
             }
             Err(_) => Err(LockError::Poisoned),
@@ -707,15 +685,13 @@ impl<'a> Drop for MutexGuard<'a> {
 
 impl<'a> Drop for ReadGuard<'a> {
     fn drop(&mut self) {
-        // Update metrics
-        if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+        // Metrics tracking removed - was unused
     }
 }
 
 impl<'a> Drop for WriteGuard<'a> {
     fn drop(&mut self) {
-        // Update metrics
-        if let Ok(mut metrics) = self.rw_lock.metrics.lock() {}
+        // Metrics tracking removed - was unused
     }
 }
 

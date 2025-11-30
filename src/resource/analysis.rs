@@ -33,9 +33,6 @@ pub struct ResourceAnalyzer {
     /// Resource contracts by function
     contracts: HashMap<String, ResourceContract>,
 
-    /// Resource pools
-    pools: HashMap<String, ResourcePool>,
-
     /// Analysis results
     results: ResourceAnalysisResults,
 }
@@ -45,8 +42,6 @@ pub struct ResourceAnalyzer {
 struct ScopeInfo {
     scope_id: String,
     resources: Vec<TrackedResource>,
-    depth: usize,
-    location: SourceLocation,
 }
 
 /// Tracked resource within a scope
@@ -167,7 +162,6 @@ impl ResourceAnalyzer {
             active_scopes: Vec::new(),
             resource_tracking: HashMap::new(),
             contracts: HashMap::new(),
-            pools: HashMap::new(),
             results: ResourceAnalysisResults::default(),
         }
     }
@@ -194,8 +188,6 @@ impl ResourceAnalyzer {
         let scope_info = ScopeInfo {
             scope_id: scope.scope_id.clone(),
             resources: Vec::new(),
-            depth: self.active_scopes.len(),
-            location: scope.source_location.clone(),
         };
 
         self.active_scopes.push(scope_info);
@@ -637,8 +629,6 @@ mod tests {
         analyzer.active_scopes.push(ScopeInfo {
             scope_id: "test_scope".to_string(),
             resources: Vec::new(),
-            depth: 0,
-            location: SourceLocation::unknown(),
         });
 
         // Simulate resource acquisition without release
@@ -671,8 +661,6 @@ mod tests {
         analyzer.active_scopes.push(ScopeInfo {
             scope_id: "test_scope".to_string(),
             resources: Vec::new(),
-            depth: 0,
-            location: SourceLocation::unknown(),
         });
 
         // Create and acquire resource

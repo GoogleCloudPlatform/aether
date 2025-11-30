@@ -17,7 +17,6 @@
 //! Pre-verified patterns for common programming tasks
 
 use super::*;
-use crate::verification::contracts::{BinaryOp, Expression as ContractExpr};
 use std::collections::HashMap;
 
 /// Helper to create a default FunctionContract for patterns
@@ -129,7 +128,7 @@ fn load_data_structure_patterns() -> Vec<Pattern> {
 "#.to_string(),
             }),
             contract: {
-                let mut contract = create_pattern_contract("safe_array_access");
+                let contract = create_pattern_contract("safe_array_access");
                 // intent: "Safe array element access with bounds checking"
                 contract
             },
@@ -389,7 +388,7 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
                 ),
             }),
             contract: {
-                let mut contract = create_pattern_contract("binary_search");
+                let contract = create_pattern_contract("binary_search");
                 // intent: "Binary search in sorted array"
                 contract
             },
@@ -533,7 +532,7 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
                     .to_string(),
             }),
             contract: {
-                let mut contract = create_pattern_contract("map_filter_reduce");
+                let contract = create_pattern_contract("map_filter_reduce");
                 // intent: "Functional data transformation"
                 contract
             },
@@ -801,7 +800,7 @@ fn load_resource_patterns() -> Vec<Pattern> {
                     .to_string(),
             }),
             contract: {
-                let mut contract = create_pattern_contract("raii_wrapper");
+                let contract = create_pattern_contract("raii_wrapper");
                 // intent: "RAII resource management"
                 contract
             },
@@ -928,7 +927,7 @@ fn load_error_patterns() -> Vec<Pattern> {
                 ],
             }),
             contract: {
-                let mut contract = create_pattern_contract("result_type");
+                let contract = create_pattern_contract("result_type");
                 // intent: "Explicit error handling with Result type"
                 contract
             },
@@ -1046,7 +1045,7 @@ fn load_validation_patterns() -> Vec<Pattern> {
                 ),
             }),
             contract: {
-                let mut contract = create_pattern_contract("input_validation");
+                let contract = create_pattern_contract("input_validation");
                 // intent: "Validate user input"
                 contract
             },

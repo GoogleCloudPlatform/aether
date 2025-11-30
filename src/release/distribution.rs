@@ -17,10 +17,12 @@
 //! Manages distribution channels, release deployment, and content delivery
 //! for AetherScript packages across multiple platforms and repositories.
 
+#![allow(dead_code)]
+
 use crate::error::SemanticError;
 use crate::release::packaging::ArtifactInfo;
 use crate::release::packaging::{PackageFormat, PackageInfo};
-use crate::release::{self, DistributionConfig, FailoverConfig, FailoverThreshold, RecoveryConfig};
+use crate::release::DistributionConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -944,7 +946,7 @@ pub struct DistributionMetrics {
 
 impl DistributionManager {
     /// Create a new distribution manager
-    pub fn new(config: DistributionConfig) -> Result<Self, SemanticError> {
+    pub fn new(_config: DistributionConfig) -> Result<Self, SemanticError> {
         let channels = Vec::new();
         let cdn = None;
 
@@ -1132,7 +1134,7 @@ impl DistributionManager {
 
         let provider = CdnProvider::CloudFront; // Example provider
         let distributions = vec![]; // Would create distributions based on config
-        let cache_config = CacheConfig {
+        let _cache_config = CacheConfig {
             default_ttl: 3600,
             max_ttl: 86400,
             cache_key_policy: CacheKeyPolicy::IncludeAll,
@@ -1316,10 +1318,10 @@ mod tests {
     use crate::release::packaging::*;
     use crate::release::{
         AnnouncementConfig, AudienceConfig, AuthConfig, ChangelogConfig, ChangelogFormat,
-        ChannelMetadata, ChannelType, ChannelVisibility, CommitParsingConfig, HealthCheckConfig,
-        LoadBalancingConfig, LoadBalancingStrategy, MirrorConfig, OptOutConfig, ReleaseNotesConfig,
-        ReleaseNotesFormat, ReleaseNotesSection, SchedulingConfig, SyncConfig, SyncFrequency,
-        SyncMethod,
+        ChannelMetadata, ChannelType, ChannelVisibility, CommitParsingConfig, FailoverConfig,
+        FailoverThreshold, HealthCheckConfig, LoadBalancingConfig, LoadBalancingStrategy,
+        MirrorConfig, OptOutConfig, RecoveryConfig, ReleaseNotesConfig, ReleaseNotesFormat,
+        ReleaseNotesSection, SchedulingConfig, SyncConfig, SyncFrequency, SyncMethod,
     };
     use std::path::PathBuf;
     // Import conflicting types with aliases to avoid conflicts

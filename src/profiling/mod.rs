@@ -88,7 +88,7 @@ impl CompilationProfiler {
     }
 
     /// Start timing a phase
-    pub fn start_phase(&mut self, phase_name: &str) -> PhaseTimer {
+    pub fn start_phase(&mut self, phase_name: &str) -> PhaseTimer<'_> {
         PhaseTimer {
             profiler: self,
             phase_name: phase_name.to_string(),

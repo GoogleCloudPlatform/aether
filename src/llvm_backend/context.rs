@@ -44,7 +44,7 @@ impl LLVMContext {
     }
 
     /// Create a new module
-    pub fn create_module(&self, name: &str) -> Module {
+    pub fn create_module(&self, name: &str) -> Module<'_> {
         let module = self.context.create_module(name);
         module
     }
@@ -55,7 +55,7 @@ impl LLVMContext {
     }
 
     /// Create a new builder
-    pub fn create_builder(&self) -> Builder {
+    pub fn create_builder(&self) -> Builder<'_> {
         self.context.create_builder()
     }
 

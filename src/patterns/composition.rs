@@ -16,9 +16,9 @@
 //!
 //! Combines patterns to create complex functionality
 
+#![allow(dead_code)]
+
 use super::*;
-use crate::ast::{Block, Expression, Function, Statement};
-use crate::error::SourceLocation;
 use crate::verification::contracts::{ContractPropagation, FunctionContract};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -516,7 +516,7 @@ impl CompositionEngine {
         &self,
         patterns: &[&Pattern],
         stages: &[String],
-        data_flow: &DataFlowSpec,
+        _data_flow: &DataFlowSpec,
     ) -> Result<Pattern, CompositionError> {
         let mut pipeline_stages = Vec::new();
         let mut stage_vars: Vec<String> = Vec::new();

@@ -17,6 +17,8 @@
 //! Implements deterministic memory management with region-based allocation,
 //! reference counting, and linear types for zero-copy operations.
 
+#![allow(dead_code)]
+
 use crate::ast::*;
 use crate::error::{SemanticError, SourceLocation};
 use crate::types::{Type, TypeChecker};
@@ -107,7 +109,7 @@ impl MemoryAnalyzer {
     }
 
     /// Create a new memory region
-    pub fn create_region(&mut self, parent: Option<RegionId>) -> RegionId {
+    pub fn create_region(&mut self, _parent: Option<RegionId>) -> RegionId {
         let id = RegionId(self.next_region_id);
         self.next_region_id += 1;
 
@@ -304,7 +306,7 @@ impl MemoryAnalyzer {
 
             Statement::Expression { expr, .. } => {
                 // Check for AddressOf in expression statements
-                if let Expression::AddressOf { operand, .. } = &**expr {
+                if let Expression::AddressOf {  .. } = &**expr {
                     // This is a simplification. Ideally we'd pass function/region context down.
                     // For now, we just need to make sure we don't crash on AddressOf.
                     // In a real implementation, we'd want to register the address-taken variable as escaping.
@@ -438,7 +440,7 @@ impl MemoryAnalyzer {
     }
 
     /// Get allocations for a specific region
-    fn get_region_allocations(&self, region_id: &RegionId) -> Vec<AllocationInfo> {
+    fn get_region_allocations(&self, _region_id: &RegionId) -> Vec<AllocationInfo> {
         vec![]
     }
 }

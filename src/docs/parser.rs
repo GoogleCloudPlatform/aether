@@ -17,6 +17,8 @@
 //! Parses AetherScript source files to extract documentation comments,
 //! function signatures, type definitions, and other API information.
 
+#![allow(dead_code)]
+
 use crate::docs::{
     CodeExample, DocConfig, ExampleType, FieldDoc, FunctionDoc, FunctionSignature, ItemKind,
     ItemSummary, ModuleDoc, ParameterDoc, SourceLocation, TypeDoc, TypeKind, TypeParameterDoc,
@@ -69,10 +71,7 @@ pub struct ParsedDoc {
 
 /// Comment parser for extracting structured documentation
 #[derive(Debug)]
-pub struct CommentParser {
-    /// Comment prefix patterns
-    patterns: CommentPatterns,
-}
+pub struct CommentParser {}
 
 /// Comment patterns for different documentation styles
 #[derive(Debug, Clone)]
@@ -128,10 +127,7 @@ pub struct ExtractionResult {
 
 impl DocParser {
     /// Create a new documentation parser
-    pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
-        let comment_parser = CommentParser::new();
-        let signature_parser = SignatureParser::new();
-
+    pub fn new(_config: &DocConfig) -> Result<Self, SemanticError> {
         Ok(Self {
             source_parser: SourceParser,
             markdown_parser: MarkdownParser,
@@ -760,15 +756,7 @@ struct TypeInfo {
 
 impl CommentParser {
     fn new() -> Self {
-        Self {
-            patterns: CommentPatterns {
-                line: ";;;".to_string(),
-                block_start: "#|".to_string(),
-                block_end: "|#".to_string(),
-                doc_line: "///".to_string(),
-                doc_block_start: "/**".to_string(),
-            },
-        }
+        Self {}
     }
 
     fn parse_documentation(&self, raw_docs: &str) -> Result<ParsedDoc, SemanticError> {
@@ -838,7 +826,7 @@ impl CommentParser {
         let trimmed = line.trim();
 
         // Remove comment prefixes
-        if let Some(rest) = trimmed.strip_prefix(&self.patterns.line) {
+        if let Some(rest) = trimmed.strip_prefix(";;;") {
             rest.trim().to_string()
         } else if let Some(rest) = trimmed.strip_prefix("//") {
             rest.trim().to_string()

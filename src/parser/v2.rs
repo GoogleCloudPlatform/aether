@@ -16,6 +16,8 @@
 //!
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
+#![allow(dead_code)]
+
 use crate::ast::{
     Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode, CatchClause,
     ConstantDeclaration, ContractAssertion, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction, FailureAction, FieldValue, Function,
@@ -3115,7 +3117,6 @@ impl Parser {
 
         // Check for empty block
         if self.check(&TokenType::RightBrace) {
-            let end_loc = self.current_location();
             self.advance();
             return Ok(LambdaBody::Block(Block {
                 statements: vec![],

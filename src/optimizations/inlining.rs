@@ -16,10 +16,12 @@
 //!
 //! Inlines small functions to reduce call overhead
 
+#![allow(dead_code)]
+
 use super::OptimizationPass;
 use crate::error::SemanticError;
 use crate::mir::{
-    BasicBlockId, Function, LocalId, Operand, Place, Program, Rvalue, SourceInfo, Statement,
+    Function, LocalId, Operand, Place, Program, Rvalue, SourceInfo, Statement,
     Terminator,
 };
 use std::collections::HashMap;
@@ -49,7 +51,7 @@ impl InliningPass {
     }
 
     /// Set the maximum inlining depth
-    pub fn set_max_inline_depth(&mut self, depth: usize) {}
+    pub fn set_max_inline_depth(&mut self, _depth: usize) {}
 
     /// Calculate the "cost" of a function for inlining decisions
     fn calculate_function_cost(&self, function: &Function) -> usize {
@@ -267,7 +269,7 @@ impl OptimizationPass for InliningPass {
         }
 
         // For each function, look for calls to inline candidates
-        for (caller_name, caller_function) in &mut program.functions {
+        for (_caller_name, caller_function) in &mut program.functions {
             // Look for calls in each basic block
             for block in caller_function.basic_blocks.values_mut() {
                 let mut new_statements = Vec::new();

@@ -21,13 +21,7 @@ use crate::types::Type;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct SmtSolver {
-    /// SMT-LIB assertions
-    assertions: Vec<String>,
-
-    /// Variables declared in the solver
-    variables: HashMap<String, String>,
-}
+pub struct SmtSolver {}
 
 /// Solver value types
 #[derive(Debug, Clone)]
@@ -148,10 +142,7 @@ pub enum Formula {
 impl SmtSolver {
     /// Create a new SMT solver
     pub fn new() -> Self {
-        Self {
-            assertions: Vec::new(),
-            variables: HashMap::new(),
-        }
+        Self {}
     }
 
     /// Check a verification condition

@@ -17,9 +17,11 @@
 //! Provides comprehensive build system integration including custom build scripts,
 //! dependency compilation, artifact generation, and build caching.
 
+#![allow(dead_code)]
+
 use crate::error::SemanticError;
-use crate::package::manifest::{BuildConfiguration, PackageManifest};
-use crate::package::{BuildConfig, CacheStats};
+use crate::package::manifest::PackageManifest;
+use crate::package::BuildConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -1025,7 +1027,7 @@ impl BuildScriptRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::manifest::{Edition, PackageMetadata};
+    use crate::package::manifest::{BuildConfiguration, Edition, PackageMetadata};
     use crate::package::version::Version;
 
     #[test]

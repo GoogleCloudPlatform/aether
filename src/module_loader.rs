@@ -276,8 +276,6 @@ impl ModuleLoader {
     ) -> Result<(), SemanticError> {
         // If we're already in the stack, we have a cycle
         if stack.contains(&module_name.to_string()) {
-            let cycle_start = stack.iter().position(|m| m == module_name).unwrap();
-            let cycle: Vec<String> = stack[cycle_start..].to_vec();
             return Err(SemanticError::CircularDependency {
                 module: module_name.to_string(),
                 location: SourceLocation::unknown(),

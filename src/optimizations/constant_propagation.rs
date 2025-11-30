@@ -18,7 +18,7 @@
 
 use super::OptimizationPass;
 use crate::error::SemanticError;
-use crate::mir::{BasicBlockId, ConstantValue, Function, LocalId, Operand, Rvalue, Statement};
+use crate::mir::{ConstantValue, Function, LocalId, Operand, Rvalue, Statement};
 use std::collections::HashMap;
 
 /// Constant propagation optimization pass

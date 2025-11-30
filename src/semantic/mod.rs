@@ -29,7 +29,7 @@ use crate::ffi::FFIAnalyzer;
 use crate::memory::MemoryAnalyzer;
 use crate::module_loader::{LoadedModule, ModuleLoader};
 use crate::symbols::{BorrowState, ScopeKind, Symbol, SymbolKind, SymbolTable};
-use crate::types::{OwnershipKind, Type, TypeChecker};
+use crate::types::{Type, TypeChecker};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -1687,7 +1687,7 @@ impl SemanticAnalyzer {
             }
 
             Expression::EnumVariant {
-                enum_name,
+                enum_name: _,
                 variant_name,
                 values,
                 source_location,
@@ -1864,7 +1864,7 @@ impl SemanticAnalyzer {
             Expression::AddressOf {
                 operand,
                 mutability,
-                source_location,
+                source_location: _,
             } => {
                 let operand_type = self.analyze_expression(operand)?;
                 // Create a borrowed type (reference) to the operand type
@@ -2066,7 +2066,7 @@ impl SemanticAnalyzer {
                 key_type,
                 value_type,
                 entries,
-                source_location,
+                source_location: _,
             } => {
                 // Convert AST types to semantic types
                 let key_sem_type = self.type_checker.borrow().ast_type_to_type(key_type)?;
@@ -3083,7 +3083,7 @@ impl SemanticAnalyzer {
         // Analyze the body
         self.analyze_block(&scope.body)?;
 
-        self.symbol_table.exit_scope();
+        let _ = self.symbol_table.exit_scope();
 
         Ok(())
     }

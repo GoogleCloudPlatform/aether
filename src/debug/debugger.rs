@@ -47,14 +47,8 @@ pub struct DebuggerInterface {
 /// Active debugging session
 #[derive(Debug)]
 pub struct DebugSession {
-    /// Target process ID
-    target_pid: Option<u32>,
-
     /// Communication channel with debugger
     request_sender: Sender<DebugCommand>,
-
-    /// Breakpoints
-    breakpoints: Arc<Mutex<HashMap<String, Vec<Breakpoint>>>>,
 
     /// Current execution state
     execution_state: Arc<Mutex<ExecutionState>>,
@@ -384,13 +378,13 @@ impl DebuggerInterface {
     pub fn start_session(
         &mut self,
         program_path: String,
-        args: Vec<String>,
+        _args: Vec<String>,
     ) -> Result<(), SemanticError> {
         let (command_sender, command_receiver) = channel();
-        let (response_sender, response_receiver) = channel();
+        let (response_sender, _) = channel();
 
         // Start debugger process
-        let debugger_process = self.start_debugger_process(&program_path)?;
+        let _ = self.start_debugger_process(&program_path)?;
 
         // Start communication thread
         let debugger_type = self.config.debugger_type.clone();
@@ -398,21 +392,8 @@ impl DebuggerInterface {
             Self::debugger_communication_thread(debugger_type, command_receiver, response_sender);
         });
 
-        let target_info = TargetInfo {
-            executable_path: program_path,
-            arguments: args,
-            environment: std::env::vars().collect(),
-            working_directory: std::env::current_dir()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string(),
-            process_id: None,
-        };
-
         self.session = Some(DebugSession {
-            target_pid: None,
             request_sender: command_sender,
-            breakpoints: Arc::new(Mutex::new(HashMap::new())),
             execution_state: Arc::new(Mutex::new(ExecutionState::NotStarted)),
         });
 

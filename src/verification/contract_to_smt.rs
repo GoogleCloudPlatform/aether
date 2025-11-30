@@ -17,9 +17,8 @@
 //! This module bridges the gap between our LLM-first contract expressions
 //! and the SMT solver's formula representation.
 
-use crate::types::Type;
 use crate::verification::contracts::{
-    AggregateOp, BinaryOp, ConstantValue, Expression, QuantifierKind, TemporalOp, UnaryOp,
+    BinaryOp, ConstantValue, Expression, QuantifierKind, UnaryOp,
 };
 use crate::verification::solver::Formula;
 use std::collections::HashMap;
@@ -290,6 +289,7 @@ impl crate::verification::contracts::SmtSolverInterface for Z3SmtSolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::Type;
 
     #[test]
     fn test_simple_expression_conversion() {

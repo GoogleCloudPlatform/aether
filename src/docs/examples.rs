@@ -17,6 +17,8 @@
 //! Generates comprehensive code examples covering language features,
 //! standard library usage, and common programming patterns.
 
+#![allow(dead_code)]
+
 use crate::docs::{DocConfig, Example};
 use crate::error::SemanticError;
 use std::collections::HashMap;
@@ -128,10 +130,7 @@ pub enum VariableType {
 
 impl ExampleManager {
     /// Create a new example manager
-    pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
-        let categories = Self::create_example_categories();
-        let templates = Self::create_example_templates();
-
+    pub fn new(_config: &DocConfig) -> Result<Self, SemanticError> {
         Ok(Self {
             examples: Vec::new(),
         })

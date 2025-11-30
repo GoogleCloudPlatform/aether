@@ -21,7 +21,6 @@ use crate::error::structured::*;
 use crate::error::{CompilerError, ParseError, SemanticError, SourceLocation, TypeError};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 
 /// Error enhancer that converts basic errors to structured errors
 pub struct ErrorEnhancer {

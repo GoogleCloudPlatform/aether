@@ -23,7 +23,6 @@ use crate::semantic::SemanticAnalyzer;
 use crate::types::Type;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 /// Language Server for AetherScript
@@ -41,14 +40,8 @@ pub struct LanguageServer {
     /// Completion provider
     completion_provider: CompletionProvider,
 
-    /// Diagnostics provider
-    diagnostics_provider: DiagnosticsProvider,
-
     /// Configuration
     config: LspConfig,
-
-    /// Shutdown signal
-    shutdown: Arc<AtomicBool>,
 }
 
 /// LSP configuration
@@ -328,19 +321,13 @@ pub struct Location {
 
 /// Diagnostic engine
 #[derive(Debug, Default)]
-pub struct DiagnosticEngine {
-    /// Active diagnostics by document
-    diagnostics: HashMap<String, Vec<Diagnostic>>,
-}
+pub struct DiagnosticEngine {}
 
 /// Completion provider
 #[derive(Debug)]
 pub struct CompletionProvider {
     /// Keyword completions
     keywords: Vec<CompletionItem>,
-
-    /// Snippet completions
-    snippets: HashMap<String, String>,
 }
 
 impl Default for CompletionProvider {
@@ -365,7 +352,6 @@ impl Default for CompletionProvider {
 
         Self {
             keywords,
-            snippets: HashMap::new(),
         }
     }
 }
@@ -471,9 +457,7 @@ impl LanguageServer {
             document_manager: DocumentManager::default(),
             symbol_index: SymbolIndex::default(),
             completion_provider,
-            diagnostics_provider: DiagnosticsProvider,
             config,
-            shutdown: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -588,25 +572,6 @@ impl LanguageServer {
             }
             Err(error) => {
                 document.parse_error = Some(error.to_string());
-
-                // Create parse error diagnostic
-                let diagnostic = Diagnostic {
-                    range: Range {
-                        start: Position {
-                            line: 0,
-                            character: 0,
-                        },
-                        end: Position {
-                            line: 0,
-                            character: 1,
-                        },
-                    },
-                    severity: DiagnosticSeverity::Error,
-                    code: Some("parse_error".to_string()),
-                    message: error.to_string(),
-                    source: Some("AetherScript".to_string()),
-                    related_information: vec![],
-                };
             }
         }
 
@@ -633,7 +598,7 @@ impl LanguageServer {
     /// Update symbol index
     fn update_symbol_index(&mut self, document: &Document) -> Result<(), SemanticError> {
         if let Some(ref semantic_info) = document.semantic_info {
-            for (name, symbol) in &semantic_info.symbols {
+            for (_, symbol) in &semantic_info.symbols {
                 self.symbol_index
                     .document_symbols
                     .entry(document.uri.clone())
@@ -786,7 +751,7 @@ impl LanguageServer {
     }
 
     /// Get diagnostics for document
-    pub fn get_diagnostics(&self, uri: &str) -> Vec<Diagnostic> {
+    pub fn get_diagnostics(&self, _uri: &str) -> Vec<Diagnostic> {
         vec![]
     }
 

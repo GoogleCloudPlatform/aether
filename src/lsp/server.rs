@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(dead_code)]
+
 use crate::pipeline::CompilationPipeline;
 use crate::semantic::SemanticAnalyzer;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
-use std::path::Path;
 use crate::error::CompilerError;
 use crate::error::SourceLocation;
 use std::sync::{Arc, RwLock};

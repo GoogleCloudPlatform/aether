@@ -16,6 +16,8 @@
 //!
 //! Tokenizes S-expression based AetherScript source code
 
+#![allow(dead_code)]
+
 pub mod v2;
 
 use crate::error::{LexerError, SourceLocation};
@@ -712,24 +714,6 @@ impl Lexer {
                     let location = self.current_location();
                     self.advance();
                     return Ok(Token::new(TokenType::Tilde, location, "~".to_string()));
-                }
-                Some('\'') => {
-                    let location = self.current_location();
-                    self.advance();
-                    // Expect an identifier after ''' for a lifetime
-                    if let Some(ch) = self.current_char {
-                        if ch.is_ascii_alphabetic() || ch == '_' {
-                            let ident_token = self.read_identifier();
-                            return Ok(Token::new(TokenType::Lifetime(ident_token.lexeme.clone()), location, format!("'{}", ident_token.lexeme)));
-                        } else {
-                            return Err(LexerError::UnexpectedCharacter {
-                                character: ch,
-                                location,
-                            });
-                        }
-                    } else {
-                        return Err(LexerError::UnexpectedEof);
-                    }
                 }
                 Some(ch) => {
                     let location = self.current_location();

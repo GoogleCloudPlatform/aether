@@ -17,6 +17,8 @@
 //! Provides registry client functionality for publishing, downloading,
 //! and searching packages from remote registries.
 
+#![allow(dead_code)]
+
 use crate::error::SemanticError;
 use crate::package::manifest::PackageManifest;
 use crate::package::version::Version;

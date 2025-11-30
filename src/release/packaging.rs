@@ -17,6 +17,8 @@
 //! Handles creation of distribution packages in various formats including
 //! archives, installers, containers, and platform-specific packages.
 
+#![allow(dead_code)]
+
 use crate::error::SemanticError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

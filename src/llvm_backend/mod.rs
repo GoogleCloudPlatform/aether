@@ -16,6 +16,8 @@
 //!
 //! Translates optimized MIR to LLVM IR and generates machine code
 
+#![allow(dead_code)]
+
 pub mod codegen;
 pub mod context;
 pub mod types;
@@ -34,7 +36,7 @@ use inkwell::values::{BasicMetadataValueEnum, BasicValueEnum, FunctionValue, Poi
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Type IDs for cleanup functions
@@ -450,16 +452,16 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 let _ = builder.build_call(shutdown_fn, &[], "call_async_shutdown");
                             }
                             
-                            builder.build_return(Some(&return_value));
+                            let _ = builder.build_return(Some(&return_value));
                         }
                         Err(_) => {
                             // Shutdown async runtime even on error
                             if let Some(shutdown_fn) = self.module.get_function("aether_async_shutdown") {
                                 let _ = builder.build_call(shutdown_fn, &[], "call_async_shutdown");
                             }
-                            
+
                             // If call fails, just return 0
-                            builder.build_return(Some(&i32_type.const_int(0, false)));
+                            let _ = builder.build_return(Some(&i32_type.const_int(0, false)));
                         }
                     }
                 } else {
@@ -622,7 +624,7 @@ impl<'ctx> LLVMBackend<'ctx> {
             builder.position_at_end(llvm_block);
 
             // Process statements
-            for (i, stmt) in mir_block.statements.iter().enumerate() {
+            for stmt in mir_block.statements.iter() {
                 match stmt {
                     mir::Statement::Assign { place, rvalue, .. } => {
                         // Step 4: Store captures when assigning a Closure
@@ -916,10 +918,8 @@ impl<'ctx> LLVMBackend<'ctx> {
                     for (i, capture) in captures.iter().enumerate() {
                         let val = self.generate_operand(capture, &local_allocas, &builder, function)?;
                         
-                        let field_ptr = unsafe {
-                            builder.build_struct_gep(context_struct_type, context_alloca, i as u32, &format!("capture_init_{}", i))
-                                .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
-                        };
+                        let field_ptr = builder.build_struct_gep(context_struct_type, context_alloca, i as u32, &format!("capture_init_{}", i))
+                            .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
                         
                         builder.build_store(field_ptr, val).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
                     }
@@ -1538,7 +1538,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                             // First argument is the map pointer, pass as-is
                             // But check if it's being loaded as an integer when it should be a pointer
                             match arg_value {
-                                BasicValueEnum::IntValue(int_val) => {
+                                BasicValueEnum::IntValue(_) => {
                                     // This is likely a map pointer that was loaded incorrectly
                                     // We need to treat it as a pointer
                                     // The value in local_1 should be a pointer, not an integer
@@ -1833,7 +1833,7 @@ impl<'ctx> LLVMBackend<'ctx> {
 
             mir::Rvalue::Aggregate { kind, operands } => {
                 match kind {
-                    mir::AggregateKind::Struct(struct_name, field_names) => {
+                    mir::AggregateKind::Struct(struct_name, _) => {
                         eprintln!("DEBUG: Generating struct aggregate for {}", struct_name);
 
                         // Look up struct definition to get field types
@@ -1857,7 +1857,6 @@ impl<'ctx> LLVMBackend<'ctx> {
                         // Calculate total size and field offsets
                         let mut field_offsets = Vec::new();
                         let mut current_offset = 0u64;
-                        let mut struct_size = 0u64;
 
                         for (i, field_type) in field_types.iter().enumerate() {
                             field_offsets.push(current_offset);
@@ -1872,7 +1871,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 }
                             }
                         }
-                        struct_size = current_offset;
+                        let struct_size = current_offset;
 
                         // Allocate space for the struct
                         let struct_type = self.context.i8_type().array_type(struct_size as u32);
@@ -2149,7 +2148,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                     } else {
                         // Handle projections (field access, array index, etc.)
                         let mut current_ptr = alloca;
-                        let mut current_type =
+                        let current_type =
                             self.get_basic_type_from_local(place.local, function)?;
 
                         // Track the current struct type name for nested field access
@@ -2434,7 +2433,6 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                 Ok(disc_i32)
             }
-            &mir::Rvalue::AddressOf(_) => todo!(),
         }
     }
 
@@ -3207,10 +3205,8 @@ impl<'ctx> LLVMBackend<'ctx> {
         function_declarations.insert("aether_runtime_init".to_string(), init_fn);
 
         let i32_type = self.context.i32_type();
-        let i64_type = self.context.i64_type();
         let i8_type = self.context.i8_type();
         let i8_ptr_type = i8_type.ptr_type(AddressSpace::default());
-        let void_type = self.context.void_type();
 
         // Array runtime functions
         // array_create: creates an array with given count
@@ -3659,10 +3655,8 @@ impl<'ctx> LLVMBackend<'ctx> {
         for (i, capture) in captures.iter().enumerate() {
             if let mir::Operand::Copy(place) | mir::Operand::Move(place) = capture {
                 // Get field pointer
-                let field_ptr = unsafe {
-                    builder.build_struct_gep(context_struct_type, context_ptr, i as u32, &format!("capture_{}", i))
-                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
-                };
+                let field_ptr = builder.build_struct_gep(context_struct_type, context_ptr, i as u32, &format!("capture_{}", i))
+                    .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
                 
                 // Load value
                 let field_val = builder.build_load(

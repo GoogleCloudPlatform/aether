@@ -17,8 +17,10 @@
 //! Creates comprehensive tutorials covering language fundamentals,
 //! advanced concepts, and practical applications.
 
+#![allow(dead_code)]
+
 use crate::docs::{
-    CodeExample, DifficultyLevel, DocConfig, ExampleType, Exercise, Tutorial, TutorialSection,
+    CodeExample, DifficultyLevel, DocConfig, Exercise, Tutorial, TutorialSection,
 };
 use crate::error::SemanticError;
 
@@ -94,9 +96,7 @@ pub struct SectionTemplate {
 
 impl TutorialGenerator {
     /// Create a new tutorial generator
-    pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
-        let templates = Self::create_tutorial_templates();
-
+    pub fn new(_config: &DocConfig) -> Result<Self, SemanticError> {
         Ok(Self {
             sections: Vec::new(),
         })

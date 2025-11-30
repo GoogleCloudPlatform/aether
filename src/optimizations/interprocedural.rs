@@ -17,9 +17,11 @@
 //! Performs analysis and optimizations that span multiple functions,
 //! including global constant propagation, escape analysis, and side effect analysis.
 
+#![allow(dead_code)]
+
 use crate::error::SemanticError;
 use crate::mir::{
-    BasicBlock, Constant, Function, Operand, Place, Program, Rvalue, Statement, Terminator,
+    BasicBlock, Function, Operand, Place, Program, Rvalue, Statement, Terminator,
 };
 use crate::optimizations::OptimizationPass;
 use std::collections::{HashMap, HashSet};
@@ -664,7 +666,7 @@ impl InterproceduralAnalysisPass {
 
     /// Update global side effect analysis
     fn update_global_side_effect_analysis(&mut self, summaries: &HashMap<String, FunctionSummary>) {
-        for (function_name, summary) in summaries {
+        for (_function_name, summary) in summaries {
             // In a real implementation, this would be populated from side effect analysis
             if !summary.side_effects.reads_memory && !summary.side_effects.writes_memory {
                 // Pure function - no memory side effects
@@ -779,7 +781,7 @@ impl InterproceduralAnalysisPass {
         // This is a placeholder for alias analysis
         // Real alias analysis is quite complex and would require sophisticated algorithms
 
-        for (function_name, function) in &program.functions {
+        for (_function_name, _function) in &program.functions {
             // Simple alias analysis - assume no aliasing for now
             // In reality, this would use algorithms like Andersen's or Steensgaard's
         }
@@ -796,7 +798,7 @@ impl InterproceduralAnalysisPass {
         // This is a placeholder for points-to analysis
         // Real points-to analysis would track what each pointer variable can point to
 
-        for (function_name, function) in &program.functions {
+        for (_function_name, function) in &program.functions {
             // Initialize points-to sets for all pointer variables
             for block in function.basic_blocks.values() {
                 for _statement in &block.statements {
@@ -818,7 +820,7 @@ impl InterproceduralAnalysisPass {
         // In a real implementation, this would be populated from global constant analysis
 
         // Find variables that are effectively constant
-        for (function_name, function) in &program.functions {
+        for (_function_name, function) in &program.functions {
             self.find_constant_variables(function)?;
         }
 
@@ -853,8 +855,8 @@ impl InterproceduralAnalysisPass {
         }
 
         // Variables in `assignments` are effectively constant
-        for (place, constant) in assignments {
-            let var_name = format!("{}::{}", function.name, place.local);
+        for (_place, _constant) in assignments {
+            // Placeholder: In a real implementation, this would record constant variables
         }
 
         Ok(())

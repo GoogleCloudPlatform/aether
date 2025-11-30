@@ -17,9 +17,11 @@
 //! Analyzes code to detect mismatches between stated intent and actual behavior,
 //! providing detailed feedback for LLM correction.
 
+#![allow(dead_code)]
+
 use crate::ast::{Block, Expression, Function, Statement};
 use crate::error::structured::IntentMismatch;
-use crate::semantic::metadata::{BehavioralSpec, IntentSpec};
+use crate::semantic::metadata::IntentSpec;
 use std::collections::HashMap;
 
 /// Intent analyzer for detecting behavior mismatches
@@ -139,7 +141,7 @@ impl IntentAnalyzer {
         &self,
         stated_intent: &Option<IntentSpec>,
         inferred: &InferredBehavior,
-        function: &Function,
+        _function: &Function,
     ) -> Vec<IntentMismatch> {
         let mut mismatches = Vec::new();
 

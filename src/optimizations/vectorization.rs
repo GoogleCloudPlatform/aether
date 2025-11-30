@@ -17,6 +17,8 @@
 //! Automatically detects and vectorizes loops that can benefit from SIMD instructions.
 //! Analyzes data dependencies and memory access patterns to identify vectorization opportunities.
 
+#![allow(dead_code)]
+
 use crate::ast::PrimitiveType;
 use crate::error::SemanticError;
 use crate::mir::{

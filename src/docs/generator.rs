@@ -18,7 +18,7 @@ use std::path::Path;
 pub struct DocGenerator {}
 
 impl DocGenerator {
-    pub fn new(output_dir: String) -> Self {
+    pub fn new(_output_dir: String) -> Self {
         Self {}
     }
 

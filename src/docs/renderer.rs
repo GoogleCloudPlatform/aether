@@ -17,6 +17,8 @@
 //! Renders parsed documentation into HTML, Markdown, PDF, and JSON formats
 //! with customizable themes and layouts.
 
+#![allow(dead_code)]
+
 use crate::docs::OutputFormat;
 use crate::docs::{
     DocConfig, Documentation, Example, ModuleDoc, SearchIndex, ThemeConfig, Tutorial,
@@ -365,7 +367,6 @@ impl DocRenderer {
     pub fn new(config: &DocConfig) -> Result<Self, SemanticError> {
         let templates = TemplateEngine::new(&config.output_dir)?;
         let assets = AssetManager::new(&config.output_dir)?;
-        let themes = ThemeManager::new()?;
 
         Ok(Self {
             template_engine: templates,
@@ -534,9 +535,8 @@ impl DocRenderer {
 }
 
 impl TemplateEngine {
-    fn new(base_dir: &PathBuf) -> Result<Self, SemanticError> {
+    fn new(_base_dir: &PathBuf) -> Result<Self, SemanticError> {
         let mut templates = HashMap::new();
-        let search_paths = vec![base_dir.join("templates"), PathBuf::from("templates")];
 
         // Load default templates
         templates.insert("index".to_string(), Self::create_index_template().content);
@@ -554,8 +554,6 @@ impl TemplateEngine {
             "example".to_string(),
             Self::create_example_template().content,
         );
-
-        let helpers = Self::create_default_helpers();
 
         Ok(Self { templates })
     }
@@ -876,7 +874,6 @@ impl AssetManager {
         std::fs::create_dir_all(&assets_dir)?;
 
         let mut assets = HashMap::new();
-        let processors: Vec<&dyn Fn(&str) -> String> = vec![];
 
         // Add default CSS
         assets.insert(
@@ -1182,15 +1179,6 @@ impl<'a> HtmlRenderer<'a> {
 
 impl MarkdownRenderer {
     fn new() -> Result<Self, SemanticError> {
-        let options = MarkdownOptions {
-            github_flavored: true,
-            include_toc: true,
-            syntax_highlighting: true,
-            math_rendering: false,
-        };
-
-        let toc_generator = TocGenerator {};
-
         Ok(Self {})
     }
 
@@ -1344,34 +1332,6 @@ impl MarkdownRenderer {
 
 impl PdfRenderer {
     fn new() -> Result<Self, SemanticError> {
-        let options = PdfOptions {
-            page_size: "A4".to_string(),
-            bookmarks: true,
-            page_numbers: true,
-            headers_footers: true,
-        };
-
-        let layout = PageLayout {
-            margins: Margins {
-                top: 72.0,
-                bottom: 72.0,
-                left: 72.0,
-                right: 72.0,
-            },
-            fonts: FontSettings {
-                family: "DejaVu Sans".to_string(),
-                size: 11.0,
-                line_height: 1.4,
-                code_family: "DejaVu Sans Mono".to_string(),
-            },
-            colors: ColorScheme {
-                text: "#000000".to_string(),
-                background: "#ffffff".to_string(),
-                accent: "#007acc".to_string(),
-                code_background: "#f8f9fa".to_string(),
-            },
-        };
-
         Ok(Self {})
     }
 

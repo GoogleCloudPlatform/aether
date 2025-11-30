@@ -535,18 +535,18 @@ impl DependencyResolver {
         // Apply selection strategy
         match self.strategy {
             ConflictStrategy::Newest => {
-                Ok(compatible_versions.iter().max().unwrap().clone().clone())
+                Ok((*compatible_versions.iter().max().unwrap()).clone())
             }
             ConflictStrategy::Oldest => {
-                Ok(compatible_versions.iter().min().unwrap().clone().clone())
+                Ok((*compatible_versions.iter().min().unwrap()).clone())
             }
             ConflictStrategy::Minimal => {
                 // Find minimal version that satisfies requirement
-                Ok(compatible_versions.iter().min().unwrap().clone().clone())
+                Ok((*compatible_versions.iter().min().unwrap()).clone())
             }
             ConflictStrategy::Custom(_) => {
                 // TODO: Implement custom strategy
-                Ok(compatible_versions.iter().max().unwrap().clone().clone())
+                Ok((*compatible_versions.iter().max().unwrap()).clone())
             }
         }
     }

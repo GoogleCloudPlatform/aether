@@ -167,7 +167,6 @@ pub unsafe extern "C" fn string_concat(str1: *const c_char, str2: *const c_char)
     };
 
     let result = format!("{}{}\0", s1, s2);
-    let c_string = result.as_ptr() as *mut c_char;
 
     // Allocate and copy
     let len = result.len();

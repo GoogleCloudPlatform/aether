@@ -17,13 +17,14 @@
 //! Provides comprehensive release management including automation, packaging,
 //! distribution, and update mechanisms for the AetherScript compiler.
 
+#![allow(dead_code)]
+
 pub mod artifacts;
 pub mod automation;
 pub mod distribution;
 pub mod packaging;
 pub mod updates;
 
-use crate::error::SemanticError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;

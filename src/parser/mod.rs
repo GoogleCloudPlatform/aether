@@ -16,6 +16,8 @@
 //!
 //! Converts token stream to Abstract Syntax Tree
 
+#![allow(dead_code)]
+
 pub mod v2;
 
 use crate::ast::CastFailureBehavior;
@@ -1417,7 +1419,6 @@ impl Parser {
                 .ok_or_else(|| ParserError::UnexpectedEof {
                     expected: "enum field keyword".to_string(),
                 })?;
-            let field_location = field_keyword.location.clone();
 
             match &field_keyword.token_type {
                 TokenType::Keyword(keyword) => {
@@ -1872,7 +1873,7 @@ impl Parser {
         self.consume_keyword(KeywordType::Param)?;
         let name = self.consume_identifier()?;
         
-        let mut constraints = Vec::new();
+        let constraints = Vec::new();
         // TODO: Parse constraints if any
 
         self.consume_right_paren()?;
@@ -1923,9 +1924,9 @@ impl Parser {
         self.advance(); // consume DEFINE_FUNCTION
 
         let mut name = None;
-        let mut intent = None;
-        let mut generic_parameters = Vec::new();
-        let mut lifetime_parameters = Vec::new();
+        let intent = None;
+        let mut _generic_parameters = Vec::new();
+        let mut _lifetime_parameters = Vec::new();
         let mut parameters = Vec::new();
         let mut return_type = None;
         let mut body = None;
@@ -1974,11 +1975,11 @@ impl Parser {
                         }
                         Some(KeywordType::GenericParameters) => {
                             self.advance(); // consume GENERIC_PARAMETERS
-                            generic_parameters = self.parse_generic_parameters()?;
+                            _generic_parameters = self.parse_generic_parameters()?;
                         }
                         Some(KeywordType::LifetimeParameters) => {
                             self.advance(); // consume LIFETIME_PARAMETERS
-                            lifetime_parameters = self.parse_lifetime_parameters()?;
+                            _lifetime_parameters = self.parse_lifetime_parameters()?;
                         }
                         Some(KeywordType::AcceptsParameter) | Some(KeywordType::Param) => {
                             self.advance(); // consume ACCEPTS_PARAMETER or PARAM
@@ -4179,7 +4180,7 @@ impl Parser {
                 self.advance(); // consume variant name
 
                 // Check for nested pattern or binding variable
-                let (nested_pattern, binding) = if let Some(token) = self.current_token() {
+                let (_nested_pattern, binding) = if let Some(token) = self.current_token() {
                     match &token.token_type {
                         TokenType::LeftParen => {
                             // Nested pattern like (Some (Ok x))
@@ -4596,7 +4597,7 @@ impl Parser {
 
         let mut scope_id = String::from("resource_scope_auto");
         let mut resources = Vec::new();
-        let mut invariants = Vec::new();
+        let invariants = Vec::new();
         let mut cleanup_order = CleanupOrder::ReverseAcquisition;
         let mut body = None;
 

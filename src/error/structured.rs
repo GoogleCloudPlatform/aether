@@ -17,7 +17,8 @@
 //! This module implements the enhanced error system that provides structured,
 //! machine-readable errors with auto-fix suggestions optimized for LLM consumption.
 
-use crate::ast::{Expression, Statement, TypeSpecifier};
+#![allow(dead_code)]
+
 use crate::error::{CompilerError, SourceLocation};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -393,45 +394,18 @@ impl From<&SourceLocation> for ErrorLocation {
 }
 
 /// Common error patterns with auto-fix suggestions
-pub struct ErrorPatterns {
-    patterns: HashMap<String, ErrorPattern>,
-}
+pub struct ErrorPatterns {}
 
 #[derive(Clone)]
-struct ErrorPattern {
-    code_prefix: String,
-    matcher: fn(&CompilerError) -> bool,
-    fixer: fn(&CompilerError) -> Vec<FixSuggestion>,
-}
+struct ErrorPattern {}
 
 impl ErrorPatterns {
     pub fn new() -> Self {
-        let mut patterns = HashMap::new();
-
-        // Register common patterns
-        patterns.insert(
-            "type_mismatch".to_string(),
-            ErrorPattern {
-                code_prefix: "TYPE".to_string(),
-                matcher: |e| matches!(e, CompilerError::TypeError(_)),
-                fixer: Self::fix_type_mismatch,
-            },
-        );
-
-        patterns.insert(
-            "undefined_symbol".to_string(),
-            ErrorPattern {
-                code_prefix: "SEM".to_string(),
-                matcher: |e| matches!(e, CompilerError::SemanticError(_)),
-                fixer: Self::fix_undefined_symbol,
-            },
-        );
-
-        Self { patterns }
+        Self {}
     }
 
     /// Generate fix suggestions for type mismatches
-    fn fix_type_mismatch(error: &CompilerError) -> Vec<FixSuggestion> {
+    fn fix_type_mismatch(_error: &CompilerError) -> Vec<FixSuggestion> {
         let mut fixes = Vec::new();
 
         // Add type cast suggestion
@@ -452,7 +426,7 @@ impl ErrorPatterns {
     }
 
     /// Generate fix suggestions for undefined symbols
-    fn fix_undefined_symbol(error: &CompilerError) -> Vec<FixSuggestion> {
+    fn fix_undefined_symbol(_error: &CompilerError) -> Vec<FixSuggestion> {
         let mut fixes = Vec::new();
 
         // Suggest variable declaration

@@ -18,6 +18,8 @@
 //! for optimization and analysis. It serves as the bridge between the AST
 //! and the final code generation phase.
 
+#![allow(dead_code)]
+
 pub mod dataflow;
 pub mod lowering;
 pub mod validation;

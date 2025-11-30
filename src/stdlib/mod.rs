@@ -91,38 +91,6 @@ impl Default for StandardLibrary {
     }
 }
 
-/// Helper function to create an external function declaration
-pub(crate) fn create_external_function(
-    runtime_name: &str,
-    parameters: Vec<(&str, TypeSpecifier)>,
-    return_type: TypeSpecifier,
-    calling_convention: crate::ast::CallingConvention,
-) -> ExternalFunction {
-    ExternalFunction {
-        name: Identifier::new(runtime_name.to_string(), SourceLocation::unknown()),
-        library: "STATIC".to_string(),
-        symbol: None,
-        parameters: parameters
-            .into_iter()
-            .map(|(name, ty)| Parameter {
-                name: Identifier::new(name.to_string(), SourceLocation::unknown()),
-                param_type: Box::new(ty),
-                intent: None,
-                constraint: None,
-                passing_mode: crate::ast::PassingMode::ByValue,
-                source_location: SourceLocation::unknown(),
-            })
-            .collect(),
-        return_type: Box::new(return_type),
-        calling_convention,
-        thread_safe: true,
-        may_block: false,
-        variadic: false,
-        ownership_info: None,
-        source_location: SourceLocation::unknown(),
-    }
-}
-
 /// Helper function to create an external function with different AetherScript and runtime names
 pub(crate) fn create_external_function_named(
     aether_name: &str,

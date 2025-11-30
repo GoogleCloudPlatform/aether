@@ -27,7 +27,6 @@ use crate::ast;
 use crate::error::SourceLocation;
 use crate::semantic::metadata::{BehavioralSpec, IntentSpec, ResourceContract};
 use crate::types::Type;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// Enhanced Function Contract for LLM-First Verification
@@ -808,7 +807,7 @@ pub fn parse_contracts(_function: &ast::Function) -> Option<FunctionContract> {
 
 /// Parse enhanced LLM-first contracts from AST
 pub fn parse_enhanced_contracts(function: &ast::Function) -> Option<FunctionContract> {
-    let mut contract = FunctionContract::new(function.name.name.clone());
+    let _contract = FunctionContract::new(function.name.name.clone());
 
     // In a full implementation, we would parse:
     // 1. PRECONDITION nodes with PROOF_HINT and FAILURE_ACTION

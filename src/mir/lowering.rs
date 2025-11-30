@@ -16,6 +16,8 @@
 //!
 //! Converts the high-level AST representation into MIR form
 
+#![allow(dead_code)]
+
 use crate::ast::{self, PrimitiveType};
 use crate::error::{SemanticError, SourceLocation};
 use crate::mir::Builder;
@@ -606,7 +608,7 @@ impl LoweringContext {
 
             ast::Statement::Break {
                 target_label,
-                source_location,
+                source_location: _,
             } => {
                 let target_block = self.find_break_target(target_label)?;
                 self.builder.set_terminator(Terminator::Goto {
@@ -619,7 +621,7 @@ impl LoweringContext {
 
             ast::Statement::Continue {
                 target_label,
-                source_location,
+                source_location: _,
             } => {
                 let target_block = self.find_continue_target(target_label)?;
                 self.builder.set_terminator(Terminator::Goto {
@@ -673,7 +675,7 @@ impl LoweringContext {
 
             ast::Statement::Expression {
                 expr,
-                source_location,
+                source_location: _,
             } => {
                 // Lower the expression - the result is discarded
                 let _ = self.lower_expression(expr)?;
@@ -683,7 +685,7 @@ impl LoweringContext {
             ast::Statement::Match {
                 value,
                 arms,
-                source_location,
+                source_location: _,
             } => {
                 self.lower_match_statement(value, arms)?;
             }
@@ -2543,7 +2545,7 @@ impl LoweringContext {
         }
 
         match current_type {
-            Type::Named { name, module } => {
+            Type::Named { name, module: _ } => {
                 // Need symbol table to look up struct fields
                 if let Some(st) = &self.symbol_table {
                     if let Some(type_def) = st.lookup_type_definition(name) {
@@ -2667,7 +2669,7 @@ impl LoweringContext {
                 place.projection.push(PlaceElem::Index(index_local));
                 Ok(place)
             }
-            ast::AssignmentTarget::MapValue { map, key } => {
+            ast::AssignmentTarget::MapValue { map: _, key: _ } => {
                 // For map assignment, we can't return a place directly
                 // This will be handled specially in the assignment lowering
                 Err(SemanticError::UnsupportedFeature {
@@ -3791,7 +3793,7 @@ impl LoweringContext {
                 if let Some(ref nested_pat) = nested_pattern {
                     // For nested patterns, we need to extract the data and then match on it
                     // First, get the type of the variant's associated data
-                    let data_type = if let Some(st) = &self.symbol_table {
+                    let data_type = if let Some(_st) = &self.symbol_table {
                         // Look up the variant type from the enum definition
                         if let Some(enum_type) = self.get_enum_variant_type(variant_name) {
                             enum_type
@@ -3818,7 +3820,7 @@ impl LoweringContext {
                     // For nested enum patterns, we need to check the inner discriminant
                     match nested_pat.as_ref() {
                         ast::Pattern::EnumVariant {
-                            variant_name: inner_variant,
+                            variant_name: _,
                             bindings: inner_bindings,
                             ..
                         } => {
@@ -3996,72 +3998,6 @@ impl LoweringContext {
                     
                     self.lower_pattern_bindings(field_pattern, &field_place, 0)?;
                 }
-            }
-            ast::Pattern::Wildcard {
-                binding: Some(binding_name),
-                source_location,
-            } => {
-                // This is a variable binding
-                // Look up the type from the symbol table or infer it
-                let binding_type = if let Some(st) = &self.symbol_table {
-                    if let Some(symbol) = st.lookup_symbol(&binding_name.name) {
-                        match &symbol.kind {
-                            SymbolKind::Variable | SymbolKind::Parameter => {
-                                symbol.symbol_type.clone()
-                            }
-                            _ => Type::Error,
-                        }
-                    } else {
-                        Type::Error // Should infer from value_place
-                    }
-                } else {
-                    Type::Error // Should infer from value_place
-                };
-                
-                // Better type inference: use the type of the value we are binding
-                let binding_type = if matches!(binding_type, Type::Error) {
-                    if let Some(func) = &self.builder.current_function {
-                        if let Some(local) = func.locals.get(&value_place.local) {
-                            // Walk projections to find type
-                            let mut current_ty = local.ty.clone();
-                            for proj in &value_place.projection {
-                                if let PlaceElem::Field { ty, .. } = proj {
-                                    current_ty = ty.clone();
-                                }
-                            }
-                            current_ty
-                        } else {
-                            Type::primitive(ast::PrimitiveType::Integer) // Fallback
-                        }
-                    } else {
-                        Type::primitive(ast::PrimitiveType::Integer) // Fallback
-                    }
-                } else {
-                    binding_type
-                };
-
-                // Create a local for the binding
-                let binding_local = self.builder.new_local(binding_type.clone(), false);
-                self.var_map
-                    .insert(binding_name.name.clone(), binding_local);
-                self.var_types
-                    .insert(binding_name.name.clone(), binding_type);
-
-                // Copy the value to the binding local
-                self.builder.push_statement(Statement::Assign {
-                    place: Place {
-                        local: binding_local,
-                        projection: vec![],
-                    },
-                    rvalue: Rvalue::Use(Operand::Copy(value_place.clone())),
-                    source_info: SourceInfo {
-                        span: source_location.clone(),
-                        scope: 0,
-                    },
-                });
-            }
-            ast::Pattern::Wildcard { binding: None, .. } => {
-                // Wildcard without binding, do nothing
             }
         }
 
@@ -4664,7 +4600,7 @@ impl LoweringContext {
 
         // Get the target type
         let pointer_type = self.get_expression_type(pointer)?;
-        let target_type = match pointer_type {
+        let _target_type = match pointer_type {
             Type::Pointer { target_type, .. } => (*target_type).clone(),
             _ => {
                 return Err(SemanticError::TypeMismatch {

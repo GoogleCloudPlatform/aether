@@ -38,7 +38,7 @@ pub fn create_network_module() -> Module {
         type_name: PrimitiveType::Boolean,
         source_location: SourceLocation::unknown(),
     };
-    let size_type = TypeSpecifier::Primitive {
+    let _size_type = TypeSpecifier::Primitive {
         type_name: PrimitiveType::SizeT,
         source_location: SourceLocation::unknown(),
     };

@@ -17,6 +17,8 @@
 //! Provides automatic update detection, download, verification, and installation
 //! with rollback capabilities and incremental update support.
 
+#![allow(dead_code)]
+
 use crate::error::SemanticError;
 use crate::release::VersionInfo;
 use serde::{Deserialize, Serialize};

@@ -374,7 +374,7 @@ impl ActorSystem {
         }
 
         let actor_id = self.next_actor_id();
-        let (sender, receiver) = mpsc::channel();
+        let (sender, _) = mpsc::channel();
 
         let handle = ActorHandle {
             id: actor_id,
@@ -619,7 +619,7 @@ impl ActorHandle {
 struct SupervisorState {}
 
 impl SupervisorState {
-    fn new(strategy: SupervisionStrategy) -> Self {
+    fn new(_strategy: SupervisionStrategy) -> Self {
         Self {}
     }
 }

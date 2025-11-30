@@ -347,7 +347,7 @@ impl AsyncRuntime {
     fn start_workers(&mut self) -> Result<(), SemanticError> {
         self.workers.clear();
 
-        for worker_id in 0..self.config.worker_threads {
+        for _ in 0..self.config.worker_threads {
             let worker = Worker::new(
                 self.scheduler.task_queue.clone(),
                 self.scheduler.task_available.clone(),

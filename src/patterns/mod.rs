@@ -20,8 +20,7 @@
 pub mod catalog;
 pub mod composition;
 
-use crate::ast::{Block, Expression, Function, Statement};
-use crate::error::SourceLocation;
+use crate::ast::{Block, Expression, Statement};
 use crate::verification::contracts::FunctionContract;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
