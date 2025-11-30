@@ -141,3 +141,6 @@ examples/**/main
 
 # Main binary in root
 /main
+*.exe
+test_memory_alloc
+test_realloc
