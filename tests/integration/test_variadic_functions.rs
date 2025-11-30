@@ -21,29 +21,16 @@ use std::process::Command;
 #[test]
 fn test_printf_variadic() {
     let test_program = r#"
-(DEFINE_MODULE
-  (NAME test_printf)
-  (INTENT "Test printf variadic function")
-  
-  (CONTENT
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME printf)
-      (LIBRARY "libc")
-      (RETURNS INTEGER)
-      (PARAM (NAME "format") (TYPE STRING))
-      (CALLING_CONVENTION "C")
-      (VARIADIC true))
+module test_printf_variadic {
+    @extern(library="libc", variadic=true)
+    func printf(format: String) -> Int;
     
-    (DEFINE_FUNCTION
-      (NAME main)
-      (RETURNS INTEGER)
-      (BODY
-        (CALL_FUNCTION printf "Hello %s! The answer is %d\n" "World" 42)
-        (RETURN_VALUE 0)
-      )
-    )
-  )
-)
+    func main() -> Int {
+        // Calls with varying number of arguments
+        printf("Hello %s! The answer is %d\n", "World", 42);
+        return 0;
+    }
+}
 "#;
 
     // Write test program
@@ -84,38 +71,18 @@ fn test_printf_variadic() {
 #[test]
 fn test_multiple_variadic_functions() {
     let test_program = r#"
-(DEFINE_MODULE
-  (NAME test_multiple_variadic)
-  (INTENT "Test multiple variadic functions")
-  
-  (CONTENT
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME printf)
-      (LIBRARY "libc")
-      (RETURNS INTEGER)
-      (PARAM (NAME "format") (TYPE STRING))
-      (CALLING_CONVENTION "C")
-      (VARIADIC true))
+module test_multiple_variadic {
+    @extern(library="libc", variadic=true)
+    func printf(format: String) -> Int;
     
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME sprintf)
-      (LIBRARY "libc")
-      (RETURNS INTEGER)
-      (PARAM (NAME "buffer") (TYPE STRING))
-      (PARAM (NAME "format") (TYPE STRING))
-      (CALLING_CONVENTION "C")
-      (VARIADIC true))
+    @extern(library="libc", variadic=true)
+    func sprintf(buffer: String, format: String) -> Int;
     
-    (DEFINE_FUNCTION
-      (NAME main)
-      (RETURNS INTEGER)
-      (BODY
-        (CALL_FUNCTION printf "Testing %s %d %f\n" "variadic" 123 3.14)
-        (RETURN_VALUE 0)
-      )
-    )
-  )
-)
+    func main() -> Int {
+        printf("Testing %s %d %f\n", "variadic", 123, 3.14);
+        return 0;
+    }
+}
 "#;
 
     // Write test program
@@ -156,29 +123,15 @@ fn test_multiple_variadic_functions() {
 #[test]
 fn test_non_variadic_external_function() {
     let test_program = r#"
-(DEFINE_MODULE
-  (NAME test_non_variadic)
-  (INTENT "Test non-variadic external function")
-  
-  (CONTENT
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME puts)
-      (LIBRARY "libc")
-      (RETURNS INTEGER)
-      (PARAM (NAME "str") (TYPE STRING))
-      (CALLING_CONVENTION "C")
-      (VARIADIC false))
+module test_non_variadic {
+    @extern(library="libc", variadic=false)
+    func puts(str: String) -> Int;
     
-    (DEFINE_FUNCTION
-      (NAME main)
-      (RETURNS INTEGER)
-      (BODY
-        (CALL_FUNCTION puts "Hello from non-variadic function!")
-        (RETURN_VALUE 0)
-      )
-    )
-  )
-)
+    func main() -> Int {
+        puts("Hello from non-variadic function!");
+        return 0;
+    }
+}
 "#;
 
     // Write test program

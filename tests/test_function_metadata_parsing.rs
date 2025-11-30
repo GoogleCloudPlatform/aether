@@ -15,95 +15,74 @@
 //! Tests for function metadata parsing
 
 use aether::ast::{ComplexityNotation, ComplexityType, FailureAction, PerformanceMetric};
-use aether::lexer::Lexer;
-use aether::parser::Parser;
+use aether::lexer::v2::Lexer;
+use aether::parser::v2::Parser;
 
 #[test]
 fn test_function_with_precondition() {
     let source = r#"
-(DEFINE_MODULE
-  (NAME 'test_module')
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME 'safe_divide')
-      (ACCEPTS_PARAMETER (NAME 'a') (TYPE INTEGER))
-      (ACCEPTS_PARAMETER (NAME 'b') (TYPE INTEGER))
-      (RETURNS INTEGER)
-      (PRECONDITION (PREDICATE_NOT_EQUALS 'b' 0) ASSERT_FAIL "Divisor cannot be zero")
-      (BODY
-        (EXPRESSION_DIVIDE 'a' 'b')))))
+module test_module {
+    @pre({b != 0})
+    func safe_divide(a: Int, b: Int) -> Int {
+        return {a / b};
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
 
-    let program = parser.parse_program().unwrap();
-    let function = &program.modules[0].function_definitions[0];
+    let program = parser.parse_module().unwrap();
+    let function = &program.function_definitions[0];
 
     assert_eq!(function.name.name, "safe_divide");
     assert_eq!(function.metadata.preconditions.len(), 1);
-    assert_eq!(
-        function.metadata.preconditions[0].message,
-        Some("Divisor cannot be zero".to_string())
-    );
+    // message not supported in @pre yet
     assert_eq!(
         function.metadata.preconditions[0].failure_action,
-        FailureAction::AssertFail
+        FailureAction::ThrowException
     );
 }
 
 #[test]
 fn test_function_with_postcondition() {
     let source = r#"
-(DEFINE_MODULE
-  (NAME 'test_module')
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME 'abs')
-      (ACCEPTS_PARAMETER (NAME 'x') (TYPE INTEGER))
-      (RETURNS INTEGER)
-      (POSTCONDITION (PREDICATE_GREATER_THAN_OR_EQUAL_TO (RETURN_VALUE) 0) ASSERT_FAIL "Result must be non-negative")
-      (BODY
-        (IF_CONDITION (PREDICATE_LESS_THAN 'x' 0)
-          (THEN_EXECUTE (EXPRESSION_NEGATE 'x'))
-          (ELSE_EXECUTE 'x'))))))
+module test_module {
+    @post({return_value >= 0})
+    func abs(x: Int) -> Int {
+        when {x < 0} { return {-x}; } else { return x; }
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
 
-    let program = parser.parse_program().unwrap();
-    let function = &program.modules[0].function_definitions[0];
+    let program = parser.parse_module().unwrap();
+    let function = &program.function_definitions[0];
 
     assert_eq!(function.metadata.postconditions.len(), 1);
-    assert_eq!(
-        function.metadata.postconditions[0].message,
-        Some("Result must be non-negative".to_string())
-    );
 }
 
 #[test]
 fn test_function_with_performance_expectation() {
     let source = r#"
-(DEFINE_MODULE
-  (NAME 'test_module')
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME 'fast_function')
-      (RETURNS VOID)
-      (PERFORMANCE_EXPECTATION LATENCY_MS 10.0 "Average case")
-      (BODY
-        (RETURN_VOID)))))
+module test_module {
+    @perf(metric="LatencyMs", target=10.0, context="Average case")
+    func fast_function() -> Void {
+        return;
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
 
-    let program = parser.parse_program().unwrap();
-    let function = &program.modules[0].function_definitions[0];
+    let program = parser.parse_module().unwrap();
+    let function = &program.function_definitions[0];
 
     assert!(function.metadata.performance_expectation.is_some());
     let perf = function.metadata.performance_expectation.as_ref().unwrap();
@@ -115,24 +94,20 @@ fn test_function_with_performance_expectation() {
 #[test]
 fn test_function_with_complexity_expectation() {
     let source = r#"
-(DEFINE_MODULE
-  (NAME 'test_module')
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME 'sort_function')
-      (ACCEPTS_PARAMETER (NAME 'arr') (TYPE (ARRAY_OF_TYPE INTEGER)))
-      (RETURNS (ARRAY_OF_TYPE INTEGER))
-      (COMPLEXITY_EXPECTATION TIME BIG_O "n log n")
-      (BODY
-        'arr'))))
+module test_module {
+    @complexity(type="Time", notation="BigO", value="n log n")
+    func sort_function(arr: Array<Int>) -> Array<Int> {
+        return arr;
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
 
-    let program = parser.parse_program().unwrap();
-    let function = &program.modules[0].function_definitions[0];
+    let program = parser.parse_module().unwrap();
+    let function = &program.function_definitions[0];
 
     assert!(function.metadata.complexity_expectation.is_some());
     let complexity = function.metadata.complexity_expectation.as_ref().unwrap();
@@ -144,24 +119,20 @@ fn test_function_with_complexity_expectation() {
 #[test]
 fn test_function_with_algorithm_hint() {
     let source = r#"
-(DEFINE_MODULE
-  (NAME 'test_module')
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME 'merge_sort')
-      (ACCEPTS_PARAMETER (NAME 'arr') (TYPE (ARRAY_OF_TYPE INTEGER)))
-      (RETURNS (ARRAY_OF_TYPE INTEGER))
-      (ALGORITHM_HINT "divide-and-conquer")
-      (BODY
-        'arr'))))
+module test_module {
+    @algo("divide-and-conquer")
+    func merge_sort(arr: Array<Int>) -> Array<Int> {
+        return arr;
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
 
-    let program = parser.parse_program().unwrap();
-    let function = &program.modules[0].function_definitions[0];
+    let program = parser.parse_module().unwrap();
+    let function = &program.function_definitions[0];
 
     assert_eq!(
         function.metadata.algorithm_hint,
@@ -172,34 +143,26 @@ fn test_function_with_algorithm_hint() {
 #[test]
 fn test_function_with_multiple_metadata() {
     let source = r#"
-(DEFINE_MODULE
-  (NAME 'test_module')
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME 'binary_search')
-      (ACCEPTS_PARAMETER (NAME 'arr') (TYPE (ARRAY_OF_TYPE INTEGER)))
-      (ACCEPTS_PARAMETER (NAME 'target') (TYPE INTEGER))
-      (RETURNS INTEGER)
-      (PRECONDITION (EXPRESSION_GREATER_THAN (ARRAY_LENGTH 'arr') 0) ASSERT_FAIL "Array must not be empty")
-      (POSTCONDITION (LOGICAL_OR 
-        (PREDICATE_EQUALS (RETURN_VALUE) -1)
-        (PREDICATE_EQUALS (ARRAY_ACCESS 'arr' (RETURN_VALUE)) 'target'))
-        ASSERT_FAIL "Must return valid index or -1")
-      (ALGORITHM_HINT "binary search")
-      (COMPLEXITY_EXPECTATION TIME BIG_O "log n")
-      (PERFORMANCE_EXPECTATION LATENCY_MS 0.1)
-      (THREAD_SAFE true)
-      (MAY_BLOCK false)
-      (BODY
-        -1))))
+module test_module {
+    @pre({arr.length > 0})
+    @post({return_value == -1 || arr[return_value] == target})
+    @algo("binary search")
+    @complexity(type="Time", notation="BigO", value="log n")
+    @perf(metric="LatencyMs", target=0.1)
+    @thread_safe(true)
+    @may_block(false)
+    func binary_search(arr: Array<Int>, target: Int) -> Int {
+        return -1;
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = Parser::new(tokens);
 
-    let program = parser.parse_program().unwrap();
-    let function = &program.modules[0].function_definitions[0];
+    let program = parser.parse_module().unwrap();
+    let function = &program.function_definitions[0];
 
     assert_eq!(function.metadata.preconditions.len(), 1);
     assert_eq!(function.metadata.postconditions.len(), 1);

@@ -17,11 +17,11 @@
 //! Parses the new Swift/Rust-like V2 syntax into AST nodes.
 
 use crate::ast::{
-    Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode,
-    ConstantDeclaration, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction, FieldValue, Function,
+    Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode, CatchClause,
+    ConstantDeclaration, ContractAssertion, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction, FailureAction, FieldValue, Function,
     FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, Identifier,
     ImportStatement, LambdaBody, MatchArm, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
-    Statement, StructField, TypeDefinition, TypeSpecifier,
+    Statement, StructField, TypeDefinition, TypeSpecifier, PerformanceMetric, PerformanceExpectation, ComplexityExpectation, ComplexityType, ComplexityNotation,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -72,9 +72,10 @@ pub struct AnnotationArgument {
 pub enum AnnotationValue {
     String(String),
     Integer(i64),
+    Float(f64),
     Boolean(bool),
     Identifier(String),
-    Expression(String, SourceLocation), // Raw expression string for contracts
+    Expression(Box<Expression>),
 }
 
 impl Parser {
@@ -553,6 +554,164 @@ impl Parser {
         (Some(module), errors)
     }
 
+    /// Apply annotations to a function
+    fn apply_annotations(&self, func: &mut Function, annotations: Vec<Annotation>) -> Result<(), ParserError> {
+        for ann in annotations {
+            match ann.name.as_str() {
+                "intent" => {
+                    if let Some(arg) = ann.arguments.first() {
+                        if let AnnotationValue::String(s) = &arg.value {
+                            func.intent = Some(s.clone());
+                        }
+                    }
+                }
+                "pre" | "requires" => {
+                    for arg in ann.arguments {
+                        if let AnnotationValue::Expression(expr) = &arg.value {
+                            func.metadata.preconditions.push(ContractAssertion {
+                                condition: expr.clone(),
+                                failure_action: FailureAction::ThrowException,
+                                message: None,
+                                source_location: ann.source_location.clone(),
+                            });
+                        }
+                    }
+                }
+                "post" | "ensures" => {
+                    for arg in ann.arguments {
+                        if let AnnotationValue::Expression(expr) = &arg.value {
+                            func.metadata.postconditions.push(ContractAssertion {
+                                condition: expr.clone(),
+                                failure_action: FailureAction::ThrowException,
+                                message: None,
+                                source_location: ann.source_location.clone(),
+                            });
+                        }
+                    }
+                }
+                "invariant" => {
+                    for arg in ann.arguments {
+                        if let AnnotationValue::Expression(expr) = &arg.value {
+                            func.metadata.invariants.push(ContractAssertion {
+                                condition: expr.clone(),
+                                failure_action: FailureAction::ThrowException,
+                                message: None,
+                                source_location: ann.source_location.clone(),
+                            });
+                        }
+                    }
+                }
+                "algo" => {
+                    if let Some(arg) = ann.arguments.first() {
+                        if let AnnotationValue::String(s) = &arg.value {
+                            func.metadata.algorithm_hint = Some(s.clone());
+                        }
+                    }
+                }
+                "perf" => {
+                    let mut metric = None;
+                    let mut target = 0.0;
+                    let mut context = None;
+                    
+                    for arg in &ann.arguments {
+                         if let Some(label) = &arg.label {
+                             match label.as_str() {
+                                 "metric" => {
+                                     if let AnnotationValue::String(s) = &arg.value {
+                                         metric = match s.as_str() {
+                                             "LatencyMs" => Some(PerformanceMetric::LatencyMs),
+                                             "ThroughputOpsPerSec" => Some(PerformanceMetric::ThroughputOpsPerSec),
+                                             "MemoryUsageBytes" => Some(PerformanceMetric::MemoryUsageBytes),
+                                             _ => None,
+                                         };
+                                     }
+                                 }
+                                 "target" => {
+                                     if let AnnotationValue::Float(f) = &arg.value {
+                                         target = *f;
+                                     } else if let AnnotationValue::Integer(i) = &arg.value {
+                                         target = *i as f64;
+                                     }
+                                 }
+                                 "context" => {
+                                     if let AnnotationValue::String(s) = &arg.value {
+                                         context = Some(s.clone());
+                                     }
+                                 }
+                                 _ => {}
+                             }
+                         }
+                    }
+                    if let Some(m) = metric {
+                        func.metadata.performance_expectation = Some(PerformanceExpectation {
+                            metric: m,
+                            target_value: target,
+                            context,
+                        });
+                    }
+                }
+                "complexity" => {
+                    let mut comp_type = ComplexityType::Time;
+                    let mut notation = ComplexityNotation::BigO;
+                    let mut value = "".to_string();
+
+                    for arg in &ann.arguments {
+                        if let Some(label) = &arg.label {
+                            match label.as_str() {
+                                "type" => {
+                                    if let AnnotationValue::String(s) = &arg.value {
+                                        comp_type = match s.as_str() {
+                                            "Time" => ComplexityType::Time,
+                                            "Space" => ComplexityType::Space,
+                                            _ => ComplexityType::Time,
+                                        };
+                                    }
+                                }
+                                "notation" => {
+                                    if let AnnotationValue::String(s) = &arg.value {
+                                        notation = match s.as_str() {
+                                            "BigO" => ComplexityNotation::BigO,
+                                            "BigTheta" => ComplexityNotation::BigTheta,
+                                            "BigOmega" => ComplexityNotation::BigOmega,
+                                            _ => ComplexityNotation::BigO,
+                                        };
+                                    }
+                                }
+                                "value" => {
+                                    if let AnnotationValue::String(s) = &arg.value {
+                                        value = s.clone();
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    func.metadata.complexity_expectation = Some(ComplexityExpectation {
+                        complexity_type: comp_type,
+                        notation,
+                        value,
+                    });
+                }
+                "thread_safe" => {
+                    if let Some(arg) = ann.arguments.first() {
+                        if let AnnotationValue::Boolean(b) = &arg.value {
+                            func.metadata.thread_safe = Some(*b);
+                        }
+                    }
+                }
+                "may_block" => {
+                    if let Some(arg) = ann.arguments.first() {
+                        if let AnnotationValue::Boolean(b) = &arg.value {
+                            func.metadata.may_block = Some(*b);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     /// Parse a module definition
     /// Grammar: "module" IDENTIFIER "{" module_item* "}"
     pub fn parse_module(&mut self) -> Result<Module, ParserError> {
@@ -656,17 +815,23 @@ impl Parser {
             false
         };
 
-        // Check for annotation (could be @extern)
-        if self.check(&TokenType::At) {
-            let annotation = self.parse_annotation()?;
+        // Collect annotations
+        let mut annotations = Vec::new();
+        while self.check(&TokenType::At) {
+            annotations.push(self.parse_annotation()?);
+        }
 
-            // Check if this is @extern followed by func
-            if annotation.name == "extern" && self.check_keyword(Keyword::Func) {
-                external_functions.push(self.parse_external_function(annotation)?);
-            } else if self.check_keyword(Keyword::Func) {
-                // Annotated function - parse but ignore annotation for now
-                // (AST Function struct doesn't have annotations field)
-                let func = self.parse_function()?;
+        if self.check_keyword(Keyword::Import) {
+            imports.push(self.parse_import()?);
+        } else if self.check_keyword(Keyword::Func) {
+            // Check for @extern in annotations
+            if let Some(extern_attr) = annotations.iter().find(|a| a.name == "extern") {
+                external_functions.push(self.parse_external_function(extern_attr.clone())?);
+            } else {
+                let mut func = self.parse_function()?;
+                // Apply annotations to func.metadata
+                self.apply_annotations(&mut func, annotations)?;
+                
                 if is_public {
                     exports.push(ExportStatement::Function {
                         name: func.name.clone(),
@@ -674,24 +839,7 @@ impl Parser {
                     });
                 }
                 function_definitions.push(func);
-            } else {
-                return Err(ParserError::UnexpectedToken {
-                    expected: "func after annotation".to_string(),
-                    found: format!("{:?}", self.peek().token_type),
-                    location: self.current_location(),
-                });
             }
-        } else if self.check_keyword(Keyword::Import) {
-            imports.push(self.parse_import()?);
-        } else if self.check_keyword(Keyword::Func) {
-            let func = self.parse_function()?;
-            if is_public {
-                exports.push(ExportStatement::Function {
-                    name: func.name.clone(),
-                    source_location: func.source_location.clone(),
-                });
-            }
-            function_definitions.push(func);
         } else if self.check_keyword(Keyword::Struct) {
             let type_def = self.parse_struct()?;
             if is_public {
@@ -1250,6 +1398,13 @@ impl Parser {
             return Ok(AnnotationValue::Integer(value));
         }
 
+        // Float literal
+        if let TokenType::FloatLiteral(f) = &self.peek().token_type {
+            let value = *f;
+            self.advance();
+            return Ok(AnnotationValue::Float(value));
+        }
+
         // Boolean literal
         if let TokenType::BoolLiteral(b) = &self.peek().token_type {
             let value = *b;
@@ -1259,36 +1414,8 @@ impl Parser {
 
         // Braced expression (for contracts like @requires({n > 0}))
         if self.check(&TokenType::LeftBrace) {
-            let start = self.current_location();
-            self.advance();
-
-            // Collect tokens until matching brace
-            let mut expr_tokens = String::new();
-            let mut brace_depth = 1;
-
-            while !self.is_at_end() && brace_depth > 0 {
-                if self.check(&TokenType::LeftBrace) {
-                    brace_depth += 1;
-                    expr_tokens.push('{');
-                } else if self.check(&TokenType::RightBrace) {
-                    brace_depth -= 1;
-                    if brace_depth > 0 {
-                        expr_tokens.push('}');
-                    }
-                } else {
-                    expr_tokens.push_str(&self.peek().lexeme);
-                    expr_tokens.push(' ');
-                }
-                if brace_depth > 0 {
-                    self.advance();
-                }
-            }
-
-            self.expect(&TokenType::RightBrace, "expected '}' to close expression")?;
-            return Ok(AnnotationValue::Expression(
-                expr_tokens.trim().to_string(),
-                start,
-            ));
+            let expr = self.parse_braced_expression()?;
+            return Ok(AnnotationValue::Expression(Box::new(expr)));
         }
 
         // Identifier
@@ -1334,6 +1461,17 @@ impl Parser {
                 _ => None,
             });
 
+        // Extract optional variadic flag
+        let variadic = annotation
+            .arguments
+            .iter()
+            .find(|a| a.label.as_deref() == Some("variadic"))
+            .and_then(|a| match &a.value {
+                AnnotationValue::Boolean(b) => Some(*b),
+                _ => None,
+            })
+            .unwrap_or(false);
+
         // Expect 'func' keyword
         self.expect_keyword(Keyword::Func, "expected 'func' after @extern annotation")?;
 
@@ -1367,7 +1505,7 @@ impl Parser {
             calling_convention: CallingConvention::C,
             thread_safe: false,
             may_block: false,
-            variadic: false,
+            variadic,
             ownership_info: None,
             source_location: start_location,
         })
@@ -1950,6 +2088,67 @@ impl Parser {
         })
     }
 
+    /// Parse a try statement
+    /// Grammar: "try" block ("catch" type ["as" name] block)* ["finally" block]
+    pub fn parse_try_statement(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Try, "expected 'try'")?;
+        let protected_block = self.parse_block()?;
+
+        let mut catch_clauses = Vec::new();
+        while self.check_keyword(Keyword::Catch) {
+            let catch_loc = self.current_location();
+            self.advance();
+
+            let exception_type = Box::new(self.parse_type()?);
+            
+            let binding_variable = if self.check_keyword(Keyword::As) {
+                self.advance();
+                Some(self.parse_identifier()?)
+            } else {
+                None
+            };
+
+            let handler_block = self.parse_block()?;
+            
+            catch_clauses.push(CatchClause {
+                exception_type,
+                binding_variable,
+                handler_block,
+                source_location: catch_loc,
+            });
+        }
+
+        let finally_block = if self.check_keyword(Keyword::Finally) {
+            self.advance();
+            Some(self.parse_block()?)
+        } else {
+            None
+        };
+
+        Ok(Statement::TryBlock {
+            protected_block,
+            catch_clauses,
+            finally_block,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a throw statement
+    /// Grammar: "throw" expression ";"
+    pub fn parse_throw_statement(&mut self) -> Result<Statement, ParserError> {
+        let start_location = self.current_location();
+        self.expect_keyword(Keyword::Throw, "expected 'throw'")?;
+        let exception = self.parse_expression()?;
+        self.expect(&TokenType::Semicolon, "expected ';' after throw")?;
+        
+        Ok(Statement::Throw {
+            exception: Box::new(exception),
+            source_location: start_location,
+        })
+    }
+
     /// Parse a concurrent block
     /// Grammar: "concurrent" block
     pub fn parse_concurrent_block(&mut self) -> Result<Statement, ParserError> {
@@ -1994,6 +2193,12 @@ impl Parser {
         }
         if self.check_keyword(Keyword::Concurrent) {
             return self.parse_concurrent_block();
+        }
+        if self.check_keyword(Keyword::Try) {
+            return self.parse_try_statement();
+        }
+        if self.check_keyword(Keyword::Throw) {
+            return self.parse_throw_statement();
         }
 
         // Otherwise, try to parse as assignment or expression statement
@@ -2678,6 +2883,28 @@ impl Parser {
             }
 
             return Ok(expr);
+        }
+
+        // Array literal or closure with capture list
+        if self.check(&TokenType::LeftBracket) {
+            // Determine if this is an array literal or capture list
+            // Array literal: [1, 2, 3] or [expr, expr, ...]
+            // Capture list: [x, y](params) => body (followed by '(')
+            if self.looks_like_array_literal() {
+                return self.parse_array_literal();
+            } else {
+                // Parse as capture list for closure
+                let captures = self.parse_capture_list()?;
+                // After capture list, we must have parameters in parens
+                if !self.check(&TokenType::LeftParen) {
+                    return Err(ParserError::SyntaxError {
+                        message: "expected '(' after capture list".to_string(),
+                        location: self.current_location(),
+                        suggestion: Some("use [captures](params) => body syntax".to_string()),
+                    });
+                }
+                return self.parse_paren_expr_or_lambda_with_captures(captures);
+            }
         }
 
         // Match expression
@@ -4700,9 +4927,25 @@ func calculate(
         assert_eq!(annotation.name, "requires");
         assert_eq!(annotation.arguments.len(), 1);
         assert!(annotation.arguments[0].label.is_none());
-        assert!(
-            matches!(&annotation.arguments[0].value, AnnotationValue::Expression(expr, _) if expr.contains("n") && expr.contains(">") && expr.contains("0"))
-        );
+        
+        match &annotation.arguments[0].value {
+            AnnotationValue::Expression(expr) => {
+                match &**expr {
+                    Expression::GreaterThan { left, right, .. } => {
+                        match &**left {
+                            Expression::Variable { name, .. } => assert_eq!(name.name, "n"),
+                            _ => panic!("Expected variable left"),
+                        }
+                        match &**right {
+                            Expression::IntegerLiteral { value, .. } => assert_eq!(*value, 0),
+                            _ => panic!("Expected integer right"),
+                        }
+                    }
+                    _ => panic!("Expected GreaterThan expression, found {:?}", expr),
+                }
+            }
+            _ => panic!("Expected Expression value"),
+        }
     }
 
     #[test]

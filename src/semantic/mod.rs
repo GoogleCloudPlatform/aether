@@ -1090,6 +1090,16 @@ impl SemanticAnalyzer {
                 left,
                 right,
                 source_location,
+            }
+            | Expression::IntegerDivide {
+                left,
+                right,
+                source_location,
+            }
+            | Expression::Modulo {
+                left,
+                right,
+                source_location,
             } => {
                 let left_type = self.analyze_expression(left)?;
                 let right_type = self.analyze_expression(right)?;
