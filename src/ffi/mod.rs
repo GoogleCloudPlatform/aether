@@ -18,9 +18,9 @@
 
 use crate::ast::*;
 use crate::error::SemanticError;
-use crate::types::{Type, TypeChecker};
+use crate::types::{Type, TypeChecker, TypeDefinition};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
 
@@ -278,12 +278,63 @@ impl FFIAnalyzer {
 
     /// Check if a type is FFI-compatible
     fn is_ffi_compatible(&self, aether_type: &Type) -> bool {
+        let mut visited = HashSet::new();
+        self.is_ffi_compatible_impl(aether_type, &mut visited)
+    }
+
+    /// Implementation of FFI compatibility check with cycle detection
+    fn is_ffi_compatible_impl(&self, aether_type: &Type, visited: &mut HashSet<String>) -> bool {
         match aether_type {
             Type::Primitive(_) => true,
-            Type::Pointer { target_type, .. } => self.is_ffi_compatible(target_type),
-            Type::Array { element_type, .. } => self.is_ffi_compatible(element_type),
+            Type::Pointer { target_type, .. } => self.is_ffi_compatible_impl(target_type, visited),
+            Type::Array { element_type, .. } => self.is_ffi_compatible_impl(element_type, visited),
             Type::Function { .. } => false, // Function pointers need special handling
-            Type::Named { .. } => false,    // Named types need special handling
+            Type::Named { name, module } => {
+                // Build full type name for cycle detection
+                let full_name = match module {
+                    Some(m) => format!("{}::{}", m, name),
+                    None => name.clone(),
+                };
+
+                // Check for cycles (self-referential structs via pointers are ok,
+                // but direct self-reference would be infinite size)
+                if visited.contains(&full_name) {
+                    // Already checking this type - assume compatible to break cycle
+                    // (if it weren't compatible, we would have already returned false)
+                    return true;
+                }
+                visited.insert(full_name.clone());
+
+                // Look up the type definition
+                let type_checker = self.type_checker.borrow();
+
+                // Try with just the name first, then with module prefix
+                let type_def = type_checker.lookup_type_definition(name)
+                    .or_else(|| type_checker.lookup_type_definition(&full_name));
+
+                match type_def {
+                    Some(TypeDefinition::Struct { fields, .. }) => {
+                        // Struct is FFI-compatible if all fields are FFI-compatible
+                        fields.iter().all(|(_, field_type)| {
+                            self.is_ffi_compatible_impl(field_type, visited)
+                        })
+                    }
+                    Some(TypeDefinition::Enum { .. }) => {
+                        // Enums need special handling for FFI
+                        // Simple C-style enums (no data) could be compatible,
+                        // but for now we'll be conservative
+                        false
+                    }
+                    Some(TypeDefinition::Alias { target_type, .. }) => {
+                        // Type alias - check the underlying type
+                        self.is_ffi_compatible_impl(target_type, visited)
+                    }
+                    None => {
+                        // Type not found - not compatible
+                        false
+                    }
+                }
+            }
             _ => false,
         }
     }

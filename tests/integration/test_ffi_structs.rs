@@ -69,7 +69,7 @@ module test_basic_struct {
     fs::write(&test_file, test_program).expect("Failed to write test file");
 
     // Compile the program
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")
@@ -123,7 +123,7 @@ module test_nested_struct {
     let test_file = PathBuf::from("test_nested_struct.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
 
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")
@@ -164,7 +164,7 @@ module test_struct_alignment {
     let test_file = PathBuf::from("test_struct_alignment.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
 
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")
@@ -206,7 +206,7 @@ module test_struct_string {
     let test_file = PathBuf::from("test_struct_string.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
 
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")

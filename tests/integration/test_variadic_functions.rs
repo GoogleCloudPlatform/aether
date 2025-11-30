@@ -38,7 +38,7 @@ module test_printf_variadic {
     fs::write(&test_file, test_program).expect("Failed to write test file");
 
     // Compile the program
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")
@@ -94,7 +94,7 @@ module test_multiple_variadic {
     fs::write(&test_file, test_program).expect("Failed to write test file");
 
     // Compile the program
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")
@@ -136,7 +136,7 @@ module test_non_variadic {
     fs::write(&test_file, test_program).expect("Failed to write test file");
 
     // Compile the program
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")
