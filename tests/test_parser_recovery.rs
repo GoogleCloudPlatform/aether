@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use aether::lexer::Lexer;
-use aether::parser::Parser;
+use aether::lexer::v2::Lexer;
+use aether::parser::v2::Parser;
 use std::fs;
 
 fn main() {
@@ -30,9 +30,9 @@ fn main() {
             if parser.has_errors() {
                 println!(
                     "But found {} errors during parsing:",
-                    parser.get_errors().len()
+                    parser.errors().len()
                 );
-                for error in parser.get_errors() {
+                for error in parser.errors() {
                     println!("  - {}", error);
                 }
             }
@@ -41,7 +41,7 @@ fn main() {
             println!("Parse failed: {}", e);
             if parser.has_errors() {
                 println!("Additional errors:");
-                for error in parser.get_errors() {
+                for error in parser.errors() {
                     println!("  - {}", error);
                 }
             }

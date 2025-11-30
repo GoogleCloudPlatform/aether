@@ -19,7 +19,8 @@
 use super::*;
 use crate::ast::{Statement, Expression, Block, Function, Identifier, TypeSpecifier};
 use crate::error::SourceLocation;
-use crate::parser::Parser;
+#[allow(unused_imports)]
+use crate::parser::v2::Parser;
 use std::collections::HashMap;
 
 /// Pattern generator for instantiating patterns

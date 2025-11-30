@@ -14,8 +14,8 @@
 
 //! Integration tests for memory management system
 
-use aether::lexer::Lexer;
-use aether::parser::Parser;
+use aether::lexer::v2::Lexer;
+use aether::parser::v2::Parser;
 use aether::semantic::SemanticAnalyzer;
 
 // Commented out until function body parsing is implemented
@@ -62,24 +62,10 @@ use aether::semantic::SemanticAnalyzer;
 #[test]
 fn test_memory_analysis_with_constants() {
     let source = r#"
-(DEFINE_MODULE
-    (NAME 'memory_test')
-    (INTENT "Test memory allocation for constants")
-    (CONTENT
-        (DECLARE_CONSTANT
-            (NAME 'PI')
-            (TYPE FLOAT)
-            (VALUE 3.14159)
-            (INTENT "Mathematical constant pi")
-        )
-        (DECLARE_CONSTANT
-            (NAME 'MAX_SIZE')
-            (TYPE INTEGER)
-            (VALUE 1000)
-            (INTENT "Maximum array size")
-        )
-    )
-)
+module memory_test {
+    const PI: Float64 = 3.14159;
+    const MAX_SIZE: Int = 1000;
+}
     "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());

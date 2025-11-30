@@ -18,7 +18,7 @@
 //! go-to-definition, and real-time diagnostics.
 
 use crate::error::{SemanticError, SourceLocation};
-use crate::parser::Parser;
+use crate::parser::v2::Parser;
 use crate::semantic::SemanticAnalyzer;
 use crate::types::Type;
 use serde::{Deserialize, Serialize};
@@ -545,7 +545,7 @@ impl LanguageServer {
     /// Analyze a document
     fn analyze_document(&mut self, document: &mut Document) -> Result<(), SemanticError> {
         // Tokenize the document
-        let mut lexer = crate::lexer::Lexer::new(&document.content, document.uri.clone());
+        let mut lexer = crate::lexer::v2::Lexer::new(&document.content, document.uri.clone());
         let tokens = match lexer.tokenize() {
             Ok(tokens) => tokens,
             Err(e) => {
