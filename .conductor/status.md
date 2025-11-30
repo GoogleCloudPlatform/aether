@@ -39,12 +39,12 @@
 - [x] **Task 10.3: Go to Definition**: Implement symbol lookup via identifier extraction and symbol table query.
 - [x] **Task 10.4: Hover**: Implemented hover support showing type and signature information for symbols.
 
-## Phase 11: Optimization Passes (In Progress)
+## Phase 11: Optimization Passes (Completed)
 
 - [x] **Task 11.1: Optimization Manager**: Implemented `OptimizationManager` and pipeline creation.
 - [x] **Task 11.2: Dead Code Elimination**: Enabled and verified `DeadCodeEliminationPass`.
 - [x] **Task 11.3: Constant Propagation**: Implemented `ConstantPropagationPass` to propagate constant values.
-- [ ] **Task 11.4: Inlining**: Implement function inlining pass.
+- [x] **Task 11.4: Inlining**: Implemented function inlining pass.
 
 ## Phase 12: Tango Project Fixes (Completed)
 
@@ -70,4 +70,5 @@
 - Phase 8: True Asynchronous Backend Implementation
 - Phase 9: Ownership System Enforcement
 - Phase 10: Language Server Protocol
+- Phase 11: Optimization Passes
 - Phase 12: Tango Project Fixes

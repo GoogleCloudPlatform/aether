@@ -154,7 +154,7 @@ fn test_cli_ast_command() {
 
 #[test]
 fn test_cli_ast_output_to_directory() {
-    let output_dir = "tests/output";
+    let output_dir = "tests/output_ast";
 
     // Clean up any existing output
     let _ = fs::remove_dir_all(output_dir);
@@ -198,7 +198,7 @@ fn test_cli_tokens_command() {
 
 #[test]
 fn test_cli_tokens_output_to_directory() {
-    let output_dir = "tests/output";
+    let output_dir = "tests/output_tokens";
 
     // Clean up any existing output
     let _ = fs::remove_dir_all(output_dir);

@@ -136,6 +136,7 @@ fn test_pointer_ownership_requirement() {
 
     // Create function with pointer but no ownership info
     let mut ext_func = create_test_external_function();
+    ext_func.calling_convention = CallingConvention::System; // Required to trigger ownership validation
     ext_func.parameters[0].param_type = Box::new(TypeSpecifier::Pointer {
         target_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,

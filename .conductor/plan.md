@@ -348,12 +348,12 @@ car go fmt && car go clippy && car go test
 - [x] **Task 10.4: Hover**: Implement type info and documentation on hover.
     - Show variable/function definition type.
 
-## Phase 11: Optimization Passes
+## Phase 11: Optimization Passes (Completed)
 
 - [x] **Task 11.1: Optimization Manager**: Create `src/optimizations/mod.rs` to manage MIR transformation passes.
 - [x] **Task 11.2: Dead Code Elimination**: Implement a pass to remove unreachable blocks and unused locals.
 - [x] **Task 11.3: Constant Propagation**: Implement a pass to fold constants and propagate values.
-- [ ] **Task 11.4: Inlining**: Implement function inlining for small functions.
+- [x] **Task 11.4: Inlining**: Implement function inlining for small functions.
 
 ## Phase 12: Tango Project Fixes
 
@@ -376,4 +376,3 @@ car go fmt && car go clippy && car go test
 - [x] **Compiler**: Update the module and import resolution logic to handle PascalCase filenames matching module names.
 - [x] **Tests**: Add integration tests with PascalCase filenames and imports to verify resolution.
 - [x] **Documentation**: Update any relevant documentation regarding file and module naming conventions.
-
