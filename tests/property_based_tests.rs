@@ -18,8 +18,11 @@ use aether::semantic::SemanticAnalyzer;
 use proptest::prelude::*;
 
 /// Generate valid AetherScript identifiers
+/// Must be at least 2 characters to avoid:
+/// 1. Lone `_` which is a keyword (wildcard pattern)
+/// 2. Single-char quoted identifiers being parsed as character literals
 fn valid_identifier() -> impl Strategy<Value = String> {
-    prop::string::string_regex(r"[a-zA-Z_][a-zA-Z0-9_]{0,100}").unwrap()
+    prop::string::string_regex(r"[a-zA-Z][a-zA-Z0-9_]{1,100}").unwrap()
 }
 
 /// Generate valid string literals  
