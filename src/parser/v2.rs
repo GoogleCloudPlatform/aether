@@ -3090,33 +3090,18 @@ impl Parser {
             }
         }
         
-        // Map with entries: { key: value
-        // We need to skip the key expression to find the colon
-        // This is hard without full backtracking.
-        // Simple heuristic: if next token is a string/int literal or identifier, 
-        // and followed by colon (after skipping potential complex key), it's a map.
-        
-        // For now, let's just check if we can find a colon at the right nesting level
-        let mut depth = 0;
-        let mut i = self.position + 1;
-        while i < self.tokens.len() {
-            match &self.tokens[i].token_type {
-                TokenType::LeftBrace => depth += 1,
-                TokenType::RightBrace => {
-                    if depth == 0 {
-                        return false; // End of brace before finding colon
-                    }
-                    depth -= 1;
-                },
-                TokenType::Colon => {
-                    if depth == 0 {
-                        return true; // Found top-level colon
+        // Check for { Identifier : ... } or { StringLiteral : ... }
+        if let Some(key_candidate) = self.peek_at(self.position + 1) {
+            match &key_candidate.token_type {
+                TokenType::Identifier(_) | TokenType::StringLiteral(_) => {
+                    if let Some(colon_candidate) = self.peek_at(self.position + 2) {
+                        if matches!(colon_candidate.token_type, TokenType::Colon) {
+                            return true;
+                        }
                     }
                 },
-                TokenType::Semicolon => return false, // Semicolon implies block/statements
-                _ => {}
+                _ => { /* not an identifier or string literal, so not a simple map key */ }
             }
-            i += 1;
         }
         
         false
