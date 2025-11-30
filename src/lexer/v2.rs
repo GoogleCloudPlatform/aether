@@ -1504,8 +1504,8 @@ mod tests {
     #[test]
     fn test_lexer_all_keywords_count() {
         let lexer = Lexer::new("", "test.aether".to_string());
-        // Count total keywords: 48 + concurrent = 49
-        assert_eq!(lexer.keywords.len(), 49);
+        // Count total keywords: 48 + concurrent = 49 -> 51
+        assert_eq!(lexer.keywords.len(), 51);
     }
 
     // ==================== LITERAL TOKENIZATION TESTS ====================

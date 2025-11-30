@@ -1560,22 +1560,22 @@ mod tests {
         let mut_borrowed_int = Type::mutable_borrow(int_type.clone());
         let shared_int = Type::shared(int_type.clone());
 
-        // Owned can be borrowed
-        assert!(checker.types_compatible(&owned_int, &borrowed_int));
-        assert!(checker.types_compatible(&owned_int, &mut_borrowed_int));
+        // Owned can be borrowed (Target: Borrowed, Source: Owned)
+        assert!(checker.types_compatible(&borrowed_int, &owned_int));
+        assert!(checker.types_compatible(&mut_borrowed_int, &owned_int));
 
-        // Mutable borrow can be used as immutable borrow
-        assert!(checker.types_compatible(&mut_borrowed_int, &borrowed_int));
+        // Mutable borrow can be used as immutable borrow (Target: Borrowed, Source: MutableBorrow)
+        assert!(checker.types_compatible(&borrowed_int, &mut_borrowed_int));
 
-        // Shared can be borrowed immutably
-        assert!(checker.types_compatible(&shared_int, &borrowed_int));
+        // Shared can be borrowed immutably (Target: Borrowed, Source: Shared)
+        assert!(checker.types_compatible(&borrowed_int, &shared_int));
 
-        // But not the other way around
-        assert!(!checker.types_compatible(&borrowed_int, &owned_int));
-        assert!(!checker.types_compatible(&borrowed_int, &mut_borrowed_int));
+        // But not the other way around (Target: Owned, Source: Borrowed)
+        assert!(!checker.types_compatible(&owned_int, &borrowed_int));
+        assert!(!checker.types_compatible(&mut_borrowed_int, &borrowed_int));
 
         // Different ownership kinds don't unify unless compatible
-        assert!(!checker.types_compatible(&owned_int, &shared_int));
+        assert!(!checker.types_compatible(&shared_int, &owned_int));
     }
 
     #[test]
