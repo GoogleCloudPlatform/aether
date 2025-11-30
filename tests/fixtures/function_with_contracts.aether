@@ -2,12 +2,12 @@ module function_with_contracts {
   // Intent: Test module with function contracts and metadata
 
   @intent("Divides two numbers with precondition and postcondition")
-  @pre(y != 0)
-  @post(return_value * y == x)
+  @pre("y != 0")
+  @post("result * y == x")
   @algo("division")
   @perf(metric="LatencyMs", target=1.0, context="Simple integer division")
   @complexity(type="Time", notation="BigO", value="O(1)")
   func test_division(x: Int, y: Int) -> Int {
-    return x / y;
+    return {x / y};
   }
 }

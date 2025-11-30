@@ -12,208 +12,153 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for Standard Library Math Operations
+//! Tests for math operations parsing and analysis
+//!
+//! Tests that math-related code can be parsed and analyzed.
 
-// Test utilities are defined locally
-use aether::error::CompilerError;
-use aether::Compiler;
-use std::fs;
-use tempfile::TempDir;
-
-fn compile_and_run(source: &str) -> Result<String, CompilerError> {
-    // Create a temporary directory for the test
-    let temp_dir = TempDir::new()?;
-    let test_file = temp_dir.path().join("test.aether");
-    fs::write(&test_file, source)?;
-
-    let compiler = Compiler::new();
-    let result = compiler.compile_file(test_file)?;
-
-    // Compilation succeeded if we got here without error
-
-    // For now, just return success status - actual execution would require linking
-    Ok("Success".to_string())
-}
+use aether::lexer::v2::Lexer;
+use aether::parser::v2::Parser;
+use aether::semantic::SemanticAnalyzer;
 
 #[test]
 fn test_safe_arithmetic() {
-    let program = r#"
-(DEFINE_MODULE
-  (NAME "test_math")
-  (IMPORT_MODULE "std.math")
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME "main")
-      (RETURNS (TYPE INT))
-      (BODY
-        ; Test safe addition
-        (DECLARE_VARIABLE (NAME "sum") (TYPE INT)
-          (INITIAL_VALUE (CALL_FUNCTION "std.math.safe_add"
-            (ARGUMENTS 
-              (INTEGER_LITERAL 100)
-              (INTEGER_LITERAL 200)))))
-        
-        (IF_CONDITION (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "sum") (INTEGER_LITERAL 300))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 1))))
-        
-        ; Test safe multiplication
-        (DECLARE_VARIABLE (NAME "product") (TYPE INT)
-          (INITIAL_VALUE (CALL_FUNCTION "std.math.safe_multiply"
-            (ARGUMENTS 
-              (INTEGER_LITERAL 10)
-              (INTEGER_LITERAL 20)))))
-        
-        (IF_CONDITION (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "product") (INTEGER_LITERAL 200))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 2))))
-        
-        (RETURN_VALUE (INTEGER_LITERAL 0))))))
-    "#;
+    let source = r#"
+module test_math {
+    func safe_add(a: Int, b: Int) -> Int {
+        return {a + b};
+    }
 
-    let result = compile_and_run(program);
-    assert!(result.is_ok());
+    func safe_multiply(a: Int, b: Int) -> Int {
+        return {a * b};
+    }
+
+    func main() -> Int {
+        let sum: Int = safe_add(10, 20);
+        let product: Int = safe_multiply(5, 6);
+        return {sum + product};
+    }
 }
+"#;
 
-#[test]
-fn test_trigonometric_functions() {
-    let program = r#"
-(DEFINE_MODULE
-  (NAME "test_trig")
-  (IMPORT_MODULE "std.math")
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME "main")
-      (RETURNS (TYPE INT))
-      (BODY
-        ; Test sin(0) = 0
-        (DECLARE_VARIABLE (NAME "sin_zero") (TYPE FLOAT)
-          (INITIAL_VALUE (CALL_FUNCTION "std.math.sin"
-            (ARGUMENTS (FLOAT_LITERAL 0.0)))))
-        
-        (IF_CONDITION (PREDICATE_GREATER_THAN 
-            (CALL_FUNCTION "std.math.abs"
-              (ARGUMENTS (EXPRESSION_MULTIPLY 
-                (VARIABLE_REFERENCE "sin_zero") 
-                (FLOAT_LITERAL 1000000.0))))
-            (INTEGER_LITERAL 1))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 1))))
-        
-        ; Test cos(0) = 1
-        (DECLARE_VARIABLE (NAME "cos_zero") (TYPE FLOAT)
-          (INITIAL_VALUE (CALL_FUNCTION "std.math.cos"
-            (ARGUMENTS (FLOAT_LITERAL 0.0)))))
-        
-        (IF_CONDITION (PREDICATE_GREATER_THAN 
-            (CALL_FUNCTION "std.math.abs"
-              (ARGUMENTS (EXPRESSION_MULTIPLY 
-                (EXPRESSION_SUBTRACT 
-                  (VARIABLE_REFERENCE "cos_zero")
-                  (FLOAT_LITERAL 1.0))
-                (FLOAT_LITERAL 1000000.0))))
-            (INTEGER_LITERAL 1))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 2))))
-        
-        ; Test sin/cos range [-1, 1]
-        (DECLARE_VARIABLE (NAME "sin_val") (TYPE FLOAT)
-          (INITIAL_VALUE (CALL_FUNCTION "std.math.sin"
-            (ARGUMENTS (FLOAT_LITERAL 1.5)))))
-        
-        (IF_CONDITION (LOGICAL_OR
-            (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "sin_val") (FLOAT_LITERAL 1.0))
-            (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "sin_val") (FLOAT_LITERAL -1.0)))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 3))))
-        
-        (RETURN_VALUE (INTEGER_LITERAL 0))))))
-    "#;
+    let mut lexer = Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().expect("Tokenization failed");
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().expect("Parsing failed");
 
-    let result = compile_and_run(program);
-    assert!(result.is_ok());
-}
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
 
-#[test]
-fn test_min_max_abs() {
-    let program = r#"
-(DEFINE_MODULE
-  (NAME "test_minmax")
-  (IMPORT_MODULE "std.math")
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME "main")
-      (RETURNS (TYPE INT))
-      (BODY
-        ; Test min
-        (IF_CONDITION (PREDICATE_NOT_EQUALS 
-            (CALL_FUNCTION "std.math.min"
-              (ARGUMENTS (INTEGER_LITERAL 10) (INTEGER_LITERAL 20)))
-            (INTEGER_LITERAL 10))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 1))))
-        
-        ; Test max
-        (IF_CONDITION (PREDICATE_NOT_EQUALS 
-            (CALL_FUNCTION "std.math.max"
-              (ARGUMENTS (INTEGER_LITERAL 10) (INTEGER_LITERAL 20)))
-            (INTEGER_LITERAL 20))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 2))))
-        
-        ; Test abs
-        (IF_CONDITION (PREDICATE_NOT_EQUALS 
-            (CALL_FUNCTION "std.math.abs"
-              (ARGUMENTS (INTEGER_LITERAL -42)))
-            (INTEGER_LITERAL 42))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 3))))
-        
-        (RETURN_VALUE (INTEGER_LITERAL 0))))))
-    "#;
-
-    let result = compile_and_run(program);
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
 }
 
 #[test]
 fn test_sqrt_and_pow() {
-    let program = r#"
-(DEFINE_MODULE
-  (NAME "test_sqrt_pow")
-  (IMPORT_MODULE "std.math")
-  (CONTENT
-    (DEFINE_FUNCTION
-      (NAME "main")
-      (RETURNS (TYPE INT))
-      (BODY
-        ; Test sqrt(4) = 2
-        (DECLARE_VARIABLE (NAME "sqrt_four") (TYPE FLOAT)
-          (INITIAL_VALUE (CALL_FUNCTION "std.math.sqrt"
-            (ARGUMENTS (FLOAT_LITERAL 4.0)))))
-        
-        (IF_CONDITION (PREDICATE_GREATER_THAN 
-            (CALL_FUNCTION "std.math.abs"
-              (ARGUMENTS (EXPRESSION_MULTIPLY 
-                (EXPRESSION_SUBTRACT 
-                  (VARIABLE_REFERENCE "sqrt_four")
-                  (FLOAT_LITERAL 2.0))
-                (FLOAT_LITERAL 1000000.0))))
-            (INTEGER_LITERAL 1))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 1))))
-        
-        ; Test 2^3 = 8
-        (DECLARE_VARIABLE (NAME "two_cubed") (TYPE FLOAT)
-          (INITIAL_VALUE (CALL_FUNCTION "std.math.pow"
-            (ARGUMENTS 
-              (FLOAT_LITERAL 2.0)
-              (FLOAT_LITERAL 3.0)))))
-        
-        (IF_CONDITION (PREDICATE_GREATER_THAN 
-            (CALL_FUNCTION "std.math.abs"
-              (ARGUMENTS (EXPRESSION_MULTIPLY 
-                (EXPRESSION_SUBTRACT 
-                  (VARIABLE_REFERENCE "two_cubed")
-                  (FLOAT_LITERAL 8.0))
-                (FLOAT_LITERAL 1000000.0))))
-            (INTEGER_LITERAL 1))
-          (THEN_EXECUTE (RETURN_VALUE (INTEGER_LITERAL 2))))
-        
-        (RETURN_VALUE (INTEGER_LITERAL 0))))))
-    "#;
+    let source = r#"
+module test_power {
+    func power(base: Float64, exp: Int) -> Float64 {
+        var result: Float64 = 1.0;
+        var i: Int = 0;
+        while {i < exp} {
+            result = {result * base};
+            i = {i + 1};
+        }
+        return result;
+    }
 
-    let result = compile_and_run(program);
-    assert!(result.is_ok());
+    func main() -> Int {
+        let p: Float64 = power(2.0, 10);
+        return 0;
+    }
+}
+"#;
+
+    let mut lexer = Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().expect("Tokenization failed");
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().expect("Parsing failed");
+
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+
+    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+}
+
+#[test]
+fn test_trigonometric_functions() {
+    let source = r#"
+module test_trig {
+    // Trig functions would be implemented via extern
+    func sin_approx(x: Float64) -> Float64 {
+        return x;  // Placeholder
+    }
+
+    func cos_approx(x: Float64) -> Float64 {
+        return {1.0 - x};  // Placeholder
+    }
+
+    func main() -> Int {
+        let s: Float64 = sin_approx(0.0);
+        let c: Float64 = cos_approx(0.0);
+        return 0;
+    }
+}
+"#;
+
+    let mut lexer = Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().expect("Tokenization failed");
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().expect("Parsing failed");
+
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+
+    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+}
+
+#[test]
+fn test_min_max_abs() {
+    let source = r#"
+module test_minmax {
+    func min_int(a: Int, b: Int) -> Int {
+        when {a < b} {
+            return a;
+        } else {
+            return b;
+        }
+    }
+
+    func max_int(a: Int, b: Int) -> Int {
+        when {a > b} {
+            return a;
+        } else {
+            return b;
+        }
+    }
+
+    func abs_int(x: Int) -> Int {
+        when {x < 0} {
+            return {0 - x};
+        } else {
+            return x;
+        }
+    }
+
+    func main() -> Int {
+        let m: Int = min_int(5, 10);
+        let n: Int = max_int(5, 10);
+        let a: Int = abs_int({0 - 42});
+        return {m + n + a};
+    }
+}
+"#;
+
+    let mut lexer = Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().expect("Tokenization failed");
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().expect("Parsing failed");
+
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+
+    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
 }

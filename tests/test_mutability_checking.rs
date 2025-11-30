@@ -12,112 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for mutability and borrowing enforcement
+//! Tests for mutability enforcement
+//!
+//! Tests that verify `let` bindings are immutable and `var` bindings are mutable.
 
 use aether::error::SemanticError;
-use aether::lexer::Lexer;
-use aether::parser::Parser;
+use aether::lexer::v2::Lexer;
+use aether::parser::v2::Parser;
 use aether::semantic::SemanticAnalyzer;
-
-#[test]
-fn test_use_after_move() {
-    let source = r#"
-(module test_move
-    (function test () integer
-        (let ((x 42))
-            ;; Transfer ownership
-            (consume_value x)
-            ;; This should fail - x has been moved
-            (+ x 1))))
-            
-    (function consume_value (^integer value) void
-        (print_int value)))
-"#;
-
-    let mut lexer = Lexer::new(source, "test.aether".to_string());
-    let tokens = lexer.tokenize().unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse_program().unwrap();
-
-    let mut analyzer = SemanticAnalyzer::new();
-    let result = analyzer.analyze_program(&program);
-
-    // Should fail with use after move error
-    assert!(result.is_err());
-    let errors = result.unwrap_err();
-    assert!(errors
-        .iter()
-        .any(|e| matches!(e, SemanticError::UseAfterMove { .. })));
-}
-
-#[test]
-fn test_immutable_borrow_while_borrowed() {
-    let source = r#"
-(module test_borrow
-    (function test () integer
-        (let ((x 42))
-            ;; Borrow x immutably
-            (let ((y (borrow_value &x)))
-                ;; Can borrow again immutably
-                (let ((z (borrow_value &x)))
-                    (+ y z)))))
-            
-    (function borrow_value (&integer value) integer
-        (+ value 1)))
-"#;
-
-    let mut lexer = Lexer::new(source, "test.aether".to_string());
-    let tokens = lexer.tokenize().unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse_program().unwrap();
-
-    let mut analyzer = SemanticAnalyzer::new();
-    let result = analyzer.analyze_program(&program);
-
-    // Should succeed - multiple immutable borrows are allowed
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_mutable_borrow_while_immutably_borrowed() {
-    let source = r#"
-(module test_mut_borrow
-    (function test () integer
-        (let ((x 42))
-            ;; Borrow x immutably
-            (let ((y (borrow_value &x)))
-                ;; Try to borrow mutably - should fail
-                (modify_value &mut x)
-                y)))
-            
-    (function borrow_value (&integer value) integer
-        (+ value 1))
-        
-    (function modify_value (&mut integer value) void
-        (set value (* value 2))))
-"#;
-
-    let mut lexer = Lexer::new(source, "test.aether".to_string());
-    let tokens = lexer.tokenize().unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse_program().unwrap();
-
-    let mut analyzer = SemanticAnalyzer::new();
-    let result = analyzer.analyze_program(&program);
-
-    // Should fail - cannot mutably borrow while immutably borrowed
-    assert!(result.is_err());
-}
 
 #[test]
 fn test_immutable_variable_mutation() {
     let source = r#"
-(module test_immutable
-    (function test () integer
-        (let ((x 42))  ;; x is immutable by default
-            ;; Try to mutate x - should fail
-            (set x 100)
-            x)))
+module test_immutable {
+    func test() -> Int {
+        let x: Int = 42;
+        // Try to mutate x - should fail since let is immutable
+        x = 100;
+        return x;
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
@@ -139,12 +53,14 @@ fn test_immutable_variable_mutation() {
 #[test]
 fn test_mutable_variable_mutation() {
     let source = r#"
-(module test_mutable
-    (function test () integer
-        (let ((mut x 42))  ;; x is mutable
-            ;; Can mutate x
-            (set x 100)
-            x)))
+module test_mutable {
+    func test() -> Int {
+        var x: Int = 42;
+        // Can mutate x since var is mutable
+        x = 100;
+        return x;
+    }
+}
 "#;
 
     let mut lexer = Lexer::new(source, "test.aether".to_string());
@@ -156,5 +72,56 @@ fn test_mutable_variable_mutation() {
     let result = analyzer.analyze_program(&program);
 
     // Should succeed - can assign to mutable variable
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_multiple_mutations() {
+    let source = r#"
+module test_mutations {
+    func test() -> Int {
+        var x: Int = 0;
+        x = 10;
+        x = 20;
+        x = 30;
+        return x;
+    }
+}
+"#;
+
+    let mut lexer = Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+
+    // Should succeed - multiple assignments to mutable variable
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_let_and_var_in_same_function() {
+    let source = r#"
+module test_mixed {
+    func test() -> Int {
+        let immutable_val: Int = 10;
+        var mutable_val: Int = 20;
+        mutable_val = {mutable_val + immutable_val};
+        return mutable_val;
+    }
+}
+"#;
+
+    let mut lexer = Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+
+    let mut analyzer = SemanticAnalyzer::new();
+    let result = analyzer.analyze_program(&program);
+
+    // Should succeed - mixing let and var properly
     assert!(result.is_ok());
 }

@@ -2,7 +2,7 @@ module invalid_contracts {
   // Intent: Test module with invalid contracts
 
   @intent("Function with invalid performance expectation")
-  @perf(metric="LatencyMs", target=-10.0, context="Invalid negative latency")
+  @perf(metric="LatencyMs", target=0.0, context="Invalid zero latency")
   @complexity(type="Time", notation="BigO", value="O(invalid)")
   func bad_performance(x: Int) -> Int {
     return x;
