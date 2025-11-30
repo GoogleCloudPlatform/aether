@@ -52,11 +52,17 @@ impl TestCompiler {
     /// Compile a single file
     pub fn compile_file<P: AsRef<Path>>(&self, input: P) -> TestCompilationResult {
         let input_path = input.as_ref();
+        
+        // Determine output path in temp dir
+        let file_stem = input_path.file_stem().unwrap_or_default();
+        let output_path = self.temp_dir.join(file_stem);
 
         let compiler = Compiler::new()
             .optimization_level(self.optimization_level)
             .debug_info(self.debug_info)
-            .verbose(self.verbose);
+            .verbose(self.verbose)
+            .output(output_path)
+            .library_path(self.temp_dir.clone());
 
         let start_time = std::time::Instant::now();
         let result = compiler.compile_file(input_path.to_path_buf());
@@ -74,10 +80,20 @@ impl TestCompiler {
     pub fn compile_files<P: AsRef<Path>>(&self, inputs: &[P]) -> TestCompilationResult {
         let input_paths: Vec<PathBuf> = inputs.iter().map(|p| p.as_ref().to_path_buf()).collect();
 
+        // Determine output path in temp dir from first file
+        let output_path = if let Some(first) = input_paths.first() {
+            let file_stem = first.file_stem().unwrap_or_default();
+            self.temp_dir.join(file_stem)
+        } else {
+            self.temp_dir.join("a.out")
+        };
+
         let compiler = Compiler::new()
             .optimization_level(self.optimization_level)
             .debug_info(self.debug_info)
-            .verbose(self.verbose);
+            .verbose(self.verbose)
+            .output(output_path)
+            .library_path(self.temp_dir.clone());
 
         let start_time = std::time::Instant::now();
         let result = compiler.compile_files(&input_paths);

@@ -450,6 +450,15 @@ impl ContractValidator {
                 // Logical operators always return boolean
                 Ok(Type::primitive(crate::ast::PrimitiveType::Boolean))
             }
+            Expression::Add { left, .. }
+            | Expression::Subtract { left, .. }
+            | Expression::Multiply { left, .. }
+            | Expression::Divide { left, .. }
+            | Expression::IntegerDivide { left, .. }
+            | Expression::Modulo { left, .. } => {
+                // Recursively infer type of left operand (assuming both are same type)
+                self.infer_expression_type(left, context)
+            }
             // For other expression types, we'd need full expression type inference
             // For now, return an error indicating unsupported expression
             _ => Err(SemanticError::UnsupportedFeature {

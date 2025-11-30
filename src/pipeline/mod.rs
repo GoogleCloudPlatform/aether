@@ -326,6 +326,12 @@ impl CompilationPipeline {
             };
 
             let mut analyzer = SemanticAnalyzer::new();
+            
+            // Add library paths to module search paths
+            for path in &self.options.library_paths {
+                analyzer.add_module_search_path(path.clone());
+            }
+            
             analyzer.analyze_program(&program)?;
 
             let analysis_stats = analyzer.get_statistics().clone();

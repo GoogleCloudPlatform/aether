@@ -25,7 +25,7 @@ fn test_pattern_discovery_by_intent() {
     let compiler = TestCompiler::new("pattern_discovery");
 
     let source = r#"
-module pattern_discovery {
+module main {
   
   func test_pattern_discovery() -> Int {
       // Use pattern discovery to find safe array access pattern
@@ -36,14 +36,19 @@ module pattern_discovery {
       let default_value: Int = -1;
       
       // Simulated generated code
-      let safe_element: Int = 0;
-      when {index_expr >= 0 && index_expr < 5} {
+      var safe_element: Int = 0;
+      when {{index_expr >= 0} && {index_expr < 5}} {
           safe_element = array_expr[index_expr];
       } else {
           safe_element = default_value;
       }
       
       // printf not available
+      return 0;
+  }
+  
+  func main() -> Int {
+      let res: Int = test_pattern_discovery();
       return 0;
   }
 }

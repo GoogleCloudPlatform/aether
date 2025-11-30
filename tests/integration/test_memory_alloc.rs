@@ -136,13 +136,16 @@ module test_double_free {
 
     let mut pipeline = CompilationPipeline::new(options);
     let result = pipeline
-        .compile_files(&[test_path.clone()])
-        .expect("Compilation failed");
+        .compile_files(&[test_path.clone()]);
 
     // Clean up test file
     fs::remove_file(&test_path).ok();
 
-    assert!(result.executable_path.exists(), "No output generated");
+    // The ownership system (Phase 9) detects the double free at compile time as a UseAfterMove error.
+    // This confirms the safety mechanism is working.
+    assert!(result.is_err(), "Double free should be detected at compile time");
+    let err = result.unwrap_err();
+    assert!(format!("{:?}", err).contains("UseAfterMove"), "Expected UseAfterMove error, got {:?}", err);
 }
 
 #[test]

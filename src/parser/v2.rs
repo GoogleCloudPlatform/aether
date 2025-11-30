@@ -807,19 +807,19 @@ impl Parser {
         constant_declarations: &mut Vec<ConstantDeclaration>,
         exports: &mut Vec<ExportStatement>,
     ) -> Result<(), ParserError> {
-        // Skip visibility modifier if present
+        // Collect annotations
+        let mut annotations = Vec::new();
+        while self.check(&TokenType::At) {
+            annotations.push(self.parse_annotation()?);
+        }
+
+        // Check for visibility modifier
         let is_public = if self.check_keyword(Keyword::Pub) {
             self.advance();
             true
         } else {
             false
         };
-
-        // Collect annotations
-        let mut annotations = Vec::new();
-        while self.check(&TokenType::At) {
-            annotations.push(self.parse_annotation()?);
-        }
 
         if self.check_keyword(Keyword::Import) {
             imports.push(self.parse_import()?);
@@ -889,7 +889,7 @@ impl Parser {
     }
 
     /// Parse an import statement
-    /// Grammar: "import" dotted_name ";"
+    /// Grammar: "import" dotted_name ["as" identifier] ";"
     pub fn parse_import(&mut self) -> Result<ImportStatement, ParserError> {
         let start_location = self.current_location();
 
@@ -899,12 +899,20 @@ impl Parser {
         // Parse dotted module name (e.g., std.io)
         let module_name = self.parse_dotted_identifier()?;
 
+        // Check for alias
+        let alias = if self.check_keyword(Keyword::As) {
+            self.advance(); // consume 'as'
+            Some(self.parse_identifier()?)
+        } else {
+            None
+        };
+
         // Expect semicolon
         self.expect(&TokenType::Semicolon, "expected ';' after import statement")?;
 
         Ok(ImportStatement {
             module_name,
-            alias: None,
+            alias,
             source_location: start_location,
         })
     }
@@ -1153,7 +1161,7 @@ impl Parser {
         }
 
         // Named type (user-defined) - possibly with generic arguments
-        let name = self.parse_identifier()?;
+        let name = self.parse_dotted_identifier()?;
 
         // Check for generic type arguments
         if self.check(&TokenType::Less) {
@@ -1351,18 +1359,18 @@ impl Parser {
         })
     }
 
-    /// Parse an annotation argument (key: value or just value)
+    /// Parse an annotation argument (key: value, key=value, or just value)
     fn parse_annotation_argument(&mut self) -> Result<AnnotationArgument, ParserError> {
         let start_location = self.current_location();
 
-        // Check if this is a labeled argument (key: value)
+        // Check if this is a labeled argument (key: value or key=value)
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name_clone = name.clone();
             if let Some(next) = self.peek_next() {
-                if matches!(next.token_type, TokenType::Colon) {
+                if matches!(next.token_type, TokenType::Colon) || matches!(next.token_type, TokenType::Equal) {
                     // Labeled argument
                     self.advance(); // consume identifier
-                    self.advance(); // consume colon
+                    self.advance(); // consume colon or equal
                     let value = self.parse_annotation_value()?;
                     return Ok(AnnotationArgument {
                         label: Some(name_clone),
@@ -3291,10 +3299,35 @@ impl Parser {
         self.expect(&TokenType::RightBracket, "expected ']'")?;
 
         // Infer element type from first element or default to Int
-        let element_type = Box::new(TypeSpecifier::Primitive {
-            type_name: PrimitiveType::Integer,
-            source_location: start_location.clone(),
-        });
+        let element_type = if let Some(first) = elements.first() {
+            match &**first {
+                Expression::IntegerLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    source_location: source_location.clone(),
+                }),
+                Expression::FloatLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Float,
+                    source_location: source_location.clone(),
+                }),
+                Expression::StringLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::String,
+                    source_location: source_location.clone(),
+                }),
+                Expression::BooleanLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Boolean,
+                    source_location: source_location.clone(),
+                }),
+                _ => Box::new(TypeSpecifier::Primitive {
+                    type_name: PrimitiveType::Integer,
+                    source_location: start_location.clone(),
+                }),
+            }
+        } else {
+            Box::new(TypeSpecifier::Primitive {
+                type_name: PrimitiveType::Integer,
+                source_location: start_location.clone(),
+            })
+        };
 
         Ok(Expression::ArrayLiteral {
             element_type,

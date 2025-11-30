@@ -138,7 +138,7 @@ module proof_obligations {
       when {n <= 1} {
           return 1;
       } else {
-          return {n * factorial(n - 1)};
+          return {n * factorial({n - 1})};
       }
   }
   

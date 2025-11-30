@@ -368,6 +368,7 @@ impl LoweringContext {
                         ty = Type::Function {
                             parameter_types: param_types,
                             return_type: Box::new(ret_type),
+                            is_variadic: false,
                         };
                     }
                     
@@ -1803,7 +1804,7 @@ impl LoweringContext {
                 // Look up return type from symbol table if available, otherwise void
                 let return_type = if let Some(st) = &self.symbol_table {
                     if let Some(func_sym) = st.lookup_symbol(&qualified_name) {
-                        if let crate::types::Type::Function { parameter_types, return_type } = &func_sym.symbol_type {
+                        if let crate::types::Type::Function { parameter_types, return_type, is_variadic: _ } = &func_sym.symbol_type {
                             // Register as external function if not already known
                             if !self.program.functions.contains_key(&qualified_name) && !self.program.external_functions.contains_key(&qualified_name) {
                                 let ext_func = crate::mir::ExternalFunction {
@@ -2335,6 +2336,7 @@ impl LoweringContext {
         let closure_type = Type::Function {
             parameter_types: mir_params.iter().map(|(_, ty)| ty.clone()).collect(),
             return_type: Box::new(mir_return_type),
+            is_variadic: false,
         };
 
         // Create a local for the closure and assign the closure value
@@ -2406,7 +2408,7 @@ impl LoweringContext {
                  let mut resolved = None;
                  if let Some(ref symbol_table) = self.symbol_table {
                      if let Some(symbol) = symbol_table.lookup_symbol(&function_name) {
-                         if let Type::Function { parameter_types, return_type } = &symbol.symbol_type {
+                         if let Type::Function { parameter_types, return_type, is_variadic: _ } = &symbol.symbol_type {
                              eprintln!("lower_function_call: found in symbol table {}", function_name);
                              resolved = Some((Some(parameter_types.clone()), *return_type.clone()));
                          }

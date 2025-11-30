@@ -102,6 +102,7 @@ impl<'ctx> TypeConverter<'ctx> {
             Type::Function {
                 parameter_types,
                 return_type,
+                is_variadic: _,
             } => {
                 let param_llvm_types: Result<Vec<_>, _> = parameter_types
                     .iter()
@@ -392,6 +393,7 @@ mod tests {
                 Type::primitive(PrimitiveType::Float),
             ],
             return_type: Box::new(Type::primitive(PrimitiveType::Boolean)),
+            is_variadic: false,
         };
 
         let llvm_type = converter.convert_type(&function_type).unwrap();

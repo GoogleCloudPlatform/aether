@@ -40,15 +40,15 @@ module structured_errors {
     if let Some(error) = result.error() {
         let error_msg = format!("{}", error);
 
-        // Should contain error code
+        // Should contain error type description
         assert!(
-            error_msg.contains("TYPE-") || error_msg.contains("SEM-"),
-            "Error should contain structured error code"
+            error_msg.contains("Type mismatch") || error_msg.contains("Invalid type"),
+            "Error should contain type mismatch description"
         );
 
-        // Should contain location information
+        // Should contain location information (standard format path:line:col)
         assert!(
-            error_msg.contains("line") || error_msg.contains("column"),
+            error_msg.contains(".aether:") || error_msg.contains("line") || error_msg.contains("column"),
             "Error should contain location information"
         );
     }

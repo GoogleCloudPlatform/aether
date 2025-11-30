@@ -47,6 +47,9 @@ pub struct SemanticAnalyzer {
 
     /// FFI analyzer for external function declarations
     ffi_analyzer: FFIAnalyzer,
+    
+    /// Expected return type of the function currently being analyzed
+    current_function_return_type: Option<Type>,
 
     /// Memory analyzer for deterministic memory management
     memory_analyzer: MemoryAnalyzer,
@@ -113,7 +116,13 @@ impl SemanticAnalyzer {
             in_concurrent_block: false,
             analyzed_modules: HashMap::new(),
             captures: HashMap::new(),
+            current_function_return_type: None,
         }
+    }
+
+    /// Add a search path for modules
+    pub fn add_module_search_path(&mut self, path: std::path::PathBuf) {
+        self.module_loader.add_search_path(path);
     }
 
     /// Analyze a complete program
@@ -135,6 +144,11 @@ impl SemanticAnalyzer {
 
     /// Analyze a module
     pub fn analyze_module(&mut self, module: &Module) -> Result<(), SemanticError> {
+        // Check if already analyzed
+        if self.analyzed_modules.contains_key(&module.name.name) {
+            return Ok(());
+        }
+
         self.current_module = Some(module.name.name.clone());
         self.symbol_table
             .set_current_module(self.current_module.clone());
@@ -197,6 +211,21 @@ impl SemanticAnalyzer {
         self.memory_analyzer.exit_region()?;
 
         self.stats.modules_analyzed += 1;
+
+        // Cache the analyzed module
+        let dependencies: Vec<String> = module
+            .imports
+            .iter()
+            .map(|import| import.module_name.name.clone())
+            .collect();
+
+        let loaded_module = LoadedModule {
+            module: module.clone(),
+            source: crate::module_loader::ModuleSource::Memory("".to_string()), // Placeholder
+            dependencies,
+        };
+        
+        self.analyzed_modules.insert(module.name.name.clone(), loaded_module);
 
         Ok(())
     }
@@ -302,7 +331,7 @@ impl SemanticAnalyzer {
                     };
 
                     // Resolve function signature from AST
-                    let (parameter_types, return_type) = {
+                    let (parameter_types, return_type, is_variadic) = {
                         if let Some(func) = loaded_module.module.function_definitions.iter().find(|f| f.name.name == name.name) {
                             let mut params = Vec::new();
                             for param in &func.parameters {
@@ -310,7 +339,7 @@ impl SemanticAnalyzer {
                                 params.push(p_type);
                             }
                             let ret_type = self.type_checker.borrow().ast_type_to_type(&func.return_type).unwrap_or(Type::Error);
-                            (params, Box::new(ret_type))
+                            (params, Box::new(ret_type), false)
                         } else if let Some(func) = loaded_module.module.external_functions.iter().find(|f| f.name.name == name.name) {
                             let mut params = Vec::new();
                             for param in &func.parameters {
@@ -318,9 +347,9 @@ impl SemanticAnalyzer {
                                 params.push(p_type);
                             }
                             let ret_type = self.type_checker.borrow().ast_type_to_type(&func.return_type).unwrap_or(Type::Error);
-                            (params, Box::new(ret_type))
+                            (params, Box::new(ret_type), func.variadic)
                         } else {
-                            (vec![], Box::new(Type::Primitive(PrimitiveType::Void)))
+                            (vec![], Box::new(Type::Primitive(PrimitiveType::Void)), false)
                         }
                     };
 
@@ -329,6 +358,7 @@ impl SemanticAnalyzer {
                         Type::Function {
                             parameter_types,
                             return_type,
+                            is_variadic,
                         },
                         SymbolKind::Function,
                         false,
@@ -347,11 +377,81 @@ impl SemanticAnalyzer {
                         format!("{}.{}", module_name, name.name)
                     };
 
+                    // Find the type definition in the loaded module
+                    if let Some(type_def) = loaded_module.module.type_definitions.iter().find(|td| {
+                        match td {
+                            crate::ast::TypeDefinition::Structured { name: n, .. } => n.name == name.name,
+                            crate::ast::TypeDefinition::Enumeration { name: n, .. } => n.name == name.name,
+                            crate::ast::TypeDefinition::Alias { new_name: n, .. } => n.name == name.name,
+                        }
+                    }) {
+                        // Convert AST definition to TypeDefinition
+                        // Note: This is a simplified conversion, ideally we should reuse analyze_type_definition logic
+                        // but we need to store it with the qualified name.
+                        // For now, we can try to extract the converted definition from the loaded module's semantic analysis result?
+                        // But we don't have access to the other module's TypeChecker.
+                        // We must reconstruct it.
+                        
+                        // BUT! types::TypeDefinition is different from ast::TypeDefinition.
+                        // We need to convert.
+                        // Since we are inside SemanticAnalyzer, we can use helper methods?
+                        // analyze_type_definition adds to symbol table.
+                        // Let's implement a minimal conversion here or refactor analyze_type_definition to return the definition.
+                        
+                        // Refactoring analyze_type_definition is better but risky.
+                        // Let's implement minimal conversion matching analyze_type_definition logic.
+                        
+                        let definition = match type_def {
+                            crate::ast::TypeDefinition::Structured { fields, source_location, .. } => {
+                                let mut field_types = Vec::new();
+                                for field in fields {
+                                    // Note: We might fail to resolve types used inside the struct if they are not fully qualified
+                                    // This is a known limitation of this simple import mechanism.
+                                    // Assuming types are primitive or fully qualified.
+                                    let field_type = self.type_checker.borrow().ast_type_to_type(&field.field_type).unwrap_or(Type::Error);
+                                    field_types.push((field.name.name.clone(), field_type));
+                                }
+                                crate::types::TypeDefinition::Struct {
+                                    fields: field_types,
+                                    source_location: source_location.clone(),
+                                }
+                            }
+                            crate::ast::TypeDefinition::Enumeration { variants, source_location, .. } => {
+                                let mut variant_infos = Vec::new();
+                                for (idx, variant) in variants.iter().enumerate() {
+                                    let mut associated_types = Vec::new();
+                                    for type_spec in &variant.associated_types {
+                                        let t = self.type_checker.borrow().ast_type_to_type(type_spec).unwrap_or(Type::Error);
+                                        associated_types.push(t);
+                                    }
+                                    variant_infos.push(crate::types::EnumVariantInfo {
+                                        name: variant.name.name.clone(),
+                                        associated_types,
+                                        discriminant: idx,
+                                    });
+                                }
+                                crate::types::TypeDefinition::Enum {
+                                    variants: variant_infos,
+                                    source_location: source_location.clone(),
+                                }
+                            }
+                            crate::ast::TypeDefinition::Alias { original_type, source_location, .. } => {
+                                let target_type = self.type_checker.borrow().ast_type_to_type(original_type).unwrap_or(Type::Error);
+                                crate::types::TypeDefinition::Alias {
+                                    target_type,
+                                    source_location: source_location.clone(),
+                                }
+                            }
+                        };
+                        
+                        self.type_checker.borrow_mut().add_type_definition(qualified_name.clone(), definition);
+                    }
+
                     // For now, add as a named type
                     let symbol = Symbol::new(
                         qualified_name.clone(),
                         Type::Named {
-                            name: qualified_name.clone(),
+                            name: name.name.clone(), // Use simple name to match definition
                             module: Some(module_name.to_string()),
                         },
                         SymbolKind::Type,
@@ -571,6 +671,13 @@ impl SemanticAnalyzer {
 
     /// Analyze function body (second pass)
     fn analyze_function_body(&mut self, func_def: &Function) -> Result<(), SemanticError> {
+        // Set current function return type
+        let return_type = self
+            .type_checker
+            .borrow()
+            .ast_type_to_type(&func_def.return_type)?;
+        self.current_function_return_type = Some(return_type);
+
         // Enter function scope
         self.symbol_table.enter_scope(ScopeKind::Function);
 
@@ -616,6 +723,9 @@ impl SemanticAnalyzer {
         // Exit function scope
         self.symbol_table.exit_scope()?;
         self.stats.functions_analyzed += 1;
+        
+        // Clear current function return type
+        self.current_function_return_type = None;
 
         Ok(())
     }
@@ -798,6 +908,9 @@ impl SemanticAnalyzer {
                         });
                     }
 
+                    // Check ownership transfer (move/borrow)
+                    self.check_argument_ownership(init_expr, &final_type)?;
+
                     is_initialized = true;
                 }
 
@@ -825,15 +938,19 @@ impl SemanticAnalyzer {
                 match target {
                     AssignmentTarget::Variable { name } => {
                         // Check that variable exists and is mutable
-                        let symbol =
-                            self.symbol_table.lookup_symbol(&name.name).ok_or_else(|| {
-                                SemanticError::UndefinedSymbol {
-                                    symbol: name.name.clone(),
-                                    location: source_location.clone(),
-                                }
-                            })?;
+                        // Clone symbol info to avoid holding borrow on symbol_table while calling check_argument_ownership
+                        let (symbol_type, is_mutable) = {
+                            let symbol =
+                                self.symbol_table.lookup_symbol(&name.name).ok_or_else(|| {
+                                    SemanticError::UndefinedSymbol {
+                                        symbol: name.name.clone(),
+                                        location: source_location.clone(),
+                                    }
+                                })?;
+                            (symbol.symbol_type.clone(), symbol.is_mutable)
+                        };
 
-                        if !symbol.is_mutable {
+                        if !is_mutable {
                             return Err(SemanticError::AssignToImmutable {
                                 variable: name.name.clone(),
                                 location: source_location.clone(),
@@ -844,14 +961,17 @@ impl SemanticAnalyzer {
                         if !self
                             .type_checker
                             .borrow()
-                            .types_compatible(&symbol.symbol_type, &value_type)
+                            .types_compatible(&symbol_type, &value_type)
                         {
                             return Err(SemanticError::TypeMismatch {
-                                expected: symbol.symbol_type.to_string(),
+                                expected: symbol_type.to_string(),
                                 found: value_type.to_string(),
                                 location: source_location.clone(),
                             });
                         }
+
+                        // Check ownership transfer (move/borrow)
+                        self.check_argument_ownership(value, &symbol_type)?;
 
                         // Mark variable as initialized
                         self.symbol_table.mark_variable_initialized(&name.name)?;
@@ -865,10 +985,21 @@ impl SemanticAnalyzer {
                 }
             }
 
-            Statement::Return { value, .. } => {
-                if let Some(return_expr) = value {
-                    self.analyze_expression(return_expr)?;
-                    // TODO: Check that return type matches function signature
+            Statement::Return { value, source_location } => {
+                let return_type = if let Some(return_expr) = value {
+                    self.analyze_expression(return_expr)?
+                } else {
+                    Type::primitive(PrimitiveType::Void)
+                };
+                
+                if let Some(expected_type) = &self.current_function_return_type {
+                    if !self.type_checker.borrow().types_compatible(expected_type, &return_type) {
+                         return Err(SemanticError::TypeMismatch {
+                            expected: expected_type.to_string(),
+                            found: return_type.to_string(),
+                            location: source_location.clone(),
+                        });
+                    }
                 }
             }
 
@@ -1870,11 +2001,18 @@ impl SemanticAnalyzer {
                         }
                     }
                     Type::Module(module_name) => {
-                        let qualified_name = format!("{}.{}", module_name, method_name.name);
+                        // Use receiver's name if possible (to handle aliasing)
+                        let module_prefix = if let Expression::Variable { name, .. } = &**receiver {
+                            name.name.clone()
+                        } else {
+                            module_name.clone()
+                        };
+                        
+                        let qualified_name = format!("{}.{}", module_prefix, method_name.name);
                         
                         // Clone the function type info to avoid holding a borrow on symbol_table
                         let (parameter_types, return_type) = if let Some(symbol) = self.symbol_table.lookup_symbol(&qualified_name) {
-                            if let Type::Function { parameter_types, return_type } = &symbol.symbol_type {
+                            if let Type::Function { parameter_types, return_type, is_variadic: _ } = &symbol.symbol_type {
                                 (parameter_types.clone(), return_type.clone())
                             } else {
                                 return Err(SemanticError::InvalidOperation {
@@ -2207,6 +2345,7 @@ impl SemanticAnalyzer {
                 Ok(Type::Function {
                     parameter_types: param_types,
                     return_type: Box::new(lambda_return_type),
+                    is_variadic: false,
                 })
             }
 
@@ -2297,6 +2436,7 @@ impl SemanticAnalyzer {
                     if let Type::Function {
                         return_type,
                         parameter_types,
+                        is_variadic: _,
                     } = &symbol.symbol_type
                     {
                         ((**return_type).clone(), parameter_types.clone())
@@ -2421,6 +2561,7 @@ impl SemanticAnalyzer {
             Type::Function {
                 parameter_types,
                 return_type,
+                is_variadic: _,
             } => (parameter_types, return_type),
             _ => {
                 return Err(SemanticError::TypeMismatch {
@@ -2432,13 +2573,24 @@ impl SemanticAnalyzer {
         };
 
         // Check argument count
+        let is_variadic = if let Type::Function { is_variadic, .. } = &func_symbol.symbol_type {
+            *is_variadic
+        } else {
+            false
+        };
+        
         if call.arguments.len() != param_types.len() {
-            // TODO: Handle variadic functions properly if needed
-            // For now assuming exact match
-            // Except if variadic arguments are present
-            if !call.variadic_arguments.is_empty() {
-                // TODO: Check variadic
-            } else {
+             if is_variadic {
+                 if call.arguments.len() < param_types.len() {
+                    return Err(SemanticError::ArgumentCountMismatch {
+                        function: func_symbol.name.clone(),
+                        expected: param_types.len(),
+                        found: call.arguments.len(),
+                        location: source_location.clone(),
+                    });
+                 }
+                 // Variadic: allow more arguments
+             } else {
                 return Err(SemanticError::ArgumentCountMismatch {
                     function: func_symbol.name.clone(),
                     expected: param_types.len(),
@@ -2451,7 +2603,13 @@ impl SemanticAnalyzer {
         // Check argument types
         for (i, arg) in call.arguments.iter().enumerate() {
             if i >= param_types.len() {
-                break; // Variadic?
+                if is_variadic {
+                    // Just analyze the expression for variadic args, don't check type against param
+                    self.analyze_expression(&arg.value)?;
+                    continue;
+                } else {
+                    break; 
+                }
             }
             
             let arg_type = self.analyze_expression(&arg.value)?;
@@ -2994,7 +3152,12 @@ impl SemanticAnalyzer {
             .type_checker
             .borrow()
             .ast_type_to_type(&ext_func.return_type)?;
-        let func_type = Type::function(param_types, return_type);
+        
+        let func_type = if ext_func.variadic {
+            Type::variadic_function(param_types.clone(), return_type.clone())
+        } else {
+            Type::function(param_types.clone(), return_type.clone())
+        };
 
         // Check if external function already exists
         if let Some(existing_symbol) = self.symbol_table.lookup_symbol(&ext_func.name.name) {
@@ -3028,7 +3191,11 @@ impl SemanticAnalyzer {
         // Add external function to symbol table
         let func_symbol = Symbol {
             name: ext_func.name.name.clone(),
-            symbol_type: func_type,
+            symbol_type: Type::Function {
+                parameter_types: param_types,
+                return_type: Box::new(return_type),
+                is_variadic: ext_func.variadic,
+            },
             kind: SymbolKind::Function, // External functions are treated as regular functions
             is_mutable: false,
             is_initialized: true,

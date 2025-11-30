@@ -92,6 +92,7 @@ pub enum Type {
     Function {
         parameter_types: Vec<Type>,
         return_type: Box<Type>,
+        is_variadic: bool,
     },
 
     /// Generic type parameters (uninstantiated)
@@ -160,6 +161,16 @@ impl Type {
         Type::Function {
             parameter_types,
             return_type: Box::new(return_type),
+            is_variadic: false,
+        }
+    }
+
+    /// Create a new variadic function type
+    pub fn variadic_function(parameter_types: Vec<Type>, return_type: Type) -> Self {
+        Type::Function {
+            parameter_types,
+            return_type: Box::new(return_type),
+            is_variadic: true,
         }
     }
 
@@ -400,8 +411,12 @@ impl fmt::Display for Type {
             Type::Function {
                 parameter_types,
                 return_type,
+                is_variadic,
             } => {
-                let params: Vec<String> = parameter_types.iter().map(|t| t.to_string()).collect();
+                let mut params: Vec<String> = parameter_types.iter().map(|t| t.to_string()).collect();
+                if *is_variadic {
+                    params.push("...".to_string());
+                }
                 write!(f, "fn({}) -> {}", params.join(", "), return_type)
             }
             Type::Generic { name, constraints } => {
@@ -630,7 +645,14 @@ impl TypeChecker {
                     eprintln!("  - Type: '{}'", key);
                 }
                 if self.type_definitions.contains_key(&name.name) {
-                    Ok(Type::named(name.name.clone(), self.current_module.clone()))
+                    // If the name is qualified (contains dot), use the module prefix
+                    if let Some(idx) = name.name.rfind('.') {
+                        let module_name = Some(name.name[..idx].to_string());
+                        let simple_name = name.name[idx+1..].to_string();
+                        Ok(Type::named(simple_name, module_name))
+                    } else {
+                        Ok(Type::named(name.name.clone(), self.current_module.clone()))
+                    }
                 } else {
                     Err(SemanticError::UndefinedSymbol {
                         symbol: name.name.clone(),
@@ -895,13 +917,16 @@ impl TypeChecker {
                 Type::Function {
                     parameter_types: p1,
                     return_type: r1,
+                    is_variadic: v1,
                 },
                 Type::Function {
                     parameter_types: p2,
                     return_type: r2,
+                    is_variadic: v2,
                 },
             ) => {
                 p1.len() == p2.len()
+                    && v1 == v2
                     && p1.iter().zip(p2.iter()).all(|(t1, t2)| self.types_compatible(t1, t2))
                     && self.types_compatible(r1, r2)
             }
@@ -959,13 +984,15 @@ impl TypeChecker {
                 Type::Function {
                     parameter_types: p1,
                     return_type: r1,
+                    is_variadic: v1,
                 },
                 Type::Function {
                     parameter_types: p2,
                     return_type: r2,
+                    is_variadic: v2,
                 },
             ) => {
-                if p1.len() != p2.len() {
+                if p1.len() != p2.len() || v1 != v2 {
                     return false;
                 }
                 for (t1, t2) in p1.iter().zip(p2.iter()) {
@@ -1076,12 +1103,14 @@ impl TypeChecker {
             Type::Function {
                 parameter_types,
                 return_type,
+                is_variadic,
             } => Type::Function {
                 parameter_types: parameter_types
                     .iter()
                     .map(|t| self.apply_substitutions(t))
                     .collect(),
                 return_type: Box::new(self.apply_substitutions(return_type)),
+                is_variadic: *is_variadic,
             },
             _ => type_to_subst.clone(),
         }
@@ -1268,12 +1297,14 @@ impl TypeChecker {
                 Type::Function {
                     parameter_types: p1,
                     return_type: r1,
+                    is_variadic: v1,
                 },
                 Type::Function {
                     parameter_types: p2,
                     return_type: r2,
+                    is_variadic: v2,
                 },
-            ) if p1.len() == p2.len() => {
+            ) if p1.len() == p2.len() && v1 == v2 => {
                 for (param1, param2) in p1.iter().zip(p2.iter()) {
                     self.unify(param1, param2)?;
                 }
