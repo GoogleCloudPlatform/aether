@@ -497,13 +497,35 @@ impl SemanticAnalyzer {
         &mut self,
         type_def: &crate::ast::TypeDefinition,
     ) -> Result<(), SemanticError> {
+        // Enter a new scope for the type definition to hold generic parameters
+        self.symbol_table.enter_scope(ScopeKind::Block); // Use Block scope for now, could be a dedicated TypeScope
+
         match type_def {
             crate::ast::TypeDefinition::Structured {
                 name,
+                generic_parameters,
                 fields,
                 source_location,
                 ..
             } => {
+                // Add generic parameters to the current scope
+                for generic_param in generic_parameters {
+                    let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
+                        name: generic_param.name.clone(),
+                        constraints: generic_param.constraints.clone(),
+                        source_location: generic_param.source_location.clone(),
+                    })?;
+                    let generic_symbol = Symbol::new(
+                        generic_param.name.name.clone(),
+                        generic_type,
+                        SymbolKind::Type,
+                        false,
+                        true,
+                        generic_param.source_location.clone(),
+                    );
+                    self.symbol_table.add_symbol(generic_symbol)?;
+                }
+
                 let mut field_types = Vec::new();
 
                 // Analyze each field (preserving declaration order)
@@ -534,10 +556,29 @@ impl SemanticAnalyzer {
 
             crate::ast::TypeDefinition::Enumeration {
                 name,
+                generic_parameters,
                 variants,
                 source_location,
                 ..
             } => {
+                // Add generic parameters to the current scope
+                for generic_param in generic_parameters {
+                    let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
+                        name: generic_param.name.clone(),
+                        constraints: generic_param.constraints.clone(),
+                        source_location: generic_param.source_location.clone(),
+                    })?;
+                    let generic_symbol = Symbol::new(
+                        generic_param.name.name.clone(),
+                        generic_type,
+                        SymbolKind::Type,
+                        false,
+                        true,
+                        generic_param.source_location.clone(),
+                    );
+                    self.symbol_table.add_symbol(generic_symbol)?;
+                }
+
                 // Convert AST variants to type system variants
                 let mut variant_infos = Vec::new();
                 for (idx, variant) in variants.iter().enumerate() {
@@ -584,6 +625,7 @@ impl SemanticAnalyzer {
         }
 
         self.stats.types_defined += 1;
+        self.symbol_table.exit_scope()?; // Exit the temporary scope for generics
         Ok(())
     }
 
@@ -680,6 +722,24 @@ impl SemanticAnalyzer {
 
         // Enter function scope
         self.symbol_table.enter_scope(ScopeKind::Function);
+
+        // Add generic parameters to function scope
+        for generic_param in &func_def.generic_parameters {
+            let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
+                name: generic_param.name.clone(),
+                constraints: generic_param.constraints.clone(),
+                source_location: generic_param.source_location.clone(),
+            })?;
+            let generic_symbol = Symbol::new(
+                generic_param.name.name.clone(),
+                generic_type,
+                SymbolKind::Type,
+                false,
+                true,
+                generic_param.source_location.clone(),
+            );
+            self.symbol_table.add_symbol(generic_symbol)?;
+        }
 
         // Add parameters to function scope
         for param in &func_def.parameters {

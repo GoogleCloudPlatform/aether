@@ -9,6 +9,7 @@ fn create_test_module() -> Module {
         exports: Vec::new(),
         type_definitions: Vec::new(),
         trait_definitions: Vec::new(),
+        impl_blocks: Vec::new(), // Add this to match the AST definition
         constant_declarations: vec![ConstantDeclaration {
             name: Identifier::new("PI".to_string(), SourceLocation::unknown()),
             type_spec: Box::new(TypeSpecifier::Primitive {
@@ -26,6 +27,18 @@ fn create_test_module() -> Module {
         external_functions: Vec::new(),
         source_location: SourceLocation::unknown(),
     }
+}
+
+// Helper to create a SemanticAnalyzer from source code
+fn semantic_analyzer_from_source(source: &str) -> SemanticAnalyzer {
+    let lexer = crate::lexer::v2::Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = crate::parser::v2::Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    let mut analyzer = SemanticAnalyzer::new();
+    // Assume a single module for simplicity in tests
+    analyzer.analyze_module(&program.modules[0]).unwrap();
+    analyzer
 }
 
 #[test]
@@ -240,4 +253,95 @@ fn test_contract_validation_failures() {
     assert!(!validation_result.is_valid);
     assert!(!validation_result.errors.is_empty());
     assert_eq!(validator.get_stats().contract_errors, 2); // Performance + complexity errors
+}
+
+#[test]
+fn test_generic_function_param_resolution() {
+    let source = r#"
+    module Test {
+        func identity<T>(value: T) -> T {
+            return value;
+        }
+    }
+    "#;
+    let analyzer = semantic_analyzer_from_source(source);
+
+    let func_symbol = analyzer.symbol_table.lookup_symbol("identity").unwrap();
+    if let Type::Function { parameter_types, return_type, .. } = &func_symbol.symbol_type {
+        assert_eq!(parameter_types.len(), 1);
+        assert!(matches!(parameter_types[0], Type::Generic { ref name, .. } if name == "T"));
+        assert!(matches!(*return_type, Type::Generic { ref name, .. } if name == "T"));
+    } else {
+        panic!("Expected function type");
+    }
+
+    // Within the function's scope, 'T' should be resolvable as a type
+    let func_scope_symbols = analyzer.symbol_table.get_all_symbols();
+    let generic_t_symbol = func_scope_symbols.iter().find(|s| s.name == "T" && matches!(s.symbol_type, Type::Generic {..}));
+    assert!(generic_t_symbol.is_some());
+}
+
+#[test]
+fn test_generic_struct_field_resolution() {
+    let source = r#"
+    module Test {
+        struct Box<T> {
+            value: T;
+        }
+    }
+    "#;
+    let analyzer = semantic_analyzer_from_source(source);
+
+    let struct_def = analyzer.symbol_table.lookup_type_definition("Box").unwrap();
+    if let TypeDefinition::Struct { fields, .. } = struct_def {
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, "value");
+        assert!(matches!(fields[0].1, Type::Generic { ref name, .. } if name == "T"));
+    } else {
+        panic!("Expected struct definition");
+    }
+}
+
+#[test]
+fn test_generic_enum_variant_resolution() {
+    let source = r#"
+    module Test {
+        enum Option<T> {
+            case Some(T);
+            case None;
+        }
+    }
+    "#;
+    let analyzer = semantic_analyzer_from_source(source);
+
+    let enum_def = analyzer.symbol_table.lookup_type_definition("Option").unwrap();
+    if let TypeDefinition::Enum { variants, .. } = enum_def {
+        assert_eq!(variants.len(), 2);
+        assert_eq!(variants[0].name, "Some");
+        assert_eq!(variants[0].associated_types.len(), 1);
+        assert!(matches!(variants[0].associated_types[0], Type::Generic { ref name, .. } if name == "T"));
+        assert_eq!(variants[1].name, "None");
+        assert_eq!(variants[1].associated_types.len(), 0);
+    } else {
+        panic!("Expected enum definition");
+    }
+}
+
+#[test]
+fn test_undefined_generic_parameter_in_function() {
+    let source = r#"
+    module Test {
+        func foo<T>(value: U) -> T { // U is undefined
+            return value;
+        }
+    }
+    "#;
+    let lexer = crate::lexer::v2::Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = crate::parser::v2::Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    let mut analyzer = SemanticAnalyzer::new();
+    let analysis_result = analyzer.analyze_module(&program.modules[0]);
+    assert!(analysis_result.is_err());
+    assert!(matches!(analysis_result.unwrap_err(), SemanticError::UndefinedSymbol { symbol, .. } if symbol == "U"));
 }

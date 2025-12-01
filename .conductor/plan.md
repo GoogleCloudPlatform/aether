@@ -452,7 +452,7 @@ See: [Architecture - Generics and Contract Verification](architecture.md#generic
 - [x] **Tests**: Impl block parsing tests
 
 ### Task 14.6: Semantic Analysis for Generics
-- [ ] **Semantic**: Resolve type parameters in scope
+- [~] **Semantic**: Resolve type parameters in scope
 - [ ] **Semantic**: Check trait bounds are satisfied at call sites
 - [ ] **Semantic**: Type check generic function bodies
 - [ ] **Tests**: Generic semantic analysis tests
