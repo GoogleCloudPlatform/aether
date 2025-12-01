@@ -37,7 +37,7 @@ module main {
       
       // Simulated generated code
       var safe_element: Int = 0;
-      when {{index_expr >= 0} && {index_expr < 5}} {
+      if {{index_expr >= 0} && {index_expr < 5}} {
           safe_element = array_expr[index_expr];
       } else {
           safe_element = default_value;
@@ -210,7 +210,7 @@ module pattern_verification {
       // Use verified safe array access pattern
       var safe_value: Int = 0;
       
-      when {unsafe_index >= 0 && unsafe_index < 5} {
+      if {unsafe_index >= 0 && unsafe_index < 5} {
           safe_value = safe_array[unsafe_index];
       } else {
           safe_value = 0;
@@ -252,7 +252,7 @@ module custom_pattern {
   func safe_divide_logged(numerator: Float, denominator: Float, log_file: String) -> Float {
       // Log start
       
-      when {denominator == 0.0} {
+      if {denominator == 0.0} {
           // Log error
           return 0.0;
       }
@@ -290,7 +290,7 @@ module pattern_performance {
       // Choose pattern based on performance characteristics
       var search_result: Int = 0;
       
-      when {data_size < 100} {
+      if {data_size < 100} {
           // Use linear search for small data
           // O(n)
           search_result = 1;

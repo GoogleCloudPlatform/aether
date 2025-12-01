@@ -92,6 +92,18 @@
     - **2 examples FILE NOT FOUND**: Example directories exist but missing expected files
     - **Conclusion**: Warning cleanup did not break any existing functionality; failures are pre-existing issues
 
+## Phase 13: Syntax Simplification (In Progress)
+
+### Task 13.1: Change `when` to `if` (Completed - 2025-11-30)
+- [x] Parser now uses `if` keyword instead of `when` for conditionals
+- [x] `else if` now replaces `else when`
+- [x] Updated 15+ example files
+- [x] Updated all parser and integration tests
+- [x] All 720+ tests pass
+
+### Task 13.2: Remove mandatory `{}` around expressions
+- [ ] Pending
+
 ## Completed Phases
 
 - Phase 1: V2 Lexer

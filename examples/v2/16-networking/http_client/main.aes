@@ -42,7 +42,7 @@ func main() -> Int {
         success: true,
     };
 
-    when is_success(response) {
+    if is_success(response) {
         puts("Request successful!");
         return 0;
     } else {

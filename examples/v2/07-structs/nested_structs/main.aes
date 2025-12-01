@@ -23,10 +23,10 @@ func manhattan_distance(line: Line) -> Int {
     var dy: Int = {line.end.y - line.start.y};
 
     // Absolute values
-    when {dx < 0} {
+    if {dx < 0} {
         dx = {0 - dx};
     }
-    when {dy < 0} {
+    if {dy < 0} {
         dy = {0 - dy};
     }
 

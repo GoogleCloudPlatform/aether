@@ -4,7 +4,7 @@
 module stdlib_math;
 
 func abs(n: Int) -> Int {
-    when {n < 0} {
+    if {n < 0} {
         return {0 - n};
     } else {
         return n;
@@ -12,7 +12,7 @@ func abs(n: Int) -> Int {
 }
 
 func min(a: Int, b: Int) -> Int {
-    when {a < b} {
+    if {a < b} {
         return a;
     } else {
         return b;
@@ -20,7 +20,7 @@ func min(a: Int, b: Int) -> Int {
 }
 
 func max(a: Int, b: Int) -> Int {
-    when {a > b} {
+    if {a > b} {
         return a;
     } else {
         return b;
@@ -28,10 +28,10 @@ func max(a: Int, b: Int) -> Int {
 }
 
 func clamp(value: Int, low: Int, high: Int) -> Int {
-    when {value < low} {
+    if {value < low} {
         return low;
     } else {
-        when {value > high} {
+        if {value > high} {
             return high;
         } else {
             return value;

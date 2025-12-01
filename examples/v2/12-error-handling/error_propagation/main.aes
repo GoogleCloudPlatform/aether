@@ -9,7 +9,7 @@ enum Result {
 }
 
 func step1(input: Int) -> Result {
-    when {input < 0} {
+    if {input < 0} {
         return Result::Err(1);
     } else {
         return Result::Ok({input * 2});
@@ -17,7 +17,7 @@ func step1(input: Int) -> Result {
 }
 
 func step2(input: Int) -> Result {
-    when {input > 100} {
+    if {input > 100} {
         return Result::Err(2);
     } else {
         return Result::Ok({input + 10});

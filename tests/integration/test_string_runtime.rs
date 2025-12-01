@@ -48,7 +48,7 @@ module test_string_runtime {
         let index: Int = string_index_of(test_str, "World");
         
         // Expected: 7
-        when {index != 7} {
+        if {index != 7} {
             // printf("FAIL: string_index_of returned %d, expected 7\n", index);
             return 1;
         }
@@ -57,7 +57,7 @@ module test_string_runtime {
         let starts: Int = string_starts_with(test_str, "Hello");
         
         // Expected: 1 (true)
-        when {starts != 1} {
+        if {starts != 1} {
             // printf("FAIL: string_starts_with returned %d, expected 1\n", starts);
             return 1;
         }
@@ -66,7 +66,7 @@ module test_string_runtime {
         let ends: Int = string_ends_with(test_str, "World!");
         
         // Expected: 1 (true)
-        when {ends != 1} {
+        if {ends != 1} {
             // printf("FAIL: string_ends_with returned %d, expected 1\n", ends);
             return 1;
         }

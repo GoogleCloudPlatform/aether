@@ -26,7 +26,7 @@ func main() -> Int {
     // Greater than or equal
     let gte: Bool = {b >= a};
 
-    when lt {
+    if lt {
         return 1;
     } else {
         return 0;

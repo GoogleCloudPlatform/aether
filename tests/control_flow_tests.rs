@@ -24,7 +24,7 @@ fn create_control_flow_module() -> String {
 
     @intent("Test if statement")
     func test_if(x: Int) -> Int {
-        when {x > 10} {
+        if {x > 10} {
             return 1;
         } else {
             return 0;
@@ -129,7 +129,7 @@ fn test_boolean_condition_type_checking() {
 
     @intent("If with non-boolean condition")
     func bad_if() {
-        when 42 {
+        if 42 {
             return;
         }
     }
@@ -195,7 +195,7 @@ fn test_nested_control_flow() {
         while {i < n} {
             var j: Int = 0;
             while {j < i} {
-                when {{j % 2} == 0} {
+                if {{j % 2} == 0} {
                     sum = {sum + j};
                 }
                 j = {j + 1};

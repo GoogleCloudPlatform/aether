@@ -51,7 +51,7 @@ fn test_function_with_postcondition() {
 module test_module {
     @post({return_value >= 0})
     func abs(x: Int) -> Int {
-        when {x < 0} { return {-x}; } else { return x; }
+        if {x < 0} { return {-x}; } else { return x; }
     }
 }
 "#;

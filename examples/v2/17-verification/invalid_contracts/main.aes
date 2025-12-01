@@ -1,0 +1,56 @@
+// Invalid Contracts Example
+// Demonstrates contracts that FAIL verification - the SMT solver finds counterexamples
+//
+// Compile with: aether compile --verify --verbose main.aes -o main
+// These contracts are intentionally wrong to show verification catching bugs.
+
+module invalid_contracts;
+
+// BUG: Postcondition claims result > 0, but 0 * anything = 0
+// Counterexample: a=0, b=5 gives result=0, not > 0
+@pre({a >= 0})
+@pre({b >= 0})
+@post({return_value > 0})
+func multiply_bug(a: Int, b: Int) -> Int {
+    return {a * b};
+}
+
+// BUG: No precondition, but claims result >= 0
+// Counterexample: a=1, b=5 gives result=-4
+@post({return_value >= 0})
+func subtract_bug(a: Int, b: Int) -> Int {
+    return {a - b};
+}
+
+// BUG: Claims result > both inputs, but max equals one of them
+// Counterexample: a=5, b=3 gives result=5, not > 5
+@post({return_value > a})
+@post({return_value > b})
+func max_bug(a: Int, b: Int) -> Int {
+    if {a >= b} {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+// BUG: Division can give 0 even with positive inputs
+// Counterexample: a=1, b=2 gives result=0 (integer division)
+@pre({a > 0})
+@pre({b > 0})
+@post({return_value > 0})
+func divide_bug(a: Int, b: Int) -> Int {
+    return {a / b};
+}
+
+// BUG: Increment doesn't guarantee result > 100
+// Counterexample: n=0 gives result=1, not > 100
+@pre({n >= 0})
+@post({return_value > 100})
+func increment_bug(n: Int) -> Int {
+    return {n + 1};
+}
+
+func main() -> Int {
+    return 0;
+}

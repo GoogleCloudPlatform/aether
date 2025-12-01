@@ -20,7 +20,7 @@ func main() -> Int {
     // Compound logical expression
     let compound: Bool = {{a || b} && !{a && b}};
 
-    when or_result {
+    if or_result {
         return 1;
     } else {
         return 0;

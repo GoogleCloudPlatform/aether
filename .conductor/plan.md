@@ -299,8 +299,15 @@ car go fmt && car go clippy && car go test
 | 10 | 10.1 - 10.4 | LSP | ✅ Done |
 | 11 | 11.1 - 11.4 | Optimizations | ✅ Done |
 | 12 | 12.1 - 12.4 | Tango Fixes | ✅ Done |
+| 13 | 13.1 - 13.2 | Syntax Simplification (`when`→`if`, remove `{}`) | ⏳ Pending |
+| 14 | 14.1 - 14.8 | Generics Implementation | ⏳ Pending |
+| 15 | 15.1 - 15.2 | Trait System | ⏳ Pending |
+| 16 | 16.1 - 16.3 | Generic Contract Verification | ⏳ Pending |
+| 17 | 17.1 - 17.3 | Contract Examples (Real-World) | ⏳ Pending |
+| 18 | 18.1 - 18.3 | Standard Library in Aether | ⏳ Pending |
+| 19 | 19.1 - 19.4 | Bootstrapping Preparation | ⏳ Pending |
 
-**Total Tasks:** 50+
+**Total Tasks:** 80+
 ## Phase 8: True Asynchronous Backend Implementation
 
 ### Phase 8.1: Runtime Support
@@ -383,4 +390,177 @@ car go fmt && car go clippy && car go test
 - [x] **Compiler**: Update the module and import resolution logic to handle PascalCase filenames matching module names.
 - [x] **Tests**: Add integration tests with PascalCase filenames and imports to verify resolution.
 - [x] **Documentation**: Update any relevant documentation regarding file and module naming conventions.
+
+---
+
+## Phase 13: Syntax Simplification
+
+See: [Architecture - Syntax Simplification](architecture.md#syntax-simplification-pending)
+
+### Task 13.1: Change `when` to `if`
+- [x] **Lexer**: `If` keyword already existed alongside `When`
+- [x] **Parser**: Updated conditional parsing to use `if` instead of `when`
+- [x] **Examples**: Updated all 15+ examples to use `if`
+- [x] **Tests**: Updated all parser and integration tests to use `if`
+- [x] **Verify**: All 720+ tests pass, examples compile and run
+
+### Task 13.2: Remove mandatory `{}` around expressions
+- [ ] **Parser**: Update expression parsing to not require braces
+- [ ] **Grammar**: Update `return expr;` to work without `{}`
+- [ ] **Examples**: Update all examples to remove expression braces
+- [ ] **Tests**: Update all tests
+- [ ] **Verify**: All tests pass
+
+---
+
+## Phase 14: Generics Implementation
+
+See: [Architecture - Generics and Contract Verification](architecture.md#generics-and-contract-verification-design)
+
+### Task 14.1: Parse Generic Type Parameters
+- [ ] **Lexer**: Ensure `<` and `>` tokens work in type context
+- [ ] **Parser**: Implement `parse_generic_parameters()` for `<T, U>` syntax
+- [ ] **Parser**: Update `parse_function()` to accept generic parameters
+- [ ] **Parser**: Update `parse_struct()` to accept generic parameters
+- [ ] **AST**: Populate `generic_parameters` field (already exists)
+- [ ] **Tests**: Generic function and struct parsing tests
+
+### Task 14.2: Parse Where Clauses
+- [ ] **Lexer**: Add `where` keyword
+- [ ] **Parser**: Implement `parse_where_clause()`
+- [ ] **AST**: Add `where_clause` field to functions
+- [ ] **Tests**: Where clause parsing tests
+
+### Task 14.3: Parse Trait Definitions
+- [ ] **Lexer**: Add `trait` keyword
+- [ ] **Parser**: Implement `parse_trait_definition()`
+- [ ] **AST**: Add `TraitDefinition` node with methods
+- [ ] **Tests**: Trait definition parsing tests
+
+### Task 14.4: Parse Trait Axioms
+- [ ] **Parser**: Implement `@axiom(...)` parsing in traits
+- [ ] **AST**: Add `Axiom` node with quantifiers and conditions
+- [ ] **Tests**: Axiom parsing tests
+
+### Task 14.5: Parse Impl Blocks
+- [ ] **Lexer**: Add `impl` keyword
+- [ ] **Parser**: Implement `parse_impl_block()`
+- [ ] **AST**: Add `TraitImpl` node
+- [ ] **Tests**: Impl block parsing tests
+
+### Task 14.6: Semantic Analysis for Generics
+- [ ] **Semantic**: Resolve type parameters in scope
+- [ ] **Semantic**: Check trait bounds are satisfied at call sites
+- [ ] **Semantic**: Type check generic function bodies
+- [ ] **Tests**: Generic semantic analysis tests
+
+### Task 14.7: Monomorphization
+- [ ] **MIR**: Implement monomorphization pass
+- [ ] **MIR**: Generate concrete functions for each type instantiation
+- [ ] **LLVM**: Generate code for monomorphized functions
+- [ ] **Tests**: Monomorphization tests
+
+### Task 14.8: Explicit Type Parameters at Call Sites
+- [ ] **Parser**: Require `func<Type>(args)` syntax
+- [ ] **Semantic**: Resolve explicit type parameters
+- [ ] **Tests**: Call site type parameter tests
+
+---
+
+## Phase 15: Trait System
+
+### Task 15.1: Trait Method Resolution
+- [ ] **Semantic**: Resolve trait method calls on generic types
+- [ ] **Semantic**: Build vtable-like dispatch info (for monomorphization)
+- [ ] **Tests**: Trait method resolution tests
+
+### Task 15.2: Trait Implementation Verification
+- [ ] **Semantic**: Verify impl blocks satisfy trait requirements
+- [ ] **Verification**: Check implementations satisfy trait axioms (if present)
+- [ ] **Tests**: Implementation verification tests
+
+---
+
+## Phase 16: Generic Contract Verification
+
+See: [Architecture - Verification Strategy](architecture.md#verification-strategy)
+
+### Task 16.1: Instantiation Verification (Option B)
+- [ ] **Verification**: Verify contracts at monomorphization
+- [ ] **VCGen**: Generate verification conditions for concrete types
+- [ ] **Tests**: Instantiation verification tests
+
+### Task 16.2: Abstract Verification with Axioms (Option C)
+- [ ] **Verification**: Convert trait axioms to Z3 assertions
+- [ ] **VCGen**: Support abstract verification using axioms
+- [ ] **Tests**: Abstract verification tests
+
+### Task 16.3: Combined Verification Strategy
+- [ ] **Verification**: Try abstract first, fall back to instantiation
+- [ ] **Verification**: Implement `@verify(abstract)` and `@verify(instantiation)` pragmas
+- [ ] **Tests**: Combined strategy tests
+
+---
+
+## Phase 17: Contract Examples (Real-World)
+
+### Task 17.1: Ring Buffer Example
+- [ ] **Example**: Create `examples/v2/17-verification/ring_buffer/`
+- [ ] **Contracts**: Implement bounds checking contracts
+- [ ] **Verify**: Static verification passes
+- [ ] **Runtime**: Runtime checks work
+
+### Task 17.2: Memory Pool Allocator Example
+- [ ] **Example**: Create `examples/v2/17-verification/memory_pool/`
+- [ ] **Contracts**: Implement allocation invariants
+- [ ] **Verify**: Static verification passes
+- [ ] **Runtime**: Runtime checks work
+
+### Task 17.3: Network Packet Parser Example
+- [ ] **Example**: Create `examples/v2/17-verification/packet_parser/`
+- [ ] **Contracts**: Implement bounds and length contracts
+- [ ] **Verify**: Static verification passes
+- [ ] **Runtime**: Runtime checks work
+
+---
+
+## Phase 18: Standard Library in Aether
+
+### Task 18.1: Remove Legacy S-expression stdlib
+- [ ] **Delete**: Remove `src/stdlib/*.aether` files (legacy V1 syntax)
+- [ ] **Verify**: Build succeeds
+
+### Task 18.2: Core stdlib in V2
+- [ ] **Implement**: `std/core.aes` with basic types
+- [ ] **Implement**: `std/math.aes` with math functions + contracts
+- [ ] **Implement**: `std/string.aes` with string operations + contracts
+- [ ] **Tests**: stdlib tests
+
+### Task 18.3: Collections stdlib (requires generics)
+- [ ] **Implement**: `std/vec.aes` - `Vec<T>` with contracts
+- [ ] **Implement**: `std/map.aes` - `Map<K,V>` with contracts
+- [ ] **Tests**: Collection tests
+
+---
+
+## Phase 19: Bootstrapping Preparation
+
+See: [Architecture - Bootstrapping Roadmap](architecture.md#bootstrapping-roadmap)
+
+### Task 19.1: Verify FFI Completeness
+- [ ] **Test**: Verify arrays can be passed to C functions
+- [ ] **Test**: Verify function pointers work
+- [ ] **Test**: Verify all LLVM-C API patterns are supported
+
+### Task 19.2: Port Lexer to Aether
+- [ ] **Implement**: Rewrite lexer in Aether
+- [ ] **Test**: Compare output with Rust lexer
+
+### Task 19.3: Port Parser to Aether
+- [ ] **Implement**: Rewrite parser in Aether
+- [ ] **Test**: Compare output with Rust parser
+
+### Task 19.4: Self-Hosting
+- [ ] **Build**: Compile Aether compiler with itself
+- [ ] **Verify**: Stage 2 compiler produces identical output to Stage 1
 

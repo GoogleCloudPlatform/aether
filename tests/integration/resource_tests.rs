@@ -259,7 +259,7 @@ module exception_safe_resources {
           try {
               write(&temp_file, "Test data");
               
-              when might_fail {
+              if might_fail {
                   throw "TestException"; // String as exception
               }
               

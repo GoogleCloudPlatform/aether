@@ -4,7 +4,7 @@
 module if_else;
 
 func abs(n: Int) -> Int {
-    when {n < 0} {
+    if {n < 0} {
         return {0 - n};
     } else {
         return n;
@@ -12,10 +12,10 @@ func abs(n: Int) -> Int {
 }
 
 func classify(n: Int) -> Int {
-    when {n > 0} {
+    if {n > 0} {
         return 1;
     } else {
-        when {n < 0} {
+        if {n < 0} {
             return -1;
         } else {
             return 0;
@@ -24,7 +24,7 @@ func classify(n: Int) -> Int {
 }
 
 func max(a: Int, b: Int) -> Int {
-    when {a > b} {
+    if {a > b} {
         return a;
     } else {
         return b;

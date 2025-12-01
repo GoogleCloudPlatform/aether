@@ -1,0 +1,61 @@
+// Valid Contracts Example
+// Demonstrates contracts that can be formally verified by the SMT solver
+//
+// Compile with: aether compile --verify --verbose main.aes -o main
+// All contracts in this file should verify successfully.
+
+module valid_contracts;
+
+// Adding two positive numbers always gives a positive result
+@pre({a > 0})
+@pre({b > 0})
+@post({return_value > 0})
+func add_positive(a: Int, b: Int) -> Int {
+    return {a + b};
+}
+
+// Doubling a non-negative number gives a result >= the input
+@pre({n >= 0})
+@post({return_value >= n})
+func double_non_negative(n: Int) -> Int {
+    return {n + n};
+}
+
+// Absolute difference is always non-negative
+@pre({a >= 0})
+@pre({b >= 0})
+@post({return_value >= 0})
+func abs_diff(a: Int, b: Int) -> Int {
+    if {a >= b} {
+        return {a - b};
+    } else {
+        return {b - a};
+    }
+}
+
+// Maximum of two numbers is >= both inputs
+@post({return_value >= a})
+@post({return_value >= b})
+func max(a: Int, b: Int) -> Int {
+    if {a >= b} {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+// Squaring a number gives non-negative result
+@post({return_value >= 0})
+func square(n: Int) -> Int {
+    return {n * n};
+}
+
+func main() -> Int {
+    let sum: Int = add_positive(5, 3);
+    let doubled: Int = double_non_negative(10);
+    let diff: Int = abs_diff(15, 7);
+    let m: Int = max(42, 17);
+    let sq: Int = square(-5);
+
+    return sum;
+}

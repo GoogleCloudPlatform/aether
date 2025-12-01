@@ -15,7 +15,7 @@ func sum_three(a: Int, b: Int, c: Int) -> Int {
 
 // Different types
 func mix_types(i: Int, f: Float, b: Bool) -> Int {
-    when b {
+    if b {
         return i;
     } else {
         return 0;

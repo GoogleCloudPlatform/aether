@@ -708,6 +708,7 @@ mod tests {
                 failure_action: FailureAction::AssertFail,
                 message: Some("Test precondition".to_string()),
                 source_location: SourceLocation::unknown(),
+                runtime_check: false,
             }],
             postconditions: Vec::new(),
             invariants: Vec::new(),

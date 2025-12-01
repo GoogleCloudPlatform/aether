@@ -60,7 +60,7 @@ module string_cleanup_test {
         let s1: ^String = "String 1";
         let s2: ^String = "String 2";
         let s3: ^String = "String 3";
-        // All strings should be cleaned up when function exits
+        // All strings should be cleaned up if function exits
     }
     
     func main() -> Int {
@@ -86,7 +86,7 @@ module array_cleanup_test {
     func create_and_drop_arrays() {
         let arr1: ^Array<Int> = [0, 0, 0, 0, 0];
         let arr2: ^Array<Int> = [1, 2, 3, 4, 5];
-        // Arrays should be cleaned up when function exits
+        // Arrays should be cleaned up if function exits
     }
     
     func main() -> Int {
@@ -119,7 +119,7 @@ module map_cleanup_test {
         let mut m1: ^Map<String, Int> = {};
         // m1["key1"] = 100; // Assignment to map index
         
-        // Maps should be cleaned up when function exits
+        // Maps should be cleaned up if function exits
     }
     
     func main() -> Int {
@@ -140,7 +140,7 @@ module early_return_cleanup_test {
         let s1: ^String = "String 1";
         let arr: ^Array<Int> = [1, 2, 3, 4, 5];
         
-        when {flag} {
+        if {flag} {
             // s1 and arr should be cleaned up before return
             return 1;
         }
@@ -176,9 +176,9 @@ module nested_scopes_test {
     func main() -> Int {
         let outer: ^String = "Outer string";
         
-        when {true} {
+        if {true} {
             let inner1: ^String = "Inner string 1";
-            when {true} {
+            if {true} {
                 let inner2: ^String = "Inner string 2";
                 // inner2 cleaned up here
             }

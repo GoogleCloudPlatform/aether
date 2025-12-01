@@ -9,7 +9,7 @@ enum Result {
 }
 
 func divide(a: Int, b: Int) -> Result {
-    when {b == 0} {
+    if {b == 0} {
         return Result::Err(1);
     } else {
         return Result::Ok({a / b});
@@ -17,7 +17,7 @@ func divide(a: Int, b: Int) -> Result {
 }
 
 func safe_sqrt(n: Int) -> Result {
-    when {n < 0} {
+    if {n < 0} {
         return Result::Err(2);
     } else {
         // Simplified - just return n for positive numbers

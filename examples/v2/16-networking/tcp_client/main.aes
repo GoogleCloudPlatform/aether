@@ -23,7 +23,7 @@ func main() -> Int {
 
     let conn: Connection = create_connection(8080);
 
-    when conn.connected {
+    if conn.connected {
         puts("Connected!");
         return 0;
     } else {

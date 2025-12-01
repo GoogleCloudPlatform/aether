@@ -31,7 +31,7 @@ module test_io {
 
     func main() -> Int {
         let success: Bool = write_data("test.txt", "Hello, World!");
-        when {success} {
+        if {success} {
             return 0;
         } else {
             return 1;
@@ -84,7 +84,7 @@ module test_file_limits {
     const MAX_FILE_SIZE: Int = 1048576;
 
     func check_file_size(size: Int) -> Bool {
-        when {size > MAX_FILE_SIZE} {
+        if {size > MAX_FILE_SIZE} {
             return false;
         } else {
             return true;
@@ -94,7 +94,7 @@ module test_file_limits {
     func main() -> Int {
         let size: Int = 512000;
         let valid: Bool = check_file_size(size);
-        when {valid} {
+        if {valid} {
             return 0;
         } else {
             return 1;

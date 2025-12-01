@@ -230,7 +230,7 @@ impl Parser {
                     | Keyword::Const
                     | Keyword::Import
                     | Keyword::Module
-                    | Keyword::When
+                    | Keyword::If
                     | Keyword::While
                     | Keyword::Return => return,
                     _ => {}
@@ -556,6 +556,32 @@ impl Parser {
         (Some(module), errors)
     }
 
+    /// Extract contract condition and runtime_check flag from annotation arguments
+    /// Syntax: @pre({condition}) or @pre({condition}, check=runtime)
+    fn extract_contract_args(args: &[AnnotationArgument]) -> (Option<Box<Expression>>, bool) {
+        let mut condition: Option<Box<Expression>> = None;
+        let mut runtime_check = false;
+
+        for arg in args {
+            // Check for the condition expression (unlabeled argument)
+            if arg.label.is_none() {
+                if let AnnotationValue::Expression(expr) = &arg.value {
+                    condition = Some(expr.clone());
+                }
+            }
+            // Check for check=runtime
+            else if arg.label.as_deref() == Some("check") {
+                if let AnnotationValue::Identifier(id) = &arg.value {
+                    if id == "runtime" {
+                        runtime_check = true;
+                    }
+                }
+            }
+        }
+
+        (condition, runtime_check)
+    }
+
     /// Apply annotations to a function
     fn apply_annotations(&self, func: &mut Function, annotations: Vec<Annotation>) -> Result<(), ParserError> {
         for ann in annotations {
@@ -568,39 +594,39 @@ impl Parser {
                     }
                 }
                 "pre" | "requires" => {
-                    for arg in ann.arguments {
-                        if let AnnotationValue::Expression(expr) = &arg.value {
-                            func.metadata.preconditions.push(ContractAssertion {
-                                condition: expr.clone(),
-                                failure_action: FailureAction::ThrowException,
-                                message: None,
-                                source_location: ann.source_location.clone(),
-                            });
-                        }
+                    let (condition, runtime_check) = Self::extract_contract_args(&ann.arguments);
+                    if let Some(expr) = condition {
+                        func.metadata.preconditions.push(ContractAssertion {
+                            condition: expr,
+                            failure_action: FailureAction::ThrowException,
+                            message: None,
+                            runtime_check,
+                            source_location: ann.source_location.clone(),
+                        });
                     }
                 }
                 "post" | "ensures" => {
-                    for arg in ann.arguments {
-                        if let AnnotationValue::Expression(expr) = &arg.value {
-                            func.metadata.postconditions.push(ContractAssertion {
-                                condition: expr.clone(),
-                                failure_action: FailureAction::ThrowException,
-                                message: None,
-                                source_location: ann.source_location.clone(),
-                            });
-                        }
+                    let (condition, runtime_check) = Self::extract_contract_args(&ann.arguments);
+                    if let Some(expr) = condition {
+                        func.metadata.postconditions.push(ContractAssertion {
+                            condition: expr,
+                            failure_action: FailureAction::ThrowException,
+                            message: None,
+                            runtime_check,
+                            source_location: ann.source_location.clone(),
+                        });
                     }
                 }
                 "invariant" => {
-                    for arg in ann.arguments {
-                        if let AnnotationValue::Expression(expr) = &arg.value {
-                            func.metadata.invariants.push(ContractAssertion {
-                                condition: expr.clone(),
-                                failure_action: FailureAction::ThrowException,
-                                message: None,
-                                source_location: ann.source_location.clone(),
-                            });
-                        }
+                    let (condition, runtime_check) = Self::extract_contract_args(&ann.arguments);
+                    if let Some(expr) = condition {
+                        func.metadata.invariants.push(ContractAssertion {
+                            condition: expr,
+                            failure_action: FailureAction::ThrowException,
+                            message: None,
+                            runtime_check,
+                            source_location: ann.source_location.clone(),
+                        });
                     }
                 }
                 "algo" => {
@@ -1878,12 +1904,12 @@ impl Parser {
         })
     }
 
-    /// Parse a when statement (V2 if/else)
-    /// Grammar: "when" expression block ["else" "when" expression block]* ["else" block]
-    pub fn parse_when_statement(&mut self) -> Result<Statement, ParserError> {
+    /// Parse an if statement
+    /// Grammar: "if" expression block ["else" "if" expression block]* ["else" block]
+    pub fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
         let start_location = self.current_location();
 
-        self.expect_keyword(Keyword::When, "expected 'when'")?;
+        self.expect_keyword(Keyword::If, "expected 'if'")?;
 
         // Parse condition
         let condition = self.parse_expression()?;
@@ -1898,10 +1924,10 @@ impl Parser {
         while self.check_keyword(Keyword::Else) {
             self.advance(); // consume 'else'
 
-            if self.check_keyword(Keyword::When) {
-                // else when (else if)
+            if self.check_keyword(Keyword::If) {
+                // else if
                 let else_if_location = self.current_location();
-                self.advance(); // consume 'when'
+                self.advance(); // consume 'if'
 
                 let else_if_condition = self.parse_expression()?;
                 let else_if_block = self.parse_block()?;
@@ -2183,8 +2209,8 @@ impl Parser {
         if self.check_keyword(Keyword::Return) {
             return self.parse_return_statement();
         }
-        if self.check_keyword(Keyword::When) {
-            return self.parse_when_statement();
+        if self.check_keyword(Keyword::If) {
+            return self.parse_if_statement();
         }
         if self.check_keyword(Keyword::While) {
             return self.parse_while_loop();

@@ -120,7 +120,7 @@ fn test_min_max_abs() {
     let source = r#"
 module test_minmax {
     func min_int(a: Int, b: Int) -> Int {
-        when {a < b} {
+        if {a < b} {
             return a;
         } else {
             return b;
@@ -128,7 +128,7 @@ module test_minmax {
     }
 
     func max_int(a: Int, b: Int) -> Int {
-        when {a > b} {
+        if {a > b} {
             return a;
         } else {
             return b;
@@ -136,7 +136,7 @@ module test_minmax {
     }
 
     func abs_int(x: Int) -> Int {
-        when {x < 0} {
+        if {x < 0} {
             return {0 - x};
         } else {
             return x;

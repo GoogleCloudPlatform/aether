@@ -1780,9 +1780,9 @@ fn test_parse_return_with_expression() {
 }
 
 #[test]
-fn test_parse_when_simple() {
-    let mut parser = parser_from_source("when true { }");
-    let result = parser.parse_when_statement();
+fn test_parse_if_simple() {
+    let mut parser = parser_from_source("if true { }");
+    let result = parser.parse_if_statement();
 
     assert!(result.is_ok());
     let stmt = result.unwrap();
@@ -1805,9 +1805,9 @@ fn test_parse_when_simple() {
 }
 
 #[test]
-fn test_parse_when_with_else() {
-    let mut parser = parser_from_source("when x { } else { }");
-    let result = parser.parse_when_statement();
+fn test_parse_if_with_else() {
+    let mut parser = parser_from_source("if x { } else { }");
+    let result = parser.parse_if_statement();
 
     assert!(result.is_ok());
     let stmt = result.unwrap();
@@ -1819,9 +1819,9 @@ fn test_parse_when_with_else() {
 }
 
 #[test]
-fn test_parse_when_with_else_when() {
-    let mut parser = parser_from_source("when x { } else when y { } else { }");
-    let result = parser.parse_when_statement();
+fn test_parse_if_with_else_if() {
+    let mut parser = parser_from_source("if x { } else if y { } else { }");
+    let result = parser.parse_if_statement();
 
     assert!(result.is_ok());
     let stmt = result.unwrap();
@@ -1839,9 +1839,9 @@ fn test_parse_when_with_else_when() {
 }
 
 #[test]
-fn test_parse_when_with_body() {
-    let mut parser = parser_from_source("when {x > 0} { return x; }");
-    let result = parser.parse_when_statement();
+fn test_parse_if_with_body() {
+    let mut parser = parser_from_source("if {x > 0} { return x; }");
+    let result = parser.parse_if_statement();
 
     assert!(result.is_ok());
     let stmt = result.unwrap();
@@ -1953,8 +1953,8 @@ fn test_parse_statement_return() {
 }
 
 #[test]
-fn test_parse_statement_when() {
-    let mut parser = parser_from_source("when true { }");
+fn test_parse_statement_if() {
+    let mut parser = parser_from_source("if true { }");
     let result = parser.parse_statement();
 
     assert!(result.is_ok());
@@ -2177,7 +2177,7 @@ return result;
 fn test_integration_function_with_control_flow() {
     let source = r#"
 func abs(n: Int) -> Int {
-when {n < 0} {
+if {n < 0} {
     return {0 - n};
 } else {
     return n;
@@ -2236,13 +2236,13 @@ return {p.x + p.y};
 fn test_integration_nested_control_flow() {
     let source = r#"
 func classify(n: Int) -> Int {
-when {n > 0} {
-    when {n > 100} {
+if {n > 0} {
+    if {n > 100} {
         return 2;
     } else {
         return 1;
     }
-} else when {n < 0} {
+} else if {n < 0} {
     return 0;
 } else {
     return 0;

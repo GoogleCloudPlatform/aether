@@ -22,7 +22,7 @@ func compute(x: Int, y: Int, z: Int) -> Int {
 
 // Recursive function: factorial
 func factorial(n: Int) -> Int {
-    when {n <= 1} {
+    if {n <= 1} {
         return 1;
     } else {
         return {n * factorial({n - 1})};

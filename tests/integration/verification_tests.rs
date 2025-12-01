@@ -99,7 +99,7 @@ module contract_propagation {
   
   @intent("Compute square root after validation")
   func validated_sqrt(value: Int) -> Float {
-      when validate_positive(value) {
+      if validate_positive(value) {
           // Contract propagation should ensure this is safe
           // Need cast syntax or implicit? V2 has explicit cast maybe?
           // Trying simple assignment/usage
@@ -135,7 +135,7 @@ module proof_obligations {
   @invariant({n >= 0})
   // @decreases(n)
   func factorial(n: Int) -> Int {
-      when {n <= 1} {
+      if {n <= 1} {
           return 1;
       } else {
           return {n * factorial({n - 1})};
@@ -200,10 +200,10 @@ module smt_solver {
       while {left <= right} {
           let mid: Int = {{left + right} / 2};
           
-          when {array[mid] == target} {
+          if {array[mid] == target} {
               return mid;
           } else {
-              when {array[mid] < target} {
+              if {array[mid] < target} {
                   left = {mid + 1};
               } else {
                   right = {mid - 1};

@@ -100,7 +100,7 @@ fn test_complex_multi_module_dependency() {
   @pre({arr.capacity > index && index >= 0})
   pub func set_element(arr: IntArray, index: Int, value: Int) -> Void {
       // Mock set
-      when {index >= arr.size} {
+      if {index >= arr.size} {
           // arr.size = index + 1; // Cannot assign to field of by-value struct easily without mutable ref
       }
   }

@@ -51,7 +51,7 @@ func multiply(a: Int, b: Int) -> Int {
 }
 
 func factorial(n: Int) -> Int {
-    when {n <= 1} {
+    if {n <= 1} {
         return 1;
     } else {
         return {n * factorial({n - 1})};
@@ -59,10 +59,10 @@ func factorial(n: Int) -> Int {
 }
 
 func fibonacci(n: Int) -> Int {
-    when {n <= 0} {
+    if {n <= 0} {
         return 0;
     } else {
-        when {n == 1} {
+        if {n == 1} {
             return 1;
         } else {
             return {fibonacci({n - 1}) + fibonacci({n - 2})};
@@ -110,7 +110,7 @@ func rectangle_area(rect: Rectangle) -> Int {
 // ============================================
 
 func max(a: Int, b: Int) -> Int {
-    when {a > b} {
+    if {a > b} {
         return a;
     } else {
         return b;
@@ -118,7 +118,7 @@ func max(a: Int, b: Int) -> Int {
 }
 
 func min(a: Int, b: Int) -> Int {
-    when {a < b} {
+    if {a < b} {
         return a;
     } else {
         return b;
@@ -126,10 +126,10 @@ func min(a: Int, b: Int) -> Int {
 }
 
 func clamp(value: Int, min_val: Int, max_val: Int) -> Int {
-    when {value < min_val} {
+    if {value < min_val} {
         return min_val;
     } else {
-        when {value > max_val} {
+        if {value > max_val} {
             return max_val;
         } else {
             return value;
@@ -154,7 +154,7 @@ func sum_to_n(n: Int) -> Int {
     let mut i: Int = 1;
 
     loop {
-        when {i > n} {
+        if {i > n} {
             break;
         }
         total = {total + i};

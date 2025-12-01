@@ -48,7 +48,7 @@ module test_memory_alloc {
         
         // Check memory usage
         var usage: Int = aether_memory_usage();
-        when {usage != 300} {
+        if {usage != 300} {
             return 1;  // Failed - expected 300 bytes
         }
         
@@ -57,7 +57,7 @@ module test_memory_alloc {
         
         // Check memory usage again
         usage = aether_memory_usage();
-        when {usage != 200} {
+        if {usage != 200} {
             return 2;  // Failed - expected 200 bytes
         }
         
@@ -66,7 +66,7 @@ module test_memory_alloc {
         
         // Check for leaks
         let leaks: Int = aether_check_leaks();
-        when {leaks != 0} {
+        if {leaks != 0} {
             return 3;  // Failed - memory leak detected
         }
         
