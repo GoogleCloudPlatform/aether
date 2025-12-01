@@ -424,6 +424,7 @@ See: [Architecture - Generics and Contract Verification](architecture.md#generic
 - [x] **Parser**: Updated `parse_struct()` and `parse_enum()` for generic parameters
 - [x] **AST**: `generic_parameters` field populated correctly
 - [x] **Tests**: Added 7 new tests for generic function, struct, and enum parsing
+- [x] **Examples**: Created `examples/v2/18-generics/` with generic_functions, generic_structs, generic_enums
 
 ### Task 14.2: Parse Where Clauses
 - [ ] **Lexer**: Add `where` keyword

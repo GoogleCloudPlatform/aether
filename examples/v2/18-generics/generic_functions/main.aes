@@ -1,0 +1,37 @@
+// Generic Functions Example
+// Demonstrates generic type parameters on functions
+// Note: This demonstrates V2 syntax parsing; full generic instantiation is WIP
+
+module generic_functions;
+
+// Identity function with single type parameter
+func identity<T>(x: T) -> T {
+    return x;
+}
+
+// Function with multiple type parameters
+func pair<T, U>(first: T, second: U) -> Int {
+    // Placeholder: returns 0 since we can't return tuples yet
+    return 0;
+}
+
+// Swap function demonstrating two parameters of different types
+func swap<A, B>(a: A, b: B) -> Int {
+    // Placeholder implementation
+    return 1;
+}
+
+// Generic function with same type used multiple times
+func compare<T>(a: T, b: T) -> Bool {
+    // Placeholder: would compare a and b
+    return true;
+}
+
+// Main function (non-generic) for testing
+func main() -> Int {
+    // These demonstrate the syntax; actual generic instantiation is WIP
+    // let x: Int = identity<Int>(42);
+    // let result: Int = pair<Int, Bool>(10, true);
+
+    return 0;
+}

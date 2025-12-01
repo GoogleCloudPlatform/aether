@@ -1,0 +1,43 @@
+// Generic Enums Example
+// Demonstrates generic type parameters on enum definitions
+// Note: This demonstrates V2 syntax parsing; full generic instantiation is WIP
+
+module generic_enums;
+
+// Option type - the classic generic enum
+enum Option<T> {
+    case Some(T);
+    case None;
+}
+
+// Result type for error handling
+enum Result<T, E> {
+    case Ok(T);
+    case Err(E);
+}
+
+// Either type - can hold one of two types
+enum Either<L, R> {
+    case Left(L);
+    case Right(R);
+}
+
+// Tree node as an enum
+enum TreeNode<T> {
+    case Leaf(T);
+    case Empty;
+}
+
+// Non-generic helper function
+func get_code() -> Int {
+    return 42;
+}
+
+func main() -> Int {
+    // Syntax demonstration - actual instantiation is WIP
+    // let some: Option<Int> = Option::Some<Int>(42);
+    // let none: Option<Int> = Option::None<Int>;
+    // let ok: Result<Int, Int> = Result::Ok<Int, Int>(100);
+
+    return get_code();
+}

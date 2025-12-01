@@ -1,0 +1,43 @@
+// Generic Structs Example
+// Demonstrates generic type parameters on struct definitions
+// Note: This demonstrates V2 syntax parsing; full generic instantiation is WIP
+
+module generic_structs;
+
+// Simple container with one type parameter
+struct Box<T> {
+    value: T,
+}
+
+// Pair with two type parameters
+struct Pair<T, U> {
+    first: T,
+    second: U,
+}
+
+// Stack-like structure (conceptual)
+struct Stack<T> {
+    data: T,
+    size: Int,
+}
+
+// Key-value entry for maps
+struct Entry<K, V> {
+    key: K,
+    value: V,
+}
+
+// Nested generic usage would look like:
+// struct Tree<T> {
+//     value: T,
+//     left: Box<Tree<T>>,
+//     right: Box<Tree<T>>,
+// }
+
+func main() -> Int {
+    // Syntax demonstration - actual instantiation is WIP
+    // let box: Box<Int> = Box<Int> { value: 42 };
+    // let pair: Pair<Int, Bool> = Pair<Int, Bool> { first: 10, second: true };
+
+    return 0;
+}
