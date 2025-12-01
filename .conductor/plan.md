@@ -418,12 +418,12 @@ See: [Architecture - Syntax Simplification](architecture.md#syntax-simplificatio
 See: [Architecture - Generics and Contract Verification](architecture.md#generics-and-contract-verification-design)
 
 ### Task 14.1: Parse Generic Type Parameters
-- [ ] **Lexer**: Ensure `<` and `>` tokens work in type context
-- [ ] **Parser**: Implement `parse_generic_parameters()` for `<T, U>` syntax
-- [ ] **Parser**: Update `parse_function()` to accept generic parameters
-- [ ] **Parser**: Update `parse_struct()` to accept generic parameters
-- [ ] **AST**: Populate `generic_parameters` field (already exists)
-- [ ] **Tests**: Generic function and struct parsing tests
+- [x] **Lexer**: `<` and `>` tokens already work (Less/Greater)
+- [x] **Parser**: Implemented `parse_generic_parameters()` for `<T, U>` syntax
+- [x] **Parser**: Updated `parse_function()` to accept generic parameters
+- [x] **Parser**: Updated `parse_struct()` and `parse_enum()` for generic parameters
+- [x] **AST**: `generic_parameters` field populated correctly
+- [x] **Tests**: Added 7 new tests for generic function, struct, and enum parsing
 
 ### Task 14.2: Parse Where Clauses
 - [ ] **Lexer**: Add `where` keyword

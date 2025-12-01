@@ -1852,6 +1852,65 @@ fn test_parse_if_with_body() {
     }
 }
 
+// Tests for brace-free expressions (Task 13.2)
+#[test]
+fn test_parse_expression_without_braces() {
+    // Should be able to parse "x > 0" without braces
+    let mut parser = parser_from_source("x > 0");
+    let result = parser.parse_expression();
+
+    assert!(result.is_ok(), "Expected expression without braces to parse: {:?}", result.err());
+    let expr = result.unwrap();
+    assert!(matches!(expr, Expression::GreaterThan { .. }));
+}
+
+#[test]
+fn test_parse_if_without_braces() {
+    // Should be able to parse "if x > 0 { return x; }" without braces around condition
+    let mut parser = parser_from_source("if x > 0 { return x; }");
+    let result = parser.parse_if_statement();
+
+    assert!(result.is_ok(), "Expected if without braces to parse: {:?}", result.err());
+    let stmt = result.unwrap();
+    if let Statement::If { condition, .. } = stmt {
+        assert!(matches!(*condition, Expression::GreaterThan { .. }));
+    } else {
+        panic!("Expected If statement");
+    }
+}
+
+#[test]
+fn test_parse_return_without_braces() {
+    // Should be able to parse "return x + 1;" without braces
+    let mut parser = parser_from_source("return x + 1;");
+    let result = parser.parse_return_statement();
+
+    assert!(result.is_ok(), "Expected return without braces to parse: {:?}", result.err());
+    let stmt = result.unwrap();
+    if let Statement::Return { value: Some(expr), .. } = stmt {
+        assert!(matches!(*expr, Expression::Add { .. }));
+    } else {
+        panic!("Expected Return statement with Add expression");
+    }
+}
+
+#[test]
+fn test_parse_arithmetic_precedence() {
+    // "1 + 2 * 3" should parse as "1 + (2 * 3)" = 7, not "(1 + 2) * 3" = 9
+    let mut parser = parser_from_source("1 + 2 * 3");
+    let result = parser.parse_expression();
+
+    assert!(result.is_ok(), "Expected precedence expression to parse: {:?}", result.err());
+    let expr = result.unwrap();
+    // Should be Add { left: 1, right: Multiply { 2, 3 } }
+    if let Expression::Add { left, right, .. } = expr {
+        assert!(matches!(*left, Expression::IntegerLiteral { value: 1, .. }));
+        assert!(matches!(*right, Expression::Multiply { .. }));
+    } else {
+        panic!("Expected Add expression at top level");
+    }
+}
+
 #[test]
 fn test_parse_while_loop() {
     let mut parser = parser_from_source("while true { }");
@@ -3662,5 +3721,158 @@ fn test_function_call_with_labeled_arguments() {
         assert_eq!(call.arguments[1].parameter_name.name, "other");
     } else {
         panic!("Expected FunctionCall expression");
+    }
+}
+
+// ==================== GENERIC TYPE PARAMETER TESTS ====================
+
+#[test]
+fn test_generic_function_single_parameter() {
+    let source = r#"
+        module test;
+        func identity<T>(x: T) -> T {
+            return x;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.function_definitions.len(), 1);
+    let func = &module.function_definitions[0];
+    assert_eq!(func.name.name, "identity");
+    assert_eq!(func.generic_parameters.len(), 1);
+    assert_eq!(func.generic_parameters[0].name.name, "T");
+}
+
+#[test]
+fn test_generic_function_multiple_parameters() {
+    let source = r#"
+        module test;
+        func pair<T, U>(first: T, second: U) -> T {
+            return first;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.function_definitions.len(), 1);
+    let func = &module.function_definitions[0];
+    assert_eq!(func.name.name, "pair");
+    assert_eq!(func.generic_parameters.len(), 2);
+    assert_eq!(func.generic_parameters[0].name.name, "T");
+    assert_eq!(func.generic_parameters[1].name.name, "U");
+}
+
+#[test]
+fn test_generic_struct_single_parameter() {
+    let source = r#"
+        module test;
+        struct Box<T> {
+            value: T,
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.type_definitions.len(), 1);
+    if let TypeDefinition::Structured { name, generic_parameters, .. } = &module.type_definitions[0] {
+        assert_eq!(name.name, "Box");
+        assert_eq!(generic_parameters.len(), 1);
+        assert_eq!(generic_parameters[0].name.name, "T");
+    } else {
+        panic!("Expected Structured type definition");
+    }
+}
+
+#[test]
+fn test_generic_struct_multiple_parameters() {
+    let source = r#"
+        module test;
+        struct Pair<K, V> {
+            key: K,
+            value: V,
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.type_definitions.len(), 1);
+    if let TypeDefinition::Structured { name, generic_parameters, .. } = &module.type_definitions[0] {
+        assert_eq!(name.name, "Pair");
+        assert_eq!(generic_parameters.len(), 2);
+        assert_eq!(generic_parameters[0].name.name, "K");
+        assert_eq!(generic_parameters[1].name.name, "V");
+    } else {
+        panic!("Expected Structured type definition");
+    }
+}
+
+#[test]
+fn test_generic_function_no_parameters() {
+    // Functions without generics should still work
+    let source = r#"
+        module test;
+        func add(a: Int, b: Int) -> Int {
+            return a + b;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.function_definitions.len(), 1);
+    let func = &module.function_definitions[0];
+    assert_eq!(func.name.name, "add");
+    assert_eq!(func.generic_parameters.len(), 0);
+}
+
+#[test]
+fn test_generic_enum_single_parameter() {
+    let source = r#"
+        module test;
+        enum Option<T> {
+            case Some(T);
+            case None;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.type_definitions.len(), 1);
+    if let TypeDefinition::Enumeration { name, generic_parameters, .. } = &module.type_definitions[0] {
+        assert_eq!(name.name, "Option");
+        assert_eq!(generic_parameters.len(), 1);
+        assert_eq!(generic_parameters[0].name.name, "T");
+    } else {
+        panic!("Expected Enumeration type definition");
+    }
+}
+
+#[test]
+fn test_generic_enum_multiple_parameters() {
+    let source = r#"
+        module test;
+        enum Result<T, E> {
+            case Ok(T);
+            case Err(E);
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.type_definitions.len(), 1);
+    if let TypeDefinition::Enumeration { name, generic_parameters, .. } = &module.type_definitions[0] {
+        assert_eq!(name.name, "Result");
+        assert_eq!(generic_parameters.len(), 2);
+        assert_eq!(generic_parameters[0].name.name, "T");
+        assert_eq!(generic_parameters[1].name.name, "E");
+    } else {
+        panic!("Expected Enumeration type definition");
     }
 }

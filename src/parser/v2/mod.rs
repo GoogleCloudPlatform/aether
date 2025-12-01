@@ -21,7 +21,7 @@
 use crate::ast::{
     Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode, CatchClause,
     ConstantDeclaration, ContractAssertion, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction, FailureAction, FieldValue, Function,
-    FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, Identifier,
+    FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, GenericParameter, Identifier,
     ImportStatement, LambdaBody, MatchArm, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
     Statement, StructField, TypeDefinition, TypeSpecifier, PerformanceMetric, PerformanceExpectation, ComplexityExpectation, ComplexityType, ComplexityNotation,
 };
@@ -1004,6 +1004,48 @@ impl Parser {
         Ok(Identifier::new(parts.join("."), start_location))
     }
 
+    /// Parse generic type parameters for functions, structs, and enums
+    /// Grammar: "<" generic_param ("," generic_param)* ">"
+    /// generic_param: IDENTIFIER
+    /// Returns empty Vec if no generic parameters are present
+    pub fn parse_generic_parameters(&mut self) -> Result<Vec<GenericParameter>, ParserError> {
+        // Check if there are generic parameters
+        if !self.check(&TokenType::Less) {
+            return Ok(Vec::new());
+        }
+
+        self.advance(); // consume '<'
+
+        let mut params = Vec::new();
+
+        // Parse first parameter
+        let start_location = self.current_location();
+        let name = self.parse_identifier()?;
+        params.push(GenericParameter {
+            name,
+            constraints: Vec::new(),
+            default_type: None,
+            source_location: start_location,
+        });
+
+        // Parse additional parameters
+        while self.check(&TokenType::Comma) {
+            self.advance(); // consume ','
+            let param_location = self.current_location();
+            let param_name = self.parse_identifier()?;
+            params.push(GenericParameter {
+                name: param_name,
+                constraints: Vec::new(),
+                default_type: None,
+                source_location: param_location,
+            });
+        }
+
+        self.expect(&TokenType::Greater, "expected '>' to close generic parameters")?;
+
+        Ok(params)
+    }
+
     /// Parse a type specifier
     /// Grammar: ownership_type | primitive_type | generic_type | named_type
     pub fn parse_type(&mut self) -> Result<TypeSpecifier, ParserError> {
@@ -1221,7 +1263,7 @@ impl Parser {
     }
 
     /// Parse a function definition
-    /// Grammar: "func" IDENTIFIER "(" params? ")" ("->" type)? block
+    /// Grammar: "func" IDENTIFIER generic_params? "(" params? ")" ("->" type)? block
     pub fn parse_function(&mut self) -> Result<Function, ParserError> {
         let start_location = self.current_location();
 
@@ -1230,6 +1272,9 @@ impl Parser {
 
         // Parse function name
         let name = self.parse_identifier()?;
+
+        // Parse optional generic parameters
+        let generic_parameters = self.parse_generic_parameters()?;
 
         // Expect opening parenthesis
         self.expect(&TokenType::LeftParen, "expected '(' after function name")?;
@@ -1258,7 +1303,7 @@ impl Parser {
         Ok(Function {
             name,
             intent: None,
-            generic_parameters: Vec::new(),
+            generic_parameters,
             lifetime_parameters: Vec::new(),
             parameters,
             return_type: Box::new(return_type),
@@ -1550,13 +1595,16 @@ impl Parser {
     // ==================== STRUCT PARSING ====================
 
     /// Parse a struct definition
-    /// Grammar: "struct" IDENTIFIER "{" field* "}"
+    /// Grammar: "struct" IDENTIFIER generic_params? "{" field* "}"
     pub fn parse_struct(&mut self) -> Result<TypeDefinition, ParserError> {
         let start_location = self.current_location();
 
         self.expect_keyword(Keyword::Struct, "expected 'struct'")?;
 
         let name = self.parse_identifier()?;
+
+        // Parse optional generic parameters
+        let generic_parameters = self.parse_generic_parameters()?;
 
         self.expect(&TokenType::LeftBrace, "expected '{' after struct name")?;
 
@@ -1571,7 +1619,7 @@ impl Parser {
         Ok(TypeDefinition::Structured {
             name,
             intent: None,
-            generic_parameters: vec![],
+            generic_parameters,
             lifetime_parameters: vec![],
             fields,
             export_as: None,
@@ -1613,6 +1661,9 @@ impl Parser {
 
         let name = self.parse_identifier()?;
 
+        // Parse optional generic parameters
+        let generic_parameters = self.parse_generic_parameters()?;
+
         self.expect(&TokenType::LeftBrace, "expected '{' after enum name")?;
 
         let mut variants = Vec::new();
@@ -1626,7 +1677,7 @@ impl Parser {
         Ok(TypeDefinition::Enumeration {
             name,
             intent: None,
-            generic_parameters: vec![],
+            generic_parameters,
             lifetime_parameters: vec![],
             variants,
             source_location: start_location,
@@ -2292,33 +2343,309 @@ impl Parser {
         Ok(args)
     }
 
-    /// Parse an expression
-    /// Supports: literals, identifiers, braced binary expressions `{a + b}`
+    /// Parse an expression using precedence-based parsing
+    /// Supports both braced expressions `{a + b}` (for backward compatibility)
+    /// and unbraced expressions `a + b`
     pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
+        // Use the precedence-based expression parser, starting with range (lowest precedence)
+        self.parse_range_expression_full()
+    }
+
+    /// Parse range expression: expr..expr or expr..=expr (lowest precedence)
+    fn parse_range_expression_full(&mut self) -> Result<Expression, ParserError> {
         let start_location = self.current_location();
 
-        // Braced binary expression: {left op right} or Map Literal
-        if self.check(&TokenType::LeftBrace) {
-            if self.looks_like_map_literal() {
-                return self.parse_map_literal();
-            }
-            return self.parse_braced_expression();
+        // Check for prefix range: ..end or ..=end
+        if self.check(&TokenType::DotDot) {
+            self.advance();
+            let end = self.parse_or_expression()?;
+            return Ok(Expression::Range {
+                start: None,
+                end: Some(Box::new(end)),
+                inclusive: false,
+                source_location: start_location,
+            });
+        }
+        if self.check(&TokenType::DotDotEqual) {
+            self.advance();
+            let end = self.parse_or_expression()?;
+            return Ok(Expression::Range {
+                start: None,
+                end: Some(Box::new(end)),
+                inclusive: true,
+                source_location: start_location,
+            });
         }
 
-        // Logical NOT: !expr
-        if self.check(&TokenType::Bang) {
-            self.advance(); // consume '!'
+        // Parse the left operand
+        let left = self.parse_or_expression()?;
+
+        // Check for postfix range: start.. or start..end
+        if self.check(&TokenType::DotDot) {
+            self.advance();
+            // Check if there's an end value
+            if self.is_expression_start() {
+                let end = self.parse_or_expression()?;
+                return Ok(Expression::Range {
+                    start: Some(Box::new(left)),
+                    end: Some(Box::new(end)),
+                    inclusive: false,
+                    source_location: start_location,
+                });
+            } else {
+                return Ok(Expression::Range {
+                    start: Some(Box::new(left)),
+                    end: None,
+                    inclusive: false,
+                    source_location: start_location,
+                });
+            }
+        }
+        if self.check(&TokenType::DotDotEqual) {
+            self.advance();
+            let end = self.parse_or_expression()?;
+            return Ok(Expression::Range {
+                start: Some(Box::new(left)),
+                end: Some(Box::new(end)),
+                inclusive: true,
+                source_location: start_location,
+            });
+        }
+
+        Ok(left)
+    }
+
+    /// Check if current token can start an expression
+    fn is_expression_start(&self) -> bool {
+        match &self.peek().token_type {
+            TokenType::IntegerLiteral(_)
+            | TokenType::FloatLiteral(_)
+            | TokenType::StringLiteral(_)
+            | TokenType::CharLiteral(_)
+            | TokenType::BoolLiteral(_)
+            | TokenType::Identifier(_)
+            | TokenType::LeftParen
+            | TokenType::LeftBrace
+            | TokenType::LeftBracket
+            | TokenType::Bang
+            | TokenType::Minus => true,
+            TokenType::Keyword(k) => matches!(k, Keyword::Match),
+            _ => false,
+        }
+    }
+
+    /// Legacy parse_expression implementation kept for reference but no longer used
+    /// Handles special cases like address-of and move that aren't part of normal expressions
+    fn parse_special_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        // Address of: &expr or &mut expr
+        if self.check(&TokenType::Ampersand) {
+            self.advance(); // consume '&'
+
+            let is_mut = if self.check_keyword(Keyword::Mut) {
+                self.advance(); // consume 'mut'
+                true
+            } else {
+                false
+            };
+
             let operand = self.parse_expression()?;
+
+            return Ok(Expression::AddressOf {
+                operand: Box::new(operand),
+                mutability: is_mut,
+                source_location: start_location,
+            });
+        }
+
+        // Move: ^expr
+        if self.check(&TokenType::Caret) {
+            self.advance(); // consume '^'
+            let operand = self.parse_expression()?;
+            return Ok(operand); // Treating ^ as a semantic marker
+        }
+
+        // Prefix range expression: ..end or ..=end
+        if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
+            return self.parse_range_expression(None, start_location);
+        }
+
+        // Fall back to precedence-based parsing
+        self.parse_or_expression()
+    }
+
+    /// Parse a braced binary expression: `{left op right}`
+    /// Kept for backward compatibility - braces are now optional
+    fn parse_braced_expression(&mut self) -> Result<Expression, ParserError> {
+        self.expect(&TokenType::LeftBrace, "expected '{'")?;
+
+        // Parse the inner expression using precedence-based parsing
+        let expr = self.parse_or_expression()?;
+
+        self.expect(
+            &TokenType::RightBrace,
+            "expected '}' after expression",
+        )?;
+
+        Ok(expr)
+    }
+
+    // ==================== PRECEDENCE-BASED EXPRESSION PARSING ====================
+    // Precedence (lowest to highest):
+    // 1. || (logical or)
+    // 2. && (logical and)
+    // 3. == != (equality)
+    // 4. < > <= >= (comparison)
+    // 5. + - (additive)
+    // 6. * / % (multiplicative)
+    // 7. unary (! -)
+    // 8. primary (literals, identifiers, function calls)
+
+    /// Parse logical OR expression: expr || expr
+    fn parse_or_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        let mut left = self.parse_and_expression()?;
+
+        while self.check(&TokenType::PipePipe) {
+            self.advance(); // consume ||
+            let right = self.parse_and_expression()?;
+            left = self.build_binary_expression(left, BinaryOp::Or, right, start_location.clone());
+        }
+
+        Ok(left)
+    }
+
+    /// Parse logical AND expression: expr && expr
+    fn parse_and_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        let mut left = self.parse_equality_expression()?;
+
+        while self.check(&TokenType::AmpAmp) {
+            self.advance(); // consume &&
+            let right = self.parse_equality_expression()?;
+            left = self.build_binary_expression(left, BinaryOp::And, right, start_location.clone());
+        }
+
+        Ok(left)
+    }
+
+    /// Parse equality expression: expr == expr, expr != expr
+    fn parse_equality_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        let mut left = self.parse_comparison_expression()?;
+
+        loop {
+            if self.check(&TokenType::EqualEqual) {
+                self.advance();
+                let right = self.parse_comparison_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::Equals, right, start_location.clone());
+            } else if self.check(&TokenType::BangEqual) {
+                self.advance();
+                let right = self.parse_comparison_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::NotEquals, right, start_location.clone());
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
+
+    /// Parse comparison expression: expr < expr, expr > expr, etc.
+    fn parse_comparison_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        let mut left = self.parse_additive_expression()?;
+
+        loop {
+            if self.check(&TokenType::Less) {
+                self.advance();
+                let right = self.parse_additive_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::LessThan, right, start_location.clone());
+            } else if self.check(&TokenType::LessEqual) {
+                self.advance();
+                let right = self.parse_additive_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::LessEqual, right, start_location.clone());
+            } else if self.check(&TokenType::Greater) {
+                self.advance();
+                let right = self.parse_additive_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::GreaterThan, right, start_location.clone());
+            } else if self.check(&TokenType::GreaterEqual) {
+                self.advance();
+                let right = self.parse_additive_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::GreaterEqual, right, start_location.clone());
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
+
+    /// Parse additive expression: expr + expr, expr - expr
+    fn parse_additive_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        let mut left = self.parse_multiplicative_expression()?;
+
+        loop {
+            if self.check(&TokenType::Plus) {
+                self.advance();
+                let right = self.parse_multiplicative_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::Add, right, start_location.clone());
+            } else if self.check(&TokenType::Minus) {
+                self.advance();
+                let right = self.parse_multiplicative_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::Subtract, right, start_location.clone());
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
+
+    /// Parse multiplicative expression: expr * expr, expr / expr, expr % expr
+    fn parse_multiplicative_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        let mut left = self.parse_unary_expression()?;
+
+        loop {
+            if self.check(&TokenType::Star) {
+                self.advance();
+                let right = self.parse_unary_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::Multiply, right, start_location.clone());
+            } else if self.check(&TokenType::Slash) {
+                self.advance();
+                let right = self.parse_unary_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::Divide, right, start_location.clone());
+            } else if self.check(&TokenType::Percent) {
+                self.advance();
+                let right = self.parse_unary_expression()?;
+                left = self.build_binary_expression(left, BinaryOp::Modulo, right, start_location.clone());
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
+
+    /// Parse unary expression: !expr, -expr, &expr, &mut expr
+    fn parse_unary_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        if self.check(&TokenType::Bang) {
+            self.advance();
+            let operand = self.parse_unary_expression()?;
             return Ok(Expression::LogicalNot {
                 operand: Box::new(operand),
                 source_location: start_location,
             });
         }
 
-        // Unary minus: -expr
         if self.check(&TokenType::Minus) {
-            self.advance(); // consume '-'
-            let operand = self.parse_expression()?;
+            self.advance();
+            let operand = self.parse_unary_expression()?;
             return Ok(Expression::Negate {
                 operand: Box::new(operand),
                 source_location: start_location,
@@ -2328,67 +2655,173 @@ impl Parser {
         // Address of: &expr or &mut expr
         if self.check(&TokenType::Ampersand) {
             self.advance(); // consume '&'
-            
-            // Check for 'mut' (which is a keyword, but we need to see if it's handled by parser)
-            // In V2, mut is a keyword.
+
             let is_mut = if self.check_keyword(Keyword::Mut) {
                 self.advance(); // consume 'mut'
                 true
             } else {
                 false
             };
-            
-            let operand = self.parse_expression()?;
-            
-            // If it was &mut, we might need a different expression type or flag
-            // For now, let's map it to AddressOf with a potential flag if supported,
-            // or just AddressOf for now. 
-            // Wait, AddressOf usually implies immutable borrow. 
-            // If the AST supports MutableBorrow, we should use that.
-            // Let's check AST.
+
+            let operand = self.parse_unary_expression()?;
+
             return Ok(Expression::AddressOf {
                 operand: Box::new(operand),
                 mutability: is_mut,
                 source_location: start_location,
             });
         }
-        
-        // Move: ^expr
-        if self.check(&TokenType::Caret) {
-            self.advance(); // consume '^'
-            let operand = self.parse_expression()?;
-            // Move is explicit in V2
-            // Map to a Move expression if it exists, or maybe just the expression itself if move is default?
-            // Actually, `^` might be a dereference in some languages, but here it says "owned".
-            // Let's see if we have a Move expression. If not, maybe it's just a marker.
-            // But wait, `^` is also XOR.
-            // If used as prefix, it's Move/Owned.
-            // Let's check if we have an AST node for this.
-            // For now, let's assume it's just an expression wrapper or we need to handle it.
-            // If no AST node, maybe it's just processed as part of the type checking/move semantics?
-            // Let's look for "Move" in AST.
-            return Ok(operand); // Just return the operand for now, treating ^ as a semantic marker handled elsewhere? 
-            // Or we need to implement it.
+
+        self.parse_postfix_expression()
+    }
+
+    /// Parse postfix expression: function calls, array indexing, field access
+    fn parse_postfix_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+        let mut expr = self.parse_atomic_expression()?;
+
+        // Handle postfix operators: (args), [index], and .field
+        loop {
+            if self.check(&TokenType::LeftParen) {
+                // Function call: expr(args)
+                let args_with_labels = self.parse_argument_list()?;
+
+                // Extract function name from variable expression
+                let function_name = match &expr {
+                    Expression::Variable { name, .. } => name.clone(),
+                    _ => {
+                        return Err(ParserError::UnexpectedToken {
+                            expected: "function name".to_string(),
+                            found: "complex expression".to_string(),
+                            location: start_location.clone(),
+                        });
+                    }
+                };
+
+                // Convert expressions to Argument structs
+                let arguments: Vec<Argument> = args_with_labels
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (label, value))| Argument {
+                        parameter_name: Identifier::new(
+                            label.unwrap_or_else(|| format!("arg_{}", i)),
+                            start_location.clone(),
+                        ),
+                        value: Box::new(value),
+                        source_location: start_location.clone(),
+                    })
+                    .collect();
+
+                expr = Expression::FunctionCall {
+                    call: AstFunctionCall {
+                        function_reference: FunctionReference::Local {
+                            name: function_name,
+                        },
+                        arguments,
+                        variadic_arguments: Vec::new(),
+                    },
+                    source_location: start_location.clone(),
+                };
+            } else if self.check(&TokenType::LeftBracket) {
+                // Array indexing: expr[index]
+                self.advance();
+                let index = self.parse_expression()?;
+                self.expect(&TokenType::RightBracket, "expected ']'")?;
+
+                expr = Expression::ArrayAccess {
+                    array: Box::new(expr),
+                    index: Box::new(index),
+                    source_location: start_location.clone(),
+                };
+            } else if self.check(&TokenType::Dot) {
+                // Field access or method call: expr.field or expr.method(args)
+                self.advance();
+                let member_name = self.parse_identifier()?;
+
+                // Check if this is a method call (followed by '(')
+                if self.check(&TokenType::LeftParen) {
+                    // Method call: expr.method(args)
+                    let args_with_labels = self.parse_argument_list()?;
+
+                    // Convert expressions to Argument structs
+                    let arguments: Vec<Argument> = args_with_labels
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, (label, value))| Argument {
+                            parameter_name: Identifier::new(
+                                label.unwrap_or_else(|| format!("arg_{}", i)),
+                                start_location.clone(),
+                            ),
+                            value: Box::new(value),
+                            source_location: start_location.clone(),
+                        })
+                        .collect();
+
+                    expr = Expression::MethodCall {
+                        receiver: Box::new(expr),
+                        method_name: member_name,
+                        arguments,
+                        source_location: start_location.clone(),
+                    };
+                } else {
+                    // Field access: expr.field
+                    expr = Expression::FieldAccess {
+                        instance: Box::new(expr),
+                        field_name: member_name,
+                        source_location: start_location.clone(),
+                    };
+                }
+            } else {
+                break;
+            }
         }
 
-        // Prefix range expression: ..end or ..=end
-        if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
-            return self.parse_range_expression(None, start_location);
+        Ok(expr)
+    }
+
+    /// Parse atomic expression: literals, identifiers, parenthesized expressions
+    fn parse_atomic_expression(&mut self) -> Result<Expression, ParserError> {
+        let start_location = self.current_location();
+
+        // Braced expression: { expr } (kept for backward compatibility)
+        if self.check(&TokenType::LeftBrace) {
+            if self.looks_like_map_literal() {
+                return self.parse_map_literal();
+            }
+            return self.parse_braced_expression();
         }
 
-        // Integer literal (with range check)
+        // Parenthesized expression or lambda: (x) => x + 1
+        if self.check(&TokenType::LeftParen) {
+            return self.parse_paren_expr_or_lambda();
+        }
+
+        // Array literal or closure with capture list: [x, y](params) => body
+        if self.check(&TokenType::LeftBracket) {
+            if self.looks_like_array_literal() {
+                return self.parse_array_literal();
+            } else {
+                // Parse as capture list for closure
+                let captures = self.parse_capture_list()?;
+                if !self.check(&TokenType::LeftParen) {
+                    return Err(ParserError::SyntaxError {
+                        message: "expected '(' after capture list".to_string(),
+                        location: self.current_location(),
+                        suggestion: Some("use [captures](params) => body syntax".to_string()),
+                    });
+                }
+                return self.parse_paren_expr_or_lambda_with_captures(captures);
+            }
+        }
+
+        // Integer literal
         if let TokenType::IntegerLiteral(value) = &self.peek().token_type {
             let value = *value;
             self.advance();
-            let expr = Expression::IntegerLiteral {
+            return Ok(Expression::IntegerLiteral {
                 value,
-                source_location: start_location.clone(),
-            };
-            // Check for range: integer..end or integer..=end
-            if self.check(&TokenType::DotDot) || self.check(&TokenType::DotDotEqual) {
-                return self.parse_range_expression(Some(expr), start_location);
-            }
-            return Ok(expr);
+                source_location: start_location,
+            });
         }
 
         // Float literal
@@ -2431,169 +2864,33 @@ impl Parser {
             });
         }
 
-        // Identifier (variable reference, struct construction, enum variant, or function call)
+        // Identifier (variable reference, struct construction, enum variant)
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name = name.clone();
             self.advance();
 
-            // Check for enum variant: EnumType::Variant or EnumType::Variant(value)
+            // Check for enum variant: EnumType::Variant
             if self.check(&TokenType::DoubleColon) {
                 return self.parse_enum_variant_expression(name, start_location);
             }
 
             // Check for struct construction: TypeName { field: value, ... }
-            // Only parse as struct construction if it looks like one (has field: value syntax)
             if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction() {
                 return self.parse_struct_construction(name, start_location);
             }
 
-            let mut expr = Expression::Variable {
+            return Ok(Expression::Variable {
                 name: Identifier {
                     name,
                     source_location: start_location.clone(),
                 },
-                source_location: start_location.clone(),
-            };
-
-            // Handle postfix operators: (args), [index], and .field
-            loop {
-                if self.check(&TokenType::LeftParen) {
-                    // Function call: expr(args)
-                    let args_with_labels = self.parse_argument_list()?;
-
-                    // Extract function name from variable expression
-                    let function_name = match &expr {
-                        Expression::Variable { name, .. } => name.clone(),
-                        _ => {
-                            return Err(ParserError::UnexpectedToken {
-                                expected: "function name".to_string(),
-                                found: "complex expression".to_string(),
-                                location: start_location.clone(),
-                            });
-                        }
-                    };
-
-                    // Convert expressions to Argument structs
-                    let arguments: Vec<Argument> = args_with_labels
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, (label, value))| Argument {
-                            parameter_name: Identifier::new(
-                                label.unwrap_or_else(|| format!("arg_{}", i)),
-                                start_location.clone(),
-                            ),
-                            value: Box::new(value),
-                            source_location: start_location.clone(),
-                        })
-                        .collect();
-
-                    expr = Expression::FunctionCall {
-                        call: AstFunctionCall {
-                            function_reference: FunctionReference::Local {
-                                name: function_name,
-                            },
-                            arguments,
-                            variadic_arguments: Vec::new(),
-                        },
-                        source_location: start_location.clone(),
-                    };
-                } else if self.check(&TokenType::LeftBracket) {
-                    // Array indexing: expr[index]
-                    self.advance(); // consume '['
-                    let index = self.parse_expression()?;
-                    self.expect(&TokenType::RightBracket, "expected ']'")?;
-                    expr = Expression::ArrayAccess {
-                        array: Box::new(expr),
-                        index: Box::new(index),
-                        source_location: start_location.clone(),
-                    };
-                } else if self.check(&TokenType::Dot) {
-                    // Field access or method call: expr.field or expr.method(args)
-                    self.advance(); // consume '.'
-                    if let TokenType::Identifier(member_name) = &self.peek().token_type {
-                        let member_name = member_name.clone();
-                        let member_loc = self.current_location();
-                        self.advance();
-
-                        // Check if this is a method call (followed by '(')
-                        if self.check(&TokenType::LeftParen) {
-                            // Method call: expr.method(args)
-                            let args_with_labels = self.parse_argument_list()?;
-
-                            // Convert expressions to Argument structs
-                            let arguments: Vec<Argument> = args_with_labels
-                                .into_iter()
-                                .enumerate()
-                                .map(|(i, (label, value))| Argument {
-                                    parameter_name: Identifier::new(
-                                        label.unwrap_or_else(|| format!("arg_{}", i)),
-                                        start_location.clone(),
-                                    ),
-                                    value: Box::new(value),
-                                    source_location: start_location.clone(),
-                                })
-                                .collect();
-
-                            expr = Expression::MethodCall {
-                                receiver: Box::new(expr),
-                                method_name: Identifier {
-                                    name: member_name,
-                                    source_location: member_loc,
-                                },
-                                arguments,
-                                source_location: start_location.clone(),
-                            };
-                        } else {
-                            // Field access: expr.field
-                            expr = Expression::FieldAccess {
-                                instance: Box::new(expr),
-                                field_name: Identifier {
-                                    name: member_name,
-                                    source_location: member_loc,
-                                },
-                                source_location: start_location.clone(),
-                            };
-                        }
-                    } else {
-                        return Err(ParserError::UnexpectedToken {
-                            expected: "field name or method name".to_string(),
-                            found: format!("{:?}", self.peek().token_type),
-                            location: self.current_location(),
-                        });
-                    }
-                } else {
-                    break;
-                }
-            }
-
-            return Ok(expr);
+                source_location: start_location,
+            });
         }
 
-        // Array literal or closure with capture list
-        if self.check(&TokenType::LeftBracket) {
-            // Determine if this is an array literal or capture list
-            // Array literal: [1, 2, 3] or [expr, expr, ...]
-            // Capture list: [x, y](params) => body (followed by '(')
-            if self.looks_like_array_literal() {
-                return self.parse_array_literal();
-            } else {
-                // Parse as capture list for closure
-                let captures = self.parse_capture_list()?;
-                // After capture list, we must have parameters in parens
-                if !self.check(&TokenType::LeftParen) {
-                    return Err(ParserError::SyntaxError {
-                        message: "expected '(' after capture list".to_string(),
-                        location: self.current_location(),
-                        suggestion: Some("use [captures](params) => body syntax".to_string()),
-                    });
-                }
-                return self.parse_paren_expr_or_lambda_with_captures(captures);
-            }
-        }
-
-        // Parenthesized expression or lambda
-        if self.check(&TokenType::LeftParen) {
-            return self.parse_paren_expr_or_lambda();
+        // Match expression
+        if self.check_keyword(Keyword::Match) {
+            return self.parse_match_expression();
         }
 
         Err(ParserError::UnexpectedToken {
@@ -2601,31 +2898,6 @@ impl Parser {
             found: format!("{:?}", self.peek().token_type),
             location: start_location,
         })
-    }
-
-    /// Parse a braced binary expression: `{left op right}`
-    /// V2 syntax requires binary operations to be wrapped in braces
-    fn parse_braced_expression(&mut self) -> Result<Expression, ParserError> {
-        let start_location = self.current_location();
-
-        self.expect(&TokenType::LeftBrace, "expected '{'")?;
-
-        // Parse left operand (must be a primary expression, not another binary)
-        let mut left = self.parse_primary_expression()?;
-
-        // Loop to handle chained binary operations
-        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
-            let operator = self.parse_binary_operator()?;
-            let right = self.parse_primary_expression()?; // Use primary expression for right operand for now
-            left = self.build_binary_expression(left, operator, right, start_location.clone());
-        }
-
-        self.expect(
-            &TokenType::RightBrace,
-            "expected '}' after binary expression",
-        )?;
-
-        Ok(left)
     }
 
     /// Parse a primary expression (non-binary): literals, identifiers
