@@ -1654,3 +1654,14 @@ let result: Bool = {{x > 0} && {y < 10}} || {!flag};
     assert!(has_greater);
     assert!(has_less);
 }
+
+#[test]
+fn test_keyword_impl() {
+    let mut lexer = Lexer::new("impl", "test.aether".to_string());
+    let tokens = lexer.tokenize().unwrap();
+    assert!(matches!(
+        tokens[0].token_type,
+        TokenType::Keyword(Keyword::Impl)
+    ));
+}
+

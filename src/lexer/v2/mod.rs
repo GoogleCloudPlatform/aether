@@ -156,6 +156,7 @@ pub enum Keyword {
     // Generics
     Where,
     Trait,
+    Impl,
 
     // Quantifiers (for axioms)
     ForAll,
@@ -291,6 +292,7 @@ impl Lexer {
         // Generic keywords
         self.keywords.insert("where".to_string(), Keyword::Where);
         self.keywords.insert("trait".to_string(), Keyword::Trait);
+        self.keywords.insert("impl".to_string(), Keyword::Impl);
 
         // Quantifier keywords (for axioms)
         self.keywords.insert("forall".to_string(), Keyword::ForAll);

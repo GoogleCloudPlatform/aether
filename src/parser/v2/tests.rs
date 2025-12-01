@@ -4201,3 +4201,44 @@ fn test_parse_trait_multiple_axioms() {
     assert_eq!(trait_def.axioms[1].name.as_ref().unwrap().name, "symmetry");
     assert_eq!(trait_def.axioms[2].name.as_ref().unwrap().name, "transitivity");
 }
+
+#[test]
+fn test_parse_impl_block() {
+    let source = r#"
+module Test {
+    impl MyType {
+        func new() -> MyType { return MyType {}; }
+    }
+}
+"#;
+    let mut tokens = crate::lexer::v2::Lexer::new(source, "test.aether".to_string()).tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let module = parser.parse_module().unwrap();
+
+    assert_eq!(module.impl_blocks.len(), 1);
+    let impl_block = &module.impl_blocks[0];
+    assert!(impl_block.trait_name.is_none());
+    assert!(matches!(*impl_block.for_type, TypeSpecifier::Named { ref name, .. } if name.name == "MyType"));
+    assert_eq!(impl_block.methods.len(), 1);
+    assert_eq!(impl_block.methods[0].name.name, "new");
+}
+
+#[test]
+fn test_parse_trait_impl_block() {
+    let source = r#"
+module Test {
+    impl MyTrait for MyType {
+        func foo() -> Void { }
+    }
+}
+"#;
+    let mut tokens = crate::lexer::v2::Lexer::new(source, "test.aether".to_string()).tokenize().unwrap();
+    let mut parser = Parser::new(tokens);
+    let module = parser.parse_module().unwrap();
+
+    assert_eq!(module.impl_blocks.len(), 1);
+    let impl_block = &module.impl_blocks[0];
+    assert!(matches!(impl_block.trait_name, Some(ref name) if name.name == "MyTrait"));
+    assert!(matches!(*impl_block.for_type, TypeSpecifier::Named { ref name, .. } if name.name == "MyType"));
+}
+

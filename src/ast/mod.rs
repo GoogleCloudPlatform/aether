@@ -46,6 +46,7 @@ pub struct Module {
     pub exports: Vec<ExportStatement>,
     pub type_definitions: Vec<TypeDefinition>,
     pub trait_definitions: Vec<TraitDefinition>,
+    pub impl_blocks: Vec<TraitImpl>,
     pub constant_declarations: Vec<ConstantDeclaration>,
     pub function_definitions: Vec<Function>,
     pub external_functions: Vec<ExternalFunction>,
@@ -144,6 +145,18 @@ pub struct TraitMethod {
     pub parameters: Vec<Parameter>,
     pub return_type: Box<TypeSpecifier>,
     pub default_body: Option<Block>, // None = required, Some = default impl
+    pub source_location: SourceLocation,
+}
+
+/// Trait implementation or inherent implementation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitImpl {
+    pub generic_parameters: Vec<GenericParameter>,
+    pub trait_name: Option<Identifier>,
+    pub trait_generic_args: Vec<TypeSpecifier>,
+    pub for_type: Box<TypeSpecifier>,
+    pub where_clause: Vec<WhereClause>,
+    pub methods: Vec<Function>,
     pub source_location: SourceLocation,
 }
 

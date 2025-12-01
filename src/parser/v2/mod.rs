@@ -24,7 +24,7 @@ use crate::ast::{
     FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, GenericParameter, Identifier,
     ImportStatement, LambdaBody, MatchArm, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
     Quantifier, QuantifierKind, QuantifierVariable,
-    Statement, StructField, TraitAxiom, TraitDefinition, TraitMethod, TypeDefinition, TypeSpecifier, PerformanceMetric, PerformanceExpectation, ComplexityExpectation, ComplexityType, ComplexityNotation,
+    Statement, StructField, TraitAxiom, TraitDefinition, TraitImpl, TraitMethod, TypeDefinition, TypeSpecifier, PerformanceMetric, PerformanceExpectation, ComplexityExpectation, ComplexityType, ComplexityNotation,
     WhereClause,
 };
 use crate::error::{ParserError, SourceLocation};
@@ -495,6 +495,7 @@ impl Parser {
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
         let mut trait_definitions = Vec::new();
+        let mut impl_blocks = Vec::new();
         let mut constant_declarations = Vec::new();
         let mut exports = Vec::new();
 
@@ -509,6 +510,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut trait_definitions,
+                    &mut impl_blocks,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -526,6 +528,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut trait_definitions,
+                    &mut impl_blocks,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -552,6 +555,7 @@ impl Parser {
             exports,
             type_definitions,
             trait_definitions,
+            impl_blocks,
             constant_declarations,
             function_definitions,
             external_functions,
@@ -763,6 +767,7 @@ impl Parser {
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
         let mut trait_definitions = Vec::new();
+        let mut impl_blocks = Vec::new();
         let mut constant_declarations = Vec::new();
         let mut exports = Vec::new();
 
@@ -779,6 +784,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut trait_definitions,
+                    &mut impl_blocks,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -797,6 +803,7 @@ impl Parser {
                     &mut external_functions,
                     &mut type_definitions,
                     &mut trait_definitions,
+                    &mut impl_blocks,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -828,6 +835,7 @@ impl Parser {
             exports,
             type_definitions,
             trait_definitions,
+            impl_blocks,
             constant_declarations,
             function_definitions,
             external_functions,
@@ -843,6 +851,7 @@ impl Parser {
         external_functions: &mut Vec<ExternalFunction>,
         type_definitions: &mut Vec<TypeDefinition>,
         trait_definitions: &mut Vec<TraitDefinition>,
+        impl_blocks: &mut Vec<TraitImpl>,
         constant_declarations: &mut Vec<ConstantDeclaration>,
         exports: &mut Vec<ExportStatement>,
     ) -> Result<(), ParserError> {
@@ -925,6 +934,8 @@ impl Parser {
                 });
             }
             trait_definitions.push(trait_def);
+        } else if self.check_keyword(Keyword::Impl) {
+            impl_blocks.push(self.parse_impl_block()?);
         } else {
             return Err(ParserError::UnexpectedToken {
                 expected: "import, func, struct, enum, const, trait, or annotation".to_string(),
@@ -1864,6 +1875,67 @@ impl Parser {
             generic_parameters,
             where_clause,
             axioms,
+            methods,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse an impl block
+    /// Grammar: "impl" generic_params? [trait_name generic_args? "for"] type where_clause? "{" method* "}"
+    pub fn parse_impl_block(&mut self) -> Result<TraitImpl, ParserError> {
+        let start_location = self.current_location();
+        self.expect_keyword(Keyword::Impl, "expected 'impl'")?;
+
+        let generic_parameters = self.parse_generic_parameters()?;
+
+        // Parse the first type (could be trait or type)
+        let first_type = self.parse_type()?;
+        let mut trait_name = None;
+        let mut trait_generic_args = Vec::new();
+        let mut for_type = Box::new(first_type);
+
+        if self.check_keyword(Keyword::For) {
+            self.advance(); // consume 'for'
+            // The first type was the trait
+            match *for_type {
+                TypeSpecifier::Named { name, .. } => {
+                    trait_name = Some(name);
+                }
+                TypeSpecifier::Generic { base_type, type_arguments, .. } => {
+                    trait_name = Some(base_type);
+                    trait_generic_args = type_arguments.into_iter().map(|b| *b).collect();
+                }
+                _ => return Err(self.syntax_error("expected trait name before 'for'", None)),
+            }
+            // Parse the actual for_type
+            for_type = Box::new(self.parse_type()?);
+        }
+
+        let where_clause = self.parse_where_clause()?;
+
+        self.expect(&TokenType::LeftBrace, "expected '{' after impl type")?;
+
+        let mut methods = Vec::new();
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            // Parse optional annotations for methods
+            let mut annotations = Vec::new();
+            while self.check(&TokenType::At) {
+                annotations.push(self.parse_annotation()?);
+            }
+
+            let mut func = self.parse_function()?;
+            self.apply_annotations(&mut func, annotations)?;
+            methods.push(func);
+        }
+
+        self.expect(&TokenType::RightBrace, "expected '}' to close impl block")?;
+
+        Ok(TraitImpl {
+            generic_parameters,
+            trait_name,
+            trait_generic_args,
+            for_type,
+            where_clause,
             methods,
             source_location: start_location,
         })

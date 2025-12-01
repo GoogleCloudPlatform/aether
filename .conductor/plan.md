@@ -446,10 +446,10 @@ See: [Architecture - Generics and Contract Verification](architecture.md#generic
 - [x] **Tests**: Added 5 axiom parsing tests
 
 ### Task 14.5: Parse Impl Blocks
-- [ ] **Lexer**: Add `impl` keyword
-- [ ] **Parser**: Implement `parse_impl_block()`
-- [ ] **AST**: Add `TraitImpl` node
-- [ ] **Tests**: Impl block parsing tests
+- [x] **Lexer**: Add `impl` keyword
+- [x] **Parser**: Implement `parse_impl_block()`
+- [x] **AST**: Add `TraitImpl` node
+- [x] **Tests**: Impl block parsing tests
 
 ### Task 14.6: Semantic Analysis for Generics
 - [ ] **Semantic**: Resolve type parameters in scope

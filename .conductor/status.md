@@ -144,8 +144,12 @@
 - [x] Tests: Added 5 tests for axiom parsing (simple, unnamed, forall, multiple variables, multiple axioms)
 - [x] All 746+ tests pass
 
-### Task 14.5: Parse Impl Blocks
-- [ ] Pending
+### Task 14.5: Parse Impl Blocks (Completed - 2025-12-01)
+- [x] Lexer: Added `impl` keyword
+- [x] AST: Added `TraitImpl` node
+- [x] Parser: Implemented `parse_impl_block()`
+- [x] Parser: Updated `parse_module_item()` to handle impl blocks
+- [x] Tests: Added 2 tests for impl parsing (inherent and trait)
 
 ## Completed Phases
 
