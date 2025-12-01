@@ -25,6 +25,7 @@ fn create_ownership_test_module(function_body: Vec<Statement>) -> Program {
         intent: None,
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![Parameter {
             name: Identifier::new("s".to_string(), loc.clone()),
             param_type: Box::new(TypeSpecifier::Owned {
@@ -71,6 +72,7 @@ fn create_ownership_test_module(function_body: Vec<Statement>) -> Program {
         intent: None,
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![Parameter {
             name: Identifier::new("s".to_string(), loc.clone()),
             param_type: Box::new(TypeSpecifier::Owned {
@@ -117,6 +119,7 @@ fn create_ownership_test_module(function_body: Vec<Statement>) -> Program {
         intent: None,
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Void,
@@ -148,6 +151,7 @@ fn create_ownership_test_module(function_body: Vec<Statement>) -> Program {
         imports: vec![],
         exports: vec![],
         type_definitions: vec![],
+        trait_definitions: vec![],
         constant_declarations: vec![],
         function_definitions: vec![consume_func, borrow_func, test_func],
         external_functions: vec![],

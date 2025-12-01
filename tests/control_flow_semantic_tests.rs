@@ -26,6 +26,7 @@ fn create_control_flow_ast() -> Program {
         intent: Some("Test if statement".to_string()),
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![Parameter {
             name: Identifier::new("x".to_string(), loc.clone()),
             param_type: Box::new(TypeSpecifier::Primitive {
@@ -101,6 +102,7 @@ fn create_control_flow_ast() -> Program {
         intent: Some("Test while loop".to_string()),
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![Parameter {
             name: Identifier::new("n".to_string(), loc.clone()),
             param_type: Box::new(TypeSpecifier::Primitive {
@@ -201,6 +203,7 @@ fn create_control_flow_ast() -> Program {
         imports: Vec::new(),
         exports: Vec::new(),
         type_definitions: Vec::new(),
+        trait_definitions: Vec::new(),
         constant_declarations: Vec::new(),
         function_definitions: vec![if_func, while_func],
         external_functions: Vec::new(),
@@ -238,6 +241,7 @@ fn test_non_boolean_condition_error() {
         intent: Some("Test non-boolean condition".to_string()),
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Void,
@@ -284,6 +288,7 @@ fn test_non_boolean_condition_error() {
         imports: Vec::new(),
         exports: Vec::new(),
         type_definitions: Vec::new(),
+        trait_definitions: Vec::new(),
         constant_declarations: Vec::new(),
         function_definitions: vec![bad_func],
         external_functions: Vec::new(),
@@ -315,6 +320,7 @@ fn test_loop_variable_scope() {
         intent: Some("Test for-each loop scope".to_string()),
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,
@@ -392,6 +398,7 @@ fn test_loop_variable_scope() {
         imports: Vec::new(),
         exports: Vec::new(),
         type_definitions: Vec::new(),
+        trait_definitions: Vec::new(),
         constant_declarations: Vec::new(),
         function_definitions: vec![foreach_func],
         external_functions: Vec::new(),
@@ -423,6 +430,7 @@ fn test_break_continue_statements() {
         intent: Some("Test break and continue".to_string()),
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Void,
@@ -487,6 +495,7 @@ fn test_break_continue_statements() {
         imports: Vec::new(),
         exports: Vec::new(),
         type_definitions: Vec::new(),
+        trait_definitions: Vec::new(),
         constant_declarations: Vec::new(),
         function_definitions: vec![loop_func],
         external_functions: Vec::new(),
@@ -514,6 +523,7 @@ fn test_try_catch_analysis() {
         intent: Some("Test try-catch block".to_string()),
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: vec![],
         return_type: Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,
@@ -576,6 +586,7 @@ fn test_try_catch_analysis() {
         imports: Vec::new(),
         exports: Vec::new(),
         type_definitions: Vec::new(),
+        trait_definitions: Vec::new(),
         constant_declarations: Vec::new(),
         function_definitions: vec![try_func],
         external_functions: Vec::new(),

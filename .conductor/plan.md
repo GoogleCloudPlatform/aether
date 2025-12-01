@@ -426,22 +426,24 @@ See: [Architecture - Generics and Contract Verification](architecture.md#generic
 - [x] **Tests**: Added 7 new tests for generic function, struct, and enum parsing
 - [x] **Examples**: Created `examples/v2/18-generics/` with generic_functions, generic_structs, generic_enums
 
-### Task 14.2: Parse Where Clauses
-- [ ] **Lexer**: Add `where` keyword
-- [ ] **Parser**: Implement `parse_where_clause()`
-- [ ] **AST**: Add `where_clause` field to functions
-- [ ] **Tests**: Where clause parsing tests
+### Task 14.2: Parse Where Clauses (Completed)
+- [x] **Lexer**: Added `Where` and `Trait` keywords
+- [x] **Parser**: Implemented `parse_where_clause()` and `parse_where_constraint()`
+- [x] **AST**: Added `where_clause` field to Function, Struct, Enum
+- [x] **Tests**: Added 5 where clause parsing tests
 
-### Task 14.3: Parse Trait Definitions
-- [ ] **Lexer**: Add `trait` keyword
-- [ ] **Parser**: Implement `parse_trait_definition()`
-- [ ] **AST**: Add `TraitDefinition` node with methods
-- [ ] **Tests**: Trait definition parsing tests
+### Task 14.3: Parse Trait Definitions (Completed)
+- [x] **Lexer**: `Trait` keyword already exists (added in 14.2)
+- [x] **Parser**: Implemented `parse_trait_definition()` and `parse_trait_method()`
+- [x] **AST**: Added `TraitDefinition` and `TraitMethod` structs
+- [x] **Tests**: Added 5 trait definition parsing tests
 
-### Task 14.4: Parse Trait Axioms
-- [ ] **Parser**: Implement `@axiom(...)` parsing in traits
-- [ ] **AST**: Add `Axiom` node with quantifiers and conditions
-- [ ] **Tests**: Axiom parsing tests
+### Task 14.4: Parse Trait Axioms (Completed)
+- [x] **Lexer**: Added `ForAll` and `Exists` keywords for quantifiers
+- [x] **Parser**: Implemented `parse_axiom()` and `parse_quantifier()` for `@axiom` annotations
+- [x] **AST**: Added `TraitAxiom`, `Quantifier`, `QuantifierKind`, `QuantifierVariable` structs
+- [x] **AST**: Added `axioms: Vec<TraitAxiom>` to `TraitDefinition`
+- [x] **Tests**: Added 5 axiom parsing tests
 
 ### Task 14.5: Parse Impl Blocks
 - [ ] **Lexer**: Add `impl` keyword

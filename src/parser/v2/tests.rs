@@ -3876,3 +3876,328 @@ fn test_generic_enum_multiple_parameters() {
         panic!("Expected Enumeration type definition");
     }
 }
+
+// ==================== WHERE CLAUSE PARSING TESTS ====================
+
+#[test]
+fn test_where_clause_single_constraint() {
+    let source = r#"
+        module test;
+        func identity<T>(x: T) -> T where T: Display {
+            return x;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.function_definitions.len(), 1);
+    let func = &module.function_definitions[0];
+    assert_eq!(func.name.name, "identity");
+    assert_eq!(func.generic_parameters.len(), 1);
+    assert_eq!(func.where_clause.len(), 1);
+    assert_eq!(func.where_clause[0].type_param.name, "T");
+    assert_eq!(func.where_clause[0].constraints.len(), 1);
+    assert_eq!(func.where_clause[0].constraints[0].name, "Display");
+}
+
+#[test]
+fn test_where_clause_multiple_constraints_same_type() {
+    let source = r#"
+        module test;
+        func show<T>(x: T) -> T where T: Display + Debug {
+            return x;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.function_definitions.len(), 1);
+    let func = &module.function_definitions[0];
+    assert_eq!(func.where_clause.len(), 1);
+    assert_eq!(func.where_clause[0].type_param.name, "T");
+    assert_eq!(func.where_clause[0].constraints.len(), 2);
+    assert_eq!(func.where_clause[0].constraints[0].name, "Display");
+    assert_eq!(func.where_clause[0].constraints[1].name, "Debug");
+}
+
+#[test]
+fn test_where_clause_multiple_types() {
+    let source = r#"
+        module test;
+        func process<T, U>(a: T, b: U) -> Int where T: Display, U: Debug {
+            return 0;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.function_definitions.len(), 1);
+    let func = &module.function_definitions[0];
+    assert_eq!(func.where_clause.len(), 2);
+    assert_eq!(func.where_clause[0].type_param.name, "T");
+    assert_eq!(func.where_clause[0].constraints[0].name, "Display");
+    assert_eq!(func.where_clause[1].type_param.name, "U");
+    assert_eq!(func.where_clause[1].constraints[0].name, "Debug");
+}
+
+#[test]
+fn test_where_clause_empty() {
+    // Function with generics but no where clause should have empty where_clause
+    let source = r#"
+        module test;
+        func identity<T>(x: T) -> T {
+            return x;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.function_definitions.len(), 1);
+    let func = &module.function_definitions[0];
+    assert_eq!(func.generic_parameters.len(), 1);
+    assert!(func.where_clause.is_empty());
+}
+
+#[test]
+fn test_where_clause_struct() {
+    let source = r#"
+        module test;
+        struct Container<T> where T: Clone {
+            value: T,
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.type_definitions.len(), 1);
+    if let TypeDefinition::Structured { name, generic_parameters, where_clause, .. } = &module.type_definitions[0] {
+        assert_eq!(name.name, "Container");
+        assert_eq!(generic_parameters.len(), 1);
+        assert_eq!(where_clause.len(), 1);
+        assert_eq!(where_clause[0].type_param.name, "T");
+        assert_eq!(where_clause[0].constraints[0].name, "Clone");
+    } else {
+        panic!("Expected Structured type definition");
+    }
+}
+
+// ==================== TRAIT DEFINITION TESTS ====================
+
+#[test]
+fn test_parse_trait_simple() {
+    let source = r#"
+        module test;
+        trait Printable {
+            func print(self: &Self) -> Void;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.trait_definitions.len(), 1);
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.name.name, "Printable");
+    assert_eq!(trait_def.methods.len(), 1);
+    assert_eq!(trait_def.methods[0].name.name, "print");
+    assert!(trait_def.methods[0].default_body.is_none());
+}
+
+#[test]
+fn test_parse_trait_with_generic() {
+    let source = r#"
+        module test;
+        trait Comparable<T> {
+            func compare(self: &Self, other: &T) -> Integer;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.trait_definitions.len(), 1);
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.name.name, "Comparable");
+    assert_eq!(trait_def.generic_parameters.len(), 1);
+    assert_eq!(trait_def.generic_parameters[0].name.name, "T");
+}
+
+#[test]
+fn test_parse_trait_with_default_impl() {
+    let source = r#"
+        module test;
+        trait Equatable {
+            func equals(self: &Self, other: &Self) -> Boolean;
+            func not_equals(self: &Self, other: &Self) -> Boolean {
+                return !self.equals(other);
+            }
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.trait_definitions.len(), 1);
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.methods.len(), 2);
+    assert!(trait_def.methods[0].default_body.is_none()); // equals has no default
+    assert!(trait_def.methods[1].default_body.is_some()); // not_equals has default
+}
+
+#[test]
+fn test_parse_trait_with_where_clause() {
+    let source = r#"
+        module test;
+        trait Sortable<T> where T: Comparable {
+            func sort(self: &Self) -> Void;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.trait_definitions.len(), 1);
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.where_clause.len(), 1);
+    assert_eq!(trait_def.where_clause[0].type_param.name, "T");
+}
+
+#[test]
+fn test_parse_trait_multiple_methods() {
+    let source = r#"
+        module test;
+        trait Iterator<T> {
+            func next(self: &Self) -> T;
+            func has_next(self: &Self) -> Boolean;
+            func reset(self: &Self) -> Void;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.trait_definitions.len(), 1);
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.methods.len(), 3);
+    assert_eq!(trait_def.methods[0].name.name, "next");
+    assert_eq!(trait_def.methods[1].name.name, "has_next");
+    assert_eq!(trait_def.methods[2].name.name, "reset");
+}
+
+// ==================== TRAIT AXIOM TESTS ====================
+
+#[test]
+fn test_parse_trait_axiom_simple() {
+    // Test simple axiom with a condition
+    let source = r#"
+        module test;
+        trait Eq {
+            @axiom reflexivity: eq(x, x)
+            func eq(self: &Self, other: &Self) -> Boolean;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.trait_definitions.len(), 1);
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.axioms.len(), 1);
+    assert_eq!(trait_def.axioms[0].name.as_ref().unwrap().name, "reflexivity");
+    assert_eq!(trait_def.methods.len(), 1);
+}
+
+#[test]
+fn test_parse_trait_axiom_unnamed() {
+    // Test axiom without a name
+    let source = r#"
+        module test;
+        trait Eq {
+            @axiom eq(x, x)
+            func eq(self: &Self, other: &Self) -> Boolean;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    assert_eq!(module.trait_definitions.len(), 1);
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.axioms.len(), 1);
+    assert!(trait_def.axioms[0].name.is_none());
+}
+
+#[test]
+fn test_parse_trait_axiom_with_forall() {
+    // Test axiom with forall quantifier
+    let source = r#"
+        module test;
+        trait Eq {
+            @axiom reflexivity: forall x: Self => eq(x, x)
+            func eq(self: &Self, other: &Self) -> Boolean;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.axioms.len(), 1);
+    let axiom = &trait_def.axioms[0];
+    assert_eq!(axiom.quantifiers.len(), 1);
+    assert!(matches!(axiom.quantifiers[0].kind, QuantifierKind::ForAll));
+    assert_eq!(axiom.quantifiers[0].variables.len(), 1);
+    assert_eq!(axiom.quantifiers[0].variables[0].name.name, "x");
+}
+
+#[test]
+fn test_parse_trait_axiom_multiple_variables() {
+    // Test axiom with multiple quantified variables
+    let source = r#"
+        module test;
+        trait Eq {
+            @axiom symmetry: forall x: Self, y: Self => eq(x, y) == eq(y, x)
+            func eq(self: &Self, other: &Self) -> Boolean;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.axioms.len(), 1);
+    let axiom = &trait_def.axioms[0];
+    assert_eq!(axiom.quantifiers.len(), 1);
+    assert_eq!(axiom.quantifiers[0].variables.len(), 2);
+    assert_eq!(axiom.quantifiers[0].variables[0].name.name, "x");
+    assert_eq!(axiom.quantifiers[0].variables[1].name.name, "y");
+}
+
+#[test]
+fn test_parse_trait_multiple_axioms() {
+    // Test trait with multiple axioms (eq laws)
+    // Note: we use implies() as a function call since => is reserved for quantifier separation
+    let source = r#"
+        module test;
+        trait Eq {
+            @axiom reflexivity: forall x: Self => eq(x, x)
+            @axiom symmetry: forall x: Self, y: Self => eq(x, y) == eq(y, x)
+            @axiom transitivity: forall x: Self, y: Self, z: Self => implies(eq(x, y) && eq(y, z), eq(x, z))
+            func eq(self: &Self, other: &Self) -> Boolean;
+        }
+    "#;
+    let mut parser = parser_from_source(source);
+    let result = parser.parse_module();
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+    let module = result.unwrap();
+    let trait_def = &module.trait_definitions[0];
+    assert_eq!(trait_def.axioms.len(), 3);
+    assert_eq!(trait_def.axioms[0].name.as_ref().unwrap().name, "reflexivity");
+    assert_eq!(trait_def.axioms[1].name.as_ref().unwrap().name, "symmetry");
+    assert_eq!(trait_def.axioms[2].name.as_ref().unwrap().name, "transitivity");
+}

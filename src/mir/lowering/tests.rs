@@ -40,6 +40,7 @@ fn test_simple_function_lowering() {
         },
         export_info: None,
         is_async: false,
+        where_clause: vec![],
         source_location: crate::error::SourceLocation::unknown(),
     };
 

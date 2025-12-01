@@ -135,6 +135,7 @@ pub(crate) fn create_function_stub(
         intent: None,
         generic_parameters: Vec::new(),
         lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
         parameters: parameters
             .into_iter()
             .map(|(name, ty)| Parameter {

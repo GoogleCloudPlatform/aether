@@ -661,8 +661,8 @@ fn test_lexer_tokenize_with_newlines() {
 #[test]
 fn test_lexer_all_keywords_count() {
     let lexer = Lexer::new("", "test.aether".to_string());
-    // Count total keywords: 48 + concurrent = 49 -> 51
-    assert_eq!(lexer.keywords.len(), 51);
+    // Count total keywords: 51 + where + trait + forall + exists = 55
+    assert_eq!(lexer.keywords.len(), 55);
 }
 
 // ==================== LITERAL TOKENIZATION TESTS ====================

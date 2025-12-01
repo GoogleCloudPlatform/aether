@@ -648,6 +648,7 @@ mod tests {
             lifetime_parameters: vec![],
             export_info: None,
             is_async: false,
+            where_clause: vec![],
         };
 
         let result = analyzer.analyze_function(&function);

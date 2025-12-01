@@ -23,7 +23,9 @@ use crate::ast::{
     ConstantDeclaration, ContractAssertion, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction, FailureAction, FieldValue, Function,
     FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, GenericParameter, Identifier,
     ImportStatement, LambdaBody, MatchArm, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
-    Statement, StructField, TypeDefinition, TypeSpecifier, PerformanceMetric, PerformanceExpectation, ComplexityExpectation, ComplexityType, ComplexityNotation,
+    Quantifier, QuantifierKind, QuantifierVariable,
+    Statement, StructField, TraitAxiom, TraitDefinition, TraitMethod, TypeDefinition, TypeSpecifier, PerformanceMetric, PerformanceExpectation, ComplexityExpectation, ComplexityType, ComplexityNotation,
+    WhereClause,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -492,6 +494,7 @@ impl Parser {
         let mut function_definitions = Vec::new();
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
+        let mut trait_definitions = Vec::new();
         let mut constant_declarations = Vec::new();
         let mut exports = Vec::new();
 
@@ -505,6 +508,7 @@ impl Parser {
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut trait_definitions,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -521,6 +525,7 @@ impl Parser {
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut trait_definitions,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -546,6 +551,7 @@ impl Parser {
             imports,
             exports,
             type_definitions,
+            trait_definitions,
             constant_declarations,
             function_definitions,
             external_functions,
@@ -756,6 +762,7 @@ impl Parser {
         let mut function_definitions = Vec::new();
         let mut external_functions = Vec::new();
         let mut type_definitions = Vec::new();
+        let mut trait_definitions = Vec::new();
         let mut constant_declarations = Vec::new();
         let mut exports = Vec::new();
 
@@ -771,6 +778,7 @@ impl Parser {
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut trait_definitions,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -788,6 +796,7 @@ impl Parser {
                     &mut function_definitions,
                     &mut external_functions,
                     &mut type_definitions,
+                    &mut trait_definitions,
                     &mut constant_declarations,
                     &mut exports,
                 ) {
@@ -818,6 +827,7 @@ impl Parser {
             imports,
             exports,
             type_definitions,
+            trait_definitions,
             constant_declarations,
             function_definitions,
             external_functions,
@@ -825,13 +835,14 @@ impl Parser {
         })
     }
 
-    /// Parse a single module item (import, function, struct, enum, extern)
+    /// Parse a single module item (import, function, struct, enum, trait, extern)
     fn parse_module_item(
         &mut self,
         imports: &mut Vec<ImportStatement>,
         function_definitions: &mut Vec<Function>,
         external_functions: &mut Vec<ExternalFunction>,
         type_definitions: &mut Vec<TypeDefinition>,
+        trait_definitions: &mut Vec<TraitDefinition>,
         constant_declarations: &mut Vec<ConstantDeclaration>,
         exports: &mut Vec<ExportStatement>,
     ) -> Result<(), ParserError> {
@@ -905,9 +916,18 @@ impl Parser {
                 });
             }
             constant_declarations.push(constant);
+        } else if self.check_keyword(Keyword::Trait) {
+            let trait_def = self.parse_trait_definition()?;
+            if is_public {
+                exports.push(ExportStatement::Type {
+                    name: trait_def.name.clone(),
+                    source_location: trait_def.source_location.clone(),
+                });
+            }
+            trait_definitions.push(trait_def);
         } else {
             return Err(ParserError::UnexpectedToken {
-                expected: "import, func, struct, enum, const, or annotation".to_string(),
+                expected: "import, func, struct, enum, const, trait, or annotation".to_string(),
                 found: format!("{:?}", self.peek().token_type),
                 location: self.current_location(),
             });
@@ -1044,6 +1064,60 @@ impl Parser {
         self.expect(&TokenType::Greater, "expected '>' to close generic parameters")?;
 
         Ok(params)
+    }
+
+    /// Parse an optional where clause for generic constraints
+    /// Grammar: ("where" where_constraint ("," where_constraint)*)?
+    /// where_constraint: IDENTIFIER ":" constraint ("+" constraint)*
+    /// constraint: IDENTIFIER
+    /// Returns empty Vec if no where clause is present
+    pub fn parse_where_clause(&mut self) -> Result<Vec<WhereClause>, ParserError> {
+        // Check if there's a where clause
+        if !self.check_keyword(Keyword::Where) {
+            return Ok(Vec::new());
+        }
+
+        self.advance(); // consume 'where'
+
+        let mut clauses = Vec::new();
+
+        // Parse first constraint
+        clauses.push(self.parse_where_constraint()?);
+
+        // Parse additional constraints separated by commas
+        while self.check(&TokenType::Comma) {
+            self.advance(); // consume ','
+            clauses.push(self.parse_where_constraint()?);
+        }
+
+        Ok(clauses)
+    }
+
+    /// Parse a single where constraint: T: Display + Debug
+    fn parse_where_constraint(&mut self) -> Result<WhereClause, ParserError> {
+        let start_location = self.current_location();
+
+        // Parse the type parameter name
+        let type_param = self.parse_identifier()?;
+
+        // Expect colon
+        self.expect(&TokenType::Colon, "expected ':' after type parameter in where clause")?;
+
+        // Parse first constraint (trait bound)
+        let mut constraints = Vec::new();
+        constraints.push(self.parse_identifier()?);
+
+        // Parse additional constraints separated by +
+        while self.check(&TokenType::Plus) {
+            self.advance(); // consume '+'
+            constraints.push(self.parse_identifier()?);
+        }
+
+        Ok(WhereClause {
+            type_param,
+            constraints,
+            source_location: start_location,
+        })
     }
 
     /// Parse a type specifier
@@ -1263,7 +1337,7 @@ impl Parser {
     }
 
     /// Parse a function definition
-    /// Grammar: "func" IDENTIFIER generic_params? "(" params? ")" ("->" type)? block
+    /// Grammar: "func" IDENTIFIER generic_params? "(" params? ")" ("->" type)? where_clause? block
     pub fn parse_function(&mut self) -> Result<Function, ParserError> {
         let start_location = self.current_location();
 
@@ -1297,6 +1371,9 @@ impl Parser {
             }
         };
 
+        // Parse optional where clause
+        let where_clause = self.parse_where_clause()?;
+
         // Parse function body
         let body = self.parse_block()?;
 
@@ -1305,6 +1382,7 @@ impl Parser {
             intent: None,
             generic_parameters,
             lifetime_parameters: Vec::new(),
+            where_clause,
             parameters,
             return_type: Box::new(return_type),
             metadata: FunctionMetadata {
@@ -1606,6 +1684,9 @@ impl Parser {
         // Parse optional generic parameters
         let generic_parameters = self.parse_generic_parameters()?;
 
+        // Parse optional where clause
+        let where_clause = self.parse_where_clause()?;
+
         self.expect(&TokenType::LeftBrace, "expected '{' after struct name")?;
 
         let mut fields = Vec::new();
@@ -1621,6 +1702,7 @@ impl Parser {
             intent: None,
             generic_parameters,
             lifetime_parameters: vec![],
+            where_clause,
             fields,
             export_as: None,
             source_location: start_location,
@@ -1653,7 +1735,7 @@ impl Parser {
     // ==================== ENUM PARSING ====================
 
     /// Parse an enum definition
-    /// Grammar: "enum" IDENTIFIER "{" ("case" IDENTIFIER ["(" type ")"] ";")* "}"
+    /// Grammar: "enum" IDENTIFIER generic_params? where_clause? "{" ("case" IDENTIFIER ["(" type ")"] ";")* "}"
     pub fn parse_enum(&mut self) -> Result<TypeDefinition, ParserError> {
         let start_location = self.current_location();
 
@@ -1663,6 +1745,9 @@ impl Parser {
 
         // Parse optional generic parameters
         let generic_parameters = self.parse_generic_parameters()?;
+
+        // Parse optional where clause
+        let where_clause = self.parse_where_clause()?;
 
         self.expect(&TokenType::LeftBrace, "expected '{' after enum name")?;
 
@@ -1679,6 +1764,7 @@ impl Parser {
             intent: None,
             generic_parameters,
             lifetime_parameters: vec![],
+            where_clause,
             variants,
             source_location: start_location,
         })
@@ -1730,6 +1816,209 @@ impl Parser {
             associated_types,
             source_location: start_location,
         })
+    }
+
+    // ==================== TRAIT DEFINITION PARSING ====================
+
+    /// Parse a trait definition
+    /// Grammar: "trait" IDENTIFIER ["<" generic_params ">"] [where_clause] "{" trait_method* "}"
+    pub fn parse_trait_definition(&mut self) -> Result<TraitDefinition, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Trait, "expected 'trait'")?;
+
+        let name = self.parse_identifier()?;
+
+        // Parse optional generic parameters
+        let generic_parameters = self.parse_generic_parameters()?;
+
+        // Parse optional where clause
+        let where_clause = self.parse_where_clause()?;
+
+        self.expect(&TokenType::LeftBrace, "expected '{' after trait name")?;
+
+        let mut axioms = Vec::new();
+        let mut methods = Vec::new();
+
+        while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
+            // Check if this is an axiom (@axiom ...)
+            if self.check(&TokenType::At) {
+                // Peek ahead to see if this is @axiom
+                if let Some(next) = self.peek_next() {
+                    if let TokenType::Identifier(name) = &next.token_type {
+                        if name == "axiom" {
+                            axioms.push(self.parse_axiom()?);
+                            continue;
+                        }
+                    }
+                }
+            }
+            // Otherwise parse as a method
+            methods.push(self.parse_trait_method()?);
+        }
+
+        self.expect(&TokenType::RightBrace, "expected '}' after trait methods")?;
+
+        Ok(TraitDefinition {
+            name,
+            generic_parameters,
+            where_clause,
+            axioms,
+            methods,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a trait method (signature with optional default implementation)
+    /// Grammar: "fn" IDENTIFIER ["<" generic_params ">"] "(" params ")" "->" type (";" | block)
+    fn parse_trait_method(&mut self) -> Result<TraitMethod, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Func, "expected 'fn' for trait method")?;
+
+        let name = self.parse_identifier()?;
+
+        // Parse optional generic parameters for the method
+        let generic_parameters = self.parse_generic_parameters()?;
+
+        // Parse parameters
+        self.expect(&TokenType::LeftParen, "expected '(' after method name")?;
+        let mut parameters = Vec::new();
+        while !self.check(&TokenType::RightParen) && !self.is_at_end() {
+            parameters.push(self.parse_parameter()?);
+            if !self.check(&TokenType::RightParen) {
+                self.expect(&TokenType::Comma, "expected ',' between parameters")?;
+            }
+        }
+        self.expect(&TokenType::RightParen, "expected ')' after parameters")?;
+
+        // Parse return type
+        self.expect(&TokenType::Arrow, "expected '->' before return type")?;
+        let return_type = Box::new(self.parse_type()?);
+
+        // Check for default implementation (block) or just declaration (semicolon)
+        let default_body = if self.check(&TokenType::LeftBrace) {
+            Some(self.parse_block()?)
+        } else {
+            self.expect(&TokenType::Semicolon, "expected ';' or '{' after method signature")?;
+            None
+        };
+
+        Ok(TraitMethod {
+            name,
+            generic_parameters,
+            parameters,
+            return_type,
+            default_body,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a trait axiom
+    /// Grammar: "@axiom" [name ":"] [quantifiers "=>"] expression
+    /// Quantifiers: "forall" var_decl {"," var_decl} | "exists" var_decl {"," var_decl}
+    fn parse_axiom(&mut self) -> Result<TraitAxiom, ParserError> {
+        let start_location = self.current_location();
+
+        // Consume the @axiom annotation - we already checked for it
+        self.expect(&TokenType::At, "expected '@'")?;
+        self.expect_identifier_value("axiom")?;
+
+        // Check for optional name: "name: ..."
+        let name = if let TokenType::Identifier(ident) = &self.peek().token_type {
+            // Check if followed by colon (to distinguish from expression start)
+            if self.peek_next().map(|t| matches!(t.token_type, TokenType::Colon)).unwrap_or(false) {
+                let name = Identifier::new(ident.clone(), self.current_location());
+                self.advance(); // consume identifier
+                self.advance(); // consume colon
+                Some(name)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Parse optional quantifiers
+        let mut quantifiers = Vec::new();
+        while self.check_keyword(Keyword::ForAll) || self.check_keyword(Keyword::Exists) {
+            quantifiers.push(self.parse_quantifier()?);
+        }
+
+        // Parse the condition expression
+        let condition = Box::new(self.parse_expression()?);
+
+        Ok(TraitAxiom {
+            name,
+            quantifiers,
+            condition,
+            source_location: start_location,
+        })
+    }
+
+    /// Parse a quantifier (forall or exists with variable bindings)
+    /// Grammar: ("forall" | "exists") var_decl {"," var_decl} "=>"
+    fn parse_quantifier(&mut self) -> Result<Quantifier, ParserError> {
+        let start_location = self.current_location();
+
+        let kind = if self.check_keyword(Keyword::ForAll) {
+            self.advance();
+            QuantifierKind::ForAll
+        } else if self.check_keyword(Keyword::Exists) {
+            self.advance();
+            QuantifierKind::Exists
+        } else {
+            return Err(ParserError::UnexpectedToken {
+                expected: "expected 'forall' or 'exists'".to_string(),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.peek().location.clone(),
+            });
+        };
+
+        // Parse variable bindings: x: Type, y: Type, ...
+        let mut variables = Vec::new();
+        loop {
+            let var_start = self.current_location();
+            let var_name = self.parse_identifier()?;
+            self.expect(&TokenType::Colon, "expected ':' after quantifier variable")?;
+            let var_type = Box::new(self.parse_type()?);
+
+            variables.push(QuantifierVariable {
+                name: var_name,
+                var_type,
+                source_location: var_start,
+            });
+
+            if self.check(&TokenType::Comma) {
+                self.advance(); // consume comma
+            } else {
+                break;
+            }
+        }
+
+        // Expect "=>" after quantifier bindings
+        self.expect(&TokenType::FatArrow, "expected '=>' after quantifier variables")?;
+
+        Ok(Quantifier {
+            kind,
+            variables,
+            source_location: start_location,
+        })
+    }
+
+    /// Check if the next token is an identifier with a specific value
+    fn expect_identifier_value(&mut self, expected: &str) -> Result<(), ParserError> {
+        match &self.peek().token_type {
+            TokenType::Identifier(name) if name == expected => {
+                self.advance();
+                Ok(())
+            }
+            _ => Err(ParserError::UnexpectedToken {
+                expected: format!("expected '{}'", expected),
+                found: format!("{:?}", self.peek().token_type),
+                location: self.peek().location.clone(),
+            }),
+        }
     }
 
     // ==================== VARIABLE DECLARATION PARSING ====================

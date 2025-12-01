@@ -92,7 +92,7 @@
     - **2 examples FILE NOT FOUND**: Example directories exist but missing expected files
     - **Conclusion**: Warning cleanup did not break any existing functionality; failures are pre-existing issues
 
-## Phase 13: Syntax Simplification (In Progress)
+## Phase 13: Syntax Simplification (Completed)
 
 ### Task 13.1: Change `when` to `if` (Completed - 2025-11-30)
 - [x] Parser now uses `if` keyword instead of `when` for conditionals
@@ -101,7 +101,50 @@
 - [x] Updated all parser and integration tests
 - [x] All 720+ tests pass
 
-### Task 13.2: Remove mandatory `{}` around expressions
+### Task 13.2: Remove mandatory `{}` around expressions (Completed - 2025-11-30)
+- [x] Updated 25+ example files to remove braces from return/expression statements
+- [x] Fixed enum syntax to use `case` keyword consistently
+- [x] All tests pass
+
+## Phase 14: Generics Implementation (In Progress)
+
+### Task 14.1: Parse Generic Type Parameters (Completed - 2025-11-30)
+- [x] Lexer: `<` and `>` tokens already work (Less/Greater)
+- [x] Parser: Implemented `parse_generic_parameters()` for `<T, U>` syntax
+- [x] Parser: Updated `parse_function()`, `parse_struct()`, `parse_enum()` for generics
+- [x] AST: `generic_parameters` field populated correctly
+- [x] Tests: Added 7 new tests for generic parsing
+- [x] Examples: Created `examples/v2/18-generics/` with generic_functions, generic_structs, generic_enums
+
+### Task 14.2: Parse Where Clauses (Completed - 2025-11-30)
+- [x] Lexer: Added `Where` and `Trait` keywords
+- [x] AST: Added `WhereClause` struct with `type_param`, `constraints`, `source_location`
+- [x] AST: Added `where_clause: Vec<WhereClause>` to `Function`, `TypeDefinition::Structured`, `TypeDefinition::Enumeration`
+- [x] Parser: Implemented `parse_where_clause()` and `parse_where_constraint()`
+- [x] Parser: Updated `parse_function()`, `parse_struct()`, `parse_enum()` to call `parse_where_clause()`
+- [x] Tests: Added 5 tests for where clause parsing
+- [x] Fixed compile errors - added `where_clause: Vec::new()` to Function constructors
+- [x] All 736+ tests pass
+
+### Task 14.3: Parse Trait Definitions (Completed - 2025-11-30)
+- [x] Lexer: `Trait` keyword already exists
+- [x] AST: Added `TraitDefinition` and `TraitMethod` structs
+- [x] AST: Added `trait_definitions: Vec<TraitDefinition>` to Module
+- [x] Parser: Implemented `parse_trait_definition()` and `parse_trait_method()`
+- [x] Parser: Updated `parse_module_item()` to handle trait keyword
+- [x] Tests: Added 5 tests for trait definition parsing
+- [x] All 741+ tests pass
+
+### Task 14.4: Parse Trait Axioms (Completed - 2025-11-30)
+- [x] Lexer: Added `ForAll` and `Exists` keywords for quantifiers
+- [x] AST: Added `TraitAxiom`, `Quantifier`, `QuantifierKind`, `QuantifierVariable` structs
+- [x] AST: Added `axioms: Vec<TraitAxiom>` to `TraitDefinition`
+- [x] Parser: Implemented `parse_axiom()` and `parse_quantifier()` for `@axiom` annotations
+- [x] Parser: Updated `parse_trait_definition()` to parse axioms before methods
+- [x] Tests: Added 5 tests for axiom parsing (simple, unnamed, forall, multiple variables, multiple axioms)
+- [x] All 746+ tests pass
+
+### Task 14.5: Parse Impl Blocks
 - [ ] Pending
 
 ## Completed Phases

@@ -153,6 +153,14 @@ pub enum Keyword {
     False,
     Nil,
 
+    // Generics
+    Where,
+    Trait,
+
+    // Quantifiers (for axioms)
+    ForAll,
+    Exists,
+
     // Other
     As,
     Range,
@@ -279,6 +287,14 @@ impl Lexer {
         self.keywords.insert("true".to_string(), Keyword::True);
         self.keywords.insert("false".to_string(), Keyword::False);
         self.keywords.insert("nil".to_string(), Keyword::Nil);
+
+        // Generic keywords
+        self.keywords.insert("where".to_string(), Keyword::Where);
+        self.keywords.insert("trait".to_string(), Keyword::Trait);
+
+        // Quantifier keywords (for axioms)
+        self.keywords.insert("forall".to_string(), Keyword::ForAll);
+        self.keywords.insert("exists".to_string(), Keyword::Exists);
 
         // Other keywords
         self.keywords.insert("as".to_string(), Keyword::As);

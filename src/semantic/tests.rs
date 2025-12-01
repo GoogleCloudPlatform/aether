@@ -8,6 +8,7 @@ fn create_test_module() -> Module {
         imports: Vec::new(),
         exports: Vec::new(),
         type_definitions: Vec::new(),
+        trait_definitions: Vec::new(),
         constant_declarations: vec![ConstantDeclaration {
             name: Identifier::new("PI".to_string(), SourceLocation::unknown()),
             type_spec: Box::new(TypeSpecifier::Primitive {

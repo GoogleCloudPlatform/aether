@@ -29,6 +29,7 @@ mod tests {
             imports: vec![],
             exports: vec![],
             type_definitions: vec![],
+            trait_definitions: vec![],
             constant_declarations: vec![],
             function_definitions: vec![
                 // Function that takes ownership: fn consume(value: ^String)
@@ -76,6 +77,7 @@ mod tests {
                     },
                     export_info: None,
                     is_async: false,
+                    where_clause: vec![],
                     source_location: SourceLocation::unknown(),
                 },
                 // Function that borrows: fn borrow(value: &String)
@@ -123,6 +125,7 @@ mod tests {
                     },
                     export_info: None,
                     is_async: false,
+                    where_clause: vec![],
                     source_location: SourceLocation::unknown(),
                 },
             ],
@@ -252,9 +255,10 @@ mod tests {
             },
             export_info: None,
             is_async: false,
+            where_clause: vec![],
             source_location: SourceLocation::unknown(),
         };
-        
+
         // Analyze the test function - it should fail with use-after-move
         // Note: analyze_function_body is private, so we wrap it in a module to test via analyze_module
         // or expose it for tests. Since we can't easily change visibility here without modifying main code again,

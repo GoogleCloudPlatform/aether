@@ -34,6 +34,7 @@ fn create_test_module_with_struct() -> Module {
             intent: Some("2D point structure".to_string()),
             generic_parameters: vec![],
             lifetime_parameters: vec![],
+            where_clause: vec![],
             fields: vec![
                 StructField {
                     name: Identifier::new("x".to_string(), SourceLocation::unknown()),
@@ -55,12 +56,14 @@ fn create_test_module_with_struct() -> Module {
             export_as: Some("struct Point2D".to_string()),
             source_location: SourceLocation::unknown(),
         }],
+        trait_definitions: vec![],
         constant_declarations: vec![],
         function_definitions: vec![Function {
             name: Identifier::new("test_struct_passing".to_string(), SourceLocation::unknown()),
             intent: Some("Test struct passing".to_string()),
             generic_parameters: vec![],
             lifetime_parameters: vec![],
+            where_clause: vec![],
             parameters: vec![Parameter {
                 name: Identifier::new("p".to_string(), SourceLocation::unknown()),
                 param_type: Box::new(TypeSpecifier::Named {
@@ -321,6 +324,7 @@ fn test_nested_struct_generation() {
                 intent: None,
                 generic_parameters: vec![],
                 lifetime_parameters: vec![],
+                where_clause: vec![],
                 fields: vec![
                     StructField {
                         name: Identifier::new("x".to_string(), SourceLocation::unknown()),
@@ -347,6 +351,7 @@ fn test_nested_struct_generation() {
                 intent: None,
                 generic_parameters: vec![],
                 lifetime_parameters: vec![],
+                where_clause: vec![],
                 fields: vec![
                     StructField {
                         name: Identifier::new("top_left".to_string(), SourceLocation::unknown()),
@@ -377,6 +382,7 @@ fn test_nested_struct_generation() {
                 source_location: SourceLocation::unknown(),
             },
         ],
+        trait_definitions: vec![],
         constant_declarations: vec![],
         function_definitions: vec![],
         external_functions: vec![],

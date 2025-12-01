@@ -239,6 +239,7 @@ proptest! {
             imports: Vec::new(),
             exports: Vec::new(),
             type_definitions: Vec::new(),
+            trait_definitions: Vec::new(),
             constant_declarations: vec![
                 aether::ast::ConstantDeclaration {
                     name: aether::ast::Identifier::new(const_name, aether::error::SourceLocation::unknown()),

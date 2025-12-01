@@ -339,6 +339,7 @@ mod tests {
                     imports: vec![],
                     exports: vec![],
                     type_definitions: vec![],
+                    trait_definitions: vec![],
                     constant_declarations: vec![],
                     function_definitions: vec![],
                     external_functions: vec![],

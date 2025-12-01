@@ -45,6 +45,7 @@ pub struct Module {
     pub imports: Vec<ImportStatement>,
     pub exports: Vec<ExportStatement>,
     pub type_definitions: Vec<TypeDefinition>,
+    pub trait_definitions: Vec<TraitDefinition>,
     pub constant_declarations: Vec<ConstantDeclaration>,
     pub function_definitions: Vec<Function>,
     pub external_functions: Vec<ExternalFunction>,
@@ -84,6 +85,7 @@ pub enum TypeDefinition {
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
         lifetime_parameters: Vec<LifetimeParameter>,
+        where_clause: Vec<WhereClause>,
         fields: Vec<StructField>,
         export_as: Option<String>, // For FFI
         source_location: SourceLocation,
@@ -93,6 +95,7 @@ pub enum TypeDefinition {
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
         lifetime_parameters: Vec<LifetimeParameter>,
+        where_clause: Vec<WhereClause>,
         variants: Vec<EnumVariant>,
         source_location: SourceLocation,
     },
@@ -119,6 +122,60 @@ pub struct StructField {
 pub struct EnumVariant {
     pub name: Identifier,
     pub associated_types: Vec<TypeSpecifier>, // Types held by the variant
+    pub source_location: SourceLocation,
+}
+
+/// Trait definition (like Rust traits or Java interfaces)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitDefinition {
+    pub name: Identifier,
+    pub generic_parameters: Vec<GenericParameter>,
+    pub where_clause: Vec<WhereClause>,
+    pub axioms: Vec<TraitAxiom>,
+    pub methods: Vec<TraitMethod>,
+    pub source_location: SourceLocation,
+}
+
+/// Method signature in a trait (may have default implementation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitMethod {
+    pub name: Identifier,
+    pub generic_parameters: Vec<GenericParameter>,
+    pub parameters: Vec<Parameter>,
+    pub return_type: Box<TypeSpecifier>,
+    pub default_body: Option<Block>, // None = required, Some = default impl
+    pub source_location: SourceLocation,
+}
+
+/// Trait axiom - a logical property that all implementations must satisfy
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitAxiom {
+    pub name: Option<Identifier>, // Optional name for debugging/error messages
+    pub quantifiers: Vec<Quantifier>, // forall/exists bindings
+    pub condition: Box<Expression>, // The axiom expression
+    pub source_location: SourceLocation,
+}
+
+/// Universal/existential quantifier binding
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Quantifier {
+    pub kind: QuantifierKind,
+    pub variables: Vec<QuantifierVariable>,
+    pub source_location: SourceLocation,
+}
+
+/// Kind of quantifier
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum QuantifierKind {
+    ForAll, // Universal quantifier: for all x...
+    Exists, // Existential quantifier: there exists x...
+}
+
+/// Variable binding in a quantifier
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuantifierVariable {
+    pub name: Identifier,
+    pub var_type: Box<TypeSpecifier>,
     pub source_location: SourceLocation,
 }
 
@@ -292,6 +349,15 @@ pub struct GenericParameter {
     pub source_location: SourceLocation,
 }
 
+/// Where clause constraint binding a type parameter to trait bounds
+/// Example: `T: Display + Debug` in `where T: Display + Debug`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhereClause {
+    pub type_param: Identifier,
+    pub constraints: Vec<Identifier>,
+    pub source_location: SourceLocation,
+}
+
 /// Function definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Function {
@@ -299,6 +365,7 @@ pub struct Function {
     pub intent: Option<String>,
     pub generic_parameters: Vec<GenericParameter>,
     pub lifetime_parameters: Vec<LifetimeParameter>,
+    pub where_clause: Vec<WhereClause>,
     pub parameters: Vec<Parameter>,
     pub return_type: Box<TypeSpecifier>,
     pub metadata: FunctionMetadata,
@@ -347,6 +414,8 @@ pub struct ContractAssertion {
     pub condition: Box<Expression>,
     pub failure_action: FailureAction,
     pub message: Option<String>,
+    /// Whether to enforce this contract at runtime (default: false, static verification only)
+    pub runtime_check: bool,
     pub source_location: SourceLocation,
 }
 

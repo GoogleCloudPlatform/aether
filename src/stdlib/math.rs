@@ -502,6 +502,7 @@ pub fn create_math_module() -> Module {
             source_location: SourceLocation::unknown(),
         }],
         type_definitions: vec![],
+        trait_definitions: vec![],
         constant_declarations: constants.into_values().collect(),
         function_definitions: functions.into_values().collect(),
         external_functions: external_functions.into_values().collect(),
