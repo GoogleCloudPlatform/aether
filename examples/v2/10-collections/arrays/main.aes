@@ -13,9 +13,9 @@ func sum_array(arr: Array<Int>, len: Int) -> Int {
     var sum: Int = 0;
     var i: Int = 0;
 
-    while {i < len} {
-        sum = {sum + arr[i]};
-        i = {i + 1};
+    while i < len {
+        sum = sum + arr[i];
+        i = i + 1;
     }
 
     return sum;
@@ -23,7 +23,7 @@ func sum_array(arr: Array<Int>, len: Int) -> Int {
 
 func main() -> Int {
     let numbers: Array<Int> = [1, 2, 3, 4, 5];
-    
+
     // Verify access
     let first: Int = numbers[0];
     puts("First element:");

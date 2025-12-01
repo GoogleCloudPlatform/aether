@@ -1,21 +1,21 @@
 // If/Else Example
-// Demonstrates conditional branching with when/else
+// Demonstrates conditional branching with if/else
 
 module if_else;
 
 func abs(n: Int) -> Int {
-    if {n < 0} {
-        return {0 - n};
+    if n < 0 {
+        return 0 - n;
     } else {
         return n;
     }
 }
 
 func classify(n: Int) -> Int {
-    if {n > 0} {
+    if n > 0 {
         return 1;
     } else {
-        if {n < 0} {
+        if n < 0 {
             return -1;
         } else {
             return 0;
@@ -24,7 +24,7 @@ func classify(n: Int) -> Int {
 }
 
 func max(a: Int, b: Int) -> Int {
-    if {a > b} {
+    if a > b {
         return a;
     } else {
         return b;

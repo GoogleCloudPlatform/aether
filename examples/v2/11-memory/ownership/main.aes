@@ -25,7 +25,7 @@ func read(data: &Data) -> Int {
 
 // Borrows mutably
 func increment(data: &mut Data) -> Void {
-    data.value = {data.value + 1};
+    data.value = data.value + 1;
 }
 
 func main() -> Int {
@@ -44,7 +44,7 @@ func main() -> Int {
 
     // Consume
     // 'd' is moved here because 'consume' takes an owned parameter (^Data)
-    let v3: Int = consume(d); 
+    let v3: Int = consume(d);
     puts("Consumed value:");
     puts(int_to_string(v3));
 

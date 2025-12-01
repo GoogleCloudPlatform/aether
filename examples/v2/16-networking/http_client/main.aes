@@ -7,10 +7,10 @@ module http_client;
 func puts(s: Pointer<Char>) -> Int;
 
 enum HttpMethod {
-    GET,
-    POST,
-    PUT,
-    DELETE,
+    case GET;
+    case POST;
+    case PUT;
+    case DELETE;
 }
 
 struct HttpRequest {
@@ -28,7 +28,7 @@ func create_request(method: HttpMethod, port: Int) -> HttpRequest {
 }
 
 func is_success(response: HttpResponse) -> Bool {
-    return {response.status_code >= 200 && response.status_code < 300};
+    return response.status_code >= 200 && response.status_code < 300;
 }
 
 func main() -> Int {

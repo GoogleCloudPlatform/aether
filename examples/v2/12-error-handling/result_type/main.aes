@@ -4,20 +4,20 @@
 module result_type;
 
 enum Result {
-    Ok(Int),
-    Err(Int),
+    case Ok(Int);
+    case Err(Int);
 }
 
 func divide(a: Int, b: Int) -> Result {
-    if {b == 0} {
+    if b == 0 {
         return Result::Err(1);
     } else {
-        return Result::Ok({a / b});
+        return Result::Ok(a / b);
     }
 }
 
 func safe_sqrt(n: Int) -> Result {
-    if {n < 0} {
+    if n < 0 {
         return Result::Err(2);
     } else {
         // Simplified - just return n for positive numbers
@@ -28,7 +28,7 @@ func safe_sqrt(n: Int) -> Result {
 func unwrap_result(r: Result) -> Int {
     match r {
         Result::Ok(value) => { return value; }
-        Result::Err(code) => { return {0 - code}; }
+        Result::Err(code) => { return 0 - code; }
     }
 }
 

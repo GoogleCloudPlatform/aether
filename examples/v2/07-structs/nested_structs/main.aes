@@ -19,18 +19,18 @@ struct Rectangle {
 }
 
 func manhattan_distance(line: Line) -> Int {
-    var dx: Int = {line.end.x - line.start.x};
-    var dy: Int = {line.end.y - line.start.y};
+    var dx: Int = line.end.x - line.start.x;
+    var dy: Int = line.end.y - line.start.y;
 
     // Absolute values
-    if {dx < 0} {
-        dx = {0 - dx};
+    if dx < 0 {
+        dx = 0 - dx;
     }
-    if {dy < 0} {
-        dy = {0 - dy};
+    if dy < 0 {
+        dy = 0 - dy;
     }
 
-    return {dx + dy};
+    return dx + dy;
 }
 
 func main() -> Int {

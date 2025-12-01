@@ -8,19 +8,19 @@ module showcase;
 // ============================================
 
 enum Color {
-    Red,
-    Green,
-    Blue,
+    case Red;
+    case Green;
+    case Blue;
 }
 
 enum Option {
-    Some(Int),
-    None,
+    case Some(Int);
+    case None;
 }
 
 enum Result {
-    Ok(Int),
-    Err(Int),
+    case Ok(Int);
+    case Err(Int);
 }
 
 // ============================================
@@ -43,29 +43,29 @@ struct Rectangle {
 // ============================================
 
 func add(a: Int, b: Int) -> Int {
-    return {a + b};
+    return a + b;
 }
 
 func multiply(a: Int, b: Int) -> Int {
-    return {a * b};
+    return a * b;
 }
 
 func factorial(n: Int) -> Int {
-    if {n <= 1} {
+    if n <= 1 {
         return 1;
     } else {
-        return {n * factorial({n - 1})};
+        return n * factorial(n - 1);
     }
 }
 
 func fibonacci(n: Int) -> Int {
-    if {n <= 0} {
+    if n <= 0 {
         return 0;
     } else {
-        if {n == 1} {
+        if n == 1 {
             return 1;
         } else {
-            return {fibonacci({n - 1}) + fibonacci({n - 2})};
+            return fibonacci(n - 1) + fibonacci(n - 2);
         }
     }
 }
@@ -98,11 +98,11 @@ func create_point(x: Int, y: Int) -> Point {
 }
 
 func point_sum(p: Point) -> Int {
-    return {p.x + p.y};
+    return p.x + p.y;
 }
 
 func rectangle_area(rect: Rectangle) -> Int {
-    return {rect.width * rect.height};
+    return rect.width * rect.height;
 }
 
 // ============================================
@@ -110,7 +110,7 @@ func rectangle_area(rect: Rectangle) -> Int {
 // ============================================
 
 func max(a: Int, b: Int) -> Int {
-    if {a > b} {
+    if a > b {
         return a;
     } else {
         return b;
@@ -118,7 +118,7 @@ func max(a: Int, b: Int) -> Int {
 }
 
 func min(a: Int, b: Int) -> Int {
-    if {a < b} {
+    if a < b {
         return a;
     } else {
         return b;
@@ -126,10 +126,10 @@ func min(a: Int, b: Int) -> Int {
 }
 
 func clamp(value: Int, min_val: Int, max_val: Int) -> Int {
-    if {value < min_val} {
+    if value < min_val {
         return min_val;
     } else {
-        if {value > max_val} {
+        if value > max_val {
             return max_val;
         } else {
             return value;
@@ -138,11 +138,11 @@ func clamp(value: Int, min_val: Int, max_val: Int) -> Int {
 }
 
 func is_positive(n: Int) -> Bool {
-    return {n > 0};
+    return n > 0;
 }
 
 func is_zero(n: Int) -> Bool {
-    return {n == 0};
+    return n == 0;
 }
 
 // ============================================
@@ -150,25 +150,22 @@ func is_zero(n: Int) -> Bool {
 // ============================================
 
 func sum_to_n(n: Int) -> Int {
-    let mut total: Int = 0;
-    let mut i: Int = 1;
+    var total: Int = 0;
+    var i: Int = 1;
 
-    loop {
-        if {i > n} {
-            break;
-        }
-        total = {total + i};
-        i = {i + 1};
+    while i <= n {
+        total = total + i;
+        i = i + 1;
     }
 
     return total;
 }
 
 func count_down(start: Int) -> Int {
-    let mut count: Int = start;
+    var count: Int = start;
 
-    while {count > 0} {
-        count = {count - 1};
+    while count > 0 {
+        count = count - 1;
     }
 
     return count;

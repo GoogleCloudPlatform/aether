@@ -17,21 +17,21 @@ func puts(s: String) -> Int;
 @post({return_value >= a}, check=runtime)
 @post({return_value >= b}, check=runtime)
 func safe_add(a: Int, b: Int) -> Int {
-    return {a + b};
+    return a + b;
 }
 
 // Division with runtime checks for safety
 @pre({b != 0}, check=runtime)
 @post({return_value * b <= a}, check=runtime)
 func safe_divide(a: Int, b: Int) -> Int {
-    return {a / b};
+    return a / b;
 }
 
 // Ensure a value is positive
 @pre({n > 0}, check=runtime)
 @post({return_value > 0}, check=runtime)
 func double_positive(n: Int) -> Int {
-    return {n * 2};
+    return n * 2;
 }
 
 func main() -> Int {

@@ -4,15 +4,15 @@
 module stdlib_math;
 
 func abs(n: Int) -> Int {
-    if {n < 0} {
-        return {0 - n};
+    if n < 0 {
+        return 0 - n;
     } else {
         return n;
     }
 }
 
 func min(a: Int, b: Int) -> Int {
-    if {a < b} {
+    if a < b {
         return a;
     } else {
         return b;
@@ -20,7 +20,7 @@ func min(a: Int, b: Int) -> Int {
 }
 
 func max(a: Int, b: Int) -> Int {
-    if {a > b} {
+    if a > b {
         return a;
     } else {
         return b;
@@ -28,10 +28,10 @@ func max(a: Int, b: Int) -> Int {
 }
 
 func clamp(value: Int, low: Int, high: Int) -> Int {
-    if {value < low} {
+    if value < low {
         return low;
     } else {
-        if {value > high} {
+        if value > high {
             return high;
         } else {
             return value;
@@ -43,9 +43,9 @@ func gcd(a: Int, b: Int) -> Int {
     var x: Int = abs(a);
     var y: Int = abs(b);
 
-    while {y != 0} {
+    while y != 0 {
         let temp: Int = y;
-        y = {x % y};
+        y = x % y;
         x = temp;
     }
 

@@ -11,14 +11,14 @@ module valid_contracts;
 @pre({b > 0})
 @post({return_value > 0})
 func add_positive(a: Int, b: Int) -> Int {
-    return {a + b};
+    return a + b;
 }
 
 // Doubling a non-negative number gives a result >= the input
 @pre({n >= 0})
 @post({return_value >= n})
 func double_non_negative(n: Int) -> Int {
-    return {n + n};
+    return n + n;
 }
 
 // Absolute difference is always non-negative
@@ -26,10 +26,10 @@ func double_non_negative(n: Int) -> Int {
 @pre({b >= 0})
 @post({return_value >= 0})
 func abs_diff(a: Int, b: Int) -> Int {
-    if {a >= b} {
-        return {a - b};
+    if a >= b {
+        return a - b;
     } else {
-        return {b - a};
+        return b - a;
     }
 }
 
@@ -37,7 +37,7 @@ func abs_diff(a: Int, b: Int) -> Int {
 @post({return_value >= a})
 @post({return_value >= b})
 func max(a: Int, b: Int) -> Int {
-    if {a >= b} {
+    if a >= b {
         return a;
     } else {
         return b;
@@ -47,7 +47,7 @@ func max(a: Int, b: Int) -> Int {
 // Squaring a number gives non-negative result
 @post({return_value >= 0})
 func square(n: Int) -> Int {
-    return {n * n};
+    return n * n;
 }
 
 func main() -> Int {

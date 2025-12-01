@@ -10,10 +10,10 @@ func main() -> Int {
     // Use map methods
     scores.insert("Alice", 100);
     scores.insert("Bob", 95);
-    
+
     let alice_score: Int = scores.get("Alice");
     let bob_score: Int = scores.get("Bob");
 
     // Should return 100 + 95 = 195
-    return {alice_score + bob_score};
+    return alice_score + bob_score;
 }

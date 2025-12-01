@@ -17,5 +17,5 @@ func get_score() -> Int {
 func main() -> Int {
     let user_id: Int = get_user_id();
     let score: Int = get_score();
-    return {user_id + score};
+    return user_id + score;
 }

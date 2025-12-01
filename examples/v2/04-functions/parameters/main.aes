@@ -5,12 +5,12 @@ module parameters;
 
 // Pass by value (default)
 func double(x: Int) -> Int {
-    return {x * 2};
+    return x * 2;
 }
 
 // Multiple parameters
 func sum_three(a: Int, b: Int, c: Int) -> Int {
-    return {a + b + c};
+    return a + b + c;
 }
 
 // Different types

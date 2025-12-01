@@ -9,22 +9,22 @@ func main() -> Int {
     let c: Int = 10;
 
     // Equality
-    let eq: Bool = {a == c};
+    let eq: Bool = a == c;
 
     // Inequality
-    let neq: Bool = {a != b};
+    let neq: Bool = a != b;
 
     // Less than
-    let lt: Bool = {a < b};
+    let lt: Bool = a < b;
 
     // Greater than
-    let gt: Bool = {b > a};
+    let gt: Bool = b > a;
 
     // Less than or equal
-    let lte: Bool = {a <= c};
+    let lte: Bool = a <= c;
 
     // Greater than or equal
-    let gte: Bool = {b >= a};
+    let gte: Bool = b >= a;
 
     if lt {
         return 1;

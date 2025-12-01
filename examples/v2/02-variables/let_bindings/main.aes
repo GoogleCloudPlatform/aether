@@ -9,8 +9,8 @@ func main() -> Int {
     let y: Int = 100;
 
     // Using variables in expressions
-    let sum: Int = {x + y};
-    let product: Int = {x * y};
+    let sum: Int = x + y;
+    let product: Int = x * y;
 
     // Different types
     let flag: Bool = true;

@@ -12,14 +12,14 @@ module invalid_contracts;
 @pre({b >= 0})
 @post({return_value > 0})
 func multiply_bug(a: Int, b: Int) -> Int {
-    return {a * b};
+    return a * b;
 }
 
 // BUG: No precondition, but claims result >= 0
 // Counterexample: a=1, b=5 gives result=-4
 @post({return_value >= 0})
 func subtract_bug(a: Int, b: Int) -> Int {
-    return {a - b};
+    return a - b;
 }
 
 // BUG: Claims result > both inputs, but max equals one of them
@@ -27,7 +27,7 @@ func subtract_bug(a: Int, b: Int) -> Int {
 @post({return_value > a})
 @post({return_value > b})
 func max_bug(a: Int, b: Int) -> Int {
-    if {a >= b} {
+    if a >= b {
         return a;
     } else {
         return b;
@@ -40,7 +40,7 @@ func max_bug(a: Int, b: Int) -> Int {
 @pre({b > 0})
 @post({return_value > 0})
 func divide_bug(a: Int, b: Int) -> Int {
-    return {a / b};
+    return a / b;
 }
 
 // BUG: Increment doesn't guarantee result > 100
@@ -48,7 +48,7 @@ func divide_bug(a: Int, b: Int) -> Int {
 @pre({n >= 0})
 @post({return_value > 100})
 func increment_bug(n: Int) -> Int {
-    return {n + 1};
+    return n + 1;
 }
 
 func main() -> Int {

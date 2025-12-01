@@ -299,7 +299,7 @@ car go fmt && car go clippy && car go test
 | 10 | 10.1 - 10.4 | LSP | ✅ Done |
 | 11 | 11.1 - 11.4 | Optimizations | ✅ Done |
 | 12 | 12.1 - 12.4 | Tango Fixes | ✅ Done |
-| 13 | 13.1 - 13.2 | Syntax Simplification (`when`→`if`, remove `{}`) | ⏳ Pending |
+| 13 | 13.1 - 13.2 | Syntax Simplification (`when`→`if`, remove `{}`) | ✅ Done |
 | 14 | 14.1 - 14.8 | Generics Implementation | ⏳ Pending |
 | 15 | 15.1 - 15.2 | Trait System | ⏳ Pending |
 | 16 | 16.1 - 16.3 | Generic Contract Verification | ⏳ Pending |
@@ -405,11 +405,11 @@ See: [Architecture - Syntax Simplification](architecture.md#syntax-simplificatio
 - [x] **Verify**: All 720+ tests pass, examples compile and run
 
 ### Task 13.2: Remove mandatory `{}` around expressions
-- [ ] **Parser**: Update expression parsing to not require braces
-- [ ] **Grammar**: Update `return expr;` to work without `{}`
-- [ ] **Examples**: Update all examples to remove expression braces
-- [ ] **Tests**: Update all tests
-- [ ] **Verify**: All tests pass
+- [x] **Parser**: Implemented precedence-based expression parsing (no braces required)
+- [x] **Grammar**: `return expr;`, `let x = expr;`, `if expr {}` all work without braces
+- [x] **Examples**: Updated all 25+ examples to remove expression braces
+- [x] **Tests**: All parser tests work with braceless expressions
+- [x] **Verify**: All 720+ tests pass, examples compile and run
 
 ---
 

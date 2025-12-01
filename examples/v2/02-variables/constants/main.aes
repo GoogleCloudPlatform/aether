@@ -8,7 +8,7 @@ const PI: Float = 3.14159265359;
 const GREETING: String = "Hello";
 
 func calculate_area(radius: Float) -> Float {
-    return {PI * radius * radius};
+    return PI * radius * radius;
 }
 
 func main() -> Int {

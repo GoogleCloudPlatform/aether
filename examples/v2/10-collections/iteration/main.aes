@@ -8,14 +8,14 @@ func main() -> Int {
 
     // Iterate over a range
     for i in 1..=10 {
-        sum = {sum + i};
+        sum = sum + i;
     }
 
     // Nested iteration
     var product: Int = 0;
     for i in 1..4 {
         for j in 1..4 {
-            product = {product + {i * j}};
+            product = product + i * j;
         }
     }
 

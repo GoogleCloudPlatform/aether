@@ -11,20 +11,20 @@ struct Vector2D {
 // "Method-like" functions that take struct as first parameter
 func vector_add(a: &Vector2D, b: &Vector2D) -> Vector2D {
     return Vector2D {
-        x: {a.x + b.x},
-        y: {a.y + b.y},
+        x: a.x + b.x,
+        y: a.y + b.y,
     };
 }
 
 func vector_scale(v: &Vector2D, factor: Float) -> Vector2D {
     return Vector2D {
-        x: {v.x * factor},
-        y: {v.y * factor},
+        x: v.x * factor,
+        y: v.y * factor,
     };
 }
 
 func vector_dot(a: &Vector2D, b: &Vector2D) -> Float {
-    return {{a.x * b.x} + {a.y * b.y}};
+    return a.x * b.x + a.y * b.y;
 }
 
 func main() -> Int {

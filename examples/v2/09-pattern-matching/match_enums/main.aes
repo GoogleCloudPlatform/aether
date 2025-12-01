@@ -4,10 +4,10 @@
 module match_enums;
 
 enum Message {
-    Quit,
-    Move(Int, Int),
-    Write(Int),
-    ChangeColor(Int, Int, Int),
+    case Quit;
+    case Move(Int, Int);
+    case Write(Int);
+    case ChangeColor(Int, Int, Int);
 }
 
 func process_message(msg: Message) -> Int {
@@ -16,13 +16,13 @@ func process_message(msg: Message) -> Int {
             return 0;
         }
         Message::Move(x, y) => {
-            return {x + y};
+            return x + y;
         }
         Message::Write(len) => {
             return len;
         }
         Message::ChangeColor(r, g, b) => {
-            return {{r + g} + b};
+            return r + g + b;
         }
     }
 }

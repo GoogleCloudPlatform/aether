@@ -18,7 +18,7 @@ func create_point(x: Int, y: Int) -> Point {
 }
 
 func area(rect: Rectangle) -> Int {
-    return {rect.width * rect.height};
+    return rect.width * rect.height;
 }
 
 func main() -> Int {

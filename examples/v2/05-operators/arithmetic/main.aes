@@ -8,19 +8,19 @@ func main() -> Int {
     let b: Int = 7;
 
     // Addition
-    let sum: Int = {a + b};
+    let sum: Int = a + b;
 
     // Subtraction
-    let diff: Int = {a - b};
+    let diff: Int = a - b;
 
     // Multiplication
-    let product: Int = {a * b};
+    let product: Int = a * b;
 
     // Division
-    let quotient: Int = {a / b};
+    let quotient: Int = a / b;
 
     // Compound expression
-    let compound: Int = {{a + b} * {a - b}};
+    let compound: Int = (a + b) * (a - b);
 
     // sum=27, diff=13, product=140, quotient=2
     return quotient;
