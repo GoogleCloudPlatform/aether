@@ -1296,4 +1296,5 @@ impl Default for LoopOptimizationPass {
 
 
 #[cfg(test)]
+#[path = "loop_optimizations_tests.rs"]
 mod loop_optimizations_tests;

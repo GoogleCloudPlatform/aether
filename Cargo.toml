@@ -50,7 +50,7 @@ libc = "0.2"
 rayon = "1.10"
 
 # Formal verification
-# z3 = { version = "0.12" }
+z3 = { version = "0.12" }
 
 # Cryptography for checksums
 sha2 = "0.10"

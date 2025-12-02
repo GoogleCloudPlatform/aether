@@ -941,4 +941,5 @@ fn is_valid_package_name(name: &str) -> bool {
 
 
 #[cfg(test)]
+#[path = "manifest_tests.rs"]
 mod manifest_tests;

@@ -16,6 +16,7 @@
 //!
 //! Provides contract verification, invariant checking, and property proving
 
+pub mod ast_to_contract;
 pub mod contract_to_smt;
 pub mod contracts;
 pub mod invariants;

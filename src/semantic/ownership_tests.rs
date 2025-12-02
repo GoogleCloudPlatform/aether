@@ -30,6 +30,7 @@ mod tests {
             exports: vec![],
             type_definitions: vec![],
             trait_definitions: vec![],
+            impl_blocks: vec![],
             constant_declarations: vec![],
             function_definitions: vec![
                 // Function that takes ownership: fn consume(value: ^String)
@@ -188,6 +189,7 @@ mod tests {
                                 function_reference: FunctionReference::Local {
                                     name: Identifier::new("borrow".to_string(), SourceLocation::unknown()),
                                 },
+                                explicit_type_arguments: vec![],
                                 arguments: vec![
                                     Argument {
                                         parameter_name: Identifier::new("value".to_string(), SourceLocation::unknown()),
@@ -211,6 +213,7 @@ mod tests {
                                 function_reference: FunctionReference::Local {
                                     name: Identifier::new("consume".to_string(), SourceLocation::unknown()),
                                 },
+                                explicit_type_arguments: vec![],
                                 arguments: vec![
                                     Argument {
                                         parameter_name: Identifier::new("value".to_string(), SourceLocation::unknown()),
@@ -234,6 +237,7 @@ mod tests {
                                 function_reference: FunctionReference::Local {
                                     name: Identifier::new("borrow".to_string(), SourceLocation::unknown()),
                                 },
+                                explicit_type_arguments: vec![],
                                 arguments: vec![
                                     Argument {
                                         parameter_name: Identifier::new("value".to_string(), SourceLocation::unknown()),

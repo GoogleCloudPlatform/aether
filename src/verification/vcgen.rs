@@ -86,23 +86,30 @@ impl VcGenerator {
         self.path_condition.clear();
         self.state.clear();
 
-        // Initialize parameters in state
-        for (idx, _param) in function.parameters.iter().enumerate() {
+        // Initialize parameters in state with their actual names
+        for (idx, param) in function.parameters.iter().enumerate() {
+            let local_name = format!("local_{}", param.local_id);
+            let var_formula = Formula::Var(local_name.clone());
+
+            // Store by local index for MIR lookup
+            self.state.insert(local_name, var_formula.clone());
+
+            // Also store by parameter name for contract expressions
+            if !param.name.is_empty() {
+                self.state.insert(param.name.clone(), var_formula.clone());
+            }
+
+            // Legacy: also store as param_N
             let param_name = format!("param_{}", idx);
-            self.state
-                .insert(param_name.clone(), Formula::Var(param_name));
+            self.state.insert(param_name, var_formula);
         }
 
-        // Check preconditions at function entry
+        // ASSUME preconditions at function entry (add to path condition)
+        // Preconditions are requirements on callers, not obligations to prove
         if let Some(contract) = contract {
             for precond in &contract.preconditions {
                 let formula = self.contract_expr_to_formula(&precond.expression)?;
-                vcs.push(self.create_vc(
-                    format!("precondition_{}", precond.name),
-                    VcType::Precondition,
-                    formula,
-                    precond.location.clone(),
-                ));
+                self.path_condition.push(formula);
             }
         }
 
@@ -141,9 +148,16 @@ impl VcGenerator {
             Terminator::Return => {
                 // Check postconditions
                 if let Some(contract) = contract {
-                    // Note: In a real implementation, we would track the return value
-                    // through the MIR statements. For now, we assume it's stored in a
-                    // special "return_value" local if there is one.
+                    // Bind the return value to the actual computed result
+                    // The return_local holds the function's return value
+                    if let Some(return_local) = function.return_local {
+                        let local_name = format!("local_{}", return_local);
+                        if let Some(return_formula) = self.state.get(&local_name).cloned() {
+                            // Bind both "result" and "return_value" to the actual return
+                            self.state.insert("result".to_string(), return_formula.clone());
+                            self.state.insert("return_value".to_string(), return_formula);
+                        }
+                    }
 
                     for postcond in &contract.postconditions {
                         let formula = self.contract_expr_to_formula(&postcond.expression)?;

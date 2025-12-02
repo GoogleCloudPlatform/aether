@@ -408,7 +408,7 @@ pub enum PassingMode {
 }
 
 /// Function metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FunctionMetadata {
     pub preconditions: Vec<ContractAssertion>,
     pub postconditions: Vec<ContractAssertion>,
@@ -1008,6 +1008,7 @@ pub enum PointerOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionCall {
     pub function_reference: FunctionReference,
+    pub explicit_type_arguments: Vec<TypeSpecifier>,
     pub arguments: Vec<Argument>,
     pub variadic_arguments: Vec<Box<Expression>>, // For variadic functions
 }
@@ -1501,6 +1502,14 @@ impl ASTPrettyPrinter {
                     }
                     FunctionReference::External { name } => name.name.clone(),
                 };
+                let type_args_str = if !call.explicit_type_arguments.is_empty() {
+                    let args: Vec<String> = call.explicit_type_arguments.iter()
+                        .map(|ts| self.print_type_specifier(ts))
+                        .collect();
+                    format!("<{}>", args.join(", "))
+                } else {
+                    "".to_string()
+                };
                 let args: Vec<String> = call
                     .arguments
                     .iter()
@@ -1512,7 +1521,7 @@ impl ASTPrettyPrinter {
                         )
                     })
                     .collect();
-                format!("{}({})", func_name, args.join(", "))
+                format!("{}{}({})", func_name, type_args_str, args.join(", "))
             }
             _ => "/* expression */".to_string(),
         }

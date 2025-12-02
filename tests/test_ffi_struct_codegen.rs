@@ -57,6 +57,7 @@ fn create_test_module_with_struct() -> Module {
             source_location: SourceLocation::unknown(),
         }],
         trait_definitions: vec![],
+        impl_blocks: vec![],
         constant_declarations: vec![],
         function_definitions: vec![Function {
             name: Identifier::new("test_struct_passing".to_string(), SourceLocation::unknown()),
@@ -383,6 +384,7 @@ fn test_nested_struct_generation() {
             },
         ],
         trait_definitions: vec![],
+        impl_blocks: vec![],
         constant_declarations: vec![],
         function_definitions: vec![],
         external_functions: vec![],

@@ -314,6 +314,11 @@ impl Type {
         matches!(self, Type::Primitive(PrimitiveType::Void))
     }
 
+    /// Check if this type is a variadic function type
+    pub fn is_variadic(&self) -> bool {
+        matches!(self, Type::Function { is_variadic: true, .. })
+    }
+
     /// Get the size in bytes of this type (if known at compile time)
     pub fn size_bytes(&self) -> Option<usize> {
         match self {

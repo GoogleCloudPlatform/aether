@@ -23,6 +23,7 @@
 pub mod dataflow;
 pub mod lowering;
 pub mod validation;
+pub mod monomorphization;
 
 use crate::error::SourceLocation;
 use crate::types::Type;
@@ -117,7 +118,7 @@ pub enum Rvalue {
     UnaryOp { op: UnOp, operand: Operand },
 
     /// Function call
-    Call { func: Operand, args: Vec<Operand> },
+    Call { func: Operand, explicit_type_arguments: Vec<Type>, args: Vec<Operand> },
 
     /// Aggregate construction (arrays, structs)
     Aggregate {
@@ -214,6 +215,7 @@ pub enum Terminator {
     /// Function call with landing pad
     Call {
         func: Operand,
+        explicit_type_arguments: Vec<Type>,
         args: Vec<Operand>,
         destination: Place,
         target: Option<BasicBlockId>,

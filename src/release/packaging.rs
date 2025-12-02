@@ -1297,4 +1297,5 @@ impl Default for VerificationConfig {
 
 
 #[cfg(test)]
+#[path = "packaging_tests.rs"]
 mod packaging_tests;

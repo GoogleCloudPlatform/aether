@@ -1121,4 +1121,5 @@ impl EnhancedContractVerifier {
 
 
 #[cfg(test)]
+#[path = "contracts_tests.rs"]
 mod contracts_tests;

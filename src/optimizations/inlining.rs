@@ -214,7 +214,7 @@ impl InliningPass {
                 self.remap_operand(right, map);
             }
             Rvalue::UnaryOp { operand, .. } => self.remap_operand(operand, map),
-            Rvalue::Call { func, args } => {
+            Rvalue::Call { func, args, .. } => {
                 self.remap_operand(func, map);
                 for arg in args {
                     self.remap_operand(arg, map);
@@ -278,7 +278,7 @@ impl OptimizationPass for InliningPass {
                     match statement {
                         Statement::Assign {
                             place,
-                            rvalue: Rvalue::Call { func, args },
+                            rvalue: Rvalue::Call { func, args, .. },
                             source_info,
                         } => {
                             // Check if this is a call to an inline candidate
@@ -475,6 +475,7 @@ mod tests {
                     },
                     value: ConstantValue::String("small".to_string()),
                 }),
+                explicit_type_arguments: vec![],
                 args: vec![],
             },
             source_info: SourceInfo {

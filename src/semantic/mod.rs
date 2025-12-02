@@ -492,6 +492,57 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
+    /// Helper function to substitute generic types in a given Type
+    fn substitute_type(&self, ty: &Type, type_map: &HashMap<String, Type>) -> Type {
+        match ty {
+            Type::Generic { name, .. } => {
+                if let Some(concrete) = type_map.get(name) {
+                    concrete.clone()
+                } else {
+                    ty.clone()
+                }
+            }
+            Type::Array { element_type, size } => Type::Array { 
+                element_type: Box::new(self.substitute_type(element_type, type_map)), 
+                size: *size 
+            },
+            Type::Map { key_type, value_type } => Type::Map { 
+                key_type: Box::new(self.substitute_type(key_type, type_map)), 
+                value_type: Box::new(self.substitute_type(value_type, type_map)), 
+            },
+            Type::Pointer { target_type, is_mutable } => Type::Pointer { 
+                target_type: Box::new(self.substitute_type(target_type, type_map)), 
+                is_mutable: *is_mutable 
+            },
+            Type::Owned { base_type, ownership } => Type::Owned { 
+                base_type: Box::new(self.substitute_type(base_type, type_map)), 
+                ownership: *ownership 
+            },
+            Type::Function { parameter_types, return_type, is_variadic } => {
+                let substituted_params = parameter_types.iter()
+                    .map(|p_ty| self.substitute_type(p_ty, type_map))
+                    .collect();
+                let substituted_return = Box::new(self.substitute_type(return_type, type_map));
+                Type::Function {
+                    parameter_types: substituted_params,
+                    return_type: substituted_return,
+                    is_variadic: *is_variadic,
+                }
+            }
+            Type::GenericInstance { base_type, type_arguments, module } => {
+                let substituted_args = type_arguments.iter()
+                    .map(|arg_ty| self.substitute_type(arg_ty, type_map))
+                    .collect();
+                Type::GenericInstance {
+                    base_type: base_type.clone(),
+                    type_arguments: substituted_args,
+                    module: module.clone(),
+                }
+            }
+            _ => ty.clone()
+        }
+    }
+
     /// Analyze a type definition
     fn analyze_type_definition(
         &mut self,
@@ -881,6 +932,23 @@ impl SemanticAnalyzer {
         }
 
         Ok(())
+    }
+
+    /// Helper to look up an AST Function by its qualified name
+    fn lookup_ast_function_in_modules(&self, qualified_name: &str) -> Option<Function> {
+        for loaded_module in self.analyzed_modules.values() {
+            for func_def in &loaded_module.module.function_definitions {
+                let full_name = if loaded_module.module.name.name == "main" {
+                    func_def.name.name.clone()
+                } else {
+                    format!("{}.{}", loaded_module.module.name.name, func_def.name.name)
+                };
+                if full_name == qualified_name {
+                    return Some(func_def.clone());
+                }
+            }
+        }
+        None
     }
 
     /// Analyze a block of statements
@@ -2607,98 +2675,180 @@ impl SemanticAnalyzer {
         }
     }
 
-    /// Analyze a function call expression
-    fn analyze_function_call_expression(
+        fn analyze_function_call_expression(
         &mut self,
         call: &FunctionCall,
         source_location: &SourceLocation,
     ) -> Result<Type, SemanticError> {
-        // Resolve the function
-        let func_symbol = self.resolve_function(&call.function_reference, source_location)?;
+        let function_name = match &call.function_reference {
+            FunctionReference::Local { name } => name.name.clone(),
+            FunctionReference::Qualified { module, name } => {
+                format!("{}.{}", module.name, name.name)
+            }
+            FunctionReference::External { name } => name.name.clone(),
+        };
 
-        // Extract parameter types and return type
-        let (param_types, return_type) = match &func_symbol.symbol_type {
-            Type::Function {
-                parameter_types,
-                return_type,
-                is_variadic: _,
-            } => (parameter_types, return_type),
-            _ => {
-                return Err(SemanticError::TypeMismatch {
-                    expected: "function type".to_string(),
-                    found: func_symbol.symbol_type.to_string(),
+        // First, try to find the AST function to get its generic parameters
+        let func_ast_opt = self.lookup_ast_function_in_modules(&function_name);
+
+        let (mut instantiated_func_type, generic_param_names) = if let Some(func_ast) = func_ast_opt {
+            // This is a generic function
+            let ast_generic_params = &func_ast.generic_parameters;
+            let explicit_type_args = &call.explicit_type_arguments;
+
+            // 1. Validate generic argument count
+            if ast_generic_params.len() != explicit_type_args.len() {
+                return Err(SemanticError::GenericArgumentCountMismatch {
+                    function: function_name.clone(),
+                    expected: ast_generic_params.len(),
+                    found: explicit_type_args.len(),
                     location: source_location.clone(),
                 });
             }
-        };
 
-        // Check argument count
-        let is_variadic = if let Type::Function { is_variadic, .. } = &func_symbol.symbol_type {
-            *is_variadic
-        } else {
-            false
-        };
-        
-        if call.arguments.len() != param_types.len() {
-             if is_variadic {
-                 if call.arguments.len() < param_types.len() {
-                    return Err(SemanticError::ArgumentCountMismatch {
-                        function: func_symbol.name.clone(),
-                        expected: param_types.len(),
-                        found: call.arguments.len(),
+            // 2. Build type map from generic parameter names to concrete types
+            let mut type_map = HashMap::new();
+            let mut generic_param_names_vec = Vec::new();
+            for (gen_param, explicit_arg_spec) in ast_generic_params.iter().zip(explicit_type_args.iter()) {
+                let explicit_type = self.type_checker.borrow().ast_type_to_type(explicit_arg_spec)?;
+                type_map.insert(gen_param.name.name.clone(), explicit_type);
+                generic_param_names_vec.push(gen_param.name.name.clone());
+            }
+
+            // 3. Get the base function type from the symbol table
+            let symbol = self.symbol_table.lookup_symbol(&function_name).ok_or_else(|| {
+                SemanticError::UndefinedSymbol {
+                    symbol: function_name.clone(),
+                    location: source_location.clone(),
+                }
+            })?;
+
+            let base_func_type = match &symbol.symbol_type {
+                Type::Function {
+                    parameter_types,
+                    return_type,
+                    is_variadic,
+                } => Type::Function {
+                    parameter_types: parameter_types.clone(),
+                    return_type: return_type.clone(),
+                    is_variadic: *is_variadic,
+                },
+                _ => {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: "function type".to_string(),
+                        found: symbol.symbol_type.to_string(),
                         location: source_location.clone(),
                     });
-                 }
-                 // Variadic: allow more arguments
-             } else {
-                return Err(SemanticError::ArgumentCountMismatch {
-                    function: func_symbol.name.clone(),
-                    expected: param_types.len(),
-                    found: call.arguments.len(),
+                }
+            };
+
+            // 4. Substitute generic types in the function type
+            let substituted_func_type = self.substitute_type(&base_func_type, &type_map);
+            (substituted_func_type, Some(generic_param_names_vec))
+        } else {
+            // Not a generic function or AST not found, proceed with direct lookup
+            if !call.explicit_type_arguments.is_empty() {
+                return Err(SemanticError::GenericArgumentCountMismatch {
+                    function: function_name.clone(),
+                    expected: 0,
+                    found: call.explicit_type_arguments.len(),
                     location: source_location.clone(),
                 });
             }
-        }
 
-        // Check argument types
-        for (i, arg) in call.arguments.iter().enumerate() {
-            if i >= param_types.len() {
-                if is_variadic {
-                    // Just analyze the expression for variadic args, don't check type against param
-                    self.analyze_expression(&arg.value)?;
-                    continue;
-                } else {
-                    break; 
+            let symbol = self.symbol_table.lookup_symbol(&function_name).ok_or_else(|| {
+                SemanticError::UndefinedSymbol {
+                    symbol: function_name.clone(),
+                    location: source_location.clone(),
                 }
-            }
-            
-            let arg_type = self.analyze_expression(&arg.value)?;
-            let param_type = &param_types[i];
+            })?;
 
-            if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
-                return Err(SemanticError::TypeMismatch {
-                    expected: param_type.to_string(),
-                    found: arg_type.to_string(),
-                    location: arg.source_location.clone(),
-                });
-            }
-
-            // Check ownership transfer
-            self.check_argument_ownership(&arg.value, param_type)?;
-        }
-
-        let final_return_type = if self.in_concurrent_block {
-            // Inside concurrent block, function calls return Future<T>
-            Type::GenericInstance {
-                base_type: "Future".to_string(),
-                type_arguments: vec![*return_type.clone()],
-                module: Some("std.concurrency".to_string()),
-            }
-        } else {
-            *return_type.clone()
+            let func_type = match &symbol.symbol_type {
+                Type::Function {
+                    parameter_types,
+                    return_type,
+                    is_variadic,
+                } => Type::Function {
+                    parameter_types: parameter_types.clone(),
+                    return_type: return_type.clone(),
+                    is_variadic: *is_variadic,
+                },
+                _ => {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: "function type".to_string(),
+                        found: symbol.symbol_type.to_string(),
+                        location: source_location.clone(),
+                    });
+                }
+            };
+            (func_type, None)
         };
 
-        Ok(final_return_type)
+        // Continue with argument type checking using the instantiated_func_type
+        let expected_param_count = if let Type::Function { parameter_types, .. } = &instantiated_func_type {
+            parameter_types.len()
+        } else {
+            0
+        };
+
+        let provided_arg_count = call.arguments.len();
+
+        if !instantiated_func_type.is_variadic() && provided_arg_count != expected_param_count {
+            return Err(SemanticError::ArgumentCountMismatch {
+                function: function_name.clone(),
+                expected: expected_param_count,
+                found: provided_arg_count,
+                location: source_location.clone(),
+            });
+        }
+
+        // Analyze arguments and check types
+        if let Type::Function { parameter_types, .. } = &instantiated_func_type {
+            for (i, arg) in call.arguments.iter().enumerate() {
+                let arg_type = self.analyze_expression(&arg.value)?;
+
+                if i < parameter_types.len() {
+                    let expected_type = &parameter_types[i];
+                    if !self
+                        .type_checker
+                        .borrow()
+                        .types_compatible(expected_type, &arg_type)
+                    {
+                        return Err(SemanticError::TypeMismatch {
+                            expected: expected_type.to_string(),
+                            found: arg_type.to_string(),
+                            location: arg.source_location.clone(),
+                        });
+                    }
+                    // Check ownership transfer (move/borrow)
+                    self.check_argument_ownership(&arg.value, expected_type)?;
+                } else if !instantiated_func_type.is_variadic() {
+                    // This case should be caught by argument count mismatch earlier, but defensive check
+                    return Err(SemanticError::ArgumentCountMismatch {
+                        function: function_name.clone(),
+                        expected: expected_param_count,
+                        found: provided_arg_count,
+                        location: source_location.clone(),
+                    });
+                }
+            }
+        }
+
+        // Analyze variadic arguments
+        for arg_expr in &call.variadic_arguments {
+            let _ = self.analyze_expression(arg_expr)?;
+            // Variadic arguments are not type-checked against a specific parameter type
+            // They are passed as-is to the runtime/FFI.
+        }
+
+        if let Type::Function { return_type, .. } = instantiated_func_type {
+            Ok(*return_type)
+        } else {
+            // Should not happen due to match above
+            Err(SemanticError::Internal {
+                message: "Function symbol did not resolve to a function type after instantiation".to_string(),
+            })
+        }
     }
 
     /// Analyze an if statement

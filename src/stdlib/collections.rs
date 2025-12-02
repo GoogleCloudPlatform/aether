@@ -642,6 +642,7 @@ pub fn create_collections_module() -> Module {
         ],
         type_definitions: vec![],
         trait_definitions: vec![],
+        impl_blocks: vec![],
         constant_declarations: vec![],
         function_definitions: functions.into_values().collect(),
         external_functions: external_functions.into_values().collect(),

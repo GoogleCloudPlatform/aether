@@ -1347,6 +1347,25 @@ impl Parser {
         })
     }
 
+    /// Parse explicit type arguments at a call site: "<" type ("," type)* ">"
+    fn parse_explicit_type_arguments(&mut self) -> Result<Vec<TypeSpecifier>, ParserError> {
+        // Assume '<' has already been consumed by the caller (parse_postfix_expression)
+        let mut type_arguments = Vec::new();
+
+        // Parse first type argument
+        type_arguments.push(self.parse_type()?);
+
+        // Parse additional type arguments
+        while self.check(&TokenType::Comma) {
+            self.advance(); // consume ','
+            type_arguments.push(self.parse_type()?);
+        }
+
+        self.expect(&TokenType::Greater, "expected '>' to close explicit type arguments")?;
+
+        Ok(type_arguments)
+    }
+
     /// Parse a function definition
     /// Grammar: "func" IDENTIFIER generic_params? "(" params? ")" ("->" type)? where_clause? block
     pub fn parse_function(&mut self) -> Result<Function, ParserError> {
@@ -3043,7 +3062,50 @@ impl Parser {
 
         // Handle postfix operators: (args), [index], and .field
         loop {
-            if self.check(&TokenType::LeftParen) {
+            if self.check(&TokenType::Less) { // NEW: Check for explicit type arguments
+                let explicit_type_arguments = self.parse_explicit_type_arguments()?;
+
+                // Then check for the left parenthesis for actual arguments
+                self.expect(&TokenType::LeftParen, "expected '(' after function name or type arguments")?;
+
+                let args_with_labels = self.parse_argument_list()?;
+
+                let function_name = match &expr {
+                    Expression::Variable { name, .. } => name.clone(),
+                    _ => {
+                        return Err(ParserError::UnexpectedToken {
+                            expected: "function name".to_string(),
+                            found: "complex expression".to_string(),
+                            location: start_location.clone(),
+                        });
+                    }
+                };
+
+                let arguments: Vec<Argument> = args_with_labels
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (label, value))| Argument {
+                        parameter_name: Identifier::new(
+                            label.unwrap_or_else(|| format!("arg_{}", i)),
+                            start_location.clone(),
+                        ),
+                        value: Box::new(value),
+                        source_location: start_location.clone(),
+                    })
+                    .collect();
+
+                expr = Expression::FunctionCall {
+                    call: AstFunctionCall {
+                        function_reference: FunctionReference::Local {
+                            name: function_name,
+                        },
+                        explicit_type_arguments, // NEW: Pass the parsed type arguments
+                        arguments,
+                        variadic_arguments: Vec::new(),
+                    },
+                    source_location: start_location.clone(),
+                };
+            } else if self.check(&TokenType::LeftParen) { // Original logic for function call without explicit type arguments
                 // Function call: expr(args)
                 let args_with_labels = self.parse_argument_list()?;
 
@@ -3078,12 +3140,14 @@ impl Parser {
                         function_reference: FunctionReference::Local {
                             name: function_name,
                         },
+                        explicit_type_arguments: Vec::new(), // No explicit type arguments
                         arguments,
                         variadic_arguments: Vec::new(),
                     },
                     source_location: start_location.clone(),
                 };
             } else if self.check(&TokenType::LeftBracket) {
+
                 // Array indexing: expr[index]
                 self.advance();
                 let index = self.parse_expression()?;
@@ -3404,6 +3468,7 @@ impl Parser {
                             function_reference: FunctionReference::Local {
                                 name: function_name,
                             },
+                            explicit_type_arguments: Vec::new(),
                             arguments,
                             variadic_arguments: Vec::new(),
                         },
@@ -3477,6 +3542,7 @@ impl Parser {
                             function_reference: FunctionReference::Local {
                                 name: function_name,
                             },
+                            explicit_type_arguments: Vec::new(),
                             arguments,
                             variadic_arguments: Vec::new(),
                         },

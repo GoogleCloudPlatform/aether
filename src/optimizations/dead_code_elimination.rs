@@ -136,7 +136,7 @@ impl DeadCodeEliminationPass {
                 self.local_used_in_operand(left, local) || self.local_used_in_operand(right, local)
             }
             Rvalue::UnaryOp { operand, .. } => self.local_used_in_operand(operand, local),
-            Rvalue::Call { func, args } => {
+            Rvalue::Call { func, args, .. } => {
                 self.local_used_in_operand(func, local)
                     || args
                         .iter()

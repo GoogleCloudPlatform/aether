@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! SMT solver interface stub (Z3 not available)
+//! SMT solver interface using Z3
 //!
-//! This is a temporary stub implementation until Z3 is properly installed
+//! Provides formal verification capabilities via Z3 SMT solver
 
 use crate::error::SourceLocation;
 use crate::types::Type;
 use std::collections::HashMap;
+use z3::ast::Ast;
 
 #[derive(Debug)]
-pub struct SmtSolver {}
+pub struct SmtSolver {
+    // Solver is created fresh for each check to avoid lifetime issues
+}
 
 /// Solver value types
 #[derive(Debug, Clone)]
@@ -145,24 +148,292 @@ impl SmtSolver {
         Self {}
     }
 
-    /// Check a verification condition
+    /// Check a verification condition using Z3
     pub fn check_condition(&mut self, vc: &VerificationCondition) -> Result<CheckResult, String> {
-        // Stub implementation - always returns verified for now
-        eprintln!("Warning: Verification is using stub implementation (Z3 not available)");
-        eprintln!("Checking condition: {}", vc.name);
+        eprintln!("Verifying condition: {}", vc.name);
 
-        // For simple cases, we can do basic checking
-        match &vc.formula {
-            Formula::Bool(true) => Ok(CheckResult::Verified),
-            Formula::Bool(false) => Ok(CheckResult::Failed(Model {
-                assignments: HashMap::new(),
-                execution_trace: vec!["Condition is false".to_string()],
-            })),
-            _ => {
-                // For now, assume all other conditions are verified
+        // Create fresh Z3 context and solver for this check
+        let cfg = z3::Config::new();
+        let ctx = z3::Context::new(&cfg);
+        let solver = z3::Solver::new(&ctx);
+
+        // Track variables we create
+        let mut variables: HashMap<String, z3::ast::Int> = HashMap::new();
+
+        // Convert formula to Z3 AST
+        let z3_formula = formula_to_z3(&ctx, &vc.formula, &mut variables)?;
+
+        // To verify a formula is always true, we assert its negation
+        // If the negation is unsatisfiable, the original is valid
+        let z3_bool = z3_formula.as_bool()
+            .ok_or_else(|| "Formula must evaluate to boolean".to_string())?;
+        solver.assert(&z3_bool.not());
+
+        // Check satisfiability
+        match solver.check() {
+            z3::SatResult::Unsat => {
+                // Negation is unsatisfiable => original formula is valid
+                eprintln!("  ✓ Verified");
                 Ok(CheckResult::Verified)
             }
+            z3::SatResult::Sat => {
+                // Found counterexample
+                eprintln!("  ✗ Failed - counterexample found");
+                let model = if let Some(z3_model) = solver.get_model() {
+                    extract_model(&z3_model, &variables)
+                } else {
+                    Model {
+                        assignments: HashMap::new(),
+                        execution_trace: vec!["Counterexample exists but model unavailable".to_string()],
+                    }
+                };
+                Ok(CheckResult::Failed(model))
+            }
+            z3::SatResult::Unknown => {
+                eprintln!("  ? Unknown (solver timeout or complexity)");
+                Err("Solver returned unknown - formula may be too complex".to_string())
+            }
         }
+    }
+}
+
+/// Convert our Formula to Z3 AST
+fn formula_to_z3<'ctx>(
+    ctx: &'ctx z3::Context,
+    formula: &Formula,
+    variables: &mut HashMap<String, z3::ast::Int<'ctx>>,
+) -> Result<z3::ast::Dynamic<'ctx>, String> {
+    use z3::ast::{Bool, Int};
+
+    match formula {
+        Formula::Bool(b) => Ok(Bool::from_bool(ctx, *b).into()),
+
+        Formula::Int(n) => Ok(Int::from_i64(ctx, *n).into()),
+
+        Formula::Real(f) => {
+            // Approximate real as integer for now (TODO: use Real sort)
+            Ok(Int::from_i64(ctx, *f as i64).into())
+        }
+
+        Formula::Var(name) => {
+            if let Some(var) = variables.get(name) {
+                Ok(var.clone().into())
+            } else {
+                // Create new integer variable
+                let var = Int::new_const(ctx, name.as_str());
+                variables.insert(name.clone(), var.clone());
+                Ok(var.into())
+            }
+        }
+
+        Formula::Eq(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            Ok(l._eq(&r).into())
+        }
+
+        Formula::Ne(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            Ok(l._eq(&r).not().into())
+        }
+
+        Formula::Lt(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in <")?;
+            let r_int = r.as_int().ok_or("Expected integer in <")?;
+            Ok(l_int.lt(&r_int).into())
+        }
+
+        Formula::Le(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in <=")?;
+            let r_int = r.as_int().ok_or("Expected integer in <=")?;
+            Ok(l_int.le(&r_int).into())
+        }
+
+        Formula::Gt(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in >")?;
+            let r_int = r.as_int().ok_or("Expected integer in >")?;
+            Ok(l_int.gt(&r_int).into())
+        }
+
+        Formula::Ge(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in >=")?;
+            let r_int = r.as_int().ok_or("Expected integer in >=")?;
+            Ok(l_int.ge(&r_int).into())
+        }
+
+        Formula::Add(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in +")?;
+            let r_int = r.as_int().ok_or("Expected integer in +")?;
+            Ok(Int::add(ctx, &[&l_int, &r_int]).into())
+        }
+
+        Formula::Sub(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in -")?;
+            let r_int = r.as_int().ok_or("Expected integer in -")?;
+            Ok(Int::sub(ctx, &[&l_int, &r_int]).into())
+        }
+
+        Formula::Mul(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in *")?;
+            let r_int = r.as_int().ok_or("Expected integer in *")?;
+            Ok(Int::mul(ctx, &[&l_int, &r_int]).into())
+        }
+
+        Formula::Div(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in /")?;
+            let r_int = r.as_int().ok_or("Expected integer in /")?;
+            Ok(l_int.div(&r_int).into())
+        }
+
+        Formula::Mod(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_int = l.as_int().ok_or("Expected integer in %")?;
+            let r_int = r.as_int().ok_or("Expected integer in %")?;
+            Ok(l_int.modulo(&r_int).into())
+        }
+
+        Formula::And(formulas) => {
+            let z3_formulas: Result<Vec<_>, _> = formulas
+                .iter()
+                .map(|f| formula_to_z3(ctx, f, variables))
+                .collect();
+            let z3_formulas = z3_formulas?;
+
+            let bool_formulas: Result<Vec<_>, _> = z3_formulas
+                .iter()
+                .map(|f| f.as_bool().ok_or("Expected boolean in AND"))
+                .collect();
+            let bool_formulas = bool_formulas?;
+
+            let refs: Vec<&Bool> = bool_formulas.iter().collect();
+            Ok(Bool::and(ctx, &refs).into())
+        }
+
+        Formula::Or(formulas) => {
+            let z3_formulas: Result<Vec<_>, _> = formulas
+                .iter()
+                .map(|f| formula_to_z3(ctx, f, variables))
+                .collect();
+            let z3_formulas = z3_formulas?;
+
+            let bool_formulas: Result<Vec<_>, _> = z3_formulas
+                .iter()
+                .map(|f| f.as_bool().ok_or("Expected boolean in OR"))
+                .collect();
+            let bool_formulas = bool_formulas?;
+
+            let refs: Vec<&Bool> = bool_formulas.iter().collect();
+            Ok(Bool::or(ctx, &refs).into())
+        }
+
+        Formula::Not(f) => {
+            let inner = formula_to_z3(ctx, f, variables)?;
+            let bool_inner = inner.as_bool().ok_or("Expected boolean in NOT")?;
+            Ok(bool_inner.not().into())
+        }
+
+        Formula::Implies(left, right) => {
+            let l = formula_to_z3(ctx, left, variables)?;
+            let r = formula_to_z3(ctx, right, variables)?;
+            let l_bool = l.as_bool().ok_or("Expected boolean in =>")?;
+            let r_bool = r.as_bool().ok_or("Expected boolean in =>")?;
+            Ok(l_bool.implies(&r_bool).into())
+        }
+
+        Formula::Ite(cond, then_branch, else_branch) => {
+            let c = formula_to_z3(ctx, cond, variables)?;
+            let t = formula_to_z3(ctx, then_branch, variables)?;
+            let e = formula_to_z3(ctx, else_branch, variables)?;
+            let c_bool = c.as_bool().ok_or("Expected boolean condition in ITE")?;
+
+            // ITE with integers
+            if let (Some(t_int), Some(e_int)) = (t.as_int(), e.as_int()) {
+                Ok(c_bool.ite(&t_int, &e_int).into())
+            } else if let (Some(t_bool), Some(e_bool)) = (t.as_bool(), e.as_bool()) {
+                Ok(c_bool.ite(&t_bool, &e_bool).into())
+            } else {
+                Err("Type mismatch in ITE branches".to_string())
+            }
+        }
+
+        Formula::Forall(vars, body) => {
+            // Create bound variables
+            let mut bound_vars: Vec<z3::ast::Int> = Vec::new();
+            for (name, _ty) in vars {
+                let var = Int::new_const(ctx, name.as_str());
+                variables.insert(name.clone(), var.clone());
+                bound_vars.push(var);
+            }
+
+            let body_z3 = formula_to_z3(ctx, body, variables)?;
+            let body_bool = body_z3.as_bool().ok_or("Forall body must be boolean")?;
+
+            let bound_refs: Vec<_> = bound_vars.iter().map(|v| v as &dyn Ast).collect();
+            Ok(z3::ast::forall_const(ctx, &bound_refs, &[], &body_bool).into())
+        }
+
+        Formula::Exists(vars, body) => {
+            // Create bound variables
+            let mut bound_vars: Vec<z3::ast::Int> = Vec::new();
+            for (name, _ty) in vars {
+                let var = Int::new_const(ctx, name.as_str());
+                variables.insert(name.clone(), var.clone());
+                bound_vars.push(var);
+            }
+
+            let body_z3 = formula_to_z3(ctx, body, variables)?;
+            let body_bool = body_z3.as_bool().ok_or("Exists body must be boolean")?;
+
+            let bound_refs: Vec<_> = bound_vars.iter().map(|v| v as &dyn Ast).collect();
+            Ok(z3::ast::exists_const(ctx, &bound_refs, &[], &body_bool).into())
+        }
+
+        Formula::Select(_array, _index) => {
+            Err("Array select not yet implemented".to_string())
+        }
+
+        Formula::Store(_array, _index, _value) => {
+            Err("Array store not yet implemented".to_string())
+        }
+    }
+}
+
+/// Extract counterexample model from Z3
+fn extract_model(
+    z3_model: &z3::Model,
+    variables: &HashMap<String, z3::ast::Int>,
+) -> Model {
+    let mut assignments = HashMap::new();
+
+    for (name, var) in variables {
+        if let Some(value) = z3_model.eval(var, true) {
+            if let Some(i) = value.as_i64() {
+                assignments.insert(name.clone(), SolverValue::Int(i));
+            }
+        }
+    }
+
+    Model {
+        assignments,
+        execution_trace: vec![],
     }
 }
 

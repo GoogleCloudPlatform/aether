@@ -71,6 +71,9 @@ pub struct LoweringContext {
 
     /// Imported modules in the current module (alias -> module name)
     imported_modules: HashMap<String, String>,
+
+    /// Runtime postconditions for the current function (stored for checking at return points)
+    runtime_postconditions: Vec<ast::ContractAssertion>,
 }
 
 impl LoweringContext {
@@ -92,6 +95,7 @@ impl LoweringContext {
             lambda_counter: 0,
             concurrent_captures: None,
             imported_modules: HashMap::new(),
+            runtime_postconditions: Vec::new(),
         }
     }
 
@@ -250,6 +254,7 @@ impl LoweringContext {
     fn lower_function(&mut self, function: &ast::Function) -> Result<(), SemanticError> {
         self.var_map.clear();
         self.var_types.clear();
+        self.runtime_postconditions.clear();
 
         // Extract parameter info
         let mut params = Vec::new();
@@ -302,6 +307,20 @@ impl LoweringContext {
             }
         }
 
+        // Store runtime postconditions for checking at return points
+        for postcond in &function.metadata.postconditions {
+            if postcond.runtime_check {
+                self.runtime_postconditions.push(postcond.clone());
+            }
+        }
+
+        // Emit runtime precondition checks at function entry
+        for precond in &function.metadata.preconditions {
+            if precond.runtime_check {
+                self.emit_contract_assertion(&precond.condition, &precond.message, true)?;
+            }
+        }
+
         // Lower function body
         self.lower_block(&function.body)?;
 
@@ -322,6 +341,62 @@ impl LoweringContext {
         self.program
             .functions
             .insert(function_name, mir_function);
+
+        Ok(())
+    }
+
+    /// Emit a runtime contract assertion (used for @pre/@post with check=runtime)
+    ///
+    /// This generates an Assert terminator that will panic at runtime if the condition is false.
+    /// For postconditions, `is_precondition` should be false to allow `return_value` references.
+    fn emit_contract_assertion(
+        &mut self,
+        condition: &ast::Expression,
+        message: &Option<String>,
+        is_precondition: bool,
+    ) -> Result<(), SemanticError> {
+        // Lower the condition expression to an operand
+        let condition_operand = self.lower_expression(condition)?;
+
+        // Create the continuation block (where execution goes after the check passes)
+        let continue_block = self.builder.new_block();
+
+        // Build the error message
+        let msg = message.clone().unwrap_or_else(|| {
+            if is_precondition {
+                "Precondition violated".to_string()
+            } else {
+                "Postcondition violated".to_string()
+            }
+        });
+
+        // Set the Assert terminator
+        self.builder.set_terminator(Terminator::Assert {
+            condition: condition_operand,
+            expected: true,
+            message: AssertMessage::Custom(msg),
+            target: continue_block,
+            cleanup: None,
+        });
+
+        // Switch to the continuation block for subsequent code
+        self.builder.switch_to_block(continue_block);
+
+        Ok(())
+    }
+
+    /// Emit postcondition checks for the current function
+    /// Called before return statements to verify postconditions
+    fn emit_postcondition_checks(&mut self) -> Result<(), SemanticError> {
+        // Clone the postconditions to avoid borrow checker issues
+        let postconditions = self.runtime_postconditions.clone();
+
+        for postcond in &postconditions {
+            // Need to substitute `return_value` references with the actual return local
+            // For now, we lower the expression directly - the `return_value` identifier
+            // should already be mapped if we're returning a value
+            self.emit_contract_assertion(&postcond.condition, &postcond.message, false)?;
+        }
 
         Ok(())
     }
@@ -442,6 +517,7 @@ impl LoweringContext {
                                     ty: Type::primitive(PrimitiveType::String),
                                     value: ConstantValue::String("map_insert".to_string()),
                                 }),
+                                explicit_type_arguments: vec![],
                                 args: vec![map_op, key_op, value_op],
                             },
                             source_info: SourceInfo {
@@ -493,10 +569,17 @@ impl LoweringContext {
                                 scope: 0,
                             },
                         });
+
+                        // Map return_value to the return local for postcondition checks
+                        self.var_map.insert("return_value".to_string(), return_local);
                     } else {
                         let _return_value = self.lower_expression(return_expr)?;
                     }
                 }
+
+                // Emit runtime postcondition checks before returning
+                self.emit_postcondition_checks()?;
+
                 self.builder.set_terminator(Terminator::Return);
             }
             ast::Statement::Concurrent { block, source_location } => {
@@ -1372,6 +1455,7 @@ impl LoweringContext {
                             ty: Type::primitive(PrimitiveType::String),
                             value: ConstantValue::String("aether_await".to_string()),
                         }),
+                        explicit_type_arguments: vec![],
                         args: vec![operand],
                     },
                     source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
@@ -1847,6 +1931,7 @@ impl LoweringContext {
                             ty: crate::types::Type::primitive(ast::PrimitiveType::String),
                             value: ConstantValue::String(qualified_name),
                         }),
+                        explicit_type_arguments: vec![],
                         args: lowered_args,
                     },
                     source_info: SourceInfo {
@@ -1895,6 +1980,7 @@ impl LoweringContext {
                         ty: Type::primitive(ast::PrimitiveType::String),
                         value: ConstantValue::String("map_insert".to_string()),
                     }),
+                    explicit_type_arguments: vec![],
                     args: vec![map_op, key_op, value_op],
                 },
                 source_info: SourceInfo {
@@ -1935,6 +2021,7 @@ impl LoweringContext {
                         ty: Type::primitive(ast::PrimitiveType::String),
                         value: ConstantValue::String("map_get".to_string()),
                     }),
+                    explicit_type_arguments: vec![],
                     args: vec![map_op, key_op],
                 },
                 source_info: SourceInfo {
@@ -2464,6 +2551,12 @@ impl LoweringContext {
                 Type::primitive(ast::PrimitiveType::Integer)
             };
 
+            // Convert explicit type arguments to MIR Types
+            let mir_explicit_type_arguments: Result<Vec<Type>, SemanticError> = call.explicit_type_arguments.iter()
+                .map(|ts| self.ast_type_to_mir_type(ts))
+                .collect();
+            let mir_explicit_type_arguments = mir_explicit_type_arguments?;
+
             let result_local = self.builder.new_local(result_type, false);
 
             // Emit call assignment
@@ -2474,6 +2567,7 @@ impl LoweringContext {
                 },
                 rvalue: Rvalue::Call {
                     func: func_operand,
+                    explicit_type_arguments: mir_explicit_type_arguments.clone(),
                     args: arg_operands,
                 },
                 source_info: SourceInfo {
@@ -2494,6 +2588,12 @@ impl LoweringContext {
             value: ConstantValue::String(function_name.clone()),
         });
 
+        // Convert explicit type arguments to MIR Types
+        let mir_explicit_type_arguments: Result<Vec<Type>, SemanticError> = call.explicit_type_arguments.iter()
+            .map(|ts| self.ast_type_to_mir_type(ts))
+            .collect();
+        let mir_explicit_type_arguments = mir_explicit_type_arguments?;
+
         let result_local = self.builder.new_local(result_type, false);
 
         // Emit call assignment
@@ -2504,6 +2604,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: mir_explicit_type_arguments,
                 args: arg_operands,
             },
             source_info: SourceInfo {
@@ -2817,6 +2918,7 @@ impl LoweringContext {
                 },
                 rvalue: Rvalue::Call {
                     func: func_operand,
+                    explicit_type_arguments: vec![],
                     args: vec![result_operand, lowered_operands[i].clone()],
                 },
                 source_info: SourceInfo {
@@ -2862,6 +2964,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: vec![],
                 args: vec![string_operand],
             },
             source_info: SourceInfo {
@@ -2905,6 +3008,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: vec![],
                 args: vec![string_operand, index_operand],
             },
             source_info: SourceInfo {
@@ -2950,6 +3054,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: vec![],
                 args: vec![string_operand, start_operand, length_operand],
             },
             source_info: SourceInfo {
@@ -2993,6 +3098,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: vec![],
                 args: vec![left_operand, right_operand],
             },
             source_info: SourceInfo {
@@ -3066,6 +3172,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: vec![],
                 args: vec![string_operand, substring_operand],
             },
             source_info: SourceInfo {
@@ -3143,6 +3250,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: array_create_func,
+                explicit_type_arguments: vec![],
                 args: vec![count_operand],
             },
             source_info: SourceInfo {
@@ -3181,6 +3289,7 @@ impl LoweringContext {
                 },
                 rvalue: Rvalue::Call {
                     func: array_set_func.clone(),
+                    explicit_type_arguments: vec![],
                     args: vec![array_operand, index_operand, element_operand],
                 },
                 source_info: SourceInfo {
@@ -3228,6 +3337,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: vec![],
                 args: vec![array_operand, index_operand],
             },
             source_info: SourceInfo {
@@ -3270,6 +3380,7 @@ impl LoweringContext {
             },
             rvalue: Rvalue::Call {
                 func: func_operand,
+                explicit_type_arguments: vec![],
                 args: vec![array_operand],
             },
             source_info: SourceInfo {
@@ -4378,6 +4489,7 @@ impl LoweringContext {
                     ty: Type::primitive(PrimitiveType::String),
                     value: ConstantValue::String("array_length".to_string()),
                 }),
+                explicit_type_arguments: vec![],
                 args: vec![Operand::Copy(Place {
                     local: collection_local,
                     projection: vec![],
@@ -4443,6 +4555,7 @@ impl LoweringContext {
                     ty: Type::primitive(PrimitiveType::String),
                     value: ConstantValue::String("array_get".to_string()),
                 }),
+                explicit_type_arguments: vec![],
                 args: vec![
                     Operand::Copy(Place {
                         local: collection_local,
@@ -4739,6 +4852,7 @@ impl LoweringContext {
                     ty: Type::primitive(PrimitiveType::String),
                     value: ConstantValue::String("map_new".to_string()),
                 }),
+                explicit_type_arguments: vec![],
                 args: vec![],
             },
             source_info: SourceInfo {
@@ -4766,6 +4880,7 @@ impl LoweringContext {
                         ty: Type::primitive(PrimitiveType::String),
                         value: ConstantValue::String("map_insert".to_string()),
                     }),
+                    explicit_type_arguments: vec![],
                     args: vec![
                         Operand::Copy(Place {
                             local: map_local,
@@ -4825,6 +4940,7 @@ impl LoweringContext {
                     ty: Type::primitive(PrimitiveType::String),
                     value: ConstantValue::String("map_get".to_string()),
                 }),
+                explicit_type_arguments: vec![],
                 args: vec![map_op, key_op],
             },
             source_info: SourceInfo {

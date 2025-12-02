@@ -542,7 +542,7 @@ impl InterproceduralAnalysisPass {
                     }
                 }
             }
-            Rvalue::Call { func, args } => {
+            Rvalue::Call { func, args, .. } => {
                 summary.side_effects.calls_functions = true;
 
                 // Extract function name and propagate its side effects
@@ -1025,4 +1025,5 @@ impl Default for InterproceduralAnalysisPass {
 
 
 #[cfg(test)]
+#[path = "interprocedural_tests.rs"]
 mod interprocedural_tests;

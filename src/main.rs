@@ -210,6 +210,10 @@ enum Commands {
         /// Link with library
         #[arg(short = 'l', long = "link")]
         link_libraries: Vec<String>,
+
+        /// Enable formal verification of contracts (@pre/@post)
+        #[arg(long)]
+        verify: bool,
     },
 
     /// Check syntax without generating code
@@ -291,9 +295,10 @@ async fn main() {
                 executable_path: PathBuf::new(),
                 intermediate_files: vec![],
                 stats: Default::default(),
+                verification_results: None,
             })
         }
-        
+
         Some(Commands::Compile {
             input,
             output,
@@ -305,6 +310,7 @@ async fn main() {
             library,
             library_paths,
             link_libraries,
+            verify,
         }) => {
             let mut options = CompileOptions::default();
             options.optimization_level = optimization.min(3);
@@ -315,6 +321,7 @@ async fn main() {
             options.compile_as_library = library;
             options.library_paths = library_paths;
             options.link_libraries = link_libraries;
+            options.enable_verification = verify;
 
             if let Some(output_path) = output {
                 options.output = Some(output_path);
@@ -396,6 +403,7 @@ async fn main() {
                     executable_path: PathBuf::new(),
                     intermediate_files: vec![],
                     stats: Default::default(),
+                    verification_results: None,
                 })
             } else {
                 println!("Type checking failed");
@@ -500,6 +508,7 @@ async fn main() {
                         executable_path: PathBuf::new(),
                         intermediate_files: vec![],
                         stats: Default::default(),
+                        verification_results: None,
                     })
                 }
                 Err(e) => {
@@ -564,6 +573,7 @@ async fn main() {
                 executable_path: PathBuf::new(),
                 intermediate_files: vec![],
                 stats: Default::default(),
+                verification_results: None,
             })
         }
 

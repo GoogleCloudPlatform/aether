@@ -31,7 +31,7 @@ fn create_test_module() -> Module {
 
 // Helper to create a SemanticAnalyzer from source code
 fn semantic_analyzer_from_source(source: &str) -> SemanticAnalyzer {
-    let lexer = crate::lexer::v2::Lexer::new(source, "test.aether".to_string());
+    let mut lexer = crate::lexer::v2::Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = crate::parser::v2::Parser::new(tokens);
     let program = parser.parse_program().unwrap();
@@ -270,7 +270,7 @@ fn test_generic_function_param_resolution() {
     if let Type::Function { parameter_types, return_type, .. } = &func_symbol.symbol_type {
         assert_eq!(parameter_types.len(), 1);
         assert!(matches!(parameter_types[0], Type::Generic { ref name, .. } if name == "T"));
-        assert!(matches!(*return_type, Type::Generic { ref name, .. } if name == "T"));
+        assert!(matches!(**return_type, Type::Generic { ref name, .. } if name == "T"));
     } else {
         panic!("Expected function type");
     }
@@ -293,10 +293,10 @@ fn test_generic_struct_field_resolution() {
     let analyzer = semantic_analyzer_from_source(source);
 
     let struct_def = analyzer.symbol_table.lookup_type_definition("Box").unwrap();
-    if let TypeDefinition::Struct { fields, .. } = struct_def {
+    if let crate::types::TypeDefinition::Struct { fields, .. } = struct_def {
         assert_eq!(fields.len(), 1);
-        assert_eq!(fields[0].0, "value");
-        assert!(matches!(fields[0].1, Type::Generic { ref name, .. } if name == "T"));
+        assert_eq!(&fields[0].0, "value");
+        assert!(matches!(&fields[0].1, Type::Generic { ref name, .. } if name == "T"));
     } else {
         panic!("Expected struct definition");
     }
@@ -315,12 +315,12 @@ fn test_generic_enum_variant_resolution() {
     let analyzer = semantic_analyzer_from_source(source);
 
     let enum_def = analyzer.symbol_table.lookup_type_definition("Option").unwrap();
-    if let TypeDefinition::Enum { variants, .. } = enum_def {
+    if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
         assert_eq!(variants.len(), 2);
-        assert_eq!(variants[0].name, "Some");
+        assert_eq!(&variants[0].name, "Some");
         assert_eq!(variants[0].associated_types.len(), 1);
-        assert!(matches!(variants[0].associated_types[0], Type::Generic { ref name, .. } if name == "T"));
-        assert_eq!(variants[1].name, "None");
+        assert!(matches!(&variants[0].associated_types[0], Type::Generic { ref name, .. } if name == "T"));
+        assert_eq!(&variants[1].name, "None");
         assert_eq!(variants[1].associated_types.len(), 0);
     } else {
         panic!("Expected enum definition");
@@ -336,7 +336,7 @@ fn test_undefined_generic_parameter_in_function() {
         }
     }
     "#;
-    let lexer = crate::lexer::v2::Lexer::new(source, "test.aether".to_string());
+    let mut lexer = crate::lexer::v2::Lexer::new(source, "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
     let mut parser = crate::parser::v2::Parser::new(tokens);
     let program = parser.parse_program().unwrap();

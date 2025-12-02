@@ -846,11 +846,124 @@ impl<'ctx> LLVMBackend<'ctx> {
                     }
                 }
 
-                mir::Terminator::Assert { .. } => {
-                    // TODO: Implement assertion checks
-                    return Err(SemanticError::CodeGenError {
-                        message: "Assert terminator not yet implemented".to_string(),
+                mir::Terminator::Assert {
+                    condition,
+                    expected,
+                    message,
+                    target,
+                    cleanup: _,
+                } => {
+                    // Generate the condition value
+                    let cond_value =
+                        self.generate_operand(condition, &local_allocas, &builder, function)?;
+
+                    // Extract integer value (should be i1 or convertible to bool)
+                    let bool_value = match cond_value {
+                        BasicValueEnum::IntValue(v) => {
+                            if v.get_type().get_bit_width() == 1 {
+                                v
+                            } else {
+                                // Convert to boolean (ne 0)
+                                let zero = v.get_type().const_int(0, false);
+                                builder
+                                    .build_int_compare(
+                                        inkwell::IntPredicate::NE,
+                                        v,
+                                        zero,
+                                        "assert_cond",
+                                    )
+                                    .map_err(|e| SemanticError::CodeGenError {
+                                        message: e.to_string(),
+                                    })?
+                            }
+                        }
+                        _ => {
+                            return Err(SemanticError::CodeGenError {
+                                message: "Expected integer/boolean value for assertion condition"
+                                    .to_string(),
+                            });
+                        }
+                    };
+
+                    // Create a failure block
+                    let fail_block = self.context.append_basic_block(llvm_func, "assert_fail");
+                    let success_block = llvm_blocks[target];
+
+                    // Branch based on expected value
+                    if *expected {
+                        // expected=true means we want condition to be true
+                        builder
+                            .build_conditional_branch(bool_value, success_block, fail_block)
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?;
+                    } else {
+                        // expected=false means we want condition to be false
+                        builder
+                            .build_conditional_branch(bool_value, fail_block, success_block)
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?;
+                    }
+
+                    // Generate the failure block: print message and abort
+                    builder.position_at_end(fail_block);
+
+                    // Get the message string
+                    let msg_str = match message {
+                        mir::AssertMessage::Custom(s) => s.clone(),
+                        mir::AssertMessage::BoundsCheck { .. } => "Index out of bounds".to_string(),
+                        mir::AssertMessage::Overflow(_, _, _) => "Arithmetic overflow".to_string(),
+                        mir::AssertMessage::DivisionByZero(_) => "Division by zero".to_string(),
+                        mir::AssertMessage::RemainderByZero(_) => "Remainder by zero".to_string(),
+                    };
+
+                    // Print the assertion failure message using puts (standard C library)
+                    let full_msg = format!("Assertion failed: {}", msg_str);
+                    let msg_global = builder
+                        .build_global_string_ptr(&full_msg, "assert_msg")
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
+                    // Get or declare the puts function (standard C library)
+                    let puts_fn = self.module.get_function("puts").unwrap_or_else(|| {
+                        let i8_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
+                        let puts_fn_type = self
+                            .context
+                            .i32_type()
+                            .fn_type(&[i8_ptr_type.into()], false);
+                        self.module.add_function("puts", puts_fn_type, None)
                     });
+
+                    builder
+                        .build_call(
+                            puts_fn,
+                            &[msg_global.as_pointer_value().into()],
+                            "print_assert",
+                        )
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
+                    // Get or declare abort function
+                    let abort_fn = self.module.get_function("abort").unwrap_or_else(|| {
+                        let abort_fn_type = self.context.void_type().fn_type(&[], false);
+                        self.module.add_function("abort", abort_fn_type, None)
+                    });
+
+                    builder
+                        .build_call(abort_fn, &[], "")
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
+                    // Unreachable after abort
+                    builder
+                        .build_unreachable()
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
                 }
 
                 mir::Terminator::Call {
@@ -858,6 +971,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                     args,
                     destination,
                     target,
+                    explicit_type_arguments,
                     ..
                 } => {
                     eprintln!("DEBUG: Processing Terminator::Call");
@@ -869,6 +983,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                     // Generate the function call
                     let rvalue = mir::Rvalue::Call {
                         func: func.clone(),
+                        explicit_type_arguments: explicit_type_arguments.clone(),
                         args: args.clone(),
                     };
                     eprintln!("DEBUG: Created Rvalue::Call: {:?}", rvalue);
@@ -1428,7 +1543,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                 }
             }
 
-            mir::Rvalue::Call { func, args } => {
+            mir::Rvalue::Call { func, args, .. } => {
                 // Check if this is an indirect call through a function pointer (closure)
                 if let mir::Operand::Copy(place) | mir::Operand::Move(place) = func {
                     // Load the function pointer from the local

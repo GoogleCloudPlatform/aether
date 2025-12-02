@@ -386,6 +386,7 @@ mod tests {
                     function_reference: crate::ast::FunctionReference::Local {
                         name: Identifier::new("open_file".to_string(), SourceLocation::unknown()),
                     },
+                    explicit_type_arguments: vec![],
                     arguments: vec![],
                     variadic_arguments: vec![],
                 },

@@ -1314,4 +1314,5 @@ impl Default for RetryConfig {
 
 
 #[cfg(test)]
+#[path = "distribution_tests.rs"]
 mod distribution_tests;

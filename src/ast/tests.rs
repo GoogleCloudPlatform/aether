@@ -21,6 +21,7 @@ fn test_ast_pretty_printer() {
         exports: vec![],
         type_definitions: vec![],
         trait_definitions: vec![],
+        impl_blocks: vec![],
         constant_declarations: vec![],
         function_definitions: vec![],
         external_functions: vec![],

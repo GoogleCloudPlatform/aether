@@ -152,6 +152,7 @@ fn create_ownership_test_module(function_body: Vec<Statement>) -> Program {
         exports: vec![],
         type_definitions: vec![],
         trait_definitions: vec![],
+        impl_blocks: vec![],
         constant_declarations: vec![],
         function_definitions: vec![consume_func, borrow_func, test_func],
         external_functions: vec![],
@@ -194,6 +195,7 @@ fn test_valid_borrowing() {
                 function_reference: FunctionReference::Local {
                     name: Identifier::new("borrow".to_string(), loc.clone()),
                 },
+                explicit_type_arguments: vec![],
                 arguments: vec![Argument {
                     parameter_name: Identifier::new("s".to_string(), loc.clone()),
                     value: Box::new(Expression::Variable {
@@ -212,6 +214,7 @@ fn test_valid_borrowing() {
                 function_reference: FunctionReference::Local {
                     name: Identifier::new("consume".to_string(), loc.clone()),
                 },
+                explicit_type_arguments: vec![],
                 arguments: vec![Argument {
                     parameter_name: Identifier::new("s".to_string(), loc.clone()),
                     value: Box::new(Expression::Variable {
@@ -262,6 +265,7 @@ fn test_use_after_move() {
                 function_reference: FunctionReference::Local {
                     name: Identifier::new("consume".to_string(), loc.clone()),
                 },
+                explicit_type_arguments: vec![],
                 arguments: vec![Argument {
                     parameter_name: Identifier::new("s".to_string(), loc.clone()),
                     value: Box::new(Expression::Variable {
@@ -280,6 +284,7 @@ fn test_use_after_move() {
                 function_reference: FunctionReference::Local {
                     name: Identifier::new("borrow".to_string(), loc.clone()),
                 },
+                explicit_type_arguments: vec![],
                 arguments: vec![Argument {
                     parameter_name: Identifier::new("s".to_string(), loc.clone()),
                     value: Box::new(Expression::Variable {
@@ -297,7 +302,7 @@ fn test_use_after_move() {
     let program = create_ownership_test_module(body);
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
+
     assert!(result.is_err(), "Use after move should fail analysis");
     let errors = result.unwrap_err();
     
@@ -355,6 +360,7 @@ fn test_move_on_assignment() {
                 function_reference: FunctionReference::Local {
                     name: Identifier::new("consume".to_string(), loc.clone()),
                 },
+                explicit_type_arguments: vec![],
                 arguments: vec![Argument {
                     parameter_name: Identifier::new("s".to_string(), loc.clone()),
                     value: Box::new(Expression::Variable {

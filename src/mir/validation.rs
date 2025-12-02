@@ -166,7 +166,7 @@ impl Validator {
             Rvalue::UnaryOp { operand, .. } => {
                 self.collect_operand_locals(operand, used, location);
             }
-            Rvalue::Call { func, args } => {
+            Rvalue::Call { func, args, .. } => {
                 self.collect_operand_locals(func, used, location);
                 for arg in args {
                     self.collect_operand_locals(arg, used, location);

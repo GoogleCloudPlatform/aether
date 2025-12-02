@@ -257,6 +257,14 @@ pub enum SemanticError {
         location: SourceLocation,
     },
 
+    #[error("Generic argument count mismatch for '{function}': expected {expected} type arguments, found {found} at {location}")]
+    GenericArgumentCountMismatch {
+        function: String,
+        expected: usize,
+        found: usize,
+        location: SourceLocation,
+    },
+
     #[error("Unsupported feature: {feature} at {location}")]
     UnsupportedFeature {
         feature: String,

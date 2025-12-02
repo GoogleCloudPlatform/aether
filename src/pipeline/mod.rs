@@ -28,6 +28,7 @@ use crate::parser::v2 as parser_v2;
 use crate::profiling::CompilationProfiler;
 use crate::semantic::SemanticAnalyzer;
 use crate::stdlib::StandardLibrary;
+use crate::verification::{ast_to_contract, VerificationEngine, VerificationResult};
 
 use inkwell::context::Context;
 use rayon::prelude::*;
@@ -131,6 +132,8 @@ pub struct CompileOptions {
     pub syntax_only: bool,
     /// Compile as a library (shared object/dylib)
     pub compile_as_library: bool,
+    /// Enable formal verification of contracts (@pre/@post)
+    pub enable_verification: bool,
 }
 
 impl Default for CompileOptions {
@@ -149,6 +152,7 @@ impl Default for CompileOptions {
             emit_object_only: false,
             syntax_only: false,
             compile_as_library: false,
+            enable_verification: false, // Disabled by default
         }
     }
 }
@@ -162,6 +166,8 @@ pub struct CompilationResult {
     pub intermediate_files: Vec<PathBuf>,
     /// Compilation statistics
     pub stats: CompilationStats,
+    /// Verification results (if verification was enabled)
+    pub verification_results: Option<Vec<VerificationResult>>,
 }
 
 /// Compilation statistics
@@ -380,6 +386,7 @@ impl CompilationPipeline {
                 executable_path: PathBuf::from("syntax-check-only"),
                 intermediate_files,
                 stats,
+                verification_results: None, // No verification in syntax-only mode
             });
         }
 
@@ -427,6 +434,103 @@ impl CompilationPipeline {
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_mir_generation");
         }
+
+        // Phase 3.1: Monomorphization
+        if self.options.verbose {
+            println!("Phase 3.1: Running monomorphization...");
+        }
+        let mono_start = std::time::Instant::now();
+        
+        let mut monomorphizer = mir::monomorphization::Monomorphizer::new();
+        monomorphizer.run(&mut mir_program);
+        
+        stats.phase_times.insert(
+            "monomorphization".to_string(),
+            mono_start.elapsed().as_millis(),
+        );
+
+        // Phase 3.5: Verification (optional)
+        let verification_results = if self.options.enable_verification {
+            if self.options.verbose {
+                println!("Phase 3.5: Running formal verification...");
+            }
+            let verify_start = std::time::Instant::now();
+
+            // Run verification in a separate scope to allow profiler reuse
+            let results = {
+                let _timer = if self.options.enable_profiling {
+                    Some(profiler.start_phase("verification"))
+                } else {
+                    None
+                };
+
+                // Extract contracts from AST
+                let contracts = ast_to_contract::extract_program_contracts(&complete_program)
+                    .map_err(|e| CompilerError::SemanticError(SemanticError::VerificationError {
+                        message: format!("Failed to extract contracts: {}", e),
+                        location: crate::error::SourceLocation::unknown(),
+                    }))?;
+
+                if self.options.verbose {
+                    println!("  Extracted {} contracts from AST", contracts.len());
+                    for (name, contract) in &contracts {
+                        println!("    Contract '{}': {} pre, {} post",
+                            name, contract.preconditions.len(), contract.postconditions.len());
+                    }
+                    println!("  MIR functions:");
+                    for name in mir_program.functions.keys() {
+                        println!("    Function: '{}'", name);
+                    }
+                }
+
+                // Create verification engine and register contracts
+                let mut engine = VerificationEngine::new();
+                for (name, contract) in contracts {
+                    engine.add_function_contract(name, contract);
+                }
+
+                // Run verification on MIR
+                engine.verify_program(&mir_program)?
+            };
+
+            // Report verification results
+            let mut all_verified = true;
+            for result in &results {
+                if !result.verified {
+                    all_verified = false;
+                    if self.options.verbose {
+                        println!("  ⚠ Function '{}' verification FAILED", result.name);
+                        for condition in &result.conditions {
+                            if !condition.verified {
+                                println!("    - {} at {:?}", condition.name, condition.location);
+                            }
+                        }
+                        for counterexample in &result.counterexamples {
+                            println!("    Counterexample: {:?}", counterexample.assignments);
+                        }
+                    }
+                } else if self.options.verbose {
+                    println!("  ✓ Function '{}' verified", result.name);
+                }
+            }
+
+            stats.phase_times.insert(
+                "verification".to_string(),
+                verify_start.elapsed().as_millis(),
+            );
+
+            if self.options.enable_profiling {
+                profiler.snapshot_memory("after_verification");
+            }
+
+            if !all_verified && self.options.verbose {
+                println!("\n  Warning: Some contracts could not be verified");
+            }
+
+            Some(results)
+        } else {
+            None
+        };
 
         // Phase 4: Optimization
         if self.options.verbose {
@@ -588,6 +692,7 @@ impl CompilationPipeline {
             executable_path,
             intermediate_files,
             stats,
+            verification_results,
         })
     }
 

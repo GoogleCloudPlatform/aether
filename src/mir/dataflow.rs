@@ -263,7 +263,7 @@ impl LivenessAnalysis {
             Rvalue::UnaryOp { operand, .. } => {
                 self.add_operand_uses(operand, fact);
             }
-            Rvalue::Call { func, args } => {
+            Rvalue::Call { func, args, .. } => {
                 self.add_operand_uses(func, fact);
                 for arg in args {
                     self.add_operand_uses(arg, fact);
