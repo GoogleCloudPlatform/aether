@@ -97,6 +97,17 @@ pub struct VerificationEngine {
     context: VerificationContext,
 }
 
+/// Verification strategy for a function
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationMode {
+    /// Try abstract verification (with axioms) first, then fall back to instantiation
+    Combined,
+    /// Use only axioms (abstract verification)
+    AbstractOnly,
+    /// Ignore axioms (instantiation-only)
+    InstantiationOnly,
+}
+
 /// Context for verification
 #[derive(Debug, Default)]
 struct VerificationContext {
@@ -105,6 +116,9 @@ struct VerificationContext {
 
     /// Known function contracts
     function_contracts: HashMap<String, contracts::FunctionContract>,
+
+    /// Verification mode per function
+    verification_modes: HashMap<String, VerificationMode>,
 
     /// Loop invariants
     loop_invariants: HashMap<mir::BasicBlockId, invariants::LoopInvariant>,
@@ -158,50 +172,16 @@ impl VerificationEngine {
             .vcgen
             .generate_function_vcs(function, contract.as_ref())?;
 
+        let mode = self
+            .context
+            .verification_modes
+            .get(name)
+            .cloned()
+            .unwrap_or(VerificationMode::Combined);
+
         // Verify each condition
-        let mut condition_results = Vec::new();
-        let mut counterexamples = Vec::new();
-        let mut all_verified = true;
-
-        for vc in conditions {
-            let start_time = std::time::Instant::now();
-
-            match self
-                .solver
-                .check_condition_with_axioms(&vc, &self.context.global_axioms)
-            {
-                Ok(solver::CheckResult::Verified) => {
-                    condition_results.push(ConditionResult {
-                        name: vc.name.clone(),
-                        condition: vc.formula.to_string(),
-                        verified: true,
-                        location: vc.location.clone(),
-                        verification_time_ms: start_time.elapsed().as_millis() as u64,
-                    });
-                }
-                Ok(solver::CheckResult::Failed(model)) => {
-                    all_verified = false;
-
-                    condition_results.push(ConditionResult {
-                        name: vc.name.clone(),
-                        condition: vc.formula.to_string(),
-                        verified: false,
-                        location: vc.location.clone(),
-                        verification_time_ms: start_time.elapsed().as_millis() as u64,
-                    });
-
-                    // Extract counterexample
-                    let counterexample = self.extract_counterexample(&vc, model);
-                    counterexamples.push(counterexample);
-                }
-                Err(e) => {
-                    return Err(SemanticError::VerificationError {
-                        message: format!("Failed to verify condition '{}': {}", vc.name, e),
-                        location: vc.location,
-                    });
-                }
-            }
-        }
+        let (condition_results, counterexamples, all_verified) =
+            self.verify_conditions_with_mode(&conditions, mode)?;
 
         Ok(VerificationResult {
             name: name.to_string(),
@@ -234,6 +214,82 @@ impl VerificationEngine {
     /// Add a global axiom that will be available to every verification condition.
     pub fn add_axiom(&mut self, axiom: solver::Formula) {
         self.context.global_axioms.push(axiom);
+    }
+
+    /// Set verification mode for a function (default is Combined).
+    pub fn set_verification_mode(&mut self, name: String, mode: VerificationMode) {
+        self.context.verification_modes.insert(name, mode);
+    }
+
+    /// Verify a set of conditions using the configured mode (abstract, instantiation, or combined).
+    fn verify_conditions_with_mode(
+        &mut self,
+        conditions: &[solver::VerificationCondition],
+        mode: VerificationMode,
+    ) -> Result<(Vec<ConditionResult>, Vec<Counterexample>, bool), SemanticError> {
+        let global_axioms = self.context.global_axioms.clone();
+        match mode {
+            VerificationMode::AbstractOnly => self.verify_pass(conditions, &global_axioms),
+            VerificationMode::InstantiationOnly => self.verify_pass(conditions, &[]),
+            VerificationMode::Combined => {
+                let (results_axioms, cex_axioms, all_axioms) =
+                    self.verify_pass(conditions, &global_axioms)?;
+                if all_axioms {
+                    return Ok((results_axioms, cex_axioms, all_axioms));
+                }
+                self.verify_pass(conditions, &[])
+            }
+        }
+    }
+
+    /// Run a single verification pass with the provided axioms.
+    fn verify_pass(
+        &mut self,
+        conditions: &[solver::VerificationCondition],
+        axioms: &[solver::Formula],
+    ) -> Result<(Vec<ConditionResult>, Vec<Counterexample>, bool), SemanticError> {
+        let mut condition_results = Vec::new();
+        let mut counterexamples = Vec::new();
+        let mut all_verified = true;
+
+        for vc in conditions {
+            let start_time = std::time::Instant::now();
+
+            match self.solver.check_condition_with_axioms(vc, axioms) {
+                Ok(solver::CheckResult::Verified) => {
+                    condition_results.push(ConditionResult {
+                        name: vc.name.clone(),
+                        condition: vc.formula.to_string(),
+                        verified: true,
+                        location: vc.location.clone(),
+                        verification_time_ms: start_time.elapsed().as_millis() as u64,
+                    });
+                }
+                Ok(solver::CheckResult::Failed(model)) => {
+                    all_verified = false;
+
+                    condition_results.push(ConditionResult {
+                        name: vc.name.clone(),
+                        condition: vc.formula.to_string(),
+                        verified: false,
+                        location: vc.location.clone(),
+                        verification_time_ms: start_time.elapsed().as_millis() as u64,
+                    });
+
+                    // Extract counterexample
+                    let counterexample = self.extract_counterexample(vc, model);
+                    counterexamples.push(counterexample);
+                }
+                Err(e) => {
+                    return Err(SemanticError::VerificationError {
+                        message: format!("Failed to verify condition '{}': {}", vc.name, e),
+                        location: vc.location.clone(),
+                    });
+                }
+            }
+        }
+
+        Ok((condition_results, counterexamples, all_verified))
     }
 
     /// Extract a counterexample from a failed verification
@@ -518,5 +574,87 @@ mod tests {
         assert!(verified.verified);
         assert!(!verified.conditions.is_empty());
         assert!(verified.conditions[0].verified);
+    }
+
+    #[test]
+    fn combined_mode_falls_back_without_axioms() {
+        let int_type = Type::primitive(PrimitiveType::Integer);
+
+        // Function returns x directly.
+        let parameters = vec![Parameter {
+            name: "x".to_string(),
+            ty: int_type.clone(),
+            local_id: 0,
+        }];
+
+        let assign_return = Statement::Assign {
+            place: Place {
+                local: 1,
+                projection: vec![],
+            },
+            rvalue: Rvalue::Use(Operand::Copy(Place {
+                local: 0,
+                projection: vec![],
+            })),
+            source_info: mir::SourceInfo {
+                span: SourceLocation::unknown(),
+                scope: 0,
+            },
+        };
+
+        let entry_block = BasicBlock {
+            id: 0,
+            statements: vec![assign_return],
+            terminator: Terminator::Return,
+        };
+
+        let mut blocks = HashMap::new();
+        blocks.insert(0, entry_block);
+
+        let function = Function {
+            name: "combined_example".to_string(),
+            parameters: parameters.clone(),
+            return_type: int_type.clone(),
+            locals: {
+                let mut locals = HashMap::new();
+                locals.insert(
+                    1,
+                    mir::Local {
+                        ty: int_type.clone(),
+                        is_mutable: false,
+                        source_info: None,
+                    },
+                );
+                locals
+            },
+            basic_blocks: blocks,
+            entry_block: 0,
+            return_local: Some(1),
+        };
+
+        let mut contract = contracts::FunctionContract::new("combined_example".to_string());
+        contract.add_postcondition(
+            "result_matches_x".to_string(),
+            contracts::Expression::BinaryOp {
+                op: contracts::BinaryOp::Eq,
+                left: Box::new(contracts::Expression::Result),
+                right: Box::new(contracts::Expression::Variable("x".to_string())),
+            },
+            SourceLocation::unknown(),
+        );
+
+        // Add a contradictory axiom to force failure in the abstract pass.
+        let mut engine = VerificationEngine::new();
+        engine.add_function_contract("combined_example".to_string(), contract);
+        engine.add_axiom(solver::Formula::Not(Box::new(solver::Formula::Eq(
+            Box::new(solver::Formula::Var("result".to_string())),
+            Box::new(solver::Formula::Var("local_0".to_string())),
+        ))));
+
+        // Default mode is Combined: first pass with axioms should fail, fallback without axioms should pass.
+        let result = engine.verify_function("combined_example", &function).unwrap();
+        assert!(result.verified);
+        assert!(!result.conditions.is_empty());
+        assert!(result.conditions[0].verified);
     }
 }
