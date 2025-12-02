@@ -144,3 +144,7 @@ examples/**/main
 *.exe
 test_memory_alloc
 test_realloc
+
+# Compiled example binaries
+examples/v2/**/*/basic_enum
+examples/v2/**/main
