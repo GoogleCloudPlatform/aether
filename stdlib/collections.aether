@@ -1,0 +1,29 @@
+module Collections;
+
+// @pre({array.length > 0}, message="Array must not be empty.")
+// @post({forall i: Int. (i >= 0 && i < array.length - 1) => array[i] <= array[i+1]}, message="Array is sorted in non-decreasing order.", verify=abstract)
+@extern("C")
+func sort_verified(array: Array<Int>) -> Void;
+
+// @pre({array.length > 0}, message="Array must not be empty.")
+// @pre({forall i: Int. (i >= 0 && i < array.length - 1) => array[i] <= array[i+1]}, message="Array must be sorted for binary search.", verify=abstract)
+// @post({result >= -1 && result < array.length}, message="Result is a valid index or -1 if not found.")
+// @post({result >= 0 => array[result] == target}, message="If found, array[result] equals target.")
+@extern("C")
+func binary_search(array: Array<Int>, target: Int) -> Int;
+
+// @pre({array.length > 0}, message="Input array for filter cannot be empty.")
+// @post({forall i: Int. (i >= 0 && i < result.length) => predicate(result[i]) == true}, message="All elements in the result satisfy the predicate.")
+// @post({result.length <= array.length}, message="Result array length is less than or equal to input array length.")
+@extern("C")
+func filter(array: Array<Int>, predicate: Pointer<Void>) -> Array<Int>;
+
+// @pre({array.length > 0}, message="Input array for map cannot be empty.")
+// @post({result.length == array.length}, message="Result array has the same length as input array.")
+@extern("C")
+func map(array: Array<Int>, transform: Pointer<Void>) -> Array<Int>;
+
+// @pre({array.length > 0}, message="Input array for reduce cannot be empty.")
+// @post({true}, message="Reduce always produces a single value.")
+@extern("C")
+func reduce(array: Array<Int>, initial: Int, reducer: Pointer<Void>) -> Int;

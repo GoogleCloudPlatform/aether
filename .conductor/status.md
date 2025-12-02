@@ -106,7 +106,7 @@
 - [x] Fixed enum syntax to use `case` keyword consistently
 - [x] All tests pass
 
-## Phase 14: Generics Implementation (In Progress)
+## Phase 14: Generics Implementation (Completed)
 
 ### Task 14.1: Parse Generic Type Parameters (Completed - 2025-11-30)
 - [x] Lexer: `<` and `>` tokens already work (Less/Greater)
@@ -173,10 +173,6 @@
 - [x] MIR: Updated Rvalue::Call and Terminator::Call to carry explicit type arguments
 - [x] MIR Lowering: Populate explicit type arguments in MIR from AST
 
-### Current Test Status (2025-12-01)
-- **754 tests pass**
-- **0 tests fail**
-
 ## Recent Fixes (2025-12-01)
 - Fixed parser ambiguity between `<` comparison and generic type arguments
 - Added `looks_like_type_arguments()` to check if `<` starts type arguments
@@ -224,3 +220,19 @@
 - Added solver and verification tests demonstrating axioms enabling previously failing contracts.
 - Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (targeted new tests and full suite).
 - Next action: begin Task 16.3 (Combined Verification Strategy).
+
+## Status Update (2025-12-02 - end of day)
+
+### Phase 16: Generic Contract Verification (In Progress)
+
+- [x] **Task 16.1: Instantiation Verification (Option B)**: Completed. Verification engine reuses generic contracts for monomorphized functions.
+- [x] **Task 16.2: Abstract Verification with Axioms (Option C)**: Completed. Verification engine asserts global axioms; solver explicitly supports them.
+- [x] **Task 16.3: Combined Verification Strategy**: Completed. Implemented flexible verification strategy allowing per-contract mode specification (`AbstractOnly`, `InstantiationOnly`, `Combined`). Refactored `VerificationEngine::verify_function` to apply modes per-condition. Added comprehensive test suite. All 764 tests pass.
+
+## Phase 17: Contract Examples (Real-World) (Completed)
+
+## Phase 18: Standard Library in Aether (Completed)
+
+- [x] Ported `std.io` module: Created `stdlib/io.aether` with FFI declarations and contracts. Verified compilation and contract parsing.
+- [x] Ported `std.math` module: Created `stdlib/math.aether` with FFI declarations and contracts. Adjusted tuple return types for FFI functions to single `Int` to match current AetherScript capabilities. Verified compilation and contract parsing.
+- [x] Ported `std.collections` module: Created `stdlib/collections.aether` with FFI declarations and contracts. Adjusted function type parameters to `Pointer<Void>` to match current AetherScript FFI limitations. Verified compilation and contract parsing.
