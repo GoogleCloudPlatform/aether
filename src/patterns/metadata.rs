@@ -337,7 +337,8 @@ impl MetadataIndex {
                            metadata.quality.maintainability_score * 0.3;
         
         self.quality_rankings.push((pattern_id.to_string(), quality_score));
-        self.quality_rankings.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        self.quality_rankings
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         
         // Update usage ranking
         self.usage_rankings.push((pattern_id.to_string(), metadata.usage.use_count));
@@ -426,7 +427,8 @@ impl PatternRecommender {
         
         // Sort by score
         let mut scored_patterns: Vec<_> = pattern_scores.into_iter().collect();
-        scored_patterns.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        scored_patterns
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         
         // Create recommendations
         for (pattern_id, score) in scored_patterns.into_iter().take(10) {
@@ -463,7 +465,8 @@ impl PatternRecommender {
             })
             .collect();
         
-        similarities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        similarities
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         
         for (similar_id, score) in similarities.into_iter().take(n) {
             recommendations.push(PatternRecommendation {

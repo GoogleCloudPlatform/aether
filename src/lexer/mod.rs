@@ -564,7 +564,9 @@ impl Lexer {
                 // Determine if this is a character literal or quoted identifier
                 if content.len() == 1 {
                     // Single character - treat as character literal
-                    let character = content.chars().next().unwrap();
+                    // Safe: we just verified content.len() == 1
+                    let character = content.chars().next()
+                        .expect("content verified to have exactly 1 char");
                     return Ok(Token::new(
                         TokenType::Character(character),
                         start_location,

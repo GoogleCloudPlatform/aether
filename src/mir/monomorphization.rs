@@ -17,7 +17,7 @@
 //! Instantiates generic functions with concrete types.
 
 use crate::mir::{
-    BasicBlock, Constant, ConstantValue, Function, Local, Operand, Program, Rvalue, Statement,
+    Constant, ConstantValue, Function, Operand, Program, Rvalue, Statement,
     Terminator,
 };
 use crate::types::Type;

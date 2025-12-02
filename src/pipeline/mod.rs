@@ -826,7 +826,10 @@ impl CompilationPipeline {
             cmd.arg("-dynamiclib");
             cmd.arg("-install_name").arg(format!(
                 "@rpath/{}",
-                output_path.file_name().unwrap().to_string_lossy()
+                output_path
+                    .file_name()
+                    .expect("output path should have a file name")
+                    .to_string_lossy()
             ));
             cmd
         } else if cfg!(target_os = "windows") {

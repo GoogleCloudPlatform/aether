@@ -1927,8 +1927,9 @@ impl<'ctx> LLVMBackend<'ctx> {
                                         .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })
                                 } else if src_width > dst_width {
                                     // Truncate
-                                    Ok(builder.build_int_truncate(int_val, target_int_type, "trunc")
-                                        .unwrap().into())
+                                    builder.build_int_truncate(int_val, target_int_type, "trunc")
+                                        .map(|v| v.into())
+                                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })
                                 } else {
                                     Ok(operand_value)
                                 }
@@ -3150,7 +3151,11 @@ impl<'ctx> LLVMBackend<'ctx> {
             })?;
 
         // Create cleanup block and continuation block
-        let current_fn = builder.get_insert_block().unwrap().get_parent().unwrap();
+        let current_fn = builder
+            .get_insert_block()
+            .expect("builder should have an insert block during code generation")
+            .get_parent()
+            .expect("insert block should have a parent function");
         let cleanup_block = self.context.append_basic_block(current_fn, "cleanup");
         let continue_block = self
             .context
@@ -3757,7 +3762,10 @@ impl<'ctx> LLVMBackend<'ctx> {
         builder.position_at_end(basic_block);
         
         // Unpack context
-        let context_arg = task_func.get_first_param().unwrap().into_pointer_value();
+        let context_arg = task_func
+            .get_first_param()
+            .expect("task function was created with exactly one parameter")
+            .into_pointer_value();
         let context_ptr = builder.build_pointer_cast(
             context_arg,
             context_struct_type.ptr_type(AddressSpace::default()),

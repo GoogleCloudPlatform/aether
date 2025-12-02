@@ -559,7 +559,9 @@ impl CompositionEngine {
                 template: format!(
                     "(BLOCK\n{}\n(RETURN_VALUE {}))",
                     pipeline_stages.join("\n"),
-                    stage_vars.last().unwrap()
+                    stage_vars
+                        .last()
+                        .expect("pipeline should have at least one stage variable")
                 ),
             }),
             contract: self.combine_contracts_pipeline(patterns),
@@ -665,9 +667,11 @@ impl CompositionEngine {
                         if patterns[j].metadata.requires.contains(provides) {
                             graph
                                 .get_mut(&patterns[i].id)
-                                .unwrap()
+                                .expect("graph entry should exist for pattern")
                                 .push(patterns[j].id.clone());
-                            *in_degree.get_mut(&patterns[j].id).unwrap() += 1;
+                            *in_degree
+                                .get_mut(&patterns[j].id)
+                                .expect("in_degree entry should exist for pattern") += 1;
                         }
                     }
                 }
@@ -1094,7 +1098,7 @@ fn uuid() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .expect("system time should be after UNIX_EPOCH")
         .as_nanos();
     format!("{:x}", timestamp)
 }

@@ -2689,6 +2689,8 @@ impl SemanticAnalyzer {
     }
 
     /// Resolve a function reference to a symbol
+    /// Note: Currently unused, but retained for future use in trait method resolution
+    #[allow(dead_code)]
     fn resolve_function(
         &self,
         reference: &FunctionReference,
@@ -2744,7 +2746,7 @@ impl SemanticAnalyzer {
         // First, try to find the AST function to get its generic parameters
         let func_ast_opt = self.lookup_ast_function_in_modules(&function_name);
 
-        let (mut instantiated_func_type, generic_param_names) = if let Some(func_ast) = func_ast_opt {
+        let (instantiated_func_type, _generic_param_names) = if let Some(func_ast) = func_ast_opt {
             // This is a generic function
             let ast_generic_params = &func_ast.generic_parameters;
             let explicit_type_args = &call.explicit_type_arguments;

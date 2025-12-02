@@ -247,7 +247,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                 })?;
 
             // Store parameter value
-            let param_value = function.get_nth_param(i as u32).unwrap();
+            let param_value = function
+                .get_nth_param(i as u32)
+                .expect("LLVM function parameter count should match MIR function parameters");
             self.builder.build_store(alloca, param_value).map_err(|e| {
                 SemanticError::CodeGenError {
                     message: e.to_string(),

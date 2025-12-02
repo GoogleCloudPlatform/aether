@@ -497,10 +497,12 @@ async fn main() {
 
                     if let Some(output_dir) = output {
                         let output_path = std::path::Path::new(&output_dir)
-                            .join(input.file_stem().unwrap())
+                            .join(input.file_stem().expect("input file should have a file stem"))
                             .with_extension("ast");
-                        fs::create_dir_all(&output_dir).unwrap();
-                        fs::write(output_path, output_content).unwrap();
+                        fs::create_dir_all(&output_dir)
+                            .expect("failed to create output directory");
+                        fs::write(output_path, output_content)
+                            .expect("failed to write output file");
                     } else {
                         println!("{}", output_content);
                     }
@@ -561,10 +563,12 @@ async fn main() {
 
             if let Some(output_dir) = output {
                 let output_path = std::path::Path::new(&output_dir)
-                    .join(input.file_stem().unwrap())
+                    .join(input.file_stem().expect("input file should have a file stem"))
                     .with_extension("tokens");
-                fs::create_dir_all(&output_dir).unwrap();
-                fs::write(output_path, output_content).unwrap();
+                fs::create_dir_all(&output_dir)
+                    .expect("failed to create output directory");
+                fs::write(output_path, output_content)
+                    .expect("failed to write output file");
             } else {
                 println!("{}", output_content);
             }
@@ -583,7 +587,7 @@ async fn main() {
             eprintln!();
             use clap::CommandFactory;
             let mut cmd = Cli::command();
-            cmd.print_help().unwrap();
+            cmd.print_help().expect("failed to print help message");
             process::exit(1);
         }
     };

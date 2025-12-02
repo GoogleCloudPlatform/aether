@@ -489,8 +489,14 @@ impl AetherSemaphore {
                 }
             } else {
                 // Wait for permits to become available
-                let _guard = self.mutex.lock().unwrap();
-                let _result = self.condvar.wait(_guard).unwrap();
+                let _guard = self
+                    .mutex
+                    .lock()
+                    .expect("semaphore mutex should not be poisoned");
+                let _result = self
+                    .condvar
+                    .wait(_guard)
+                    .expect("condvar wait should not fail on unpoisoned mutex");
 
                 if let Ok(mut metrics) = self.metrics.lock() {
                     metrics.wait_count += 1;
