@@ -31,6 +31,12 @@ pub struct CaptureAnalyzer {
     pub captures: HashMap<SourceLocation, HashSet<String>>,
 }
 
+impl Default for CaptureAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CaptureAnalyzer {
     /// Create a new capture analyzer
     pub fn new() -> Self {
@@ -362,11 +368,8 @@ impl ASTVisitor<()> for CaptureAnalyzer {
     }
 
     fn visit_expression(&mut self, node: &Expression) {
-        match node {
-            Expression::Variable { name, .. } => {
-                self.check_variable_usage(&name.name);
-            }
-            _ => {}
+        if let Expression::Variable { name, .. } = node {
+            self.check_variable_usage(&name.name);
         }
 
         // Generic traversal for all children

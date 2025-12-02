@@ -755,7 +755,10 @@ impl SemanticAnalyzer {
     }
 
     /// Convert AST type to a Type, allowing `Self` as a placeholder before substitution
-    fn ast_type_to_type_allow_self(&self, type_spec: &TypeSpecifier) -> Result<Type, SemanticError> {
+    fn ast_type_to_type_allow_self(
+        &self,
+        type_spec: &TypeSpecifier,
+    ) -> Result<Type, SemanticError> {
         if let TypeSpecifier::Named { name, .. } = type_spec {
             if name.name == "Self" {
                 return Ok(Type::named("Self".to_string(), self.current_module.clone()));
@@ -978,7 +981,8 @@ impl SemanticAnalyzer {
                         )?;
 
                         if let Some(impl_sig) = impl_signatures.get(&trait_method.name.name) {
-                            if expected_sig.call_param_types.len() != impl_sig.call_param_types.len()
+                            if expected_sig.call_param_types.len()
+                                != impl_sig.call_param_types.len()
                             {
                                 return Err(SemanticError::TraitMethodSignatureMismatch {
                                     trait_name: trait_ident.name.clone(),
@@ -2373,7 +2377,7 @@ impl SemanticAnalyzer {
 
                         let type_def =
                             self.symbol_table
-                                .lookup_type_definition(&name)
+                                .lookup_type_definition(name)
                                 .ok_or_else(|| SemanticError::UndefinedSymbol {
                                     symbol: full_name.clone(),
                                     location: source_location.clone(),
@@ -2725,7 +2729,7 @@ impl SemanticAnalyzer {
                             if !self
                                 .type_checker
                                 .borrow()
-                                .types_compatible(&*key_type, &arg_key_type)
+                                .types_compatible(key_type, &arg_key_type)
                             {
                                 return Err(SemanticError::TypeMismatch {
                                     expected: key_type.to_string(),
@@ -2739,7 +2743,7 @@ impl SemanticAnalyzer {
                             if !self
                                 .type_checker
                                 .borrow()
-                                .types_compatible(&*value_type, &arg_value_type)
+                                .types_compatible(value_type, &arg_value_type)
                             {
                                 return Err(SemanticError::TypeMismatch {
                                     expected: value_type.to_string(),
@@ -2764,7 +2768,7 @@ impl SemanticAnalyzer {
                             if !self
                                 .type_checker
                                 .borrow()
-                                .types_compatible(&*key_type, &arg_key_type)
+                                .types_compatible(key_type, &arg_key_type)
                             {
                                 return Err(SemanticError::TypeMismatch {
                                     expected: key_type.to_string(),
@@ -2778,7 +2782,7 @@ impl SemanticAnalyzer {
                         } else {
                             Err(SemanticError::InvalidOperation {
                                 operation: format!("method call '{}'", method_name.name),
-                                reason: format!("method not found on type Map"),
+                                reason: "method not found on type Map".to_string(),
                                 location: source_location.clone(),
                             })
                         }
@@ -2928,7 +2932,7 @@ impl SemanticAnalyzer {
                         if !self
                             .type_checker
                             .borrow()
-                            .types_compatible(&*key_type, &provided_key_type)
+                            .types_compatible(&key_type, &provided_key_type)
                         {
                             return Err(SemanticError::TypeMismatch {
                                 expected: key_type.to_string(),
@@ -3194,7 +3198,7 @@ impl SemanticAnalyzer {
                         if !self
                             .type_checker
                             .borrow()
-                            .types_compatible(&*key_type, &provided_key_type)
+                            .types_compatible(&key_type, &provided_key_type)
                         {
                             return Err(SemanticError::TypeMismatch {
                                 expected: key_type.to_string(),
@@ -3589,7 +3593,10 @@ impl SemanticAnalyzer {
         arguments: &[Argument],
         source_location: &SourceLocation,
     ) -> Result<Option<Type>, SemanticError> {
-        if let Type::Generic { constraints, name, .. } = normalized_receiver {
+        if let Type::Generic {
+            constraints, name, ..
+        } = normalized_receiver
+        {
             let mut all_constraints: Vec<crate::types::TypeConstraintInfo> = constraints.clone();
 
             // Merge in constraints from current function where-clause if present
@@ -3598,7 +3605,8 @@ impl SemanticAnalyzer {
             }
 
             for constraint in all_constraints {
-                if let crate::types::TypeConstraintInfo::TraitBound { trait_name, .. } = constraint {
+                if let crate::types::TypeConstraintInfo::TraitBound { trait_name, .. } = constraint
+                {
                     if let Some(sig) = self.trait_method_signature_from_trait(
                         &trait_name,
                         method_name,
@@ -3627,7 +3635,8 @@ impl SemanticAnalyzer {
                             }
                         }
 
-                        for (arg, expected_ty) in arguments.iter().zip(sig.call_param_types.iter()) {
+                        for (arg, expected_ty) in arguments.iter().zip(sig.call_param_types.iter())
+                        {
                             let actual_ty = self.analyze_expression(&arg.value)?;
                             if !self
                                 .type_checker
@@ -4371,7 +4380,7 @@ impl SemanticAnalyzer {
 
                         // Handle nested pattern
                         if let Some(ref nested_pat) = nested_pattern {
-                            if let Some(ref associated_type) = variant.associated_types.first() {
+                            if let Some(associated_type) = variant.associated_types.first() {
                                 // Recursively analyze the nested pattern with the associated type
                                 self.analyze_pattern(nested_pat, associated_type)?;
                             } else {
@@ -4387,31 +4396,29 @@ impl SemanticAnalyzer {
                         }
 
                         // If there are bindings (without nested pattern), add them to the symbol table
-                        if !bindings.is_empty() {
-                            if nested_pattern.is_none() {
-                                if bindings.len() != variant.associated_types.len() {
-                                    return Err(SemanticError::ArgumentCountMismatch {
-                                        function: variant_name.name.clone(), // Using function for variant name
-                                        expected: variant.associated_types.len(),
-                                        found: bindings.len(),
-                                        location: source_location.clone(),
-                                    });
-                                }
+                        if !bindings.is_empty() && nested_pattern.is_none() {
+                            if bindings.len() != variant.associated_types.len() {
+                                return Err(SemanticError::ArgumentCountMismatch {
+                                    function: variant_name.name.clone(), // Using function for variant name
+                                    expected: variant.associated_types.len(),
+                                    found: bindings.len(),
+                                    location: source_location.clone(),
+                                });
+                            }
 
-                                for (binding_id, associated_type) in
-                                    bindings.iter().zip(variant.associated_types.iter())
-                                {
-                                    self.symbol_table.add_symbol(Symbol {
-                                        name: binding_id.name.clone(),
-                                        symbol_type: associated_type.clone(),
-                                        kind: SymbolKind::Variable,
-                                        is_mutable: false,
-                                        is_initialized: true,
-                                        declaration_location: binding_id.source_location.clone(),
-                                        is_moved: false,
-                                        borrow_state: BorrowState::None,
-                                    })?;
-                                }
+                            for (binding_id, associated_type) in
+                                bindings.iter().zip(variant.associated_types.iter())
+                            {
+                                self.symbol_table.add_symbol(Symbol {
+                                    name: binding_id.name.clone(),
+                                    symbol_type: associated_type.clone(),
+                                    kind: SymbolKind::Variable,
+                                    is_mutable: false,
+                                    is_initialized: true,
+                                    declaration_location: binding_id.source_location.clone(),
+                                    is_moved: false,
+                                    borrow_state: BorrowState::None,
+                                })?;
                             }
                         }
                     } else {

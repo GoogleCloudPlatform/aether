@@ -508,7 +508,7 @@ See: [Architecture - Verification Strategy](architecture.md#verification-strateg
 
 ### Task 16.3: Combined Verification Strategy
 - [ ] **Verification**: Try abstract first, fall back to instantiation
-- [ ] **Verification**: Implement `@verify(abstract)` and `@verify(instantiation)` pragmas
+- [~] **Verification**: Implement `@verify(abstract)` and `@verify(instantiation)` pragmas
 - [ ] **Tests**: Combined strategy tests
 
 ---

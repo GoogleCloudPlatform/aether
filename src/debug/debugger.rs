@@ -327,6 +327,12 @@ pub enum StackSnapshotTrigger {
     FunctionReturn,
 }
 
+impl Default for DebuggerInterface {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DebuggerInterface {
     pub fn new() -> Self {
         Self {

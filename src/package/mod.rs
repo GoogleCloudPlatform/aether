@@ -153,7 +153,7 @@ pub struct CacheStats {
 }
 
 /// Package installation options
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct InstallOptions {
     /// Install globally
     pub global: bool,
@@ -609,7 +609,7 @@ impl PackageManager {
         let mut dependents = Vec::new();
 
         for (package_name, versions) in &self.cache.packages {
-            for (_, cached_package) in versions {
+            for cached_package in versions.values() {
                 if cached_package
                     .manifest
                     .dependencies
@@ -734,7 +734,7 @@ impl PackageCache {
 
         self.packages
             .entry(name.to_string())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(version.clone(), cached_package);
 
         self.stats.total_packages += 1;
@@ -819,19 +819,6 @@ impl Default for NetworkConfig {
             max_retries: 3,
             proxy: None,
             ssl_verify: true,
-        }
-    }
-}
-
-impl Default for InstallOptions {
-    fn default() -> Self {
-        Self {
-            global: false,
-            no_deps: false,
-            force: false,
-            version: None,
-            dev: false,
-            optional: false,
         }
     }
 }

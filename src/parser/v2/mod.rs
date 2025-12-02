@@ -31,6 +31,7 @@ use crate::ast::{
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
+use crate::verification::VerificationMode;
 
 /// Internal enum for binary operators during parsing
 #[derive(Debug, Clone, Copy)]
@@ -631,11 +632,14 @@ impl Parser {
         (Some(module), errors)
     }
 
-    /// Extract contract condition and runtime_check flag from annotation arguments
-    /// Syntax: @pre({condition}) or @pre({condition}, check=runtime)
-    fn extract_contract_args(args: &[AnnotationArgument]) -> (Option<Box<Expression>>, bool) {
+    /// Extract contract condition, runtime_check flag, and verification mode from annotation arguments
+    /// Syntax: @pre({condition}) or @pre({condition}, check=runtime) or @pre({condition}, verify=abstract)
+    fn extract_contract_args(
+        args: &[AnnotationArgument],
+    ) -> (Option<Box<Expression>>, bool, Option<VerificationMode>) {
         let mut condition: Option<Box<Expression>> = None;
         let mut runtime_check = false;
+        let mut verification_mode: Option<VerificationMode> = None;
 
         for arg in args {
             // Check for the condition expression (unlabeled argument)
@@ -652,9 +656,22 @@ impl Parser {
                     }
                 }
             }
+            // Check for verify=mode
+            else if arg.label.as_deref() == Some("verify") {
+                if let AnnotationValue::Identifier(id) = &arg.value {
+                    match id.as_str() {
+                        "abstract" => verification_mode = Some(VerificationMode::AbstractOnly),
+                        "instantiation" => {
+                            verification_mode = Some(VerificationMode::InstantiationOnly)
+                        }
+                        "combined" => verification_mode = Some(VerificationMode::Combined),
+                        _ => { /* warn or error about invalid verification mode */ }
+                    }
+                }
+            }
         }
 
-        (condition, runtime_check)
+        (condition, runtime_check, verification_mode)
     }
 
     /// Apply annotations to a function
@@ -673,37 +690,43 @@ impl Parser {
                     }
                 }
                 "pre" | "requires" => {
-                    let (condition, runtime_check) = Self::extract_contract_args(&ann.arguments);
+                    let (condition, runtime_check, verification_mode) =
+                        Self::extract_contract_args(&ann.arguments);
                     if let Some(expr) = condition {
                         func.metadata.preconditions.push(ContractAssertion {
                             condition: expr,
                             failure_action: FailureAction::ThrowException,
                             message: None,
                             runtime_check,
+                            verification_mode,
                             source_location: ann.source_location.clone(),
                         });
                     }
                 }
                 "post" | "ensures" => {
-                    let (condition, runtime_check) = Self::extract_contract_args(&ann.arguments);
+                    let (condition, runtime_check, verification_mode) =
+                        Self::extract_contract_args(&ann.arguments);
                     if let Some(expr) = condition {
                         func.metadata.postconditions.push(ContractAssertion {
                             condition: expr,
                             failure_action: FailureAction::ThrowException,
                             message: None,
                             runtime_check,
+                            verification_mode,
                             source_location: ann.source_location.clone(),
                         });
                     }
                 }
                 "invariant" => {
-                    let (condition, runtime_check) = Self::extract_contract_args(&ann.arguments);
+                    let (condition, runtime_check, verification_mode) =
+                        Self::extract_contract_args(&ann.arguments);
                     if let Some(expr) = condition {
                         func.metadata.invariants.push(ContractAssertion {
                             condition: expr,
                             failure_action: FailureAction::ThrowException,
                             message: None,
                             runtime_check,
+                            verification_mode,
                             source_location: ann.source_location.clone(),
                         });
                     }
@@ -964,36 +987,32 @@ impl Parser {
         } else if self.check_keyword(Keyword::Struct) {
             let type_def = self.parse_struct()?;
             if is_public {
-                match &type_def {
-                    TypeDefinition::Structured {
-                        name,
-                        source_location,
-                        ..
-                    } => {
-                        exports.push(ExportStatement::Type {
-                            name: name.clone(),
-                            source_location: source_location.clone(),
-                        });
-                    }
-                    _ => {}
+                if let TypeDefinition::Structured {
+                    name,
+                    source_location,
+                    ..
+                } = &type_def
+                {
+                    exports.push(ExportStatement::Type {
+                        name: name.clone(),
+                        source_location: source_location.clone(),
+                    });
                 }
             }
             type_definitions.push(type_def);
         } else if self.check_keyword(Keyword::Enum) {
             let type_def = self.parse_enum()?;
             if is_public {
-                match &type_def {
-                    TypeDefinition::Enumeration {
-                        name,
-                        source_location,
-                        ..
-                    } => {
-                        exports.push(ExportStatement::Type {
-                            name: name.clone(),
-                            source_location: source_location.clone(),
-                        });
-                    }
-                    _ => {}
+                if let TypeDefinition::Enumeration {
+                    name,
+                    source_location,
+                    ..
+                } = &type_def
+                {
+                    exports.push(ExportStatement::Type {
+                        name: name.clone(),
+                        source_location: source_location.clone(),
+                    });
                 }
             }
             type_definitions.push(type_def);
@@ -3916,13 +3935,13 @@ impl Parser {
                                     depth -= 1;
                                     if depth == 0 {
                                         // Check if => follows
-                                        if i + 1 < self.tokens.len() {
-                                            if matches!(
+                                        if i + 1 < self.tokens.len()
+                                            && matches!(
                                                 self.tokens[i + 1].token_type,
                                                 TokenType::FatArrow
-                                            ) {
-                                                return true;
-                                            }
+                                            )
+                                        {
+                                            return true;
                                         }
                                         break;
                                     }

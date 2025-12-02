@@ -692,7 +692,7 @@ impl TypeChecker {
                     name.name,
                     self.type_definitions.len()
                 );
-                for (key, _) in &self.type_definitions {
+                for key in self.type_definitions.keys() {
                     eprintln!("  - Type: '{}'", key);
                 }
                 if self.type_definitions.contains_key(&name.name) {

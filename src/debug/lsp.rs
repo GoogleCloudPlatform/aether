@@ -89,17 +89,12 @@ pub struct ServerCapabilities {
 }
 
 /// Text document synchronization kind
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum TextDocumentSyncKind {
     None = 0,
+    #[default]
     Full = 1,
     Incremental = 2,
-}
-
-impl Default for TextDocumentSyncKind {
-    fn default() -> Self {
-        TextDocumentSyncKind::Full
-    }
 }
 
 /// Completion options
@@ -226,18 +221,10 @@ pub enum SymbolKind {
 }
 
 /// Symbol index for fast lookup
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct SymbolIndex {
     /// Document symbols
     pub document_symbols: HashMap<String, Vec<SymbolInfo>>,
-}
-
-impl Default for SymbolIndex {
-    fn default() -> Self {
-        Self {
-            document_symbols: HashMap::new(),
-        }
-    }
 }
 
 impl std::fmt::Debug for SymbolIndex {
@@ -407,14 +394,8 @@ pub enum CompletionItemKind {
 }
 
 /// Hover provider for providing hover information
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct HoverProvider;
-
-impl Default for HoverProvider {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 /// Hover information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -437,14 +418,8 @@ pub enum MarkedString {
 }
 
 /// Definition provider for go-to-definition functionality
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DefinitionProvider;
-
-impl Default for DefinitionProvider {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 impl LanguageServer {
     pub fn new(config: LspConfig) -> Self {
@@ -596,11 +571,11 @@ impl LanguageServer {
     /// Update symbol index
     fn update_symbol_index(&mut self, document: &Document) -> Result<(), SemanticError> {
         if let Some(ref semantic_info) = document.semantic_info {
-            for (_, symbol) in &semantic_info.symbols {
+            for symbol in semantic_info.symbols.values() {
                 self.symbol_index
                     .document_symbols
                     .entry(document.uri.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(symbol.clone());
             }
         }

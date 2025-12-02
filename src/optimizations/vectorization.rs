@@ -213,7 +213,7 @@ impl VectorizationPass {
         let mut visited = HashSet::new();
 
         // Simple loop detection using back edges
-        for (block_id, _block) in &function.basic_blocks {
+        for block_id in function.basic_blocks.keys() {
             if visited.contains(block_id) {
                 continue;
             }
@@ -241,20 +241,10 @@ impl VectorizationPass {
             })?;
 
         // Look for loop pattern: header -> body -> back edge to header
-        match &block.terminator {
-            Terminator::SwitchInt { targets, .. } => {
-                // Check if one of the targets points back to this block
-                for target in &targets.targets {
-                    if *target == start_block as u32 {
-                        return Ok(Some(LoopInfo {
-                            header: start_block,
-                            blocks: HashSet::new(),
-                            induction_variable: None,
-                        }));
-                    }
-                }
-                // Also check the otherwise target
-                if targets.otherwise == start_block as u32 {
+        if let Terminator::SwitchInt { targets, .. } = &block.terminator {
+            // Check if one of the targets points back to this block
+            for target in &targets.targets {
+                if *target == start_block as u32 {
                     return Ok(Some(LoopInfo {
                         header: start_block,
                         blocks: HashSet::new(),
@@ -262,7 +252,14 @@ impl VectorizationPass {
                     }));
                 }
             }
-            _ => {}
+            // Also check the otherwise target
+            if targets.otherwise == start_block as u32 {
+                return Ok(Some(LoopInfo {
+                    header: start_block,
+                    blocks: HashSet::new(),
+                    induction_variable: None,
+                }));
+            }
         }
 
         Ok(None)
@@ -319,7 +316,7 @@ impl VectorizationPass {
     /// Find the induction variable of a loop
     fn find_induction_variable(&self, header_block: &BasicBlock) -> Result<Place, SemanticError> {
         // Look for pattern: i = i + 1 or i = i + step
-        for (_index, statement) in header_block.statements.iter().enumerate() {
+        for statement in header_block.statements.iter() {
             if let Statement::Assign { place, rvalue, .. } = statement {
                 if let Rvalue::BinaryOp {
                     op: BinOp::Add,
@@ -424,61 +421,57 @@ impl VectorizationPass {
         statement: &Statement,
         index: usize,
     ) -> Result<Option<VectorizableStatement>, SemanticError> {
-        match statement {
-            Statement::Assign { place, rvalue, .. } => {
-                match rvalue {
-                    Rvalue::BinaryOp { op, left, right } => {
-                        // Check if this is a vectorizable arithmetic operation
-                        if let Some(local) = function.locals.get(&place.local) {
-                            if self.is_vectorizable_type(&local.ty) {
-                                let access_pattern =
-                                    self.analyze_memory_access_pattern(left, right);
+        if let Statement::Assign { place, rvalue, .. } = statement {
+            match rvalue {
+                Rvalue::BinaryOp { op, left, right } => {
+                    // Check if this is a vectorizable arithmetic operation
+                    if let Some(local) = function.locals.get(&place.local) {
+                        if self.is_vectorizable_type(&local.ty) {
+                            let access_pattern = self.analyze_memory_access_pattern(left, right);
 
-                                return Ok(Some(VectorizableStatement {
-                                    statement_index: index,
-                                    vector_op: VectorOperation::Arithmetic(*op),
-                                    inputs: vec![left.clone(), right.clone()],
-                                    output: place.clone(),
-                                    access_pattern,
-                                }));
-                            }
+                            return Ok(Some(VectorizableStatement {
+                                statement_index: index,
+                                vector_op: VectorOperation::Arithmetic(*op),
+                                inputs: vec![left.clone(), right.clone()],
+                                output: place.clone(),
+                                access_pattern,
+                            }));
                         }
                     }
-                    Rvalue::UnaryOp { op, operand } => {
-                        if let Some(local) = function.locals.get(&place.local) {
-                            if self.is_vectorizable_type(&local.ty) {
-                                let access_pattern = self.analyze_single_operand_access(operand);
-
-                                return Ok(Some(VectorizableStatement {
-                                    statement_index: index,
-                                    vector_op: VectorOperation::Unary(*op),
-                                    inputs: vec![operand.clone()],
-                                    output: place.clone(),
-                                    access_pattern,
-                                }));
-                            }
-                        }
-                    }
-                    Rvalue::Use(operand) => {
-                        // Simple assignment/load
-                        if let Some(local) = function.locals.get(&place.local) {
-                            if self.is_vectorizable_type(&local.ty) {
-                                let access_pattern = self.analyze_single_operand_access(operand);
-
-                                return Ok(Some(VectorizableStatement {
-                                    statement_index: index,
-                                    vector_op: VectorOperation::Load,
-                                    inputs: vec![operand.clone()],
-                                    output: place.clone(),
-                                    access_pattern,
-                                }));
-                            }
-                        }
-                    }
-                    _ => {}
                 }
+                Rvalue::UnaryOp { op, operand } => {
+                    if let Some(local) = function.locals.get(&place.local) {
+                        if self.is_vectorizable_type(&local.ty) {
+                            let access_pattern = self.analyze_single_operand_access(operand);
+
+                            return Ok(Some(VectorizableStatement {
+                                statement_index: index,
+                                vector_op: VectorOperation::Unary(*op),
+                                inputs: vec![operand.clone()],
+                                output: place.clone(),
+                                access_pattern,
+                            }));
+                        }
+                    }
+                }
+                Rvalue::Use(operand) => {
+                    // Simple assignment/load
+                    if let Some(local) = function.locals.get(&place.local) {
+                        if self.is_vectorizable_type(&local.ty) {
+                            let access_pattern = self.analyze_single_operand_access(operand);
+
+                            return Ok(Some(VectorizableStatement {
+                                statement_index: index,
+                                vector_op: VectorOperation::Load,
+                                inputs: vec![operand.clone()],
+                                output: place.clone(),
+                                access_pattern,
+                            }));
+                        }
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         Ok(None)
@@ -718,24 +711,22 @@ impl DependencyAnalyzer {
         index2: usize,
     ) -> Result<Option<Dependency>, SemanticError> {
         // Simplified dependency detection
-        match (stmt1, stmt2) {
-            (
-                Statement::Assign { place: place1, .. },
-                Statement::Assign {
-                    rvalue: rvalue2, ..
-                },
-            ) => {
-                // Check if stmt2 reads what stmt1 writes (RAW)
-                if self.rvalue_reads_place(rvalue2, place1) {
-                    return Ok(Some(Dependency {
-                        from_statement: index1,
-                        to_statement: index2,
-                        distance: Some((index2 - index1) as i64),
-                        dependency_type: DependencyType::Flow,
-                    }));
-                }
+        if let (
+            Statement::Assign { place: place1, .. },
+            Statement::Assign {
+                rvalue: rvalue2, ..
+            },
+        ) = (stmt1, stmt2)
+        {
+            // Check if stmt2 reads what stmt1 writes (RAW)
+            if self.rvalue_reads_place(rvalue2, place1) {
+                return Ok(Some(Dependency {
+                    from_statement: index1,
+                    to_statement: index2,
+                    distance: Some((index2 - index1) as i64),
+                    dependency_type: DependencyType::Flow,
+                }));
             }
-            _ => {}
         }
 
         Ok(None)

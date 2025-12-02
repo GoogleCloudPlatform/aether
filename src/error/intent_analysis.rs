@@ -83,6 +83,12 @@ pub enum ErrorHandlingStyle {
     Mixed,
 }
 
+impl Default for IntentAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IntentAnalyzer {
     pub fn new() -> Self {
         Self {

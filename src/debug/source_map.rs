@@ -372,7 +372,7 @@ impl AddressMap {
         self.address_to_source.insert(address, source.clone());
         self.source_to_addresses
             .entry(source)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(address);
     }
 
@@ -421,7 +421,7 @@ impl LineMap {
 
         self.line_mappings
             .entry((source_file, source_line))
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(generated.clone());
 
         self.generated_mappings.insert(generated, source_location);

@@ -32,6 +32,12 @@ pub struct Monomorphizer {
     processed: HashSet<String>,
 }
 
+impl Default for Monomorphizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Monomorphizer {
     pub fn new() -> Self {
         Self {
@@ -45,7 +51,7 @@ impl Monomorphizer {
     pub fn run(&mut self, program: &mut Program) {
         // Start with main function and any exported functions
         let mut entry_points = Vec::new();
-        for (name, _) in &program.functions {
+        for name in program.functions.keys() {
             // For now, assume "main" and non-generic functions are entry points
             if name == "main" || !self.is_generic(program, name) {
                 entry_points.push(name.clone());
@@ -232,14 +238,11 @@ impl Monomorphizer {
         let mangled_name = self.mangle_name(callee_name, &inferred_types);
 
         // If not already instantiated/queued, add to queue
-        if !self
+        if let std::collections::hash_map::Entry::Vacant(e) = self
             .instantiated_funcs
-            .contains_key(&(callee_name.to_string(), inferred_types.clone()))
+            .entry((callee_name.to_string(), inferred_types.clone()))
         {
-            self.instantiated_funcs.insert(
-                (callee_name.to_string(), inferred_types.clone()),
-                mangled_name.clone(),
-            );
+            e.insert(mangled_name.clone());
             self.queue.push((
                 mangled_name.clone(),
                 callee_name.to_string(),
@@ -381,7 +384,7 @@ impl Monomorphizer {
     fn mangle_name(&self, name: &str, type_args: &[Type]) -> String {
         let mut mangled = name.to_string();
         for ty in type_args {
-            mangled.push_str("_");
+            mangled.push('_');
             mangled.push_str(&self.type_to_string_mangled(ty));
         }
         mangled

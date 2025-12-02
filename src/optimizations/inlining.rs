@@ -271,7 +271,7 @@ impl OptimizationPass for InliningPass {
         }
 
         // For each function, look for calls to inline candidates
-        for (_caller_name, caller_function) in &mut program.functions {
+        for caller_function in program.functions.values_mut() {
             // Look for calls in each basic block
             for block in caller_function.basic_blocks.values_mut() {
                 let mut new_statements = Vec::new();

@@ -82,7 +82,7 @@ impl CleanupInfo {
         self.owned_locals.insert(local_id, type_id);
         self.block_cleanup
             .entry(block_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(LocalCleanupInfo { local_id, type_id });
     }
 
@@ -271,9 +271,8 @@ impl<'ctx> LLVMBackend<'ctx> {
                         current_offset += field_size;
                         // Add alignment padding
                         let alignment = field_size.min(8);
-                        if current_offset % alignment != 0 {
-                            current_offset =
-                                (current_offset + alignment - 1) / alignment * alignment;
+                        if !current_offset.is_multiple_of(alignment) {
+                            current_offset = current_offset.div_ceil(alignment) * alignment;
                         }
                     }
                     return current_offset;
@@ -2091,9 +2090,8 @@ impl<'ctx> LLVMBackend<'ctx> {
                             if i < field_types.len() - 1 {
                                 // Add padding for alignment (simplified - align to field size)
                                 let alignment = field_size.min(8);
-                                if current_offset % alignment != 0 {
-                                    current_offset =
-                                        (current_offset + alignment - 1) / alignment * alignment;
+                                if !current_offset.is_multiple_of(alignment) {
+                                    current_offset = current_offset.div_ceil(alignment) * alignment;
                                 }
                             }
                         }
@@ -2239,8 +2237,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                                     message: "aether_malloc function not found".to_string(),
                                 }
                             })?;
-                            let size_val =
-                                self.context.i32_type().const_int(enum_size as u64, false);
+                            let size_val = self.context.i32_type().const_int(enum_size, false);
                             let heap_ptr = builder
                                 .build_call(
                                     *malloc_fn,
@@ -2629,7 +2626,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                         crate::types::Type::Named { name, .. } => name.clone(),
                         _ => {
                             return Err(SemanticError::CodeGenError {
-                                message: format!("Discriminant operation on non-enum type"),
+                                message: "Discriminant operation on non-enum type".to_string(),
                             });
                         }
                     }
@@ -3067,22 +3064,22 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 let field_type = self.get_basic_type(ty);
                                 let field_ptr_type = match field_type {
                                     inkwell::types::BasicTypeEnum::IntType(t) => {
-                                        t.ptr_type(AddressSpace::default()).into()
+                                        t.ptr_type(AddressSpace::default())
                                     }
                                     inkwell::types::BasicTypeEnum::FloatType(t) => {
-                                        t.ptr_type(AddressSpace::default()).into()
+                                        t.ptr_type(AddressSpace::default())
                                     }
                                     inkwell::types::BasicTypeEnum::PointerType(t) => {
-                                        t.ptr_type(AddressSpace::default()).into()
+                                        t.ptr_type(AddressSpace::default())
                                     }
                                     inkwell::types::BasicTypeEnum::ArrayType(t) => {
-                                        t.ptr_type(AddressSpace::default()).into()
+                                        t.ptr_type(AddressSpace::default())
                                     }
                                     inkwell::types::BasicTypeEnum::StructType(t) => {
-                                        t.ptr_type(AddressSpace::default()).into()
+                                        t.ptr_type(AddressSpace::default())
                                     }
                                     inkwell::types::BasicTypeEnum::VectorType(t) => {
-                                        t.ptr_type(AddressSpace::default()).into()
+                                        t.ptr_type(AddressSpace::default())
                                     }
                                 };
                                 current_ptr = builder
@@ -4082,31 +4079,30 @@ impl<'ctx> LLVMBackend<'ctx> {
         // Generate block content
         if let Some(mir_block) = function.basic_blocks.get(&block_id) {
             for stmt in &mir_block.statements {
-                match stmt {
-                    mir::Statement::Assign { place, rvalue, .. } => {
-                        // Allocate on demand if not exists
-                        if !local_allocas.contains_key(&place.local) {
-                            let local_ty = self.get_basic_type_from_local(place.local, function)?;
-                            let alloca = builder
-                                .build_alloca(local_ty, &format!("local_{}", place.local))
-                                .map_err(|e| SemanticError::CodeGenError {
-                                    message: e.to_string(),
-                                })?;
-                            local_allocas.insert(place.local, alloca);
-                        }
-
-                        let result =
-                            self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
-
-                        if let Some(alloca) = local_allocas.get(&place.local) {
-                            builder.build_store(*alloca, result).map_err(|e| {
-                                SemanticError::CodeGenError {
-                                    message: e.to_string(),
-                                }
+                if let mir::Statement::Assign { place, rvalue, .. } = stmt {
+                    // Allocate on demand if not exists
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        local_allocas.entry(place.local)
+                    {
+                        let local_ty = self.get_basic_type_from_local(place.local, function)?;
+                        let alloca = builder
+                            .build_alloca(local_ty, &format!("local_{}", place.local))
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
                             })?;
-                        }
+                        e.insert(alloca);
                     }
-                    _ => {}
+
+                    let result =
+                        self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
+
+                    if let Some(alloca) = local_allocas.get(&place.local) {
+                        builder.build_store(*alloca, result).map_err(|e| {
+                            SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            }
+                        })?;
+                    }
                 }
             }
 

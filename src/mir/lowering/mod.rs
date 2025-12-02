@@ -164,7 +164,7 @@ impl LoweringContext {
                     },
                     rvalue: Rvalue::Cast {
                         kind: CastKind::Numeric,
-                        operand: operand,
+                        operand,
                         ty: target_type.clone(),
                     },
                     source_info: SourceInfo {
@@ -2501,7 +2501,7 @@ impl LoweringContext {
         let saved_loop_stack = std::mem::take(&mut self.loop_stack);
 
         // Use a fresh builder for the lambda
-        let saved_builder = std::mem::replace(&mut self.builder, Builder::new());
+        let saved_builder = std::mem::take(&mut self.builder);
 
         // Start building the lambda function with captures as extra parameters
         self.builder.start_function(
@@ -4418,7 +4418,7 @@ impl LoweringContext {
     fn get_enum_variant_type(&self, variant_name: &ast::Identifier) -> Option<Type> {
         if let Some(st) = &self.symbol_table {
             // Search through all enum definitions to find this variant
-            for (_, type_def) in st.get_type_definitions() {
+            for type_def in st.get_type_definitions().values() {
                 if let TypeDefinition::Enum { variants, .. } = type_def {
                     for variant in variants {
                         if variant.name == variant_name.name {
@@ -4480,7 +4480,7 @@ impl LoweringContext {
 
         // Fallback: search all enums for this variant (less precise)
         if let Some(st) = &self.symbol_table {
-            for (_, type_def) in st.get_type_definitions() {
+            for type_def in st.get_type_definitions().values() {
                 if let TypeDefinition::Enum { variants, .. } = type_def {
                     for variant in variants {
                         if variant.name == variant_name.name {
@@ -5035,7 +5035,7 @@ impl LoweringContext {
         // Create a place with dereference projection
         let deref_place = Place {
             local: pointer_place.local,
-            projection: vec![pointer_place.projection.clone(), vec![PlaceElem::Deref]].concat(),
+            projection: [pointer_place.projection.clone(), vec![PlaceElem::Deref]].concat(),
         };
 
         Ok(Operand::Copy(deref_place))

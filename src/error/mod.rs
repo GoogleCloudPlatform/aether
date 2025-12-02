@@ -629,7 +629,7 @@ impl ErrorReporter {
             }
             CompilerError::ParseError(e) => Diagnostic::error(format!("Parse error: {}", e), None),
             CompilerError::TypeError(e) => Diagnostic::error(format!("Type error: {}", e), None),
-            CompilerError::SemanticError(e) => self.semantic_error_to_diagnostic(&e),
+            CompilerError::SemanticError(e) => self.semantic_error_to_diagnostic(e),
         };
 
         self.report_diagnostic(&diagnostic);

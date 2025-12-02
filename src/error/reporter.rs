@@ -240,20 +240,13 @@ impl DetailedErrorReporter {
 
                     // Show caret pointing to error position
                     let padding = " ".repeat(line_num_width + 6 + col_num.saturating_sub(1));
-                    let caret = "^".repeat(1); // Could calculate actual token length
+                    let caret = "^".to_string(); // Could calculate actual token length
                     eprintln!(
-                        "{} {} {}",
+                        "{} | {}",
                         " ".repeat(line_num_width),
-                        "|",
                         padding.clone() + &caret
                     );
-                    eprintln!(
-                        "{} {} {} {}",
-                        " ".repeat(line_num_width),
-                        "|",
-                        padding,
-                        message
-                    );
+                    eprintln!("{} | {} {}", " ".repeat(line_num_width), padding, message);
                 } else {
                     // Context lines
                     eprintln!("{} |     {}", line_str, line);

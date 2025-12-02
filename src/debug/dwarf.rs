@@ -443,7 +443,7 @@ impl DwarfGenerator {
             self.line_program.entries.push(LineEntry {
                 address: *block_id as u64 * 0x1000, // Placeholder address
                 file: file_index,
-                line: (*block_id + 1) as u32, // Placeholder line number
+                line: (*block_id + 1), // Placeholder line number
                 column: 1,
                 is_stmt: true,
                 basic_block: true,
@@ -455,7 +455,7 @@ impl DwarfGenerator {
                 self.line_program.entries.push(LineEntry {
                     address: (*block_id as u64 * 0x1000) + (stmt_idx as u64 * 4),
                     file: file_index,
-                    line: (*block_id + 1) as u32,
+                    line: (*block_id + 1),
                     column: (stmt_idx + 1) as u32,
                     is_stmt: true,
                     basic_block: false,

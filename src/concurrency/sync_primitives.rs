@@ -508,17 +508,16 @@ impl AetherSemaphore {
     /// Try to acquire a permit without blocking
     pub fn try_acquire(&self) -> LockResult<()> {
         let current = self.permits.load(Ordering::Acquire);
-        if current > 0 {
-            if self
+        if current > 0
+            && self
                 .permits
                 .compare_exchange_weak(current, current - 1, Ordering::Release, Ordering::Relaxed)
                 .is_ok()
-            {
-                if let Ok(mut metrics) = self.metrics.lock() {
-                    metrics.acquire_count += 1;
-                }
-                return Ok(());
+        {
+            if let Ok(mut metrics) = self.metrics.lock() {
+                metrics.acquire_count += 1;
             }
+            return Ok(());
         }
         Err(LockError::WouldBlock)
     }

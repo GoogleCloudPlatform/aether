@@ -528,7 +528,7 @@ pub enum QualityGateAction {
 }
 
 /// Notification configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NotificationConfig {
     /// Notification channels
     pub channels: Vec<NotificationChannel>,
@@ -538,16 +538,6 @@ pub struct NotificationConfig {
 
     /// Message templates
     pub templates: HashMap<String, String>,
-}
-
-impl Default for NotificationConfig {
-    fn default() -> Self {
-        Self {
-            channels: vec![],
-            triggers: vec![],
-            templates: HashMap::new(),
-        }
-    }
 }
 
 /// Notification channel

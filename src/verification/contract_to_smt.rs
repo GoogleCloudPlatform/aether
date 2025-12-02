@@ -145,8 +145,7 @@ pub fn expression_to_formula(expr: &Expression) -> Result<Formula, String> {
         Expression::SemanticPredicate { predicate, args } => {
             // Semantic predicates need to be expanded to their definitions
             // For now, treat them as uninterpreted functions
-            let _arg_formulas: Result<Vec<_>, _> =
-                args.iter().map(|arg| expression_to_formula(arg)).collect();
+            let _arg_formulas: Result<Vec<_>, _> = args.iter().map(expression_to_formula).collect();
 
             Err(format!(
                 "Semantic predicate '{}' needs definition expansion",
@@ -229,6 +228,12 @@ pub struct Z3SmtSolver {
     inner: crate::verification::solver::SmtSolver,
 }
 
+impl Default for Z3SmtSolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Z3SmtSolver {
     pub fn new() -> Self {
         Self {
@@ -250,6 +255,7 @@ impl crate::verification::contracts::SmtSolverInterface for Z3SmtSolver {
                     name: "contract_check".to_string(),
                     formula: smt_formula,
                     location: crate::error::SourceLocation::unknown(),
+                    verification_mode: None,
                 };
 
                 // Check with the solver

@@ -709,6 +709,7 @@ mod tests {
                 message: Some("Test precondition".to_string()),
                 source_location: SourceLocation::unknown(),
                 runtime_check: false,
+                verification_mode: None,
             }],
             postconditions: Vec::new(),
             invariants: Vec::new(),

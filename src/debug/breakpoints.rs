@@ -388,7 +388,7 @@ impl BreakpointManager {
         // Index the breakpoint
         self.location_index
             .entry(location.clone())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
 
         self.breakpoints.insert(id, breakpoint);
@@ -452,7 +452,7 @@ impl BreakpointManager {
         // Index by function name
         self.function_index
             .entry(function_name)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(id);
 
         Ok(id)

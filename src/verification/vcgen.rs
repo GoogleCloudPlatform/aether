@@ -22,6 +22,7 @@ use super::contracts::{
 use super::solver::{Formula, VerificationCondition};
 use crate::error::{SemanticError, SourceLocation};
 use crate::mir::{self, BasicBlockId, Operand, Rvalue, Statement, Terminator};
+use crate::verification::VerificationMode;
 use std::collections::{HashMap, HashSet};
 
 /// Verification condition generator
@@ -62,6 +63,12 @@ pub enum VcType {
 
     /// Null pointer check
     NullPointer,
+}
+
+impl Default for VcGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VcGenerator {
@@ -169,6 +176,7 @@ impl VcGenerator {
                             VcType::Postcondition,
                             vc_formula,
                             postcond.location.clone(),
+                            postcond.verification_mode,
                         ));
                     }
                 }
@@ -239,6 +247,7 @@ impl VcGenerator {
                     VcType::Assertion,
                     vc_formula,
                     SourceLocation::unknown(), // TODO: Get proper location
+                    None,
                 ));
 
                 // Continue to target block
@@ -281,6 +290,7 @@ impl VcGenerator {
                         VcType::DivisionByZero,
                         vc_formula,
                         source_info.span.clone(),
+                        None,
                     ));
                 }
 
@@ -417,7 +427,7 @@ impl VcGenerator {
                     .state
                     .get(&local_name)
                     .cloned()
-                    .unwrap_or_else(|| Formula::Var(local_name)))
+                    .unwrap_or(Formula::Var(local_name)))
             }
             Operand::Constant(constant) => {
                 let value = &constant.value;
@@ -539,12 +549,14 @@ impl VcGenerator {
         vc_type: VcType,
         formula: Formula,
         location: SourceLocation,
+        verification_mode: Option<VerificationMode>,
     ) -> VerificationCondition {
         self.vc_counter += 1;
         VerificationCondition {
             name: format!("{} ({})", name, format!("{:?}", vc_type)),
             formula,
             location,
+            verification_mode,
         }
     }
 }

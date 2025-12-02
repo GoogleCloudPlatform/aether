@@ -402,7 +402,7 @@ impl LoopOptimizationPass {
             self.dominance_info
                 .dom_tree
                 .entry(parent)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(child);
         }
 
@@ -658,7 +658,7 @@ impl LoopOptimizationPass {
         }
 
         // Build loop map
-        for (_i, loop_info) in self.loops.iter().enumerate() {
+        for loop_info in self.loops.iter() {
             self.loop_forest
                 .loops
                 .insert(loop_info.header, loop_info.clone());
@@ -671,7 +671,7 @@ impl LoopOptimizationPass {
     fn analyze_loop_invariants(&mut self, function: &Function) -> Result<(), SemanticError> {
         self.invariant_analysis = LoopInvariantAnalysis::default();
 
-        for (_loop_idx, loop_info) in self.loops.iter().enumerate() {
+        for loop_info in self.loops.iter() {
             let mut invariant_statements = Vec::new();
             let mut invariant_variables = HashSet::new();
 
@@ -1085,30 +1085,28 @@ impl LoopOptimizationPass {
         index2: usize,
     ) -> Result<Option<Dependence>, SemanticError> {
         // Simplified dependency detection
-        match (stmt1, stmt2) {
-            (
-                Statement::Assign { place: place1, .. },
-                Statement::Assign {
-                    rvalue: rvalue2, ..
-                },
-            ) => {
-                if self.rvalue_uses_place(rvalue2, place1) {
-                    return Ok(Some(Dependence {
-                        source: StatementRef {
-                            block: block_id,
-                            statement: index1,
-                        },
-                        sink: StatementRef {
-                            block: block_id,
-                            statement: index2,
-                        },
-                        distance: vec![index2 as i64 - index1 as i64],
-                        direction: vec![DependenceDirection::Greater],
-                        dep_type: DependenceType::Flow,
-                    }));
-                }
+        if let (
+            Statement::Assign { place: place1, .. },
+            Statement::Assign {
+                rvalue: rvalue2, ..
+            },
+        ) = (stmt1, stmt2)
+        {
+            if self.rvalue_uses_place(rvalue2, place1) {
+                return Ok(Some(Dependence {
+                    source: StatementRef {
+                        block: block_id,
+                        statement: index1,
+                    },
+                    sink: StatementRef {
+                        block: block_id,
+                        statement: index2,
+                    },
+                    distance: vec![index2 as i64 - index1 as i64],
+                    direction: vec![DependenceDirection::Greater],
+                    dep_type: DependenceType::Flow,
+                }));
             }
-            _ => {}
         }
 
         Ok(None)
@@ -1170,10 +1168,11 @@ impl LoopOptimizationPass {
                 .get(&loop_info.header)
             {
                 for invariant_stmt in invariant_statements {
-                    if invariant_stmt.safe_to_hoist && invariant_stmt.hoist_profit > 10.0 {
-                        if self.hoist_statement(function, loop_info, invariant_stmt)? {
-                            changed = true;
-                        }
+                    if invariant_stmt.safe_to_hoist
+                        && invariant_stmt.hoist_profit > 10.0
+                        && self.hoist_statement(function, loop_info, invariant_stmt)?
+                    {
+                        changed = true;
                     }
                 }
             }
@@ -1203,10 +1202,8 @@ impl LoopOptimizationPass {
         let mut changed = false;
 
         for loop_info in &self.loops {
-            if self.should_unroll_loop(loop_info) {
-                if self.unroll_loop(function, loop_info)? {
-                    changed = true;
-                }
+            if self.should_unroll_loop(loop_info) && self.unroll_loop(function, loop_info)? {
+                changed = true;
             }
         }
 

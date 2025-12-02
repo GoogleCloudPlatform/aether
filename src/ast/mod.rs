@@ -17,6 +17,7 @@
 //! Defines AST node types for all language constructs
 
 use crate::error::SourceLocation;
+use crate::verification::VerificationMode;
 use serde::{Deserialize, Serialize};
 
 pub mod resource;
@@ -429,6 +430,7 @@ pub struct ContractAssertion {
     pub message: Option<String>,
     /// Whether to enforce this contract at runtime (default: false, static verification only)
     pub runtime_check: bool,
+    pub verification_mode: Option<VerificationMode>, // Added for per-contract verification mode
     pub source_location: SourceLocation,
 }
 

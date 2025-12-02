@@ -664,7 +664,7 @@ impl InterproceduralAnalysisPass {
 
     /// Update global side effect analysis
     fn update_global_side_effect_analysis(&mut self, summaries: &HashMap<String, FunctionSummary>) {
-        for (_function_name, summary) in summaries {
+        for summary in summaries.values() {
             // In a real implementation, this would be populated from side effect analysis
             if !summary.side_effects.reads_memory && !summary.side_effects.writes_memory {
                 // Pure function - no memory side effects
@@ -737,26 +737,22 @@ impl InterproceduralAnalysisPass {
 
         for block in function.basic_blocks.values() {
             for statement in &block.statements {
-                match statement {
-                    Statement::Assign { place, rvalue, .. } => {
-                        match rvalue {
-                            Rvalue::Call { args, .. } => {
-                                // Arguments to function calls may escape
-                                for arg in args {
-                                    if let Operand::Move(arg_place) | Operand::Copy(arg_place) = arg
-                                    {
-                                        escaping.insert(arg_place.clone());
-                                        passed.insert(arg_place.clone());
-                                    }
+                if let Statement::Assign { place, rvalue, .. } = statement {
+                    match rvalue {
+                        Rvalue::Call { args, .. } => {
+                            // Arguments to function calls may escape
+                            for arg in args {
+                                if let Operand::Move(arg_place) | Operand::Copy(arg_place) = arg {
+                                    escaping.insert(arg_place.clone());
+                                    passed.insert(arg_place.clone());
                                 }
                             }
-                            _ => {
-                                // Local assignment
-                                local.insert(place.clone());
-                            }
+                        }
+                        _ => {
+                            // Local assignment
+                            local.insert(place.clone());
                         }
                     }
-                    _ => {}
                 }
             }
 
@@ -779,7 +775,7 @@ impl InterproceduralAnalysisPass {
         // This is a placeholder for alias analysis
         // Real alias analysis is quite complex and would require sophisticated algorithms
 
-        for (_function_name, _function) in &program.functions {
+        for _function in program.functions.values() {
             // Simple alias analysis - assume no aliasing for now
             // In reality, this would use algorithms like Andersen's or Steensgaard's
         }
@@ -796,7 +792,7 @@ impl InterproceduralAnalysisPass {
         // This is a placeholder for points-to analysis
         // Real points-to analysis would track what each pointer variable can point to
 
-        for (_function_name, function) in &program.functions {
+        for function in program.functions.values() {
             // Initialize points-to sets for all pointer variables
             for block in function.basic_blocks.values() {
                 for _statement in &block.statements {
@@ -818,7 +814,7 @@ impl InterproceduralAnalysisPass {
         // In a real implementation, this would be populated from global constant analysis
 
         // Find variables that are effectively constant
-        for (_function_name, function) in &program.functions {
+        for function in program.functions.values() {
             self.find_constant_variables(function)?;
         }
 

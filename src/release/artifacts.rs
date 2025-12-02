@@ -1545,7 +1545,7 @@ Basic usage examples and tutorials.
     ) -> Result<Artifact, SemanticError> {
         println!("Generating release notes in {:?} format", format);
 
-        let release_notes = template.as_ref().map(|t| t.clone()).unwrap_or_else(|| {
+        let release_notes = template.clone().unwrap_or_else(|| {
             format!(
                 r#"
 # Release Notes - {} {}

@@ -18,6 +18,7 @@
 
 use crate::error::SourceLocation;
 use crate::types::Type;
+use crate::verification::VerificationMode;
 use std::collections::HashMap;
 use z3::ast::Ast;
 
@@ -57,6 +58,7 @@ pub struct Model {
 }
 
 /// Verification condition to check
+#[derive(Debug, Clone)]
 pub struct VerificationCondition {
     /// Condition name
     pub name: String,
@@ -66,6 +68,9 @@ pub struct VerificationCondition {
 
     /// Source location
     pub location: SourceLocation,
+
+    /// Specific verification mode for this condition (overrides function-level)
+    pub verification_mode: Option<VerificationMode>,
 }
 
 /// Logical formula
@@ -142,6 +147,12 @@ pub enum Formula {
 
     /// Array store
     Store(Box<Formula>, Box<Formula>, Box<Formula>),
+}
+
+impl Default for SmtSolver {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SmtSolver {
@@ -509,6 +520,7 @@ mod tests {
             name: "test".to_string(),
             formula,
             location: SourceLocation::unknown(),
+            verification_mode: None,
         };
 
         match solver.check_condition(&vc) {
@@ -536,6 +548,7 @@ mod tests {
                 Box::new(Formula::Var("y".to_string())),
             ),
             location: SourceLocation::unknown(),
+            verification_mode: None,
         };
 
         // Without axioms, verification should fail.

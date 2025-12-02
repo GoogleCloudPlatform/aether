@@ -229,7 +229,7 @@ impl ProfileGuidedOptimizationPass {
                     self.profile_data
                         .block_counts
                         .entry(function_name)
-                        .or_insert_with(HashMap::new)
+                        .or_default()
                         .insert(block_id, count);
                 }
             }
@@ -254,7 +254,7 @@ impl ProfileGuidedOptimizationPass {
                     self.profile_data
                         .branch_frequencies
                         .entry(function_name)
-                        .or_insert_with(HashMap::new)
+                        .or_default()
                         .insert(block_id, branch_profile);
                 }
             }
@@ -268,7 +268,7 @@ impl ProfileGuidedOptimizationPass {
                     self.profile_data
                         .call_frequencies
                         .entry(caller)
-                        .or_insert_with(HashMap::new)
+                        .or_default()
                         .insert(callee, count);
                 }
             }
@@ -295,7 +295,7 @@ impl ProfileGuidedOptimizationPass {
                     self.profile_data
                         .loop_iteration_counts
                         .entry(function_name)
-                        .or_insert_with(HashMap::new)
+                        .or_default()
                         .insert(block_id, loop_profile);
                 }
             }
@@ -621,18 +621,15 @@ impl ProfileGuidedOptimizationPass {
         // - Add branch prediction hints
         // - Transform unlikely branches to reduce overhead
 
-        match &mut block.terminator {
-            Terminator::SwitchInt { .. } => {
-                // Could reorder switch targets based on branch probabilities
-                if branch_profile.probability > 0.9 {
-                    eprintln!(
-                        "Would optimize highly predictable branch (p={:.2})",
-                        branch_profile.probability
-                    );
-                    return Ok(false); // Not actually implemented
-                }
+        if let Terminator::SwitchInt { .. } = &mut block.terminator {
+            // Could reorder switch targets based on branch probabilities
+            if branch_profile.probability > 0.9 {
+                eprintln!(
+                    "Would optimize highly predictable branch (p={:.2})",
+                    branch_profile.probability
+                );
+                return Ok(false); // Not actually implemented
             }
-            _ => {}
         }
 
         Ok(false)

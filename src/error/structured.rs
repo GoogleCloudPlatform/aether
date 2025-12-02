@@ -262,6 +262,12 @@ pub struct ErrorCodeGenerator {
     next_codes: HashMap<String, usize>,
 }
 
+impl Default for ErrorCodeGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ErrorCodeGenerator {
     pub fn new() -> Self {
         Self {
@@ -288,6 +294,12 @@ pub struct StructuredErrorBuilder {
     fix_suggestions: Vec<FixSuggestion>,
     related: Vec<RelatedDiagnostic>,
     llm_context: LLMContext,
+}
+
+impl Default for StructuredErrorBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StructuredErrorBuilder {
@@ -399,6 +411,12 @@ pub struct ErrorPatterns {}
 #[derive(Clone)]
 struct ErrorPattern {}
 
+impl Default for ErrorPatterns {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ErrorPatterns {
     pub fn new() -> Self {
         Self {}
@@ -486,6 +504,12 @@ pub struct LLMErrorFormatter {
     max_fixes_per_error: usize,
 }
 
+impl Default for LLMErrorFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LLMErrorFormatter {
     pub fn new() -> Self {
         Self {
@@ -500,7 +524,7 @@ impl LLMErrorFormatter {
         let mut output = String::new();
 
         // Header
-        output.push_str(&format!("(COMPILATION_ERROR\n"));
+        output.push_str("(COMPILATION_ERROR\n");
         output.push_str(&format!("  (ERROR_CODE \"{}\")\n", error.error_code));
         output.push_str(&format!(
             "  (SEVERITY \"{}\")\n",
@@ -514,7 +538,7 @@ impl LLMErrorFormatter {
         ));
 
         // Location
-        output.push_str(&format!("  (LOCATION\n"));
+        output.push_str("  (LOCATION\n");
         output.push_str(&format!("    (FILE \"{}\")\n", error.location.file));
         output.push_str(&format!("    (LINE {})\n", error.location.line));
         output.push_str(&format!("    (COLUMN {}))\n", error.location.column));

@@ -57,6 +57,12 @@ pub struct ModuleLoader {
     stdlib_modules: HashMap<String, String>,
 }
 
+impl Default for ModuleLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ModuleLoader {
     pub fn new() -> Self {
         let mut loader = Self {
@@ -386,7 +392,7 @@ fn to_snake_case(s: &str) -> String {
 
 /// Convert string to PascalCase (e.g., "my_module" -> "MyModule")
 fn to_pascal_case(s: &str) -> String {
-    s.split(|c| c == '_' || c == '/')
+    s.split(['_', '/'])
         .map(|part| {
             let mut c = part.chars();
             match c.next() {

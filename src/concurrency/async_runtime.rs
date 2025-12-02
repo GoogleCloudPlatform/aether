@@ -206,6 +206,12 @@ pub enum TaskValue {
     Array(Vec<TaskValue>),
 }
 
+impl Default for AsyncRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AsyncRuntime {
     /// Create a new async runtime
     pub fn new() -> Self {
@@ -382,6 +388,12 @@ impl AsyncRuntime {
 
         self.workers.clear();
         Ok(())
+    }
+}
+
+impl Default for TaskScheduler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

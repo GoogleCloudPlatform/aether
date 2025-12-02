@@ -1379,8 +1379,8 @@ impl UpdateManager {
         };
 
         match rule.operator {
-            RuleOperator::Equals => Ok(actual_value == &rule.value),
-            RuleOperator::NotEquals => Ok(actual_value != &rule.value),
+            RuleOperator::Equals => Ok(actual_value == rule.value),
+            RuleOperator::NotEquals => Ok(actual_value != rule.value),
             RuleOperator::Contains => Ok(actual_value.contains(&rule.value)),
             RuleOperator::NotContains => Ok(!actual_value.contains(&rule.value)),
             RuleOperator::GreaterThan => {
@@ -1913,7 +1913,7 @@ impl UpdateManager {
             .history
             .iter()
             .filter(|r| matches!(r.status, UpdateStatus::Installed))
-            .last()
+            .next_back()
             .ok_or_else(|| SemanticError::Internal {
                 message: "No previous installation found for rollback".to_string(),
             })?;

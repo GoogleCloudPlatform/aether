@@ -132,7 +132,7 @@ impl WholeProgramOptimizationPass {
                 self.call_graph
                     .called_by
                     .entry(callee)
-                    .or_insert_with(HashSet::new)
+                    .or_default()
                     .insert(caller_name.clone());
             }
         }

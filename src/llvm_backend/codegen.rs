@@ -389,10 +389,9 @@ impl<'ctx> CodeGenerator<'ctx> {
                     })
             }
 
-            Operand::Constant(constant) => self
-                .value_converter
-                .convert_constant_value(&constant.value)
-                .map(|v| v),
+            Operand::Constant(constant) => {
+                self.value_converter.convert_constant_value(&constant.value)
+            }
         }
     }
 

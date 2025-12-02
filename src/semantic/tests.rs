@@ -178,6 +178,7 @@ fn test_contract_validation_integration() {
             message: Some("Test precondition".to_string()),
             source_location: SourceLocation::unknown(),
             runtime_check: false,
+            verification_mode: None,
         }],
         postconditions: Vec::new(),
         invariants: Vec::new(),
@@ -492,7 +493,10 @@ fn test_trait_impl_missing_required_method() {
     "#;
 
     let result = analyze_program_result(source);
-    assert!(result.is_err(), "expected error for missing required method");
+    assert!(
+        result.is_err(),
+        "expected error for missing required method"
+    );
     let errors = result.err().unwrap();
     assert!(
         errors.iter().any(|e| matches!(
@@ -500,7 +504,8 @@ fn test_trait_impl_missing_required_method() {
             SemanticError::TraitMethodNotImplemented { trait_name, method_name, .. }
             if trait_name == "Printable" && method_name == "print"
         )),
-        "expected TraitMethodNotImplemented error, got {:?}", errors
+        "expected TraitMethodNotImplemented error, got {:?}",
+        errors
     );
 }
 
@@ -531,6 +536,7 @@ fn test_trait_impl_signature_mismatch() {
             SemanticError::TraitMethodSignatureMismatch { trait_name, method_name, .. }
             if trait_name == "Showable" && method_name == "show"
         )),
-        "expected TraitMethodSignatureMismatch error, got {:?}", errors
+        "expected TraitMethodSignatureMismatch error, got {:?}",
+        errors
     );
 }

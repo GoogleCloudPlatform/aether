@@ -156,6 +156,12 @@ pub struct OptimizationBenefit {
     pub resource_count_reduced: Option<usize>,
 }
 
+impl Default for ResourceAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ResourceAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -465,23 +471,20 @@ impl ResourceAnalyzer {
             .count();
 
         // Check against contracts
-        for (_, contract) in &self.contracts {
-            match resource_type {
-                "file_handle" => {
-                    if let Some(max_files) = contract.max_file_handles {
-                        if active_count > max_files as usize {
-                            return Err(SemanticError::InvalidOperation {
-                                operation: "resource acquisition".to_string(),
-                                reason: format!(
-                                    "Exceeded max file handles: {} > {}",
-                                    active_count, max_files
-                                ),
-                                location: SourceLocation::unknown(),
-                            });
-                        }
+        for contract in self.contracts.values() {
+            if resource_type == "file_handle" {
+                if let Some(max_files) = contract.max_file_handles {
+                    if active_count > max_files as usize {
+                        return Err(SemanticError::InvalidOperation {
+                            operation: "resource acquisition".to_string(),
+                            reason: format!(
+                                "Exceeded max file handles: {} > {}",
+                                active_count, max_files
+                            ),
+                            location: SourceLocation::unknown(),
+                        });
                     }
                 }
-                _ => {}
             }
         }
 
@@ -552,7 +555,7 @@ impl ResourceAnalyzer {
         for tracking in self.resource_tracking.values() {
             type_stats
                 .entry(tracking.resource_type.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(tracking);
         }
 

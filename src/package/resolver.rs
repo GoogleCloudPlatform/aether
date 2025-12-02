@@ -335,6 +335,12 @@ struct PendingDependency {
     depth: usize,
 }
 
+impl Default for DependencyResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DependencyResolver {
     /// Create a new dependency resolver
     pub fn new() -> Self {

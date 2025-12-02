@@ -161,9 +161,10 @@ pub struct PackageMetadata {
 }
 
 /// Package edition
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum Edition {
     #[serde(rename = "2024")]
+    #[default]
     Edition2024,
     #[serde(rename = "2025")]
     Edition2025,
@@ -242,7 +243,7 @@ pub struct Feature {
 }
 
 /// Build configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BuildConfiguration {
     /// Build script path
     pub script: Option<PathBuf>,
@@ -886,34 +887,6 @@ impl PackageManifest {
         }
 
         Ok(())
-    }
-}
-
-impl Default for Edition {
-    fn default() -> Self {
-        Edition::Edition2024
-    }
-}
-
-impl Default for BuildConfiguration {
-    fn default() -> Self {
-        Self {
-            script: None,
-            sources: vec![],
-            include: vec![],
-            lib_dirs: vec![],
-            libs: vec![],
-            flags: vec![],
-            env: HashMap::new(),
-            opt_level: None,
-            debug: None,
-            lto: None,
-            codegen_units: None,
-            panic: None,
-            overflow_checks: None,
-            debug_assertions: None,
-            incremental: None,
-        }
     }
 }
 

@@ -37,6 +37,7 @@ fn main() {
         Some("denominator != 0 is required for division".to_string()),
         FailureAction::ThrowException("Division by zero".to_string()),
         VerificationHint::SMTSolver,
+        None, // Default verification mode
     );
 
     // Add enhanced postcondition
@@ -55,6 +56,7 @@ fn main() {
         Some("Result equals numerator divided by denominator".to_string()),
         FailureAction::Abort,
         VerificationHint::SMTSolver,
+        None, // Default verification mode
     );
 
     // Add semantic intent

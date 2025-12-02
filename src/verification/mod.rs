@@ -25,6 +25,7 @@ pub mod vcgen;
 
 use crate::error::{SemanticError, SourceLocation};
 use crate::mir;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Verification result for a function or module
@@ -98,7 +99,7 @@ pub struct VerificationEngine {
 }
 
 /// Verification strategy for a function
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationMode {
     /// Try abstract verification (with axioms) first, then fall back to instantiation
     Combined,
@@ -172,27 +173,64 @@ impl VerificationEngine {
             .vcgen
             .generate_function_vcs(function, contract.as_ref())?;
 
-        let mode = self
+        // Get function-level default verification mode
+        let function_level_mode = self
             .context
             .verification_modes
             .get(name)
             .cloned()
             .unwrap_or(VerificationMode::Combined);
 
-        // Verify each condition
-        let (condition_results, counterexamples, all_verified) =
-            self.verify_conditions_with_mode(&conditions, mode)?;
+        let mut all_verified = true;
+        let mut all_condition_results = Vec::new();
+        let mut all_counterexamples = Vec::new();
+
+        for vc in conditions {
+            let mode_for_this_vc = vc.verification_mode.unwrap_or(function_level_mode);
+
+            let cloned_global_axioms = self.context.global_axioms.clone();
+            let axioms_for_pass: &[solver::Formula] = match mode_for_this_vc {
+                VerificationMode::AbstractOnly => cloned_global_axioms.as_slice(),
+                VerificationMode::InstantiationOnly => &[],
+                VerificationMode::Combined => cloned_global_axioms.as_slice(),
+            };
+
+            let (pass1_results, pass1_counterexamples, pass1_verified) =
+                self.verify_pass(&[vc.clone()], axioms_for_pass)?;
+
+            let mut current_vc_verified = pass1_verified;
+            let mut current_vc_results = pass1_results;
+            let mut current_vc_counterexamples = pass1_counterexamples;
+
+            if mode_for_this_vc == VerificationMode::Combined && !pass1_verified {
+                let (pass2_results, pass2_counterexamples, pass2_verified) =
+                    self.verify_pass(&[vc.clone()], &[])?;
+                current_vc_verified = pass2_verified;
+                current_vc_results = pass2_results;
+                current_vc_counterexamples = pass2_counterexamples;
+            }
+
+            if !current_vc_verified {
+                all_verified = false;
+            }
+            all_condition_results.append(&mut current_vc_results);
+            all_counterexamples.append(&mut current_vc_counterexamples);
+        }
 
         Ok(VerificationResult {
             name: name.to_string(),
             verified: all_verified,
-            conditions: condition_results,
-            counterexamples,
+            conditions: all_condition_results,
+            counterexamples: all_counterexamples,
         })
     }
 
     /// Add a function contract
-    pub fn add_function_contract(&mut self, name: String, mut contract: contracts::FunctionContract) {
+    pub fn add_function_contract(
+        &mut self,
+        name: String,
+        mut contract: contracts::FunctionContract,
+    ) {
         contract.function_name = name.clone();
         self.context.function_contracts.insert(name, contract);
     }
@@ -219,27 +257,6 @@ impl VerificationEngine {
     /// Set verification mode for a function (default is Combined).
     pub fn set_verification_mode(&mut self, name: String, mode: VerificationMode) {
         self.context.verification_modes.insert(name, mode);
-    }
-
-    /// Verify a set of conditions using the configured mode (abstract, instantiation, or combined).
-    fn verify_conditions_with_mode(
-        &mut self,
-        conditions: &[solver::VerificationCondition],
-        mode: VerificationMode,
-    ) -> Result<(Vec<ConditionResult>, Vec<Counterexample>, bool), SemanticError> {
-        let global_axioms = self.context.global_axioms.clone();
-        match mode {
-            VerificationMode::AbstractOnly => self.verify_pass(conditions, &global_axioms),
-            VerificationMode::InstantiationOnly => self.verify_pass(conditions, &[]),
-            VerificationMode::Combined => {
-                let (results_axioms, cex_axioms, all_axioms) =
-                    self.verify_pass(conditions, &global_axioms)?;
-                if all_axioms {
-                    return Ok((results_axioms, cex_axioms, all_axioms));
-                }
-                self.verify_pass(conditions, &[])
-            }
-        }
     }
 
     /// Run a single verification pass with the provided axioms.
@@ -329,16 +346,8 @@ impl VerificationEngine {
     }
 
     /// Resolve a contract for the given function name, falling back to generic bases for monomorphized functions.
-    fn resolve_contract_for(
-        &mut self,
-        function_name: &str,
-    ) -> Option<contracts::FunctionContract> {
-        if let Some(contract) = self
-            .context
-            .function_contracts
-            .get(function_name)
-            .cloned()
-        {
+    fn resolve_contract_for(&mut self, function_name: &str) -> Option<contracts::FunctionContract> {
+        if let Some(contract) = self.context.function_contracts.get(function_name).cloned() {
             return Some(contract);
         }
 
@@ -351,7 +360,7 @@ impl VerificationEngine {
                     let base_len = base_name.len();
                     if best_match
                         .as_ref()
-                        .map_or(true, |(existing_len, _)| base_len > *existing_len)
+                        .is_none_or(|(existing_len, _)| base_len > *existing_len)
                     {
                         let mut cloned = contract.clone();
                         cloned.function_name = function_name.to_string();
@@ -633,7 +642,7 @@ mod tests {
         };
 
         let mut contract = contracts::FunctionContract::new("combined_example".to_string());
-        contract.add_postcondition(
+        contract.add_enhanced_postcondition(
             "result_matches_x".to_string(),
             contracts::Expression::BinaryOp {
                 op: contracts::BinaryOp::Eq,
@@ -641,9 +650,13 @@ mod tests {
                 right: Box::new(contracts::Expression::Variable("x".to_string())),
             },
             SourceLocation::unknown(),
+            None,
+            contracts::FailureAction::ThrowException("Postcondition violation".to_string()),
+            contracts::VerificationHint::SMTSolver,
+            None, // Default to Combined mode for this condition
         );
 
-        // Add a contradictory axiom to force failure in the abstract pass.
+        // Add a contradictory axiom to force failure in the abstract pass for the default combined mode.
         let mut engine = VerificationEngine::new();
         engine.add_function_contract("combined_example".to_string(), contract);
         engine.add_axiom(solver::Formula::Not(Box::new(solver::Formula::Eq(
@@ -652,9 +665,161 @@ mod tests {
         ))));
 
         // Default mode is Combined: first pass with axioms should fail, fallback without axioms should pass.
-        let result = engine.verify_function("combined_example", &function).unwrap();
+        let result = engine
+            .verify_function("combined_example", &function)
+            .unwrap();
         assert!(result.verified);
         assert!(!result.conditions.is_empty());
         assert!(result.conditions[0].verified);
+    }
+
+    #[test]
+    fn test_verification_modes_with_pragmas() {
+        let int_type = Type::primitive(PrimitiveType::Integer);
+
+        // A simple function: `fn test(x: Int, y: Int) -> Int { return x; }`
+        let parameters = vec![
+            Parameter {
+                name: "x".to_string(),
+                ty: int_type.clone(),
+                local_id: 0,
+            },
+            Parameter {
+                name: "y".to_string(),
+                ty: int_type.clone(),
+                local_id: 1,
+            },
+        ];
+        let assign_return = Statement::Assign {
+            place: Place {
+                local: 2,
+                projection: vec![],
+            },
+            rvalue: Rvalue::Use(Operand::Copy(Place {
+                local: 0,
+                projection: vec![],
+            })),
+            source_info: mir::SourceInfo {
+                span: SourceLocation::unknown(),
+                scope: 0,
+            },
+        };
+        let entry_block = BasicBlock {
+            id: 0,
+            statements: vec![assign_return],
+            terminator: Terminator::Return,
+        };
+        let mut blocks = HashMap::new();
+        blocks.insert(0, entry_block);
+        let function = Function {
+            name: "test_modes".to_string(),
+            parameters: parameters.clone(),
+            return_type: int_type.clone(),
+            locals: {
+                let mut locals = HashMap::new();
+                locals.insert(
+                    2,
+                    mir::Local {
+                        ty: int_type.clone(),
+                        is_mutable: false,
+                        source_info: None,
+                    },
+                );
+                locals
+            },
+            basic_blocks: blocks,
+            entry_block: 0,
+            return_local: Some(2),
+        };
+
+        let mut contract = contracts::FunctionContract::new("test_modes".to_string());
+
+        // Condition 1: Requires axiom to pass (result == y). Explicitly set to AbstractOnly.
+        // This condition should fail if only instantiation is used, but pass with abstract + axiom.
+        contract.add_enhanced_postcondition(
+            "axiom_dependent_abstract_only".to_string(),
+            contracts::Expression::BinaryOp {
+                op: contracts::BinaryOp::Eq,
+                left: Box::new(contracts::Expression::Result),
+                right: Box::new(contracts::Expression::Variable("y".to_string())),
+            },
+            SourceLocation::unknown(),
+            None,
+            contracts::FailureAction::ThrowException("AbstractOnly violation".to_string()),
+            contracts::VerificationHint::SMTSolver,
+            Some(VerificationMode::AbstractOnly),
+        );
+
+        // Condition 2: Fails with axiom, passes without (result == x). Explicitly set to InstantiationOnly.
+        // This condition should pass with instantiation, but fail with abstract + contradictory axiom.
+        contract.add_enhanced_postcondition(
+            "instantiation_only_passes".to_string(),
+            contracts::Expression::BinaryOp {
+                op: contracts::BinaryOp::Eq,
+                left: Box::new(contracts::Expression::Result),
+                right: Box::new(contracts::Expression::Variable("x".to_string())),
+            },
+            SourceLocation::unknown(),
+            None,
+            contracts::FailureAction::ThrowException("InstantiationOnly violation".to_string()),
+            contracts::VerificationHint::SMTSolver,
+            Some(VerificationMode::InstantiationOnly),
+        );
+
+        // Condition 3: Should pass with Combined mode. (result == x). No specific mode set, defaults to Combined.
+        contract.add_enhanced_postcondition(
+            "combined_mode_default".to_string(),
+            contracts::Expression::BinaryOp {
+                op: contracts::BinaryOp::Eq,
+                left: Box::new(contracts::Expression::Result),
+                right: Box::new(contracts::Expression::Variable("x".to_string())),
+            },
+            SourceLocation::unknown(),
+            None,
+            contracts::FailureAction::ThrowException("CombinedMode violation".to_string()),
+            contracts::VerificationHint::SMTSolver,
+            None,
+        );
+
+        let mut engine = VerificationEngine::new();
+        engine.add_function_contract("test_modes".to_string(), contract);
+
+        // Add an axiom: x == y (local_0 == local_1). This helps 'axiom_dependent_abstract_only' but hurts 'instantiation_only_passes' if used in instantiation.
+        engine.add_axiom(solver::Formula::Eq(
+            Box::new(solver::Formula::Var("local_0".to_string())),
+            Box::new(solver::Formula::Var("local_1".to_string())),
+        ));
+
+        // For the function as a whole, set default to Combined (though individual conditions override)
+        engine.set_verification_mode("test_modes".to_string(), VerificationMode::Combined);
+
+        let result = engine.verify_function("test_modes", &function).unwrap();
+
+        assert!(result.verified);
+        assert_eq!(result.conditions.len(), 3);
+
+        let c1 = result
+            .conditions
+            .iter()
+            .find(|c| c.name.contains("axiom_dependent_abstract_only"))
+            .unwrap();
+        assert!(c1.verified, "AbstractOnly condition should pass with axiom");
+
+        let c2 = result
+            .conditions
+            .iter()
+            .find(|c| c.name.contains("instantiation_only_passes"))
+            .unwrap();
+        assert!(
+            c2.verified,
+            "InstantiationOnly condition should pass without contradictory axiom"
+        );
+
+        let c3 = result
+            .conditions
+            .iter()
+            .find(|c| c.name.contains("combined_mode_default"))
+            .unwrap();
+        assert!(c3.verified, "CombinedMode (default) condition should pass");
     }
 }

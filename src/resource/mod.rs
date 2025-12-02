@@ -32,6 +32,12 @@ pub struct ResourceManager {
     analyzer: ResourceAnalyzer,
 }
 
+impl Default for ResourceManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ResourceManager {
     pub fn new() -> Self {
         Self {
@@ -107,6 +113,12 @@ pub struct ResourceValidationPass {
     manager: ResourceManager,
 }
 
+impl Default for ResourceValidationPass {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ResourceValidationPass {
     pub fn new() -> Self {
         Self {
@@ -163,7 +175,7 @@ impl ResourceReport {
         if !self.optimizations.is_empty() {
             result.push_str("  (OPTIMIZATIONS\n");
             for opt in &self.optimizations {
-                result.push_str(&format!("    (OPTIMIZATION\n"));
+                result.push_str("    (OPTIMIZATION\n");
                 result.push_str(&format!("      (TYPE {:?})\n", opt.optimization_type));
                 result.push_str(&format!("      (RESOURCE \"{}\")\n", opt.resource_type));
                 result.push_str(&format!("      (DESCRIPTION \"{}\")\n", opt.description));
@@ -183,7 +195,7 @@ impl ResourceReport {
         if !self.usage_patterns.is_empty() {
             result.push_str("  (USAGE_PATTERNS\n");
             for (resource_type, pattern) in &self.usage_patterns {
-                result.push_str(&format!("    (PATTERN\n"));
+                result.push_str("    (PATTERN\n");
                 result.push_str(&format!("      (RESOURCE_TYPE \"{}\")\n", resource_type));
                 result.push_str(&format!(
                     "      (AVG_HOLD_TIME_MS {})\n",

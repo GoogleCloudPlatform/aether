@@ -439,7 +439,7 @@ impl CompositionEngine {
                 patterns
                     .iter()
                     .find(|p| p.id == *id)
-                    .map(|p| *p)
+                    .copied()
                     .ok_or_else(|| CompositionError::PatternNotFound(id.clone()))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -1013,30 +1013,24 @@ impl CompositionEngine {
 
         if has_io {
             Some(IOProfile {
-                reads: patterns.iter().any(|p| {
-                    p.performance
-                        .io_profile
-                        .as_ref()
-                        .map_or(false, |io| io.reads)
-                }),
+                reads: patterns
+                    .iter()
+                    .any(|p| p.performance.io_profile.as_ref().is_some_and(|io| io.reads)),
                 writes: patterns.iter().any(|p| {
                     p.performance
                         .io_profile
                         .as_ref()
-                        .map_or(false, |io| io.writes)
+                        .is_some_and(|io| io.writes)
                 }),
                 network: patterns.iter().any(|p| {
                     p.performance
                         .io_profile
                         .as_ref()
-                        .map_or(false, |io| io.network)
+                        .is_some_and(|io| io.network)
                 }),
-                file: patterns.iter().any(|p| {
-                    p.performance
-                        .io_profile
-                        .as_ref()
-                        .map_or(false, |io| io.file)
-                }),
+                file: patterns
+                    .iter()
+                    .any(|p| p.performance.io_profile.as_ref().is_some_and(|io| io.file)),
             })
         } else {
             None

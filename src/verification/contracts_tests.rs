@@ -35,6 +35,7 @@ fn test_enhanced_contract_creation() {
         Some("denominator != 0 is required for division".to_string()),
         FailureAction::ThrowException("Division by zero".to_string()),
         VerificationHint::SMTSolver,
+        None,
     );
 
     assert_eq!(contract.preconditions.len(), 1);
@@ -139,6 +140,7 @@ fn test_proof_obligation_generation() {
         None,
         FailureAction::ThrowException("x must be positive".to_string()),
         VerificationHint::SMTSolver,
+        None,
     );
 
     contract.add_enhanced_postcondition(
@@ -152,6 +154,7 @@ fn test_proof_obligation_generation() {
         Some("Result is non-negative".to_string()),
         FailureAction::Abort,
         VerificationHint::SMTSolver,
+        None,
     );
 
     let obligations = contract.generate_proof_obligations();

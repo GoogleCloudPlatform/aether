@@ -339,7 +339,8 @@ pub fn ast_assertion_to_condition(
         location: assertion.source_location.clone(),
         proof_hint: assertion.message.clone(),
         failure_action,
-        verification_hint: VerificationHint::SMTSolver,
+        verification_hint: VerificationHint::SMTSolver, // Default hint, consider mapping this if @hint is added later
+        verification_mode: assertion.verification_mode, // Transfer the new field
     })
 }
 

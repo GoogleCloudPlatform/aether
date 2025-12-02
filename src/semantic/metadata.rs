@@ -420,6 +420,12 @@ pub struct MetadataRepository {
     pub global_hints: GenerationHints,
 }
 
+impl Default for MetadataRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetadataRepository {
     pub fn new() -> Self {
         Self {

@@ -464,6 +464,12 @@ pub struct CompositionGraph {
     exclusions: HashMap<String, Vec<String>>,
 }
 
+impl Default for PatternLibrary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PatternLibrary {
     /// Create a new pattern library
     pub fn new() -> Self {
@@ -496,14 +502,14 @@ impl PatternLibrary {
         // Index by category
         self.by_category
             .entry(pattern.category.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pattern.id.clone());
 
         // Index by capabilities
         for capability in &pattern.metadata.provides {
             self.by_capability
                 .entry(capability.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(pattern.id.clone());
         }
 
@@ -514,14 +520,14 @@ impl PatternLibrary {
                     self.composition_graph
                         .compatible
                         .entry(pattern.id.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(pattern_id.clone());
                 }
                 CompositionCondition::ExcludesWith { pattern_id } => {
                     self.composition_graph
                         .exclusions
                         .entry(pattern.id.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(pattern_id.clone());
                 }
                 _ => {}

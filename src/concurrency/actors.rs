@@ -492,6 +492,12 @@ impl ActorSystem {
     }
 }
 
+impl Default for MessageDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MessageDispatcher {
     pub fn new() -> Self {
         Self {

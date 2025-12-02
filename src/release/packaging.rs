@@ -1037,14 +1037,14 @@ Description: {}
             message: format!("Failed to create usr/bin directory: {}", e),
         })?;
 
-        for (_, artifact) in &self.artifacts {
-            if self.should_include_artifact(artifact, platform) {
-                if matches!(artifact.artifact_type, ArtifactType::Executable) {
-                    let dest = usr_bin.join(artifact.path.file_name().unwrap());
-                    std::fs::copy(&artifact.path, dest).map_err(|e| SemanticError::Internal {
-                        message: format!("Failed to copy artifact: {}", e),
-                    })?;
-                }
+        for artifact in self.artifacts.values() {
+            if self.should_include_artifact(artifact, platform)
+                && matches!(artifact.artifact_type, ArtifactType::Executable)
+            {
+                let dest = usr_bin.join(artifact.path.file_name().unwrap());
+                std::fs::copy(&artifact.path, dest).map_err(|e| SemanticError::Internal {
+                    message: format!("Failed to copy artifact: {}", e),
+                })?;
             }
         }
 
@@ -1168,7 +1168,7 @@ end
         if let Some(signing_config) = &self.config.signing {
             println!("Signing artifacts with {:?}", signing_config.algorithm);
 
-            for (_, artifact) in &mut self.artifacts {
+            for artifact in self.artifacts.values_mut() {
                 // In a real implementation, would use actual signing libraries
                 let signature = format!("signature_for_{}", artifact.checksum);
                 artifact.signature = Some(signature);

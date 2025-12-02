@@ -27,6 +27,7 @@ use crate::ast;
 use crate::error::SourceLocation;
 use crate::semantic::metadata::{BehavioralSpec, IntentSpec, ResourceContract};
 use crate::types::Type;
+use crate::verification::VerificationMode;
 use std::collections::{HashMap, HashSet};
 
 /// Enhanced Function Contract for LLM-First Verification
@@ -92,6 +93,7 @@ pub struct EnhancedCondition {
 
     /// Verification method hint
     pub verification_hint: VerificationHint,
+    pub verification_mode: Option<VerificationMode>,
 }
 
 /// Original condition structure for backwards compatibility
@@ -429,6 +431,7 @@ impl FunctionContract {
         proof_hint: Option<String>,
         failure_action: FailureAction,
         verification_hint: VerificationHint,
+        verification_mode: Option<VerificationMode>,
     ) {
         self.preconditions.push(EnhancedCondition {
             name: name.clone(),
@@ -437,6 +440,7 @@ impl FunctionContract {
             proof_hint,
             failure_action: failure_action.clone(),
             verification_hint,
+            verification_mode,
         });
 
         // Store failure action for quick lookup
@@ -452,6 +456,7 @@ impl FunctionContract {
             None,
             FailureAction::ThrowException("Precondition violation".to_string()),
             VerificationHint::SMTSolver,
+            None, // Default to no specific verification mode
         );
     }
 
@@ -464,6 +469,7 @@ impl FunctionContract {
         proof_hint: Option<String>,
         failure_action: FailureAction,
         verification_hint: VerificationHint,
+        verification_mode: Option<VerificationMode>,
     ) {
         self.postconditions.push(EnhancedCondition {
             name: name.clone(),
@@ -472,6 +478,7 @@ impl FunctionContract {
             proof_hint,
             failure_action: failure_action.clone(),
             verification_hint,
+            verification_mode,
         });
 
         self.failure_actions.insert(name, failure_action);
@@ -486,6 +493,7 @@ impl FunctionContract {
             None,
             FailureAction::ThrowException("Postcondition violation".to_string()),
             VerificationHint::SMTSolver,
+            None, // Default to no specific verification mode
         );
     }
 
@@ -496,6 +504,7 @@ impl FunctionContract {
         expr: Expression,
         location: SourceLocation,
         proof_hint: Option<String>,
+        verification_mode: Option<VerificationMode>,
     ) {
         self.invariants.push(EnhancedCondition {
             name,
@@ -504,6 +513,7 @@ impl FunctionContract {
             proof_hint,
             failure_action: FailureAction::Abort,
             verification_hint: VerificationHint::SMTSolver,
+            verification_mode,
         });
     }
 
@@ -627,7 +637,7 @@ impl Expression {
                 ConstantValue::Integer(n) => n.to_string(),
                 ConstantValue::Float(f) => f.to_string(),
                 ConstantValue::Boolean(b) => b.to_string(),
-                ConstantValue::String(s) => format!("{}", s),
+                ConstantValue::String(s) => s.to_string(),
                 ConstantValue::Null => "null".to_string(),
             },
             Expression::BinaryOp { op, left, right } => {
@@ -899,6 +909,12 @@ pub struct ProofCertificate {
     pub method: VerificationMethod,
 }
 
+impl Default for EnhancedContractVerifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnhancedContractVerifier {
     pub fn new() -> Self {
         Self {
@@ -949,7 +965,7 @@ impl EnhancedContractVerifier {
 
         // Verify preconditions
         for pre in &contract.preconditions {
-            let (verified, time_ms, proof) = self.verify_condition(&pre, &contract.preconditions);
+            let (verified, time_ms, proof) = self.verify_condition(pre, &contract.preconditions);
             conditions.push(ConditionResult {
                 condition_name: pre.name.clone(),
                 verified,
@@ -977,7 +993,7 @@ impl EnhancedContractVerifier {
         // Verify postconditions with preconditions as assumptions
         for post in &contract.postconditions {
             let (verified, time_ms, proof) =
-                self.verify_postcondition(&post, &contract.preconditions);
+                self.verify_postcondition(post, &contract.preconditions);
             conditions.push(ConditionResult {
                 condition_name: post.name.clone(),
                 verified,
