@@ -107,10 +107,12 @@ impl LoweringContext {
     }
 
     /// Set the concurrent captures map
-    pub fn set_captures(&mut self, captures: HashMap<SourceLocation, std::collections::HashSet<String>>) {
+    pub fn set_captures(
+        &mut self,
+        captures: HashMap<SourceLocation, std::collections::HashSet<String>>,
+    ) {
         self.concurrent_captures = Some(captures);
     }
-
 
     /// Ensure operand is compatible with target type (awaiting or casting if necessary)
     fn ensure_compatible_operand(
@@ -120,18 +122,24 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Check if operand is Future and target is not
         let op_type = self.infer_operand_type(&operand)?;
-        
-        if let Type::GenericInstance { base_type, type_arguments, .. } = &op_type {
+
+        if let Type::GenericInstance {
+            base_type,
+            type_arguments,
+            ..
+        } = &op_type
+        {
             if base_type == "Future" && !type_arguments.is_empty() {
                 // Operand is Future<T>
                 // Check if target type is Future (or generic/unspecified)
                 // If target is specifically NOT a future (e.g. Int), await it.
-                let target_is_future = if let Type::GenericInstance { base_type, .. } = target_type {
+                let target_is_future = if let Type::GenericInstance { base_type, .. } = target_type
+                {
                     base_type == "Future"
                 } else {
                     false
                 };
-                
+
                 if !target_is_future {
                     return self.maybe_await_operand(operand);
                 }
@@ -140,26 +148,38 @@ impl LoweringContext {
 
         // Check for Numeric Casting (Int -> Int64)
         match (&op_type, target_type) {
-            (Type::Primitive(ast::PrimitiveType::Integer), Type::Primitive(ast::PrimitiveType::Integer64)) |
-            (Type::Primitive(ast::PrimitiveType::Integer32), Type::Primitive(ast::PrimitiveType::Integer64)) => {
-                 let temp = self.builder.new_local(target_type.clone(), false);
-                 self.builder.push_statement(Statement::Assign {
-                     place: Place { local: temp, projection: vec![] },
-                     rvalue: Rvalue::Cast {
-                         kind: CastKind::Numeric,
-                         operand: operand,
-                         ty: target_type.clone(),
-                     },
-                     source_info: SourceInfo {
-                         span: SourceLocation::unknown(),
-                         scope: 0,
-                     },
-                 });
-                 return Ok(Operand::Copy(Place { local: temp, projection: vec![] }));
+            (
+                Type::Primitive(ast::PrimitiveType::Integer),
+                Type::Primitive(ast::PrimitiveType::Integer64),
+            )
+            | (
+                Type::Primitive(ast::PrimitiveType::Integer32),
+                Type::Primitive(ast::PrimitiveType::Integer64),
+            ) => {
+                let temp = self.builder.new_local(target_type.clone(), false);
+                self.builder.push_statement(Statement::Assign {
+                    place: Place {
+                        local: temp,
+                        projection: vec![],
+                    },
+                    rvalue: Rvalue::Cast {
+                        kind: CastKind::Numeric,
+                        operand: operand,
+                        ty: target_type.clone(),
+                    },
+                    source_info: SourceInfo {
+                        span: SourceLocation::unknown(),
+                        scope: 0,
+                    },
+                });
+                return Ok(Operand::Copy(Place {
+                    local: temp,
+                    projection: vec![],
+                }));
             }
             _ => {}
         }
-        
+
         Ok(operand)
     }
 
@@ -189,7 +209,8 @@ impl LoweringContext {
             } else {
                 import.module_name.name.clone()
             };
-            self.imported_modules.insert(alias, import.module_name.name.clone());
+            self.imported_modules
+                .insert(alias, import.module_name.name.clone());
         }
 
         // Lower constants
@@ -338,9 +359,7 @@ impl LoweringContext {
         // Finish and add to program
         let mut mir_function = self.builder.finish_function();
         mir_function.return_local = self.return_local;
-        self.program
-            .functions
-            .insert(function_name, mir_function);
+        self.program.functions.insert(function_name, mir_function);
 
         Ok(())
     }
@@ -432,9 +451,15 @@ impl LoweringContext {
                 // Initialize if value provided (before creating local to infer type)
                 let init_value_opt = if let Some(init_expr) = initial_value {
                     // Check if it's a lambda expression and infer type
-                    if let ast::Expression::Lambda { parameters, return_type, .. } = init_expr.as_ref() {
+                    if let ast::Expression::Lambda {
+                        parameters,
+                        return_type,
+                        ..
+                    } = init_expr.as_ref()
+                    {
                         // Build function type from lambda signature
-                        let param_types: Vec<Type> = parameters.iter()
+                        let param_types: Vec<Type> = parameters
+                            .iter()
                             .map(|p| self.ast_type_to_mir_type(&p.param_type))
                             .collect::<Result<Vec<_>, _>>()?;
                         let ret_type = if let Some(rt) = return_type {
@@ -448,16 +473,16 @@ impl LoweringContext {
                             is_variadic: false,
                         };
                     }
-                    
+
                     let op = self.lower_expression(init_expr)?;
-                    
+
                     // If type is inferred, use the type of the initializer
                     if let Type::Named { name, .. } = &ty {
                         if name == "_inferred" {
                             ty = self.infer_operand_type(&op)?;
                         }
                     }
-                    
+
                     // Check compatibility and await if needed
                     let compatible_op = self.ensure_compatible_operand(op, &ty)?;
                     Some(compatible_op)
@@ -548,7 +573,11 @@ impl LoweringContext {
                     if let Some(return_local) = self.return_local {
                         // Explicitly generate Operand::Constant for integer literals
                         // to ensure return values aren't affected by CSE
-                        let final_return_operand = if let ast::Expression::IntegerLiteral { value: literal_value, .. } = &**return_expr {
+                        let final_return_operand = if let ast::Expression::IntegerLiteral {
+                            value: literal_value,
+                            ..
+                        } = &**return_expr
+                        {
                             Operand::Constant(Constant {
                                 ty: Type::primitive(PrimitiveType::Integer),
                                 value: ConstantValue::Integer(*literal_value as i128),
@@ -571,7 +600,8 @@ impl LoweringContext {
                         });
 
                         // Map return_value to the return local for postcondition checks
-                        self.var_map.insert("return_value".to_string(), return_local);
+                        self.var_map
+                            .insert("return_value".to_string(), return_local);
                     } else {
                         let _return_value = self.lower_expression(return_expr)?;
                     }
@@ -582,7 +612,10 @@ impl LoweringContext {
 
                 self.builder.set_terminator(Terminator::Return);
             }
-            ast::Statement::Concurrent { block, source_location } => {
+            ast::Statement::Concurrent {
+                block,
+                source_location,
+            } => {
                 // Look up captures for this block
                 let captures = if let Some(captures_map) = &self.concurrent_captures {
                     if let Some(captured_names) = captures_map.get(source_location) {
@@ -590,7 +623,7 @@ impl LoweringContext {
                         // Sort names to ensure deterministic order
                         let mut sorted_names: Vec<_> = captured_names.iter().collect();
                         sorted_names.sort();
-                        
+
                         for name in sorted_names {
                             if let Some(&local_id) = self.var_map.get(name) {
                                 caps.push(Operand::Copy(Place {
@@ -610,14 +643,14 @@ impl LoweringContext {
                 // Create a new block for the concurrent execution
                 let concurrent_entry = self.builder.new_block();
                 let after_concurrent = self.builder.new_block();
-                
+
                 // Terminate current block with Concurrent
                 self.builder.set_terminator(Terminator::Concurrent {
                     block_id: concurrent_entry,
                     target: after_concurrent,
                     captures,
                 });
-                
+
                 // Lower the concurrent block
                 self.builder.switch_to_block(concurrent_entry);
                 // We need to ensure the block eventually terminates or returns
@@ -626,9 +659,9 @@ impl LoweringContext {
                 for stmt in &block.statements {
                     self.lower_statement(stmt)?;
                 }
-                
+
                 // If the concurrent block falls through, it should return/end
-                // For MIR structure, we might want it to jump to 'after_concurrent' 
+                // For MIR structure, we might want it to jump to 'after_concurrent'
                 // but semantically 'Concurrent' implies it runs separately.
                 // The 'Concurrent' terminator in the parent block handles the "spawning".
                 // The body of the concurrent block needs to be self-contained or jump back?
@@ -636,7 +669,7 @@ impl LoweringContext {
                 // The spawned block should probably end with Return (if it's a task) or similar.
                 // Let's assume for now it just ends.
                 if !self.builder.current_block_diverges() {
-                     self.builder.set_terminator(Terminator::Return);
+                    self.builder.set_terminator(Terminator::Return);
                 }
 
                 // Continue generation in the code after the concurrent block
@@ -850,7 +883,16 @@ impl LoweringContext {
 
         // Check if any arm has a guard or complex pattern
         let has_guards = arms.iter().any(|arm| arm.guard.is_some());
-        let has_complex_patterns = arms.iter().any(|arm| matches!(arm.pattern, ast::Pattern::Struct { .. } | ast::Pattern::EnumVariant { nested_pattern: Some(_), .. }));
+        let has_complex_patterns = arms.iter().any(|arm| {
+            matches!(
+                arm.pattern,
+                ast::Pattern::Struct { .. }
+                    | ast::Pattern::EnumVariant {
+                        nested_pattern: Some(_),
+                        ..
+                    }
+            )
+        });
 
         // Create an end block to jump to after each arm
         let end_bb = self.builder.new_block();
@@ -887,12 +929,19 @@ impl LoweringContext {
             arm_blocks.push(arm_bb);
 
             match &arm.pattern {
-                ast::Pattern::Literal { value: lit_expr, .. } => {
+                ast::Pattern::Literal {
+                    value: lit_expr, ..
+                } => {
                     // Extract the integer value from the literal
-                    if let ast::Expression::IntegerLiteral { value: int_val, .. } = lit_expr.as_ref() {
+                    if let ast::Expression::IntegerLiteral { value: int_val, .. } =
+                        lit_expr.as_ref()
+                    {
                         switch_values.push(*int_val as u128);
                         switch_targets.push(arm_bb);
-                    } else if let ast::Expression::BooleanLiteral { value: bool_val, .. } = lit_expr.as_ref() {
+                    } else if let ast::Expression::BooleanLiteral {
+                        value: bool_val, ..
+                    } = lit_expr.as_ref()
+                    {
                         switch_values.push(if *bool_val { 1 } else { 0 });
                         switch_targets.push(arm_bb);
                     }
@@ -901,13 +950,20 @@ impl LoweringContext {
                     // This is the default case
                     wildcard_block = Some(arm_bb);
                 }
-                ast::Pattern::EnumVariant { enum_name, variant_name, .. } => {
+                ast::Pattern::EnumVariant {
+                    enum_name,
+                    variant_name,
+                    ..
+                } => {
                     // Look up the variant's discriminant value
                     // For now, use variant index as discriminant
                     if let Some(enum_ident) = enum_name {
-                        if let Some(enum_def) = self.program.type_definitions.get(&enum_ident.name) {
+                        if let Some(enum_def) = self.program.type_definitions.get(&enum_ident.name)
+                        {
                             if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
-                                if let Some(idx) = variants.iter().position(|v| v.name == variant_name.name) {
+                                if let Some(idx) =
+                                    variants.iter().position(|v| v.name == variant_name.name)
+                                {
                                     switch_values.push(idx as u128);
                                     switch_targets.push(arm_bb);
                                 }
@@ -947,9 +1003,16 @@ impl LoweringContext {
 
         // For enum patterns, we ALWAYS need to extract the discriminant first
         // (even for simple enums without data, since they're stored as pointers)
-        let switch_discriminant = if let Some(ast::Pattern::EnumVariant { enum_name: Some(_enum_ident), source_location, .. }) = arms.first().map(|a| &a.pattern) {
+        let switch_discriminant = if let Some(ast::Pattern::EnumVariant {
+            enum_name: Some(_enum_ident),
+            source_location,
+            ..
+        }) = arms.first().map(|a| &a.pattern)
+        {
             // Extract the discriminant from the enum pointer
-            let disc_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+            let disc_local = self
+                .builder
+                .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
             self.builder.push_statement(Statement::Assign {
                 place: Place {
                     local: disc_local,
@@ -1018,7 +1081,10 @@ impl LoweringContext {
         // Create a chain: check_arm1 -> (guard true -> body1, guard false -> check_arm2) -> ...
 
         // Save entry block to set its terminator after processing arms
-        let entry_bb = self.builder.current_block.expect("should have current block");
+        let entry_bb = self
+            .builder
+            .current_block
+            .expect("should have current block");
 
         // Process arms in reverse order to build the chain
         let arm_count = arms.len();
@@ -1052,23 +1118,32 @@ impl LoweringContext {
                     // If it's a constant, we store it in a temporary to get a Place
                     let temp = self.builder.new_local(
                         Type::primitive(ast::PrimitiveType::Integer), // Type will be inferred/checked later
-                        false
+                        false,
                     );
                     self.builder.push_statement(Statement::Assign {
-                        place: Place { local: temp, projection: vec![] },
+                        place: Place {
+                            local: temp,
+                            projection: vec![],
+                        },
                         rvalue: Rvalue::Use(match_op.clone()),
-                        source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                        source_info: SourceInfo {
+                            span: SourceLocation::unknown(),
+                            scope: 0,
+                        },
                     });
-                    Place { local: temp, projection: vec![] }
+                    Place {
+                        local: temp,
+                        projection: vec![],
+                    }
                 }
             };
 
             // Check if pattern matches
             let pattern_match_op = self.lower_pattern_check(&arm.pattern, &match_place)?;
-            
+
             // Create a block for when pattern matches (to process bindings and guard)
             let pattern_matched_bb = self.builder.new_block();
-            
+
             self.builder.set_terminator(Terminator::SwitchInt {
                 discriminant: pattern_match_op,
                 switch_ty: Type::primitive(ast::PrimitiveType::Boolean),
@@ -1078,10 +1153,10 @@ impl LoweringContext {
                     otherwise: fallthrough_bb,
                 },
             });
-            
+
             // In pattern_matched_bb, process bindings and guard
             self.builder.switch_to_block(pattern_matched_bb);
-            
+
             // Extract bindings
             self.lower_pattern_bindings(&arm.pattern, &match_place, 0)?; // 0 variant idx is placeholder
 
@@ -1100,20 +1175,24 @@ impl LoweringContext {
                 });
             } else {
                 // No guard, just go to body
-                self.builder.set_terminator(Terminator::Goto { target: body_bb });
+                self.builder
+                    .set_terminator(Terminator::Goto { target: body_bb });
             }
 
             // Generate the body block
             self.builder.switch_to_block(body_bb);
             self.lower_block(&arm.body)?;
             if !self.builder.current_block_diverges() {
-                self.builder.set_terminator(Terminator::Goto { target: end_bb });
+                self.builder
+                    .set_terminator(Terminator::Goto { target: end_bb });
             }
         }
 
         // Switch back to entry block and set terminator to first arm's check
         self.builder.switch_to_block(entry_bb);
-        self.builder.set_terminator(Terminator::Goto { target: arm_check_blocks[0] });
+        self.builder.set_terminator(Terminator::Goto {
+            target: arm_check_blocks[0],
+        });
 
         Ok(())
     }
@@ -1423,19 +1502,30 @@ impl LoweringContext {
     /// Helper to await an operand if it is a Future<T>
     fn maybe_await_operand(&mut self, operand: Operand) -> Result<Operand, SemanticError> {
         let ty = self.infer_operand_type(&operand)?;
-        if let Type::GenericInstance { base_type, type_arguments, .. } = &ty {
+        if let Type::GenericInstance {
+            base_type,
+            type_arguments,
+            ..
+        } = &ty
+        {
             if base_type == "Future" && !type_arguments.is_empty() {
                 let inner_type = &type_arguments[0];
-                
+
                 // Emit call to aether_async_wait
                 // 1. Create temp for result pointer (i8*)
                 let result_ptr_local = self.builder.new_local(
-                    Type::Pointer { target_type: Box::new(Type::primitive(PrimitiveType::Char)), is_mutable: true }, 
-                    false
+                    Type::Pointer {
+                        target_type: Box::new(Type::primitive(PrimitiveType::Char)),
+                        is_mutable: true,
+                    },
+                    false,
                 );
-                
+
                 self.builder.push_statement(Statement::Assign {
-                    place: Place { local: result_ptr_local, projection: vec![] },
+                    place: Place {
+                        local: result_ptr_local,
+                        projection: vec![],
+                    },
                     rvalue: Rvalue::Call {
                         func: Operand::Constant(Constant {
                             ty: Type::primitive(PrimitiveType::String),
@@ -1444,48 +1534,77 @@ impl LoweringContext {
                         explicit_type_arguments: vec![],
                         args: vec![operand],
                     },
-                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                    source_info: SourceInfo {
+                        span: SourceLocation::unknown(),
+                        scope: 0,
+                    },
                 });
-                
+
                 // 2. Cast result pointer to inner_type*
                 let typed_ptr_local = self.builder.new_local(
-                    Type::Pointer { target_type: Box::new(inner_type.clone()), is_mutable: true },
-                    false
+                    Type::Pointer {
+                        target_type: Box::new(inner_type.clone()),
+                        is_mutable: true,
+                    },
+                    false,
                 );
-                
+
                 self.builder.push_statement(Statement::Assign {
-                    place: Place { local: typed_ptr_local, projection: vec![] },
+                    place: Place {
+                        local: typed_ptr_local,
+                        projection: vec![],
+                    },
                     rvalue: Rvalue::Cast {
                         kind: CastKind::Pointer,
-                        operand: Operand::Copy(Place { local: result_ptr_local, projection: vec![] }),
-                        ty: Type::Pointer { target_type: Box::new(inner_type.clone()), is_mutable: true },
+                        operand: Operand::Copy(Place {
+                            local: result_ptr_local,
+                            projection: vec![],
+                        }),
+                        ty: Type::Pointer {
+                            target_type: Box::new(inner_type.clone()),
+                            is_mutable: true,
+                        },
                     },
-                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                    source_info: SourceInfo {
+                        span: SourceLocation::unknown(),
+                        scope: 0,
+                    },
                 });
-                
+
                 // 3. Dereference to get value
                 let value_local = self.builder.new_local(inner_type.clone(), false);
-                
+
                 self.builder.push_statement(Statement::Assign {
-                    place: Place { local: value_local, projection: vec![] },
-                    rvalue: Rvalue::Use(Operand::Copy(Place { 
-                        local: typed_ptr_local, 
-                        projection: vec![PlaceElem::Deref] 
+                    place: Place {
+                        local: value_local,
+                        projection: vec![],
+                    },
+                    rvalue: Rvalue::Use(Operand::Copy(Place {
+                        local: typed_ptr_local,
+                        projection: vec![PlaceElem::Deref],
                     })),
-                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                    source_info: SourceInfo {
+                        span: SourceLocation::unknown(),
+                        scope: 0,
+                    },
                 });
-                
-                return Ok(Operand::Copy(Place { local: value_local, projection: vec![] }));
+
+                return Ok(Operand::Copy(Place {
+                    local: value_local,
+                    projection: vec![],
+                }));
             }
         }
-        
+
         Ok(operand)
     }
 
-
-
     /// Get the index and type of a struct field
-    fn get_struct_field_index(&self, struct_name: &str, field_name: &str) -> Result<(usize, Type), SemanticError> {
+    fn get_struct_field_index(
+        &self,
+        struct_name: &str,
+        field_name: &str,
+    ) -> Result<(usize, Type), SemanticError> {
         if let Some(type_def) = self.program.type_definitions.get(struct_name) {
             if let crate::types::TypeDefinition::Struct { fields, .. } = type_def {
                 if let Some(idx) = fields.iter().position(|(name, _)| name == field_name) {
@@ -1500,7 +1619,11 @@ impl LoweringContext {
     }
 
     /// Generate a boolean operand that is true if the pattern matches the value at place
-    fn lower_pattern_check(&mut self, pattern: &ast::Pattern, place: &Place) -> Result<Operand, SemanticError> {
+    fn lower_pattern_check(
+        &mut self,
+        pattern: &ast::Pattern,
+        place: &Place,
+    ) -> Result<Operand, SemanticError> {
         match pattern {
             ast::Pattern::Wildcard { .. } => {
                 // Always matches
@@ -1512,43 +1635,62 @@ impl LoweringContext {
             ast::Pattern::Literal { value, .. } => {
                 // Evaluate literal
                 let lit_op = self.lower_expression(value)?;
-                
+
                 // Generate comparison: place == literal
-                let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
-                
+                let result_local = self
+                    .builder
+                    .new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
+
                 self.builder.push_statement(Statement::Assign {
-                    place: Place { local: result_local, projection: vec![] },
+                    place: Place {
+                        local: result_local,
+                        projection: vec![],
+                    },
                     rvalue: Rvalue::BinaryOp {
                         op: BinOp::Eq,
                         left: Operand::Copy(place.clone()),
                         right: lit_op,
                     },
-                    source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                    source_info: SourceInfo {
+                        span: SourceLocation::unknown(),
+                        scope: 0,
+                    },
                 });
-                
-                Ok(Operand::Copy(Place { local: result_local, projection: vec![] }))
+
+                Ok(Operand::Copy(Place {
+                    local: result_local,
+                    projection: vec![],
+                }))
             }
-            ast::Pattern::Struct { struct_name, fields, .. } => {
+            ast::Pattern::Struct {
+                struct_name,
+                fields,
+                ..
+            } => {
                 // Check each field
                 let mut conditions = Vec::new();
-                
+
                 for (field_name, field_pattern) in fields {
-                    let (field_idx, field_type) = self.get_struct_field_index(&struct_name.name, &field_name.name)?;
-                    
+                    let (field_idx, field_type) =
+                        self.get_struct_field_index(&struct_name.name, &field_name.name)?;
+
                     let field_place = Place {
                         local: place.local,
-                        projection: place.projection.iter().cloned().chain(vec![
-                            PlaceElem::Field {
+                        projection: place
+                            .projection
+                            .iter()
+                            .cloned()
+                            .chain(vec![PlaceElem::Field {
                                 field: field_idx as u32,
                                 ty: field_type,
-                            }
-                        ]).collect(),
+                            }])
+                            .collect(),
                     };
-                    
+
                     let field_check = self.lower_pattern_check(field_pattern, &field_place)?;
                     conditions.push(field_check);
                 }
-                
+
                 // Combine conditions with AND
                 if conditions.is_empty() {
                     Ok(Operand::Constant(Constant {
@@ -1559,17 +1701,28 @@ impl LoweringContext {
                     let mut result_op = conditions[0].clone();
                     for i in 1..conditions.len() {
                         let right_op = conditions[i].clone();
-                        let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
+                        let result_local = self
+                            .builder
+                            .new_local(Type::primitive(ast::PrimitiveType::Boolean), false);
                         self.builder.push_statement(Statement::Assign {
-                            place: Place { local: result_local, projection: vec![] },
+                            place: Place {
+                                local: result_local,
+                                projection: vec![],
+                            },
                             rvalue: Rvalue::BinaryOp {
                                 op: BinOp::And,
                                 left: result_op,
                                 right: right_op,
                             },
-                            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                            source_info: SourceInfo {
+                                span: SourceLocation::unknown(),
+                                scope: 0,
+                            },
                         });
-                        result_op = Operand::Copy(Place { local: result_local, projection: vec![] });
+                        result_op = Operand::Copy(Place {
+                            local: result_local,
+                            projection: vec![],
+                        });
                     }
                     Ok(result_op)
                 }
@@ -1859,7 +2012,6 @@ impl LoweringContext {
         }
     }
 
-
     fn lower_method_call(
         &mut self,
         receiver: &ast::Expression,
@@ -1872,13 +2024,23 @@ impl LoweringContext {
             if let Some(module_name) = self.imported_modules.get(&name.name) {
                 // It's a module function call
                 let qualified_name = format!("{}.{}", module_name, method_name.name);
-                
+
                 // Look up return type from symbol table if available, otherwise void
                 let return_type = if let Some(st) = &self.symbol_table {
                     if let Some(func_sym) = st.lookup_symbol(&qualified_name) {
-                        if let crate::types::Type::Function { parameter_types, return_type, is_variadic: _ } = &func_sym.symbol_type {
+                        if let crate::types::Type::Function {
+                            parameter_types,
+                            return_type,
+                            is_variadic: _,
+                        } = &func_sym.symbol_type
+                        {
                             // Register as external function if not already known
-                            if !self.program.functions.contains_key(&qualified_name) && !self.program.external_functions.contains_key(&qualified_name) {
+                            if !self.program.functions.contains_key(&qualified_name)
+                                && !self
+                                    .program
+                                    .external_functions
+                                    .contains_key(&qualified_name)
+                            {
                                 let ext_func = crate::mir::ExternalFunction {
                                     name: qualified_name.clone(),
                                     symbol: None, // Or lookup from somewhere? But for now None.
@@ -1887,7 +2049,9 @@ impl LoweringContext {
                                     calling_convention: crate::mir::CallingConvention::C,
                                     variadic: false,
                                 };
-                                self.program.external_functions.insert(qualified_name.clone(), ext_func);
+                                self.program
+                                    .external_functions
+                                    .insert(qualified_name.clone(), ext_func);
                             }
                             *return_type.clone()
                         } else {
@@ -1936,11 +2100,11 @@ impl LoweringContext {
         // For map methods "insert" and "get", lower to map_insert/map_get runtime calls
         // In a real compiler, this would look up the type of receiver and dispatch appropriately
         // For now, we'll assume it's a map if the method name matches map operations
-        
+
         if method_name.name == "insert" {
             // map.insert(key, value) -> map_insert(map, key, value)
             let map_op = self.lower_expression(receiver)?;
-            
+
             if arguments.len() != 2 {
                 return Err(SemanticError::ArgumentCountMismatch {
                     function: "map.insert".to_string(),
@@ -1949,13 +2113,15 @@ impl LoweringContext {
                     location: source_location.clone(),
                 });
             }
-            
+
             let key_op = self.lower_expression(&arguments[0].value)?;
             let value_op = self.lower_expression(&arguments[1].value)?;
-            
+
             // Call map_insert(map, key, value)
-            let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Void), false);
-            
+            let result_local = self
+                .builder
+                .new_local(Type::primitive(ast::PrimitiveType::Void), false);
+
             self.builder.push_statement(Statement::Assign {
                 place: Place {
                     local: result_local,
@@ -1974,7 +2140,7 @@ impl LoweringContext {
                     scope: 0,
                 },
             });
-            
+
             Ok(Operand::Copy(Place {
                 local: result_local,
                 projection: vec![],
@@ -1982,7 +2148,7 @@ impl LoweringContext {
         } else if method_name.name == "get" {
             // map.get(key) -> map_get(map, key)
             let map_op = self.lower_expression(receiver)?;
-            
+
             if arguments.len() != 1 {
                 return Err(SemanticError::ArgumentCountMismatch {
                     function: "map.get".to_string(),
@@ -1991,12 +2157,14 @@ impl LoweringContext {
                     location: source_location.clone(),
                 });
             }
-            
+
             let key_op = self.lower_expression(&arguments[0].value)?;
-            
+
             // Assume integer return for now (need generics for full support)
-            let result_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
-            
+            let result_local = self
+                .builder
+                .new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+
             self.builder.push_statement(Statement::Assign {
                 place: Place {
                     local: result_local,
@@ -2015,7 +2183,7 @@ impl LoweringContext {
                     scope: 0,
                 },
             });
-            
+
             Ok(Operand::Copy(Place {
                 local: result_local,
                 projection: vec![],
@@ -2025,7 +2193,7 @@ impl LoweringContext {
             // This requires knowing the type of the receiver, which we might not have fully resolved here
             // Fallback: treat as function call "ReceiverType_MethodName(receiver, args)"?
             // Or "MethodName(receiver, args)"?
-            
+
             // For now, just error
             Err(SemanticError::UnsupportedFeature {
                 feature: format!("Method call '{}' not supported yet", method_name.name),
@@ -2126,7 +2294,9 @@ impl LoweringContext {
         for operand in &operands[1..] {
             let right = self.lower_expression(operand)?;
 
-            let result_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+            let result_local = self
+                .builder
+                .new_local(Type::primitive(PrimitiveType::Boolean), false);
             self.builder.push_statement(Statement::Assign {
                 place: Place {
                     local: result_local,
@@ -2172,7 +2342,9 @@ impl LoweringContext {
         for operand in &operands[1..] {
             let right = self.lower_expression(operand)?;
 
-            let result_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+            let result_local = self
+                .builder
+                .new_local(Type::primitive(PrimitiveType::Boolean), false);
             self.builder.push_statement(Statement::Assign {
                 place: Place {
                     local: result_local,
@@ -2206,7 +2378,9 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         let operand_val = self.lower_expression(operand)?;
 
-        let result_local = self.builder.new_local(Type::primitive(PrimitiveType::Boolean), false);
+        let result_local = self
+            .builder
+            .new_local(Type::primitive(PrimitiveType::Boolean), false);
         self.builder.push_statement(Statement::Assign {
             place: Place {
                 local: result_local,
@@ -2279,13 +2453,18 @@ impl LoweringContext {
         let mut capture_types = Vec::new();
         for capture in captures {
             if let Some(&local_id) = self.var_map.get(&capture.name.name) {
-                let capture_type = self.var_types.get(&capture.name.name)
+                let capture_type = self
+                    .var_types
+                    .get(&capture.name.name)
                     .cloned()
                     .unwrap_or_else(|| Type::primitive(PrimitiveType::Integer));
-                capture_operands.push((capture.name.name.clone(), Operand::Copy(Place {
-                    local: local_id,
-                    projection: vec![],
-                })));
+                capture_operands.push((
+                    capture.name.name.clone(),
+                    Operand::Copy(Place {
+                        local: local_id,
+                        projection: vec![],
+                    }),
+                ));
                 capture_types.push((capture.name.name.clone(), capture_type));
             } else {
                 return Err(SemanticError::UndefinedSymbol {
@@ -2325,7 +2504,11 @@ impl LoweringContext {
         let saved_builder = std::mem::replace(&mut self.builder, Builder::new());
 
         // Start building the lambda function with captures as extra parameters
-        self.builder.start_function(lambda_name.clone(), mir_params.clone(), mir_return_type.clone());
+        self.builder.start_function(
+            lambda_name.clone(),
+            mir_params.clone(),
+            mir_return_type.clone(),
+        );
 
         // Set up parameter mappings - first captures, then regular parameters
         if let Some(current_func) = &self.builder.current_function {
@@ -2333,15 +2516,19 @@ impl LoweringContext {
             // Map captures (using original names, not __capture_ prefix)
             for (capture_name, capture_type) in &capture_types {
                 let mir_param = &current_func.parameters[param_idx];
-                self.var_map.insert(capture_name.clone(), mir_param.local_id);
-                self.var_types.insert(capture_name.clone(), capture_type.clone());
+                self.var_map
+                    .insert(capture_name.clone(), mir_param.local_id);
+                self.var_types
+                    .insert(capture_name.clone(), capture_type.clone());
                 param_idx += 1;
             }
             // Map regular parameters
             for ast_param in parameters {
                 let mir_param = &current_func.parameters[param_idx];
-                self.var_map.insert(ast_param.name.name.clone(), mir_param.local_id);
-                self.var_types.insert(ast_param.name.name.clone(), mir_param.ty.clone());
+                self.var_map
+                    .insert(ast_param.name.name.clone(), mir_param.local_id);
+                self.var_types
+                    .insert(ast_param.name.name.clone(), mir_param.ty.clone());
                 param_idx += 1;
             }
         }
@@ -2351,7 +2538,8 @@ impl LoweringContext {
             Type::Primitive(PrimitiveType::Void) => None,
             _ => {
                 let local_id = self.builder.new_local(mir_return_type.clone(), false);
-                self.builder.push_statement(Statement::StorageLive(local_id));
+                self.builder
+                    .push_statement(Statement::StorageLive(local_id));
                 Some(local_id)
             }
         };
@@ -2364,9 +2552,15 @@ impl LoweringContext {
                 let result = self.lower_expression(expr)?;
                 if let Some(ret_local) = self.return_local {
                     self.builder.push_statement(Statement::Assign {
-                        place: Place { local: ret_local, projection: vec![] },
+                        place: Place {
+                            local: ret_local,
+                            projection: vec![],
+                        },
                         rvalue: Rvalue::Use(result),
-                        source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                        source_info: SourceInfo {
+                            span: SourceLocation::unknown(),
+                            scope: 0,
+                        },
                     });
                 }
                 self.builder.set_terminator(Terminator::Return);
@@ -2392,7 +2586,9 @@ impl LoweringContext {
         mir_function.return_local = self.return_local;
 
         // Add lambda function to program
-        self.program.functions.insert(lambda_name.clone(), mir_function);
+        self.program
+            .functions
+            .insert(lambda_name.clone(), mir_function);
 
         // Restore previous builder state
         self.builder = saved_builder;
@@ -2417,12 +2613,18 @@ impl LoweringContext {
         // Create a local for the closure and assign the closure value
         let closure_local = self.builder.new_local(closure_type, false);
         self.builder.push_statement(Statement::Assign {
-            place: Place { local: closure_local, projection: vec![] },
+            place: Place {
+                local: closure_local,
+                projection: vec![],
+            },
             rvalue: Rvalue::Closure {
                 func_name: lambda_name,
                 captures: closure_captures,
             },
-            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+            source_info: SourceInfo {
+                span: SourceLocation::unknown(),
+                scope: 0,
+            },
         });
 
         Ok(Operand::Copy(Place {
@@ -2442,17 +2644,17 @@ impl LoweringContext {
         let function_name = match &call.function_reference {
             ast::FunctionReference::Local { name, .. } => {
                 if let Some(mod_name) = &self.current_module {
-                     let qualified = format!("{}.{}", mod_name, name.name);
-                     
-                     // Check if it's an external function (lowered before functions in lower_module)
-                     if self.program.external_functions.contains_key(&name.name) {
-                         name.name.clone()
-                     } else if name.name == "main" {
-                         "main".to_string()
-                     } else {
-                         // Assume it's a local function in this module (forward or backward ref)
-                         qualified
-                     }
+                    let qualified = format!("{}.{}", mod_name, name.name);
+
+                    // Check if it's an external function (lowered before functions in lower_module)
+                    if self.program.external_functions.contains_key(&name.name) {
+                        name.name.clone()
+                    } else if name.name == "main" {
+                        "main".to_string()
+                    } else {
+                        // Assume it's a local function in this module (forward or backward ref)
+                        qualified
+                    }
                 } else {
                     name.name.clone()
                 }
@@ -2460,54 +2662,74 @@ impl LoweringContext {
             ast::FunctionReference::Qualified { module, name, .. } => {
                 format!("{}.{}", module.name, name.name)
             }
-            ast::FunctionReference::External { name, .. } => {
-                name.name.clone()
-            }
+            ast::FunctionReference::External { name, .. } => name.name.clone(),
         };
         eprintln!("lower_function_call: function name = {}", function_name);
 
         // Determine parameter types and return type
-        let (parameter_types, result_type) = if let Some(ext_func) = self.program.external_functions.get(&function_name) {
-             eprintln!("lower_function_call: found external function {}", function_name);
-             (Some(ext_func.parameters.clone()), ext_func.return_type.clone())
+        let (parameter_types, result_type) = if let Some(ext_func) =
+            self.program.external_functions.get(&function_name)
+        {
+            eprintln!(
+                "lower_function_call: found external function {}",
+                function_name
+            );
+            (
+                Some(ext_func.parameters.clone()),
+                ext_func.return_type.clone(),
+            )
         } else if let Some(func) = self.program.functions.get(&function_name) {
-             eprintln!("lower_function_call: found regular function {}", function_name);
-             let params: Vec<Type> = func.parameters.iter().map(|p| p.ty.clone()).collect();
-             (Some(params), func.return_type.clone())
+            eprintln!(
+                "lower_function_call: found regular function {}",
+                function_name
+            );
+            let params: Vec<Type> = func.parameters.iter().map(|p| p.ty.clone()).collect();
+            (Some(params), func.return_type.clone())
         } else {
-             // Check builtin printf
-             if function_name == "printf" {
-                 (None, Type::primitive(ast::PrimitiveType::Integer))
-             } else {
-                 // Try symbol table
-                 let mut resolved = None;
-                 if let Some(ref symbol_table) = self.symbol_table {
-                     if let Some(symbol) = symbol_table.lookup_symbol(&function_name) {
-                         if let Type::Function { parameter_types, return_type, is_variadic: _ } = &symbol.symbol_type {
-                             eprintln!("lower_function_call: found in symbol table {}", function_name);
-                             resolved = Some((Some(parameter_types.clone()), *return_type.clone()));
-                         }
-                     }
-                 }
-                 resolved.unwrap_or_else(|| {
-                     eprintln!("lower_function_call: WARNING - function {} not found, using default types", function_name);
-                     (None, Type::primitive(ast::PrimitiveType::Integer))
-                 })
-             }
+            // Check builtin printf
+            if function_name == "printf" {
+                (None, Type::primitive(ast::PrimitiveType::Integer))
+            } else {
+                // Try symbol table
+                let mut resolved = None;
+                if let Some(ref symbol_table) = self.symbol_table {
+                    if let Some(symbol) = symbol_table.lookup_symbol(&function_name) {
+                        if let Type::Function {
+                            parameter_types,
+                            return_type,
+                            is_variadic: _,
+                        } = &symbol.symbol_type
+                        {
+                            eprintln!(
+                                "lower_function_call: found in symbol table {}",
+                                function_name
+                            );
+                            resolved = Some((Some(parameter_types.clone()), *return_type.clone()));
+                        }
+                    }
+                }
+                resolved.unwrap_or_else(|| {
+                    eprintln!(
+                        "lower_function_call: WARNING - function {} not found, using default types",
+                        function_name
+                    );
+                    (None, Type::primitive(ast::PrimitiveType::Integer))
+                })
+            }
         };
 
         // Lower arguments
         let mut arg_operands = Vec::new();
         for (i, arg) in call.arguments.iter().enumerate() {
             let mut arg_operand = self.lower_expression(&arg.value)?;
-            
+
             // Check for implicit cast if expected type is known
             if let Some(ref params) = parameter_types {
                 if let Some(expected_type) = params.get(i) {
                     arg_operand = self.ensure_compatible_operand(arg_operand, expected_type)?;
                 }
             }
-            
+
             arg_operands.push(arg_operand);
         }
 
@@ -2519,7 +2741,10 @@ impl LoweringContext {
 
         // Check if this is a call to a local variable (closure call)
         if let Some(&local_id) = self.var_map.get(&function_name) {
-            eprintln!("lower_function_call: {} is a local variable (closure)", function_name);
+            eprintln!(
+                "lower_function_call: {} is a local variable (closure)",
+                function_name
+            );
 
             // Get the closure function pointer from the local variable
             let func_operand = Operand::Copy(Place {
@@ -2538,7 +2763,9 @@ impl LoweringContext {
             };
 
             // Convert explicit type arguments to MIR Types
-            let mir_explicit_type_arguments: Result<Vec<Type>, SemanticError> = call.explicit_type_arguments.iter()
+            let mir_explicit_type_arguments: Result<Vec<Type>, SemanticError> = call
+                .explicit_type_arguments
+                .iter()
                 .map(|ts| self.ast_type_to_mir_type(ts))
                 .collect();
             let mir_explicit_type_arguments = mir_explicit_type_arguments?;
@@ -2575,7 +2802,9 @@ impl LoweringContext {
         });
 
         // Convert explicit type arguments to MIR Types
-        let mir_explicit_type_arguments: Result<Vec<Type>, SemanticError> = call.explicit_type_arguments.iter()
+        let mir_explicit_type_arguments: Result<Vec<Type>, SemanticError> = call
+            .explicit_type_arguments
+            .iter()
             .map(|ts| self.ast_type_to_mir_type(ts))
             .collect();
         let mir_explicit_type_arguments = mir_explicit_type_arguments?;
@@ -2624,7 +2853,11 @@ impl LoweringContext {
         let mut current_type = struct_type;
         loop {
             match current_type {
-                Type::Owned { base_type, .. } | Type::Pointer { target_type: base_type, .. } => {
+                Type::Owned { base_type, .. }
+                | Type::Pointer {
+                    target_type: base_type,
+                    ..
+                } => {
                     current_type = base_type;
                 }
                 _ => break,
@@ -2694,65 +2927,87 @@ impl LoweringContext {
                     Operand::Constant(c) => {
                         let temp = self.builder.new_local(c.ty.clone(), false);
                         self.builder.push_statement(Statement::Assign {
-                            place: Place { local: temp, projection: vec![] },
+                            place: Place {
+                                local: temp,
+                                projection: vec![],
+                            },
                             rvalue: Rvalue::Use(Operand::Constant(c)),
-                            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                            source_info: SourceInfo {
+                                span: SourceLocation::unknown(),
+                                scope: 0,
+                            },
                         });
-                        Place { local: temp, projection: vec![] }
+                        Place {
+                            local: temp,
+                            projection: vec![],
+                        }
                     }
                 };
-                
+
                 // Get the type of the instance
                 let instance_type = self.get_expression_type(instance)?;
-                
+
                 // Unwrap pointer/reference types and add Deref projections
                 let mut current_type = &instance_type;
                 loop {
                     match current_type {
-                        Type::Owned { base_type, .. } | Type::Pointer { target_type: base_type, .. } => {
+                        Type::Owned { base_type, .. }
+                        | Type::Pointer {
+                            target_type: base_type,
+                            ..
+                        } => {
                             place.projection.push(PlaceElem::Deref);
                             current_type = base_type;
                         }
                         _ => break,
                     }
                 }
-                
+
                 // Resolve field index
-                let (field_idx, field_type) = self.resolve_field_index(&instance_type, &field_name.name)?;
-                
+                let (field_idx, field_type) =
+                    self.resolve_field_index(&instance_type, &field_name.name)?;
+
                 // Add field projection
                 place.projection.push(PlaceElem::Field {
                     field: field_idx,
                     ty: field_type,
                 });
-                
+
                 Ok(place)
             }
             ast::AssignmentTarget::ArrayElement { array, index } => {
                 let array_op = self.lower_expression(array)?;
                 let mut place = match array_op {
                     Operand::Copy(p) | Operand::Move(p) => p,
-                    Operand::Constant(_) => return Err(SemanticError::InvalidOperation {
-                        operation: "array assignment".to_string(),
-                        reason: "cannot assign to constant array".to_string(),
-                        location: SourceLocation::unknown(),
-                    }),
+                    Operand::Constant(_) => {
+                        return Err(SemanticError::InvalidOperation {
+                            operation: "array assignment".to_string(),
+                            reason: "cannot assign to constant array".to_string(),
+                            location: SourceLocation::unknown(),
+                        })
+                    }
                 };
-                
+
                 let index_operand = self.lower_expression(index)?;
                 let index_local = match index_operand {
                     Operand::Copy(p) | Operand::Move(p) => p.local,
                     Operand::Constant(c) => {
                         let temp = self.builder.new_local(c.ty.clone(), false);
                         self.builder.push_statement(Statement::Assign {
-                            place: Place { local: temp, projection: vec![] },
+                            place: Place {
+                                local: temp,
+                                projection: vec![],
+                            },
                             rvalue: Rvalue::Use(Operand::Constant(c)),
-                            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+                            source_info: SourceInfo {
+                                span: SourceLocation::unknown(),
+                                scope: 0,
+                            },
                         });
                         temp
                     }
                 };
-                
+
                 place.projection.push(PlaceElem::Index(index_local));
                 Ok(place)
             }
@@ -2844,29 +3099,29 @@ impl LoweringContext {
                     base_type: Box::new(base),
                 })
             }
-            ast::TypeSpecifier::TypeParameter { name, constraints, .. } => {
+            ast::TypeSpecifier::TypeParameter {
+                name, constraints, ..
+            } => {
                 // Convert type parameter constraints to TypeConstraintInfo
                 let constraint_infos: Vec<crate::types::TypeConstraintInfo> = constraints
                     .iter()
-                    .filter_map(|c| {
-                        match &c.constraint_type {
-                            ast::TypeConstraintKind::TraitBound { trait_name } => {
-                                Some(crate::types::TypeConstraintInfo::TraitBound {
-                                    trait_name: trait_name.name.clone(),
-                                    module: None,
-                                })
-                            }
-                            ast::TypeConstraintKind::NumericBound => {
-                                Some(crate::types::TypeConstraintInfo::NumericBound)
-                            }
-                            ast::TypeConstraintKind::EqualityBound => {
-                                Some(crate::types::TypeConstraintInfo::EqualityBound)
-                            }
-                            ast::TypeConstraintKind::OrderBound => {
-                                Some(crate::types::TypeConstraintInfo::OrderBound)
-                            }
-                            _ => None,
+                    .filter_map(|c| match &c.constraint_type {
+                        ast::TypeConstraintKind::TraitBound { trait_name } => {
+                            Some(crate::types::TypeConstraintInfo::TraitBound {
+                                trait_name: trait_name.name.clone(),
+                                module: None,
+                            })
                         }
+                        ast::TypeConstraintKind::NumericBound => {
+                            Some(crate::types::TypeConstraintInfo::NumericBound)
+                        }
+                        ast::TypeConstraintKind::EqualityBound => {
+                            Some(crate::types::TypeConstraintInfo::EqualityBound)
+                        }
+                        ast::TypeConstraintKind::OrderBound => {
+                            Some(crate::types::TypeConstraintInfo::OrderBound)
+                        }
+                        _ => None,
                     })
                     .collect();
                 Ok(Type::generic(name.name.clone(), constraint_infos))
@@ -3515,49 +3770,55 @@ impl LoweringContext {
             if let Some(local) = func.locals.get(&place.local) {
                 local.ty.clone()
             } else {
-                return Err(SemanticError::Internal { 
+                return Err(SemanticError::Internal {
                     message: format!("Local {:?} not found", place.local),
                 });
             }
         } else {
-            return Err(SemanticError::Internal { 
+            return Err(SemanticError::Internal {
                 message: "No current function".to_string(),
             });
         };
 
         for elem in &place.projection {
             match elem {
-                PlaceElem::Deref => {
-                    match current_type {
-                        Type::Pointer { target_type, .. } | Type::Owned { base_type: target_type, .. } => {
-                            current_type = *target_type.clone();
-                        }
-                        _ => return Err(SemanticError::TypeMismatch {
+                PlaceElem::Deref => match current_type {
+                    Type::Pointer { target_type, .. }
+                    | Type::Owned {
+                        base_type: target_type,
+                        ..
+                    } => {
+                        current_type = *target_type.clone();
+                    }
+                    _ => {
+                        return Err(SemanticError::TypeMismatch {
                             expected: "pointer type".to_string(),
                             found: current_type.to_string(),
                             location: SourceLocation::unknown(),
-                        }),
+                        })
                     }
-                }
+                },
                 PlaceElem::Field { ty, .. } => {
                     current_type = ty.clone();
                 }
-                PlaceElem::Index(_) => {
-                    match current_type {
-                        Type::Array { element_type, .. } => {
-                            current_type = *element_type.clone();
-                        }
-                        _ => return Err(SemanticError::TypeMismatch {
+                PlaceElem::Index(_) => match current_type {
+                    Type::Array { element_type, .. } => {
+                        current_type = *element_type.clone();
+                    }
+                    _ => {
+                        return Err(SemanticError::TypeMismatch {
                             expected: "array type".to_string(),
                             found: current_type.to_string(),
                             location: SourceLocation::unknown(),
-                        }),
+                        })
                     }
+                },
+                _ => {
+                    return Err(SemanticError::UnsupportedFeature {
+                        feature: "Non-field place projections".to_string(),
+                        location: SourceLocation::unknown(),
+                    })
                 }
-                _ => return Err(SemanticError::UnsupportedFeature {
-                    feature: "Non-field place projections".to_string(),
-                    location: SourceLocation::unknown(),
-                }),
             }
         }
 
@@ -3571,8 +3832,6 @@ impl LoweringContext {
             Operand::Constant(constant) => Ok(constant.ty.clone()),
         }
     }
-
-
 
     /// Lower field access expression
     fn lower_field_access(
@@ -3612,7 +3871,11 @@ impl LoweringContext {
         let mut current_type = &instance_type;
         loop {
             match current_type {
-                Type::Owned { base_type, .. } | Type::Pointer { target_type: base_type, .. } => {
+                Type::Owned { base_type, .. }
+                | Type::Pointer {
+                    target_type: base_type,
+                    ..
+                } => {
                     place.projection.push(PlaceElem::Deref);
                     current_type = base_type;
                 }
@@ -4038,9 +4301,12 @@ impl LoweringContext {
 
                 // If there are bindings (without nested pattern), extract the enum variant's associated data
                 if !bindings.is_empty() && nested_pattern.is_none() {
-                    let associated_types = self.get_enum_variant_associated_types(enum_name, variant_name);
-                    
-                    for (i, (binding_name, binding_type)) in bindings.iter().zip(associated_types.iter()).enumerate() {
+                    let associated_types =
+                        self.get_enum_variant_associated_types(enum_name, variant_name);
+
+                    for (i, (binding_name, binding_type)) in
+                        bindings.iter().zip(associated_types.iter()).enumerate()
+                    {
                         // Create a local for the binding
                         let binding_local = self.builder.new_local(binding_type.clone(), false);
 
@@ -4055,7 +4321,7 @@ impl LoweringContext {
                         let data_place = Place {
                             local: value_place.local,
                             projection: vec![PlaceElem::Field {
-                                field: (i + 1) as u32, 
+                                field: (i + 1) as u32,
                                 ty: binding_type.clone(),
                             }],
                         };
@@ -4124,18 +4390,22 @@ impl LoweringContext {
                 source_location: _,
             } => {
                 for (field_name, field_pattern) in fields {
-                    let (field_idx, field_type) = self.get_struct_field_index(&struct_name.name, &field_name.name)?;
-                    
+                    let (field_idx, field_type) =
+                        self.get_struct_field_index(&struct_name.name, &field_name.name)?;
+
                     let field_place = Place {
                         local: value_place.local,
-                        projection: value_place.projection.iter().cloned().chain(vec![
-                            PlaceElem::Field {
+                        projection: value_place
+                            .projection
+                            .iter()
+                            .cloned()
+                            .chain(vec![PlaceElem::Field {
                                 field: field_idx as u32,
                                 ty: field_type,
-                            }
-                        ]).collect(),
+                            }])
+                            .collect(),
                     };
-                    
+
                     self.lower_pattern_bindings(field_pattern, &field_place, 0)?;
                 }
             }
@@ -4241,7 +4511,7 @@ impl LoweringContext {
                         }
                     }
                 }
-                
+
                 Err(SemanticError::UndefinedSymbol {
                     symbol: name.name.clone(),
                     location: name.source_location.clone(),
@@ -4278,7 +4548,11 @@ impl LoweringContext {
             ast::Expression::Dereference { pointer, .. } => {
                 let pointer_type = self.get_expression_type(pointer)?;
                 match pointer_type {
-                    Type::Pointer { target_type, .. } | Type::Owned { base_type: target_type, .. } => Ok(*target_type),
+                    Type::Pointer { target_type, .. }
+                    | Type::Owned {
+                        base_type: target_type,
+                        ..
+                    } => Ok(*target_type),
                     _ => Err(SemanticError::TypeMismatch {
                         expected: "pointer type".to_string(),
                         found: pointer_type.to_string(),
@@ -4291,7 +4565,7 @@ impl LoweringContext {
             ast::Expression::BooleanLiteral { .. } => Ok(Type::primitive(PrimitiveType::Boolean)),
             ast::Expression::StringLiteral { .. } => Ok(Type::primitive(PrimitiveType::String)),
             // Add other cases as needed
-            _ => Ok(Type::primitive(PrimitiveType::Integer)) // Placeholder/Fallback
+            _ => Ok(Type::primitive(PrimitiveType::Integer)), // Placeholder/Fallback
         }
     }
 
@@ -4658,11 +4932,14 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Check the type of the operand
         let operand_type = self.get_expression_type(operand)?;
-        
+
         // If it's a reference type (implicitly passed by pointer), &expr just returns the pointer
         let is_reference_type = match &operand_type {
-            Type::Named { .. } | Type::Array { .. } | Type::Map { .. } | 
-            Type::Pointer { .. } | Type::Owned { .. } => true,
+            Type::Named { .. }
+            | Type::Array { .. }
+            | Type::Map { .. }
+            | Type::Pointer { .. }
+            | Type::Owned { .. } => true,
             // Strings are primitives but might be treated as reference types depending on implementation.
             // For now, assume Primitives are value types.
             _ => false,
@@ -4674,7 +4951,7 @@ impl LoweringContext {
         } else {
             // Value type: take address
             let operand_op = self.lower_expression(operand)?;
-            
+
             let place = match operand_op {
                 Operand::Copy(p) | Operand::Move(p) => p,
                 Operand::Constant(c) => {
@@ -4699,7 +4976,9 @@ impl LoweringContext {
             };
 
             // Create a temporary for the pointer
-            let temp = self.builder.new_local(Type::pointer(operand_type, mutability), false);
+            let temp = self
+                .builder
+                .new_local(Type::pointer(operand_type, mutability), false);
 
             self.builder.push_statement(Statement::Assign {
                 place: Place {
@@ -4851,8 +5130,6 @@ impl LoweringContext {
             projection: vec![],
         }))
     }
-
-
 
     /// Lower map literal
     fn lower_map_literal(
@@ -5016,7 +5293,6 @@ pub fn lower_ast_to_mir_with_symbols_and_captures(
     context.set_captures(captures);
     context.lower_program(ast_program)
 }
-
 
 #[cfg(test)]
 mod tests;

@@ -22,8 +22,8 @@
 
 pub mod dataflow;
 pub mod lowering;
-pub mod validation;
 pub mod monomorphization;
+pub mod validation;
 
 use crate::error::SourceLocation;
 use crate::types::Type;
@@ -118,7 +118,11 @@ pub enum Rvalue {
     UnaryOp { op: UnOp, operand: Operand },
 
     /// Function call
-    Call { func: Operand, explicit_type_arguments: Vec<Type>, args: Vec<Operand> },
+    Call {
+        func: Operand,
+        explicit_type_arguments: Vec<Type>,
+        args: Vec<Operand>,
+    },
 
     /// Aggregate construction (arrays, structs)
     Aggregate {

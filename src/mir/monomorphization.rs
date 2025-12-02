@@ -17,8 +17,7 @@
 //! Instantiates generic functions with concrete types.
 
 use crate::mir::{
-    Constant, ConstantValue, Function, Operand, Program, Rvalue, Statement,
-    Terminator,
+    Constant, ConstantValue, Function, Operand, Program, Rvalue, Statement, Terminator,
 };
 use crate::types::Type;
 use std::collections::{HashMap, HashSet};
@@ -63,7 +62,7 @@ impl Monomorphizer {
             if self.processed.contains(&mangled_name) {
                 continue;
             }
-            
+
             self.instantiate_function(program, &mangled_name, &original_name, &type_args);
             self.process_function(program, &mangled_name);
             self.processed.insert(mangled_name);
@@ -73,7 +72,8 @@ impl Monomorphizer {
     /// Check if a function is generic (has generic parameters)
     fn is_generic(&self, program: &Program, func_name: &str) -> bool {
         if let Some(func) = program.functions.get(func_name) {
-            func.parameters.iter().any(|p| self.contains_generic(&p.ty)) || self.contains_generic(&func.return_type)
+            func.parameters.iter().any(|p| self.contains_generic(&p.ty))
+                || self.contains_generic(&func.return_type)
         } else {
             false
         }
@@ -87,13 +87,19 @@ impl Monomorphizer {
                 type_arguments.iter().any(|t| self.contains_generic(t))
             }
             Type::Array { element_type, .. } => self.contains_generic(element_type),
-            Type::Map { key_type, value_type } => {
-                self.contains_generic(key_type) || self.contains_generic(value_type)
-            }
+            Type::Map {
+                key_type,
+                value_type,
+            } => self.contains_generic(key_type) || self.contains_generic(value_type),
             Type::Pointer { target_type, .. } => self.contains_generic(target_type),
             Type::Owned { base_type, .. } => self.contains_generic(base_type),
-            Type::Function { parameter_types, return_type, .. } => {
-                parameter_types.iter().any(|t| self.contains_generic(t)) || self.contains_generic(return_type)
+            Type::Function {
+                parameter_types,
+                return_type,
+                ..
+            } => {
+                parameter_types.iter().any(|t| self.contains_generic(t))
+                    || self.contains_generic(return_type)
             }
             _ => false,
         }
@@ -105,16 +111,35 @@ impl Monomorphizer {
         // But here we are just scanning for calls and updating them in place?
         // Updating in place is tricky if we need mutable access to program to add new functions.
         // So we'll scan first, collect replacements, then apply them.
-        
+
         let mut calls_to_replace = Vec::new();
-        
+
         if let Some(caller_func) = program.functions.get(func_name) {
             for (block_id, block) in &caller_func.basic_blocks {
                 // Check statements for calls (assignments with Rvalue::Call)
                 for (stmt_idx, stmt) in block.statements.iter().enumerate() {
-                    if let Statement::Assign { rvalue: Rvalue::Call { func: callee_operand, explicit_type_arguments, args }, .. } = stmt {
-                        if let Operand::Constant(Constant { value: ConstantValue::String(callee_name), .. }) = callee_operand {
-                            if let Some(replacement) = self.check_generic_call(program, caller_func, callee_name, explicit_type_arguments, args) {
+                    if let Statement::Assign {
+                        rvalue:
+                            Rvalue::Call {
+                                func: callee_operand,
+                                explicit_type_arguments,
+                                args,
+                            },
+                        ..
+                    } = stmt
+                    {
+                        if let Operand::Constant(Constant {
+                            value: ConstantValue::String(callee_name),
+                            ..
+                        }) = callee_operand
+                        {
+                            if let Some(replacement) = self.check_generic_call(
+                                program,
+                                caller_func,
+                                callee_name,
+                                explicit_type_arguments,
+                                args,
+                            ) {
                                 calls_to_replace.push((*block_id, stmt_idx, replacement));
                             }
                         }
@@ -122,9 +147,25 @@ impl Monomorphizer {
                 }
 
                 // Check terminator for calls
-                if let Terminator::Call { func: callee_operand, explicit_type_arguments, args, .. } = &block.terminator {
-                    if let Operand::Constant(Constant { value: ConstantValue::String(callee_name), .. }) = callee_operand {
-                        if let Some(replacement) = self.check_generic_call(program, caller_func, callee_name, explicit_type_arguments, args) {
+                if let Terminator::Call {
+                    func: callee_operand,
+                    explicit_type_arguments,
+                    args,
+                    ..
+                } = &block.terminator
+                {
+                    if let Operand::Constant(Constant {
+                        value: ConstantValue::String(callee_name),
+                        ..
+                    }) = callee_operand
+                    {
+                        if let Some(replacement) = self.check_generic_call(
+                            program,
+                            caller_func,
+                            callee_name,
+                            explicit_type_arguments,
+                            args,
+                        ) {
                             // Use a special index for terminator
                             calls_to_replace.push((*block_id, usize::MAX, replacement));
                         }
@@ -132,7 +173,7 @@ impl Monomorphizer {
                 }
             }
         }
-        
+
         // Apply replacements
         if let Some(func) = program.functions.get_mut(func_name) {
             for (block_id, stmt_idx, new_name) in calls_to_replace {
@@ -151,7 +192,11 @@ impl Monomorphizer {
                 } else {
                     // Update statement
                     if let Some(block) = func.basic_blocks.get_mut(&block_id) {
-                        if let Statement::Assign { rvalue: Rvalue::Call { func, .. }, .. } = &mut block.statements[stmt_idx] {
+                        if let Statement::Assign {
+                            rvalue: Rvalue::Call { func, .. },
+                            ..
+                        } = &mut block.statements[stmt_idx]
+                        {
                             *func = new_func_operand;
                         }
                     }
@@ -161,7 +206,14 @@ impl Monomorphizer {
     }
 
     /// Check if a call is to a generic function and needs instantiation
-    fn check_generic_call(&mut self, program: &Program, caller_func: &Function, callee_name: &str, explicit_type_arguments: &[Type], args: &[Operand]) -> Option<String> {
+    fn check_generic_call(
+        &mut self,
+        program: &Program,
+        caller_func: &Function,
+        callee_name: &str,
+        explicit_type_arguments: &[Type],
+        args: &[Operand],
+    ) -> Option<String> {
         // If callee is not generic, no need to instantiate
         if !self.is_generic(program, callee_name) {
             return None;
@@ -180,40 +232,55 @@ impl Monomorphizer {
         let mangled_name = self.mangle_name(callee_name, &inferred_types);
 
         // If not already instantiated/queued, add to queue
-        if !self.instantiated_funcs.contains_key(&(callee_name.to_string(), inferred_types.clone())) {
-            self.instantiated_funcs.insert((callee_name.to_string(), inferred_types.clone()), mangled_name.clone());
-            self.queue.push((mangled_name.clone(), callee_name.to_string(), inferred_types));
+        if !self
+            .instantiated_funcs
+            .contains_key(&(callee_name.to_string(), inferred_types.clone()))
+        {
+            self.instantiated_funcs.insert(
+                (callee_name.to_string(), inferred_types.clone()),
+                mangled_name.clone(),
+            );
+            self.queue.push((
+                mangled_name.clone(),
+                callee_name.to_string(),
+                inferred_types,
+            ));
         }
 
         Some(mangled_name)
     }
 
     /// Infer generic type arguments by matching call arguments with function parameters
-    fn infer_type_args(&self, callee: &Function, args: &[Operand], caller_func: &Function) -> Option<Vec<Type>> {
-        // This is a simplified inference. 
+    fn infer_type_args(
+        &self,
+        callee: &Function,
+        args: &[Operand],
+        caller_func: &Function,
+    ) -> Option<Vec<Type>> {
+        // This is a simplified inference.
         // In a full implementation, we'd use unification.
         // Here we assume simple one-to-one mapping or direct usage.
-        
+
         let mut inferred = HashMap::new();
-        
+
         for (param, arg_op) in callee.parameters.iter().zip(args.iter()) {
             let arg_type = self.get_operand_type(arg_op, caller_func);
             self.unify_types(&param.ty, &arg_type, &mut inferred);
         }
-        
-        // Collect results in order? 
-        // We need to know the order of generic parameters. 
+
+        // Collect results in order?
+        // We need to know the order of generic parameters.
         // Since MIR Function doesn't store generic params list, we have to guess or scan.
         // For this task, let's assume we scan the parameter types for Generic(name) and order them?
         // Or better, let's assume T, U, V order or alphabetical.
-        
+
         let mut generic_params = HashSet::new();
         self.collect_generic_params(&callee.parameters, &mut generic_params);
         self.collect_generic_params_from_type(&callee.return_type, &mut generic_params);
-        
+
         let mut sorted_params: Vec<_> = generic_params.into_iter().collect();
         sorted_params.sort();
-        
+
         let mut result = Vec::new();
         for param in sorted_params {
             if let Some(ty) = inferred.get(&param) {
@@ -224,41 +291,67 @@ impl Monomorphizer {
                 return None;
             }
         }
-        
+
         Some(result)
     }
-    
+
     fn collect_generic_params(&self, params: &[crate::mir::Parameter], set: &mut HashSet<String>) {
         for param in params {
             self.collect_generic_params_from_type(&param.ty, set);
         }
     }
-    
+
     fn collect_generic_params_from_type(&self, ty: &Type, set: &mut HashSet<String>) {
         match ty {
-            Type::Generic { name, .. } => { set.insert(name.clone()); },
-            Type::GenericInstance { type_arguments, .. } => {
-                for t in type_arguments { self.collect_generic_params_from_type(t, set); }
+            Type::Generic { name, .. } => {
+                set.insert(name.clone());
             }
-            Type::Array { element_type, .. } => self.collect_generic_params_from_type(element_type, set),
-            Type::Pointer { target_type, .. } => self.collect_generic_params_from_type(target_type, set),
+            Type::GenericInstance { type_arguments, .. } => {
+                for t in type_arguments {
+                    self.collect_generic_params_from_type(t, set);
+                }
+            }
+            Type::Array { element_type, .. } => {
+                self.collect_generic_params_from_type(element_type, set)
+            }
+            Type::Pointer { target_type, .. } => {
+                self.collect_generic_params_from_type(target_type, set)
+            }
             Type::Owned { base_type, .. } => self.collect_generic_params_from_type(base_type, set),
-            Type::Function { parameter_types, return_type, .. } => {
-                for t in parameter_types { self.collect_generic_params_from_type(t, set); }
+            Type::Function {
+                parameter_types,
+                return_type,
+                ..
+            } => {
+                for t in parameter_types {
+                    self.collect_generic_params_from_type(t, set);
+                }
                 self.collect_generic_params_from_type(return_type, set);
             }
             _ => {}
         }
     }
 
-    fn unify_types(&self, generic_ty: &Type, concrete_ty: &Type, inferred: &mut HashMap<String, Type>) {
+    fn unify_types(
+        &self,
+        generic_ty: &Type,
+        concrete_ty: &Type,
+        inferred: &mut HashMap<String, Type>,
+    ) {
         match (generic_ty, concrete_ty) {
             (Type::Generic { name, .. }, _) => {
                 // Found a mapping
                 // Check for conflict?
                 inferred.insert(name.clone(), concrete_ty.clone());
             }
-            (Type::Array { element_type: g, .. }, Type::Array { element_type: c, .. }) => {
+            (
+                Type::Array {
+                    element_type: g, ..
+                },
+                Type::Array {
+                    element_type: c, ..
+                },
+            ) => {
                 self.unify_types(g, c, inferred);
             }
             (Type::Pointer { target_type: g, .. }, Type::Pointer { target_type: c, .. }) => {
@@ -278,7 +371,7 @@ impl Monomorphizer {
                 if let Some(local) = caller_func.locals.get(&place.local) {
                     local.ty.clone()
                 } else {
-                    Type::Error 
+                    Type::Error
                 }
             }
         }
@@ -293,7 +386,7 @@ impl Monomorphizer {
         }
         mangled
     }
-    
+
     fn type_to_string_mangled(&self, ty: &Type) -> String {
         match ty {
             Type::Primitive(p) => format!("{:?}", p),
@@ -316,31 +409,31 @@ impl Monomorphizer {
             let mut generic_params = HashSet::new();
             self.collect_generic_params(&original_func.parameters, &mut generic_params);
             self.collect_generic_params_from_type(&original_func.return_type, &mut generic_params);
-            
+
             let mut sorted_params: Vec<_> = generic_params.into_iter().collect();
             sorted_params.sort();
-            
+
             for (name, ty) in sorted_params.iter().zip(type_args.iter()) {
                 type_map.insert(name.clone(), ty.clone());
             }
-            
+
             // Create new function
             let mut new_func = original_func.clone();
             new_func.name = mangled_name.to_string();
-            
+
             // Substitute types in parameters
             for param in &mut new_func.parameters {
                 param.ty = self.substitute_type(&param.ty, &type_map);
             }
-            
+
             // Substitute return type
             new_func.return_type = self.substitute_type(&new_func.return_type, &type_map);
-            
+
             // Substitute types in locals
             for local in new_func.locals.values_mut() {
                 local.ty = self.substitute_type(&local.ty, &type_map);
             }
-            
+
             // Note: We assume statements don't contain types explicitly that need substitution
             // EXCEPT for Casts or Aggregate construction.
             // We should scan statements and substitute there too.
@@ -350,11 +443,11 @@ impl Monomorphizer {
                 }
                 self.substitute_in_terminator(&mut block.terminator, &type_map);
             }
-            
+
             program.functions.insert(mangled_name.to_string(), new_func);
         }
     }
-    
+
     fn substitute_type(&self, ty: &Type, type_map: &HashMap<String, Type>) -> Type {
         match ty {
             Type::Generic { name, .. } => {
@@ -364,28 +457,34 @@ impl Monomorphizer {
                     ty.clone()
                 }
             }
-            Type::Array { element_type, size } => Type::Array { 
-                element_type: Box::new(self.substitute_type(element_type, type_map)), 
-                size: *size 
+            Type::Array { element_type, size } => Type::Array {
+                element_type: Box::new(self.substitute_type(element_type, type_map)),
+                size: *size,
             },
-            Type::Pointer { target_type, is_mutable } => Type::Pointer { 
-                target_type: Box::new(self.substitute_type(target_type, type_map)), 
-                is_mutable: *is_mutable 
+            Type::Pointer {
+                target_type,
+                is_mutable,
+            } => Type::Pointer {
+                target_type: Box::new(self.substitute_type(target_type, type_map)),
+                is_mutable: *is_mutable,
             },
-            Type::Owned { base_type, ownership } => Type::Owned { 
-                base_type: Box::new(self.substitute_type(base_type, type_map)), 
-                ownership: *ownership 
+            Type::Owned {
+                base_type,
+                ownership,
+            } => Type::Owned {
+                base_type: Box::new(self.substitute_type(base_type, type_map)),
+                ownership: *ownership,
             },
-            _ => ty.clone()
+            _ => ty.clone(),
         }
     }
-    
+
     fn substitute_in_statement(&self, stmt: &mut Statement, type_map: &HashMap<String, Type>) {
         if let Statement::Assign { rvalue, .. } = stmt {
             self.substitute_in_rvalue(rvalue, type_map);
         }
     }
-    
+
     fn substitute_in_rvalue(&self, rvalue: &mut Rvalue, type_map: &HashMap<String, Type>) {
         match rvalue {
             Rvalue::Cast { ty, .. } => {
@@ -399,7 +498,7 @@ impl Monomorphizer {
             _ => {}
         }
     }
-    
+
     fn substitute_in_terminator(&self, term: &mut Terminator, type_map: &HashMap<String, Type>) {
         if let Terminator::SwitchInt { switch_ty, .. } = term {
             *switch_ty = self.substitute_type(switch_ty, type_map);

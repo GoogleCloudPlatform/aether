@@ -138,43 +138,60 @@ impl<'ctx> LLVMBackend<'ctx> {
                 crate::ast::PrimitiveType::Integer
                 | crate::ast::PrimitiveType::Integer32
                 | crate::ast::PrimitiveType::SizeT => self.context.i32_type().into(),
-                crate::ast::PrimitiveType::Integer64
-                | crate::ast::PrimitiveType::UIntPtrT => self.context.i64_type().into(),
+                crate::ast::PrimitiveType::Integer64 | crate::ast::PrimitiveType::UIntPtrT => {
+                    self.context.i64_type().into()
+                }
                 crate::ast::PrimitiveType::Float | crate::ast::PrimitiveType::Float64 => {
                     self.context.f64_type().into()
                 }
                 crate::ast::PrimitiveType::Float32 => self.context.f32_type().into(),
                 crate::ast::PrimitiveType::Boolean => self.context.i32_type().into(), // Use i32 for bool to match C ABI and backend assumptions
                 crate::ast::PrimitiveType::Char => self.context.i8_type().into(),
-                crate::ast::PrimitiveType::String => {
-                    self.context.i8_type().ptr_type(AddressSpace::default()).into()
-                }
+                crate::ast::PrimitiveType::String => self
+                    .context
+                    .i8_type()
+                    .ptr_type(AddressSpace::default())
+                    .into(),
                 crate::ast::PrimitiveType::Void => self.context.i8_type().into(),
             },
             crate::types::Type::Named { .. } => {
                 // Structs and Enums are passed by pointer (reference)
-                self.context.i8_type().ptr_type(AddressSpace::default()).into()
+                self.context
+                    .i8_type()
+                    .ptr_type(AddressSpace::default())
+                    .into()
             }
             crate::types::Type::Array { .. } => {
                 // Arrays are passed by pointer
-                self.context.i8_type().ptr_type(AddressSpace::default()).into()
+                self.context
+                    .i8_type()
+                    .ptr_type(AddressSpace::default())
+                    .into()
             }
             crate::types::Type::Map { .. } => {
                 // Maps are passed by pointer
-                self.context.i8_type().ptr_type(AddressSpace::default()).into()
+                self.context
+                    .i8_type()
+                    .ptr_type(AddressSpace::default())
+                    .into()
             }
             crate::types::Type::Pointer { .. } | crate::types::Type::Owned { .. } => {
                 // Pointers are passed by pointer
-                self.context.i8_type().ptr_type(AddressSpace::default()).into()
+                self.context
+                    .i8_type()
+                    .ptr_type(AddressSpace::default())
+                    .into()
             }
             crate::types::Type::Function { .. } => {
                 // Function pointers
-                self.context.i8_type().ptr_type(AddressSpace::default()).into()
+                self.context
+                    .i8_type()
+                    .ptr_type(AddressSpace::default())
+                    .into()
             }
             _ => self.context.i32_type().into(), // Default fallback
         }
     }
-
 
     /// Get the basic type from a local ID
     fn get_basic_type_from_local(
@@ -255,7 +272,8 @@ impl<'ctx> LLVMBackend<'ctx> {
                         // Add alignment padding
                         let alignment = field_size.min(8);
                         if current_offset % alignment != 0 {
-                            current_offset = (current_offset + alignment - 1) / alignment * alignment;
+                            current_offset =
+                                (current_offset + alignment - 1) / alignment * alignment;
                         }
                     }
                     return current_offset;
@@ -446,17 +464,21 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 } else {
                                     i32_type.const_int(0, false)
                                 };
-                            
+
                             // Shutdown async runtime (waits for all tasks)
-                            if let Some(shutdown_fn) = self.module.get_function("aether_async_shutdown") {
+                            if let Some(shutdown_fn) =
+                                self.module.get_function("aether_async_shutdown")
+                            {
                                 let _ = builder.build_call(shutdown_fn, &[], "call_async_shutdown");
                             }
-                            
+
                             let _ = builder.build_return(Some(&return_value));
                         }
                         Err(_) => {
                             // Shutdown async runtime even on error
-                            if let Some(shutdown_fn) = self.module.get_function("aether_async_shutdown") {
+                            if let Some(shutdown_fn) =
+                                self.module.get_function("aether_async_shutdown")
+                            {
                                 let _ = builder.build_call(shutdown_fn, &[], "call_async_shutdown");
                             }
 
@@ -478,19 +500,34 @@ impl<'ctx> LLVMBackend<'ctx> {
                     .map(|param| self.get_basic_type(&param.ty).into())
                     .collect();
 
-                let fn_type = if let crate::types::Type::Primitive(crate::ast::PrimitiveType::Void) = &function.return_type {
-                    self.context.void_type().fn_type(&param_types, false)
-                } else {
-                    let return_type = self.get_basic_type(&function.return_type);
-                    match return_type {
-                        inkwell::types::BasicTypeEnum::IntType(t) => t.fn_type(&param_types, false),
-                        inkwell::types::BasicTypeEnum::FloatType(t) => t.fn_type(&param_types, false),
-                        inkwell::types::BasicTypeEnum::PointerType(t) => t.fn_type(&param_types, false),
-                        inkwell::types::BasicTypeEnum::ArrayType(t) => t.fn_type(&param_types, false),
-                        inkwell::types::BasicTypeEnum::StructType(t) => t.fn_type(&param_types, false),
-                        inkwell::types::BasicTypeEnum::VectorType(t) => t.fn_type(&param_types, false),
-                    }
-                };
+                let fn_type =
+                    if let crate::types::Type::Primitive(crate::ast::PrimitiveType::Void) =
+                        &function.return_type
+                    {
+                        self.context.void_type().fn_type(&param_types, false)
+                    } else {
+                        let return_type = self.get_basic_type(&function.return_type);
+                        match return_type {
+                            inkwell::types::BasicTypeEnum::IntType(t) => {
+                                t.fn_type(&param_types, false)
+                            }
+                            inkwell::types::BasicTypeEnum::FloatType(t) => {
+                                t.fn_type(&param_types, false)
+                            }
+                            inkwell::types::BasicTypeEnum::PointerType(t) => {
+                                t.fn_type(&param_types, false)
+                            }
+                            inkwell::types::BasicTypeEnum::ArrayType(t) => {
+                                t.fn_type(&param_types, false)
+                            }
+                            inkwell::types::BasicTypeEnum::StructType(t) => {
+                                t.fn_type(&param_types, false)
+                            }
+                            inkwell::types::BasicTypeEnum::VectorType(t) => {
+                                t.fn_type(&param_types, false)
+                            }
+                        }
+                    };
 
                 let llvm_func = self.module.add_function(name, fn_type, None);
                 function_declarations.insert(name.clone(), llvm_func);
@@ -629,24 +666,36 @@ impl<'ctx> LLVMBackend<'ctx> {
                     mir::Statement::Assign { place, rvalue, .. } => {
                         // Step 4: Store captures when assigning a Closure
                         if let mir::Rvalue::Closure { captures, .. } = rvalue {
-                            self.closure_captures.borrow_mut().insert(place.local, captures.clone());
+                            self.closure_captures
+                                .borrow_mut()
+                                .insert(place.local, captures.clone());
                         }
-                        
+
                         // Propagate captures when copying/moving a closure
-                        if let mir::Rvalue::Use(mir::Operand::Copy(src_place) | mir::Operand::Move(src_place)) = rvalue {
-                             let captures = self.closure_captures.borrow().get(&src_place.local).cloned();
-                             if let Some(c) = captures {
-                                 self.closure_captures.borrow_mut().insert(place.local, c);
-                             }
+                        if let mir::Rvalue::Use(
+                            mir::Operand::Copy(src_place) | mir::Operand::Move(src_place),
+                        ) = rvalue
+                        {
+                            let captures = self
+                                .closure_captures
+                                .borrow()
+                                .get(&src_place.local)
+                                .cloned();
+                            if let Some(c) = captures {
+                                self.closure_captures.borrow_mut().insert(place.local, c);
+                            }
                         }
 
                         let result =
                             self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
-                        
+
                         // Check if we should skip storing the result (e.g. for Void types)
                         let should_store = if place.projection.is_empty() {
                             if let Some(local) = function.locals.get(&place.local) {
-                                !matches!(local.ty, crate::types::Type::Primitive(crate::ast::PrimitiveType::Void))
+                                !matches!(
+                                    local.ty,
+                                    crate::types::Type::Primitive(crate::ast::PrimitiveType::Void)
+                                )
                             } else {
                                 true
                             }
@@ -656,8 +705,9 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                         if should_store {
                             // Get the target address using get_place_pointer
-                            let target_ptr = self.get_place_pointer(place, &local_allocas, &builder, function)?;
-                            
+                            let target_ptr =
+                                self.get_place_pointer(place, &local_allocas, &builder, function)?;
+
                             builder.build_store(target_ptr, result).map_err(|e| {
                                 SemanticError::CodeGenError {
                                     message: e.to_string(),
@@ -952,11 +1002,11 @@ impl<'ctx> LLVMBackend<'ctx> {
                         self.module.add_function("abort", abort_fn_type, None)
                     });
 
-                    builder
-                        .build_call(abort_fn, &[], "")
-                        .map_err(|e| SemanticError::CodeGenError {
+                    builder.build_call(abort_fn, &[], "").map_err(|e| {
+                        SemanticError::CodeGenError {
                             message: e.to_string(),
-                        })?;
+                        }
+                    })?;
 
                     // Unreachable after abort
                     builder
@@ -1020,69 +1070,118 @@ impl<'ctx> LLVMBackend<'ctx> {
                     }
                 }
 
-                mir::Terminator::Concurrent { block_id, target, captures } => {
+                mir::Terminator::Concurrent {
+                    block_id,
+                    target,
+                    captures,
+                } => {
                     // 1. Outline the concurrent block
-                    let task_func = self.outline_concurrent_block(*block_id, captures, function, *target)?;
-                    
+                    let task_func =
+                        self.outline_concurrent_block(*block_id, captures, function, *target)?;
+
                     // 2. Create context struct
                     let context_struct_type = self.get_capture_struct_type(captures, function)?;
-                    let context_alloca = builder.build_alloca(context_struct_type, "task_context")
-                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                        
+                    let context_alloca = builder
+                        .build_alloca(context_struct_type, "task_context")
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
                     // 3. Populate context struct
                     for (i, capture) in captures.iter().enumerate() {
-                        let val = self.generate_operand(capture, &local_allocas, &builder, function)?;
-                        
-                        let field_ptr = builder.build_struct_gep(context_struct_type, context_alloca, i as u32, &format!("capture_init_{}", i))
-                            .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                        
-                        builder.build_store(field_ptr, val).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                        let val =
+                            self.generate_operand(capture, &local_allocas, &builder, function)?;
+
+                        let field_ptr = builder
+                            .build_struct_gep(
+                                context_struct_type,
+                                context_alloca,
+                                i as u32,
+                                &format!("capture_init_{}", i),
+                            )
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?;
+
+                        builder.build_store(field_ptr, val).map_err(|e| {
+                            SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            }
+                        })?;
                     }
-                    
+
                     // 4. Call aether_spawn(task_func, context)
                     let i8_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
-                    
+
                     // Cast function pointer to i8*
-                    let func_ptr_cast = builder.build_pointer_cast(
-                        task_func.as_global_value().as_pointer_value(),
-                        i8_ptr_type,
-                        "task_func_ptr"
-                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                    
+                    let func_ptr_cast = builder
+                        .build_pointer_cast(
+                            task_func.as_global_value().as_pointer_value(),
+                            i8_ptr_type,
+                            "task_func_ptr",
+                        )
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
                     // Cast context pointer to i8*
-                    let context_ptr_cast = builder.build_pointer_cast(
-                        context_alloca,
-                        i8_ptr_type,
-                        "context_ptr"
-                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                    
+                    let context_ptr_cast = builder
+                        .build_pointer_cast(context_alloca, i8_ptr_type, "context_ptr")
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
                     // Call spawn
-                    let spawn_fn = self.module.get_function("aether_spawn")
-                        .ok_or_else(|| SemanticError::CodeGenError { message: "aether_spawn not found".to_string() })?;
-                        
+                    let spawn_fn = self.module.get_function("aether_spawn").ok_or_else(|| {
+                        SemanticError::CodeGenError {
+                            message: "aether_spawn not found".to_string(),
+                        }
+                    })?;
+
                     // Pass null for cleanup_fn
                     let null_ptr = i8_ptr_type.const_null();
-                    
-                    let handle_call = builder.build_call(spawn_fn, &[func_ptr_cast.into(), context_ptr_cast.into(), null_ptr.into()], "spawn_call")
-                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                        
-                    let handle_val = handle_call.try_as_basic_value().left()
-                        .ok_or_else(|| SemanticError::CodeGenError { message: "Failed to get handle value".to_string() })?;
+
+                    let handle_call = builder
+                        .build_call(
+                            spawn_fn,
+                            &[
+                                func_ptr_cast.into(),
+                                context_ptr_cast.into(),
+                                null_ptr.into(),
+                            ],
+                            "spawn_call",
+                        )
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
+                    let handle_val = handle_call.try_as_basic_value().left().ok_or_else(|| {
+                        SemanticError::CodeGenError {
+                            message: "Failed to get handle value".to_string(),
+                        }
+                    })?;
 
                     // Call await(handle)
-                    let await_fn = self.module.get_function("aether_await")
-                         .ok_or_else(|| SemanticError::CodeGenError { message: "aether_await not found".to_string() })?;
-                    
-                    builder.build_call(await_fn, &[handle_val.into()], "await_call")
-                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                        
+                    let await_fn = self.module.get_function("aether_await").ok_or_else(|| {
+                        SemanticError::CodeGenError {
+                            message: "aether_await not found".to_string(),
+                        }
+                    })?;
+
+                    builder
+                        .build_call(await_fn, &[handle_val.into()], "await_call")
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
                     // 5. Continue to target block
                     let target_block = llvm_blocks[target];
-                    builder.build_unconditional_branch(target_block).map_err(|e| SemanticError::CodeGenError {
-                        message: e.to_string(),
-                    })?;
+                    builder
+                        .build_unconditional_branch(target_block)
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
                 }
-
             }
         }
 
@@ -1611,9 +1710,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                 // Extract function name from the func operand (direct call)
                 let function_name = match func {
                     mir::Operand::Constant(constant) => match &constant.value {
-                        mir::ConstantValue::String(name) => {
-                            name.clone()
-                        }
+                        mir::ConstantValue::String(name) => name.clone(),
                         _ => {
                             return Err(SemanticError::CodeGenError {
                                 message: "Function call with non-string function reference"
@@ -1912,37 +2009,50 @@ impl<'ctx> LLVMBackend<'ctx> {
                 } else {
                     // Handle numeric casts
                     let target_type = self.get_basic_type(ty);
-                    
+
                     match operand_value {
                         inkwell::values::BasicValueEnum::IntValue(int_val) => {
                             if target_type.is_int_type() {
                                 let target_int_type = target_type.into_int_type();
                                 let src_width = int_val.get_type().get_bit_width();
                                 let dst_width = target_int_type.get_bit_width();
-                                
+
                                 if src_width < dst_width {
                                     // Sign extend
-                                    builder.build_int_s_extend(int_val, target_int_type, "sext")
+                                    builder
+                                        .build_int_s_extend(int_val, target_int_type, "sext")
                                         .map(|v| v.into())
-                                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })
+                                        .map_err(|e| SemanticError::CodeGenError {
+                                            message: e.to_string(),
+                                        })
                                 } else if src_width > dst_width {
                                     // Truncate
-                                    builder.build_int_truncate(int_val, target_int_type, "trunc")
+                                    builder
+                                        .build_int_truncate(int_val, target_int_type, "trunc")
                                         .map(|v| v.into())
-                                        .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })
+                                        .map_err(|e| SemanticError::CodeGenError {
+                                            message: e.to_string(),
+                                        })
                                 } else {
                                     Ok(operand_value)
                                 }
                             } else if target_type.is_float_type() {
                                 // Int to Float
-                                builder.build_signed_int_to_float(int_val, target_type.into_float_type(), "sitofp")
+                                builder
+                                    .build_signed_int_to_float(
+                                        int_val,
+                                        target_type.into_float_type(),
+                                        "sitofp",
+                                    )
                                     .map(|v| v.into())
-                                    .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })
+                                    .map_err(|e| SemanticError::CodeGenError {
+                                        message: e.to_string(),
+                                    })
                             } else {
                                 Ok(operand_value)
                             }
-                        },
-                        _ => Ok(operand_value)
+                        }
+                        _ => Ok(operand_value),
                     }
                 }
             }
@@ -2103,7 +2213,9 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                         // Check if this enum has data - if so, use heap allocation
                         // to ensure the memory survives function returns
-                        let enum_has_data = if let Some(type_def) = self.type_definitions.get(enum_name) {
+                        let enum_has_data = if let Some(type_def) =
+                            self.type_definitions.get(enum_name)
+                        {
                             if let crate::types::TypeDefinition::Enum { variants, .. } = type_def {
                                 variants.iter().any(|v| !v.associated_types.is_empty())
                             } else {
@@ -2115,17 +2227,26 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                         let enum_alloca = if enum_has_data {
                             // Heap-allocate enums with data to ensure memory survives returns
-                            let func_decls = self.function_declarations.as_ref()
-                                .ok_or_else(|| SemanticError::CodeGenError {
-                                    message: "function_declarations not initialized".to_string(),
+                            let func_decls =
+                                self.function_declarations.as_ref().ok_or_else(|| {
+                                    SemanticError::CodeGenError {
+                                        message: "function_declarations not initialized"
+                                            .to_string(),
+                                    }
                                 })?;
-                            let malloc_fn = func_decls.get("aether_malloc")
-                                .ok_or_else(|| SemanticError::CodeGenError {
+                            let malloc_fn = func_decls.get("aether_malloc").ok_or_else(|| {
+                                SemanticError::CodeGenError {
                                     message: "aether_malloc function not found".to_string(),
-                                })?;
-                            let size_val = self.context.i32_type().const_int(enum_size as u64, false);
+                                }
+                            })?;
+                            let size_val =
+                                self.context.i32_type().const_int(enum_size as u64, false);
                             let heap_ptr = builder
-                                .build_call(*malloc_fn, &[size_val.into()], &format!("{}_heap", enum_name))
+                                .build_call(
+                                    *malloc_fn,
+                                    &[size_val.into()],
+                                    &format!("{}_heap", enum_name),
+                                )
                                 .map_err(|e| SemanticError::CodeGenError {
                                     message: e.to_string(),
                                 })?
@@ -2210,9 +2331,10 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                                 // Calculate offset: i * 4 (assuming 4 bytes per field)
                                 let offset = (i as u64) * 4;
-                                
+
                                 // Calculate pointer to this field
-                                let indices = vec![self.context.i32_type().const_int(offset, false)];
+                                let indices =
+                                    vec![self.context.i32_type().const_int(offset, false)];
                                 let field_ptr = unsafe {
                                     builder.build_gep(
                                         self.context.i8_type(),
@@ -2220,7 +2342,12 @@ impl<'ctx> LLVMBackend<'ctx> {
                                         &indices,
                                         &format!("{}_field_{}_ptr", variant_name, i),
                                     )
-                                }.map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                                }
+                                .map_err(|e| {
+                                    SemanticError::CodeGenError {
+                                        message: e.to_string(),
+                                    }
+                                })?;
 
                                 // Cast data pointer to appropriate type
                                 let value_type_ptr = match value {
@@ -2258,7 +2385,9 @@ impl<'ctx> LLVMBackend<'ctx> {
 
                         // Check if the enum type has ANY variants with associated data
                         // If so, the enum type is a pointer type and we must return a pointer
-                        let enum_has_data = if let Some(enum_def) = self.type_definitions.get(enum_name) {
+                        let enum_has_data = if let Some(enum_def) =
+                            self.type_definitions.get(enum_name)
+                        {
                             if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
                                 variants.iter().any(|v| !v.associated_types.is_empty())
                             } else {
@@ -2302,8 +2431,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                     } else {
                         // Handle projections (field access, array index, etc.)
                         let mut current_ptr = alloca;
-                        let current_type =
-                            self.get_basic_type_from_local(place.local, function)?;
+                        let current_type = self.get_basic_type_from_local(place.local, function)?;
 
                         // Track the current struct type name for nested field access
                         let mut current_struct_type: Option<String> =
@@ -2336,24 +2464,28 @@ impl<'ctx> LLVMBackend<'ctx> {
                                 }
                                 mir::PlaceElem::Field { field, ty } => {
                                     // For field access, calculate offset based on current struct type
-                                    let offset =
-                                        if let Some(ref struct_name) = current_struct_type {
-                                            self.calculate_field_offset(struct_name, *field as usize)
-                                        } else {
-                                            // Check if we're accessing an enum's data field
-                                            // For enums, field 0 is discriminant (at offset 0) and field 1 is data (at offset 4)
-                                            if let Some(local) = function.locals.get(&place.local) {
-                                                if let crate::types::Type::Named { name, .. } = &local.ty {
-                                                    if let Some(type_def) = self.type_definitions.get(name) {
-                                                        if matches!(type_def, crate::types::TypeDefinition::Enum { .. }) {
-                                                            // For enum data extraction, field 1 (data) is at offset 4
-                                                            if *field == 1 {
-                                                                4u64
-                                                            } else {
-                                                                0u64 // Discriminant is at offset 0
-                                                            }
+                                    let offset = if let Some(ref struct_name) = current_struct_type
+                                    {
+                                        self.calculate_field_offset(struct_name, *field as usize)
+                                    } else {
+                                        // Check if we're accessing an enum's data field
+                                        // For enums, field 0 is discriminant (at offset 0) and field 1 is data (at offset 4)
+                                        if let Some(local) = function.locals.get(&place.local) {
+                                            if let crate::types::Type::Named { name, .. } =
+                                                &local.ty
+                                            {
+                                                if let Some(type_def) =
+                                                    self.type_definitions.get(name)
+                                                {
+                                                    if matches!(
+                                                        type_def,
+                                                        crate::types::TypeDefinition::Enum { .. }
+                                                    ) {
+                                                        // For enum data extraction, field 1 (data) is at offset 4
+                                                        if *field == 1 {
+                                                            4u64
                                                         } else {
-                                                            (*field * 8) as u64
+                                                            0u64 // Discriminant is at offset 0
                                                         }
                                                     } else {
                                                         (*field * 8) as u64
@@ -2362,9 +2494,12 @@ impl<'ctx> LLVMBackend<'ctx> {
                                                     (*field * 8) as u64
                                                 }
                                             } else {
-                                                (*field * 8) as u64 // Default fallback
+                                                (*field * 8) as u64
                                             }
-                                        };
+                                        } else {
+                                            (*field * 8) as u64 // Default fallback
+                                        }
+                                    };
 
                                     let indices = vec![
                                         self.context.i32_type().const_int(0, false),
@@ -2470,7 +2605,10 @@ impl<'ctx> LLVMBackend<'ctx> {
                 })
             }
 
-            mir::Rvalue::Closure { func_name, captures: _ } => {
+            mir::Rvalue::Closure {
+                func_name,
+                captures: _,
+            } => {
                 // Get the function pointer for the lambda
                 // The lambda function should already be generated as a separate MIR function
                 if let Some(llvm_func) = self.module.get_function(func_name) {
@@ -2502,21 +2640,23 @@ impl<'ctx> LLVMBackend<'ctx> {
                 };
 
                 // Check if this enum has associated data
-                let enum_has_data = if let Some(type_def) = self.type_definitions.get(&enum_type_name) {
-                    if let crate::types::TypeDefinition::Enum { variants, .. } = type_def {
-                        variants.iter().any(|v| !v.associated_types.is_empty())
+                let enum_has_data =
+                    if let Some(type_def) = self.type_definitions.get(&enum_type_name) {
+                        if let crate::types::TypeDefinition::Enum { variants, .. } = type_def {
+                            variants.iter().any(|v| !v.associated_types.is_empty())
+                        } else {
+                            false
+                        }
                     } else {
                         false
-                    }
-                } else {
-                    false
-                };
+                    };
 
-                let alloca = local_allocas.get(&place.local).ok_or_else(|| {
-                    SemanticError::CodeGenError {
-                        message: format!("Local {:?} not found in allocas", place.local),
-                    }
-                })?;
+                let alloca =
+                    local_allocas
+                        .get(&place.local)
+                        .ok_or_else(|| SemanticError::CodeGenError {
+                            message: format!("Local {:?} not found in allocas", place.local),
+                        })?;
 
                 if !enum_has_data {
                     // Simple enum without data - the stored value IS the discriminant (an i32)
@@ -2619,16 +2759,25 @@ impl<'ctx> LLVMBackend<'ctx> {
         function: &mir::Function,
     ) -> Result<PointerValue<'ctx>, SemanticError> {
         // Start with the local variable's alloca
-        let mut current_ptr = *local_allocas.get(&place.local).ok_or_else(|| {
-            SemanticError::CodeGenError {
-                message: format!("Local {:?} not found in allocas", place.local),
-            }
-        })?;
+        let mut current_ptr =
+            *local_allocas
+                .get(&place.local)
+                .ok_or_else(|| SemanticError::CodeGenError {
+                    message: format!("Local {:?} not found in allocas", place.local),
+                })?;
 
         // Track current type to calculate offsets
-        let mut current_type = function.locals.get(&place.local)
+        let mut current_type = function
+            .locals
+            .get(&place.local)
             .map(|l| l.ty.clone())
-            .or_else(|| function.parameters.iter().find(|p| p.local_id == place.local).map(|p| p.ty.clone()))
+            .or_else(|| {
+                function
+                    .parameters
+                    .iter()
+                    .find(|p| p.local_id == place.local)
+                    .map(|p| p.ty.clone())
+            })
             .ok_or_else(|| SemanticError::CodeGenError {
                 message: format!("Local {:?} type not found", place.local),
             })?;
@@ -2638,65 +2787,90 @@ impl<'ctx> LLVMBackend<'ctx> {
             match proj {
                 mir::PlaceElem::Deref => {
                     // Load the pointer value to dereference it
-                    let loaded = builder.build_load(
-                        self.context.i8_type().ptr_type(AddressSpace::default()),
-                        current_ptr,
-                        "deref_ptr"
-                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                    let loaded = builder
+                        .build_load(
+                            self.context.i8_type().ptr_type(AddressSpace::default()),
+                            current_ptr,
+                            "deref_ptr",
+                        )
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
                     current_ptr = loaded.into_pointer_value();
-                    
+
                     // Update type: dereference pointer/owned
                     match current_type {
-                        crate::types::Type::Pointer { target_type, .. } | 
-                        crate::types::Type::Owned { base_type: target_type, .. } => {
+                        crate::types::Type::Pointer { target_type, .. }
+                        | crate::types::Type::Owned {
+                            base_type: target_type,
+                            ..
+                        } => {
                             current_type = *target_type;
                         }
-                        _ => return Err(SemanticError::CodeGenError {
-                            message: format!("Cannot dereference type {:?}", current_type),
-                        }),
+                        _ => {
+                            return Err(SemanticError::CodeGenError {
+                                message: format!("Cannot dereference type {:?}", current_type),
+                            })
+                        }
                     }
                 }
                 mir::PlaceElem::Field { field, ty } => {
                     // Struct field access - use manual GEP with offset
                     let struct_name = match &current_type {
                         crate::types::Type::Named { name, .. } => name,
-                        _ => return Err(SemanticError::CodeGenError {
-                            message: format!("Field access on non-named type {:?}", current_type),
-                        }),
+                        _ => {
+                            return Err(SemanticError::CodeGenError {
+                                message: format!(
+                                    "Field access on non-named type {:?}",
+                                    current_type
+                                ),
+                            })
+                        }
                     };
-                    
+
                     let offset = self.calculate_field_offset(struct_name, *field as usize);
-                    
+
                     // Cast to i8*
-                    let i8_ptr = builder.build_pointer_cast(
-                        current_ptr,
-                        self.context.i8_type().ptr_type(AddressSpace::default()),
-                        "i8_ptr"
-                    ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                    
+                    let i8_ptr = builder
+                        .build_pointer_cast(
+                            current_ptr,
+                            self.context.i8_type().ptr_type(AddressSpace::default()),
+                            "i8_ptr",
+                        )
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+
                     // GEP
                     let field_ptr_i8 = unsafe {
-                        builder.build_gep(
-                            self.context.i8_type(),
-                            i8_ptr,
-                            &[self.context.i32_type().const_int(offset as u64, false)],
-                            &format!("field_{}_ptr", field),
-                        ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
+                        builder
+                            .build_gep(
+                                self.context.i8_type(),
+                                i8_ptr,
+                                &[self.context.i32_type().const_int(offset as u64, false)],
+                                &format!("field_{}_ptr", field),
+                            )
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?
                     };
-                    
+
                     // Cast to appropriate field pointer type (optional but good for debugging IR)
                     // For now keep as opaque pointer (or i8*) since we just store to it.
                     // But next operation might expect something else.
                     // Let's keep it as i8* (ptr in opaque world).
                     current_ptr = field_ptr_i8;
-                    
+
                     current_type = ty.clone();
                 }
                 mir::PlaceElem::Index(index_local) => {
                     // Array indexing
                     let index_val = if let Some(idx_ptr) = local_allocas.get(index_local) {
-                         builder.build_load(self.context.i32_type(), *idx_ptr, "index_val")
-                            .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?
+                        builder
+                            .build_load(self.context.i32_type(), *idx_ptr, "index_val")
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?
                             .into_int_value()
                     } else {
                         return Err(SemanticError::CodeGenError {
@@ -2708,9 +2882,14 @@ impl<'ctx> LLVMBackend<'ctx> {
                     // Need to know element type size.
                     let element_type = match &current_type {
                         crate::types::Type::Array { element_type, .. } => element_type,
-                        _ => return Err(SemanticError::CodeGenError {
-                            message: format!("Index access on non-array type {:?}", current_type),
-                        }),
+                        _ => {
+                            return Err(SemanticError::CodeGenError {
+                                message: format!(
+                                    "Index access on non-array type {:?}",
+                                    current_type
+                                ),
+                            })
+                        }
                     };
                     // We don't have easy size calculation here without type size map.
                     // Assuming i32 array for now as fallback or 8 bytes if pointer?
@@ -2719,23 +2898,29 @@ impl<'ctx> LLVMBackend<'ctx> {
                     // If it is opaque `ptr`, `build_gep` needs element type.
                     // We should use `get_basic_type` for element type.
                     let elem_basic_type = self.get_basic_type(element_type);
-                    
+
                     unsafe {
-                        current_ptr = builder.build_gep(
-                            elem_basic_type, 
-                            current_ptr,
-                            &[index_val], // For pointer to array, usually [0, index]. But if pointer to first element (slice), just [index].
-                            // Arrays are passed as pointers (to first element? or to struct?)
-                            // get_basic_type returns ptr.
-                            // Let's assume pointer to first element for now.
-                            "array_index"
-                        ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                        current_ptr = builder
+                            .build_gep(
+                                elem_basic_type,
+                                current_ptr,
+                                &[index_val], // For pointer to array, usually [0, index]. But if pointer to first element (slice), just [index].
+                                // Arrays are passed as pointers (to first element? or to struct?)
+                                // get_basic_type returns ptr.
+                                // Let's assume pointer to first element for now.
+                                "array_index",
+                            )
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?;
                     }
                     current_type = *element_type.clone();
                 }
-                _ => return Err(SemanticError::CodeGenError {
-                    message: format!("Unsupported projection: {:?}", proj),
-                }),
+                _ => {
+                    return Err(SemanticError::CodeGenError {
+                        message: format!("Unsupported projection: {:?}", proj),
+                    })
+                }
             }
         }
 
@@ -2916,7 +3101,9 @@ impl<'ctx> LLVMBackend<'ctx> {
                                     // Load the pointer to the nested struct
                                     let loaded_nested = builder
                                         .build_load(
-                                            self.context.i8_type().ptr_type(AddressSpace::default()),
+                                            self.context
+                                                .i8_type()
+                                                .ptr_type(AddressSpace::default()),
                                             current_ptr,
                                             "loaded_nested_struct",
                                         )
@@ -3108,7 +3295,9 @@ impl<'ctx> LLVMBackend<'ctx> {
     /// Write object file
     pub fn write_object_file<P: AsRef<Path>>(&self, path: P) -> Result<(), String> {
         // Verify the module first (temporarily disabled to debug function signature issues)
-        self.module.verify().map_err(|e| format!("Module verification failed: {}", e))?;
+        self.module
+            .verify()
+            .map_err(|e| format!("Module verification failed: {}", e))?;
 
         // Print IR for debugging
         eprintln!("LLVM IR:\n{}", self.module.print_to_string().to_string());
@@ -3555,8 +3744,7 @@ impl<'ctx> LLVMBackend<'ctx> {
         function_declarations.insert("aether_free".to_string(), free_fn);
 
         // aether_realloc(ptr, size: int) -> ptr
-        let realloc_type =
-            i8_ptr_type.fn_type(&[i8_ptr_type.into(), i32_type.into()], false);
+        let realloc_type = i8_ptr_type.fn_type(&[i8_ptr_type.into(), i32_type.into()], false);
         let realloc_fn = self
             .module
             .add_function("aether_realloc", realloc_type, None);
@@ -3749,24 +3937,35 @@ impl<'ctx> LLVMBackend<'ctx> {
         // Async Runtime functions
         // aether_async_init() -> void
         let async_init_type = void_type.fn_type(&[], false);
-        let async_init_fn = self.module.add_function("aether_async_init", async_init_type, None);
+        let async_init_fn = self
+            .module
+            .add_function("aether_async_init", async_init_type, None);
         function_declarations.insert("aether_async_init".to_string(), async_init_fn);
 
         // aether_async_shutdown() -> void
         let async_shutdown_type = void_type.fn_type(&[], false);
-        let async_shutdown_fn = self.module.add_function("aether_async_shutdown", async_shutdown_type, None);
+        let async_shutdown_fn =
+            self.module
+                .add_function("aether_async_shutdown", async_shutdown_type, None);
         function_declarations.insert("aether_async_shutdown".to_string(), async_shutdown_fn);
 
         // aether_spawn(fn_ptr, arg_ptr, cleanup_ptr) -> task_handle_ptr
         // Note: fn_ptr is extern "C" fn(*mut c_void) -> *mut c_void, which we model as ptr
         // args: task_fn, context, cleanup_fn
-        let async_spawn_type = i8_ptr_type.fn_type(&[i8_ptr_type.into(), i8_ptr_type.into(), i8_ptr_type.into()], false);
-        let async_spawn_fn = self.module.add_function("aether_spawn", async_spawn_type, None);
+        let async_spawn_type = i8_ptr_type.fn_type(
+            &[i8_ptr_type.into(), i8_ptr_type.into(), i8_ptr_type.into()],
+            false,
+        );
+        let async_spawn_fn = self
+            .module
+            .add_function("aether_spawn", async_spawn_type, None);
         function_declarations.insert("aether_spawn".to_string(), async_spawn_fn);
 
         // aether_await(task_handle_ptr) -> result_ptr
         let async_wait_type = i8_ptr_type.fn_type(&[i8_ptr_type.into()], false);
-        let async_wait_fn = self.module.add_function("aether_await", async_wait_type, None);
+        let async_wait_fn = self
+            .module
+            .add_function("aether_await", async_wait_type, None);
         function_declarations.insert("aether_await".to_string(), async_wait_fn);
 
         Ok(())
@@ -3779,19 +3978,17 @@ impl<'ctx> LLVMBackend<'ctx> {
         function: &mir::Function,
     ) -> Result<inkwell::types::StructType<'ctx>, SemanticError> {
         let mut field_types = Vec::new();
-        
+
         for capture in captures {
             let capture_type = match capture {
                 mir::Operand::Copy(place) | mir::Operand::Move(place) => {
                     self.get_basic_type_from_local(place.local, function)?
                 }
-                mir::Operand::Constant(constant) => {
-                    self.get_basic_type(&constant.ty)
-                }
+                mir::Operand::Constant(constant) => self.get_basic_type(&constant.ty),
             };
             field_types.push(capture_type);
         }
-        
+
         Ok(self.context.struct_type(&field_types, false))
     }
 
@@ -3805,86 +4002,122 @@ impl<'ctx> LLVMBackend<'ctx> {
     ) -> Result<FunctionValue<'ctx>, SemanticError> {
         // 1. Create context struct type
         let context_struct_type = self.get_capture_struct_type(captures, function)?;
-        
+
         // 2. Create the new function signature: void task_func(void* context)
         let void_type = self.context.void_type();
         let i8_ptr_type = self.context.i8_type().ptr_type(AddressSpace::default());
         let fn_type = void_type.fn_type(&[i8_ptr_type.into()], false);
-        
+
         let task_name = format!("{}_concurrent_{}", function.name, block_id);
         let task_func = self.module.add_function(&task_name, fn_type, None);
-        
+
         // 3. Generate function body
         let basic_block = self.context.append_basic_block(task_func, "entry");
         let builder = self.context.create_builder();
         builder.position_at_end(basic_block);
-        
+
         // Unpack context
         let context_arg = task_func
             .get_first_param()
             .expect("task function was created with exactly one parameter")
             .into_pointer_value();
-        let context_ptr = builder.build_pointer_cast(
-            context_arg,
-            context_struct_type.ptr_type(AddressSpace::default()),
-            "context_typed"
-        ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-        
+        let context_ptr = builder
+            .build_pointer_cast(
+                context_arg,
+                context_struct_type.ptr_type(AddressSpace::default()),
+                "context_typed",
+            )
+            .map_err(|e| SemanticError::CodeGenError {
+                message: e.to_string(),
+            })?;
+
         // Create local allocas for captured variables within the new function
         let mut local_allocas = HashMap::new();
-        
+
         for (i, capture) in captures.iter().enumerate() {
             if let mir::Operand::Copy(place) | mir::Operand::Move(place) = capture {
                 // Get field pointer
-                let field_ptr = builder.build_struct_gep(context_struct_type, context_ptr, i as u32, &format!("capture_{}", i))
-                    .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                
+                let field_ptr = builder
+                    .build_struct_gep(
+                        context_struct_type,
+                        context_ptr,
+                        i as u32,
+                        &format!("capture_{}", i),
+                    )
+                    .map_err(|e| SemanticError::CodeGenError {
+                        message: e.to_string(),
+                    })?;
+
                 // Load value
-                let field_val = builder.build_load(
-                    context_struct_type.get_field_types()[i],
-                    field_ptr,
-                    &format!("capture_val_{}", i)
-                ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                
+                let field_val = builder
+                    .build_load(
+                        context_struct_type.get_field_types()[i],
+                        field_ptr,
+                        &format!("capture_val_{}", i),
+                    )
+                    .map_err(|e| SemanticError::CodeGenError {
+                        message: e.to_string(),
+                    })?;
+
                 // Create alloca in new function for this variable
-                let alloca = builder.build_alloca(
-                    context_struct_type.get_field_types()[i],
-                    &format!("local_{}", place.local)
-                ).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                
-                builder.build_store(alloca, field_val).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                
+                let alloca = builder
+                    .build_alloca(
+                        context_struct_type.get_field_types()[i],
+                        &format!("local_{}", place.local),
+                    )
+                    .map_err(|e| SemanticError::CodeGenError {
+                        message: e.to_string(),
+                    })?;
+
+                builder.build_store(alloca, field_val).map_err(|e| {
+                    SemanticError::CodeGenError {
+                        message: e.to_string(),
+                    }
+                })?;
+
                 local_allocas.insert(place.local, alloca);
             }
         }
-        
+
         // Generate block content
         if let Some(mir_block) = function.basic_blocks.get(&block_id) {
-             for stmt in &mir_block.statements {
+            for stmt in &mir_block.statements {
                 match stmt {
                     mir::Statement::Assign { place, rvalue, .. } => {
                         // Allocate on demand if not exists
                         if !local_allocas.contains_key(&place.local) {
-                             let local_ty = self.get_basic_type_from_local(place.local, function)?;
-                             let alloca = builder.build_alloca(local_ty, &format!("local_{}", place.local))
-                                .map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
-                             local_allocas.insert(place.local, alloca);
+                            let local_ty = self.get_basic_type_from_local(place.local, function)?;
+                            let alloca = builder
+                                .build_alloca(local_ty, &format!("local_{}", place.local))
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?;
+                            local_allocas.insert(place.local, alloca);
                         }
-                        
-                        let result = self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
-                        
+
+                        let result =
+                            self.generate_rvalue(rvalue, &local_allocas, &builder, function)?;
+
                         if let Some(alloca) = local_allocas.get(&place.local) {
-                             builder.build_store(*alloca, result).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+                            builder.build_store(*alloca, result).map_err(|e| {
+                                SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                }
+                            })?;
                         }
                     }
                     _ => {}
                 }
             }
-            
+
             // For concurrent tasks, we implicitly return void at the end
-            builder.build_return(None).map_err(|e| SemanticError::CodeGenError { message: e.to_string() })?;
+            builder
+                .build_return(None)
+                .map_err(|e| SemanticError::CodeGenError {
+                    message: e.to_string(),
+                })?;
         }
-        
+
         Ok(task_func)
     }
 }
