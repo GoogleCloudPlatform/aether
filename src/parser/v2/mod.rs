@@ -20,12 +20,14 @@
 
 use crate::ast::{
     Argument, AssignmentTarget, Block, CallingConvention, Capture, CaptureMode, CatchClause,
-    ConstantDeclaration, ContractAssertion, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction, FailureAction, FieldValue, Function,
-    FunctionCall as AstFunctionCall, FunctionMetadata, FunctionReference, GenericParameter, Identifier,
-    ImportStatement, LambdaBody, MatchArm, MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern, PrimitiveType, Program,
-    Quantifier, QuantifierKind, QuantifierVariable,
-    Statement, StructField, TraitAxiom, TraitDefinition, TraitImpl, TraitMethod, TypeDefinition, TypeSpecifier, PerformanceMetric, PerformanceExpectation, ComplexityExpectation, ComplexityType, ComplexityNotation,
-    WhereClause,
+    ComplexityExpectation, ComplexityNotation, ComplexityType, ConstantDeclaration,
+    ContractAssertion, ElseIf, EnumVariant, ExportStatement, Expression, ExternalFunction,
+    FailureAction, FieldValue, Function, FunctionCall as AstFunctionCall, FunctionMetadata,
+    FunctionReference, GenericParameter, Identifier, ImportStatement, LambdaBody, MatchArm,
+    MatchCase, Module, Mutability, OwnershipKind, Parameter, PassingMode, Pattern,
+    PerformanceExpectation, PerformanceMetric, PrimitiveType, Program, Quantifier, QuantifierKind,
+    QuantifierVariable, Statement, StructField, TraitAxiom, TraitDefinition, TraitImpl,
+    TraitMethod, TypeDefinition, TypeSpecifier, WhereClause,
 };
 use crate::error::{ParserError, SourceLocation};
 use crate::lexer::v2::{Keyword, Token, TokenType};
@@ -267,11 +269,18 @@ impl Parser {
         while !self.is_at_end() {
             match &self.peek().token_type {
                 TokenType::Keyword(kw) => match kw {
-                    Keyword::Func | Keyword::Struct | Keyword::Enum | Keyword::Import | Keyword::Const => return,
+                    Keyword::Func
+                    | Keyword::Struct
+                    | Keyword::Enum
+                    | Keyword::Import
+                    | Keyword::Const => return,
                     _ => {}
                 },
-                TokenType::At => return,         // Annotation
-                TokenType::RightBrace => { self.advance(); return; }
+                TokenType::At => return, // Annotation
+                TokenType::RightBrace => {
+                    self.advance();
+                    return;
+                }
                 _ => {}
             }
             self.advance();
@@ -304,7 +313,11 @@ impl Parser {
             // Check for empty braces `{}` - only struct construction if type_name looks like a type
             if matches!(after_brace.token_type, TokenType::RightBrace) {
                 // Treat as struct construction only if the name starts with uppercase (type convention)
-                return type_name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false);
+                return type_name
+                    .chars()
+                    .next()
+                    .map(|c| c.is_uppercase())
+                    .unwrap_or(false);
             }
 
             // Check for field: value pattern
@@ -398,21 +411,31 @@ impl Parser {
             match &after_less.token_type {
                 // Type keywords always indicate type arguments
                 TokenType::Keyword(kw) => {
-                    matches!(kw,
-                        Keyword::Int | Keyword::Int32 | Keyword::Int64 |
-                        Keyword::Float | Keyword::Float32 | Keyword::Float64 |
-                        Keyword::String_ | Keyword::Char | Keyword::Bool |
-                        Keyword::Void | Keyword::Array | Keyword::Map | Keyword::SizeT
+                    matches!(
+                        kw,
+                        Keyword::Int
+                            | Keyword::Int32
+                            | Keyword::Int64
+                            | Keyword::Float
+                            | Keyword::Float32
+                            | Keyword::Float64
+                            | Keyword::String_
+                            | Keyword::Char
+                            | Keyword::Bool
+                            | Keyword::Void
+                            | Keyword::Array
+                            | Keyword::Map
+                            | Keyword::SizeT
                     )
                 }
                 // Identifiers that start with uppercase are likely types
-                TokenType::Identifier(name) => {
-                    name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
-                }
+                TokenType::Identifier(name) => name
+                    .chars()
+                    .next()
+                    .map(|c| c.is_uppercase())
+                    .unwrap_or(false),
                 // Reference types: &Type, ^Type, ~Type
-                TokenType::Ampersand | TokenType::Caret | TokenType::Tilde => {
-                    true
-                }
+                TokenType::Ampersand | TokenType::Caret | TokenType::Tilde => true,
                 _ => false,
             }
         } else {
@@ -635,7 +658,11 @@ impl Parser {
     }
 
     /// Apply annotations to a function
-    fn apply_annotations(&self, func: &mut Function, annotations: Vec<Annotation>) -> Result<(), ParserError> {
+    fn apply_annotations(
+        &self,
+        func: &mut Function,
+        annotations: Vec<Annotation>,
+    ) -> Result<(), ParserError> {
         for ann in annotations {
             match ann.name.as_str() {
                 "intent" => {
@@ -692,35 +719,39 @@ impl Parser {
                     let mut metric = None;
                     let mut target = 0.0;
                     let mut context = None;
-                    
+
                     for arg in &ann.arguments {
-                         if let Some(label) = &arg.label {
-                             match label.as_str() {
-                                 "metric" => {
-                                     if let AnnotationValue::String(s) = &arg.value {
-                                         metric = match s.as_str() {
-                                             "LatencyMs" => Some(PerformanceMetric::LatencyMs),
-                                             "ThroughputOpsPerSec" => Some(PerformanceMetric::ThroughputOpsPerSec),
-                                             "MemoryUsageBytes" => Some(PerformanceMetric::MemoryUsageBytes),
-                                             _ => None,
-                                         };
-                                     }
-                                 }
-                                 "target" => {
-                                     if let AnnotationValue::Float(f) = &arg.value {
-                                         target = *f;
-                                     } else if let AnnotationValue::Integer(i) = &arg.value {
-                                         target = *i as f64;
-                                     }
-                                 }
-                                 "context" => {
-                                     if let AnnotationValue::String(s) = &arg.value {
-                                         context = Some(s.clone());
-                                     }
-                                 }
-                                 _ => {}
-                             }
-                         }
+                        if let Some(label) = &arg.label {
+                            match label.as_str() {
+                                "metric" => {
+                                    if let AnnotationValue::String(s) = &arg.value {
+                                        metric = match s.as_str() {
+                                            "LatencyMs" => Some(PerformanceMetric::LatencyMs),
+                                            "ThroughputOpsPerSec" => {
+                                                Some(PerformanceMetric::ThroughputOpsPerSec)
+                                            }
+                                            "MemoryUsageBytes" => {
+                                                Some(PerformanceMetric::MemoryUsageBytes)
+                                            }
+                                            _ => None,
+                                        };
+                                    }
+                                }
+                                "target" => {
+                                    if let AnnotationValue::Float(f) = &arg.value {
+                                        target = *f;
+                                    } else if let AnnotationValue::Integer(i) = &arg.value {
+                                        target = *i as f64;
+                                    }
+                                }
+                                "context" => {
+                                    if let AnnotationValue::String(s) = &arg.value {
+                                        context = Some(s.clone());
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                     if let Some(m) = metric {
                         func.metadata.performance_expectation = Some(PerformanceExpectation {
@@ -921,7 +952,7 @@ impl Parser {
                 let mut func = self.parse_function()?;
                 // Apply annotations to func.metadata
                 self.apply_annotations(&mut func, annotations)?;
-                
+
                 if is_public {
                     exports.push(ExportStatement::Function {
                         name: func.name.clone(),
@@ -934,7 +965,11 @@ impl Parser {
             let type_def = self.parse_struct()?;
             if is_public {
                 match &type_def {
-                    TypeDefinition::Structured { name, source_location, .. } => {
+                    TypeDefinition::Structured {
+                        name,
+                        source_location,
+                        ..
+                    } => {
                         exports.push(ExportStatement::Type {
                             name: name.clone(),
                             source_location: source_location.clone(),
@@ -948,7 +983,11 @@ impl Parser {
             let type_def = self.parse_enum()?;
             if is_public {
                 match &type_def {
-                    TypeDefinition::Enumeration { name, source_location, .. } => {
+                    TypeDefinition::Enumeration {
+                        name,
+                        source_location,
+                        ..
+                    } => {
                         exports.push(ExportStatement::Type {
                             name: name.clone(),
                             source_location: source_location.clone(),
@@ -1029,7 +1068,10 @@ impl Parser {
         let type_spec = self.parse_type()?;
         self.expect(&TokenType::Equal, "expected '=' after type")?;
         let value = self.parse_expression()?;
-        self.expect(&TokenType::Semicolon, "expected ';' after constant declaration")?;
+        self.expect(
+            &TokenType::Semicolon,
+            "expected ';' after constant declaration",
+        )?;
 
         Ok(ConstantDeclaration {
             name,
@@ -1114,7 +1156,10 @@ impl Parser {
             });
         }
 
-        self.expect(&TokenType::Greater, "expected '>' to close generic parameters")?;
+        self.expect(
+            &TokenType::Greater,
+            "expected '>' to close generic parameters",
+        )?;
 
         Ok(params)
     }
@@ -1154,7 +1199,10 @@ impl Parser {
         let type_param = self.parse_identifier()?;
 
         // Expect colon
-        self.expect(&TokenType::Colon, "expected ':' after type parameter in where clause")?;
+        self.expect(
+            &TokenType::Colon,
+            "expected ':' after type parameter in where clause",
+        )?;
 
         // Parse first constraint (trait bound)
         let mut constraints = Vec::new();
@@ -1196,19 +1244,21 @@ impl Parser {
             if self.check_keyword(Keyword::Mut) {
                 self.advance();
                 let base_type = self.parse_type()?;
-                            return Ok(TypeSpecifier::Owned {
-                                base_type: Box::new(base_type),
-                                ownership: OwnershipKind::BorrowedMut,
-                                lifetime: None,
-                                source_location: start_location,
-                            });            }
+                return Ok(TypeSpecifier::Owned {
+                    base_type: Box::new(base_type),
+                    ownership: OwnershipKind::BorrowedMut,
+                    lifetime: None,
+                    source_location: start_location,
+                });
+            }
             let base_type = self.parse_type()?;
-                            return Ok(TypeSpecifier::Owned {
-                                base_type: Box::new(base_type),
-                                ownership: OwnershipKind::Borrowed,
-                                lifetime: None,
-                                source_location: start_location,
-                            });        }
+            return Ok(TypeSpecifier::Owned {
+                base_type: Box::new(base_type),
+                ownership: OwnershipKind::Borrowed,
+                lifetime: None,
+                source_location: start_location,
+            });
+        }
 
         if self.check(&TokenType::Tilde) {
             self.advance();
@@ -1403,7 +1453,10 @@ impl Parser {
             type_arguments.push(self.parse_type()?);
         }
 
-        self.expect(&TokenType::Greater, "expected '>' to close explicit type arguments")?;
+        self.expect(
+            &TokenType::Greater,
+            "expected '>' to close explicit type arguments",
+        )?;
 
         Ok(type_arguments)
     }
@@ -1590,7 +1643,9 @@ impl Parser {
         if let TokenType::Identifier(name) = &self.peek().token_type {
             let name_clone = name.clone();
             if let Some(next) = self.peek_next() {
-                if matches!(next.token_type, TokenType::Colon) || matches!(next.token_type, TokenType::Equal) {
+                if matches!(next.token_type, TokenType::Colon)
+                    || matches!(next.token_type, TokenType::Equal)
+                {
                     // Labeled argument
                     self.advance(); // consume identifier
                     self.advance(); // consume colon or equal
@@ -1864,7 +1919,10 @@ impl Parser {
                     break;
                 }
             }
-            self.expect(&TokenType::RightParen, "expected ')' after associated types")?;
+            self.expect(
+                &TokenType::RightParen,
+                "expected ')' after associated types",
+            )?;
             types
         } else {
             Vec::new()
@@ -1957,12 +2015,16 @@ impl Parser {
 
         if self.check_keyword(Keyword::For) {
             self.advance(); // consume 'for'
-            // The first type was the trait
+                            // The first type was the trait
             match *for_type {
                 TypeSpecifier::Named { name, .. } => {
                     trait_name = Some(name);
                 }
-                TypeSpecifier::Generic { base_type, type_arguments, .. } => {
+                TypeSpecifier::Generic {
+                    base_type,
+                    type_arguments,
+                    ..
+                } => {
                     trait_name = Some(base_type);
                     trait_generic_args = type_arguments.into_iter().map(|b| *b).collect();
                 }
@@ -2033,7 +2095,10 @@ impl Parser {
         let default_body = if self.check(&TokenType::LeftBrace) {
             Some(self.parse_block()?)
         } else {
-            self.expect(&TokenType::Semicolon, "expected ';' or '{' after method signature")?;
+            self.expect(
+                &TokenType::Semicolon,
+                "expected ';' or '{' after method signature",
+            )?;
             None
         };
 
@@ -2060,7 +2125,11 @@ impl Parser {
         // Check for optional name: "name: ..."
         let name = if let TokenType::Identifier(ident) = &self.peek().token_type {
             // Check if followed by colon (to distinguish from expression start)
-            if self.peek_next().map(|t| matches!(t.token_type, TokenType::Colon)).unwrap_or(false) {
+            if self
+                .peek_next()
+                .map(|t| matches!(t.token_type, TokenType::Colon))
+                .unwrap_or(false)
+            {
                 let name = Identifier::new(ident.clone(), self.current_location());
                 self.advance(); // consume identifier
                 self.advance(); // consume colon
@@ -2130,7 +2199,10 @@ impl Parser {
         }
 
         // Expect "=>" after quantifier bindings
-        self.expect(&TokenType::FatArrow, "expected '=>' after quantifier variables")?;
+        self.expect(
+            &TokenType::FatArrow,
+            "expected '=>' after quantifier variables",
+        )?;
 
         Ok(Quantifier {
             kind,
@@ -2227,25 +2299,29 @@ impl Parser {
     /// Check if the current statement looks like an assignment
     fn looks_like_assignment(&self) -> bool {
         let mut i = self.position;
-        
+
         // Must start with identifier
-        if i >= self.tokens.len() { return false; }
+        if i >= self.tokens.len() {
+            return false;
+        }
         if !matches!(self.tokens[i].token_type, TokenType::Identifier(_)) {
             return false;
         }
         i += 1;
-        
+
         while i < self.tokens.len() {
             match &self.tokens[i].token_type {
                 TokenType::Dot => {
                     i += 1;
                     // Expect identifier after dot
-                    if i < self.tokens.len() && matches!(self.tokens[i].token_type, TokenType::Identifier(_)) {
+                    if i < self.tokens.len()
+                        && matches!(self.tokens[i].token_type, TokenType::Identifier(_))
+                    {
                         i += 1;
                     } else {
-                        return false; 
+                        return false;
                     }
-                },
+                }
                 TokenType::LeftBracket => {
                     // Skip until RightBracket (balanced)
                     i += 1;
@@ -2258,12 +2334,12 @@ impl Parser {
                         }
                         i += 1;
                     }
-                },
+                }
                 TokenType::Equal => return true, // Found assignment operator
-                
+
                 TokenType::LeftParen => return false, // Method/Function call
                 TokenType::Semicolon => return false, // Expression statement
-                _ => return false, // Unexpected token for assignment target
+                _ => return false,                    // Unexpected token for assignment target
             }
         }
         false
@@ -2538,7 +2614,7 @@ impl Parser {
             // Check for optional guard: `if { condition }`
             let guard = if self.check_keyword(Keyword::If) {
                 self.advance(); // consume 'if'
-                // Parse the guard condition (a block expression like `{x < 0}`)
+                                // Parse the guard condition (a block expression like `{x < 0}`)
                 let guard_expr = self.parse_expression()?;
                 Some(Box::new(guard_expr))
             } else {
@@ -2611,7 +2687,7 @@ impl Parser {
             self.advance();
 
             let exception_type = Box::new(self.parse_type()?);
-            
+
             let binding_variable = if self.check_keyword(Keyword::As) {
                 self.advance();
                 Some(self.parse_identifier()?)
@@ -2620,7 +2696,7 @@ impl Parser {
             };
 
             let handler_block = self.parse_block()?;
-            
+
             catch_clauses.push(CatchClause {
                 exception_type,
                 binding_variable,
@@ -2651,7 +2727,7 @@ impl Parser {
         self.expect_keyword(Keyword::Throw, "expected 'throw'")?;
         let exception = self.parse_expression()?;
         self.expect(&TokenType::Semicolon, "expected ';' after throw")?;
-        
+
         Ok(Statement::Throw {
             exception: Box::new(exception),
             source_location: start_location,
@@ -2905,10 +2981,7 @@ impl Parser {
         // Parse the inner expression using precedence-based parsing
         let expr = self.parse_or_expression()?;
 
-        self.expect(
-            &TokenType::RightBrace,
-            "expected '}' after expression",
-        )?;
+        self.expect(&TokenType::RightBrace, "expected '}' after expression")?;
 
         Ok(expr)
     }
@@ -2961,11 +3034,21 @@ impl Parser {
             if self.check(&TokenType::EqualEqual) {
                 self.advance();
                 let right = self.parse_comparison_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::Equals, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::Equals,
+                    right,
+                    start_location.clone(),
+                );
             } else if self.check(&TokenType::BangEqual) {
                 self.advance();
                 let right = self.parse_comparison_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::NotEquals, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::NotEquals,
+                    right,
+                    start_location.clone(),
+                );
             } else {
                 break;
             }
@@ -2983,19 +3066,39 @@ impl Parser {
             if self.check(&TokenType::Less) {
                 self.advance();
                 let right = self.parse_additive_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::LessThan, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::LessThan,
+                    right,
+                    start_location.clone(),
+                );
             } else if self.check(&TokenType::LessEqual) {
                 self.advance();
                 let right = self.parse_additive_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::LessEqual, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::LessEqual,
+                    right,
+                    start_location.clone(),
+                );
             } else if self.check(&TokenType::Greater) {
                 self.advance();
                 let right = self.parse_additive_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::GreaterThan, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::GreaterThan,
+                    right,
+                    start_location.clone(),
+                );
             } else if self.check(&TokenType::GreaterEqual) {
                 self.advance();
                 let right = self.parse_additive_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::GreaterEqual, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::GreaterEqual,
+                    right,
+                    start_location.clone(),
+                );
             } else {
                 break;
             }
@@ -3013,11 +3116,21 @@ impl Parser {
             if self.check(&TokenType::Plus) {
                 self.advance();
                 let right = self.parse_multiplicative_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::Add, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::Add,
+                    right,
+                    start_location.clone(),
+                );
             } else if self.check(&TokenType::Minus) {
                 self.advance();
                 let right = self.parse_multiplicative_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::Subtract, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::Subtract,
+                    right,
+                    start_location.clone(),
+                );
             } else {
                 break;
             }
@@ -3035,15 +3148,30 @@ impl Parser {
             if self.check(&TokenType::Star) {
                 self.advance();
                 let right = self.parse_unary_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::Multiply, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::Multiply,
+                    right,
+                    start_location.clone(),
+                );
             } else if self.check(&TokenType::Slash) {
                 self.advance();
                 let right = self.parse_unary_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::Divide, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::Divide,
+                    right,
+                    start_location.clone(),
+                );
             } else if self.check(&TokenType::Percent) {
                 self.advance();
                 let right = self.parse_unary_expression()?;
-                left = self.build_binary_expression(left, BinaryOp::Modulo, right, start_location.clone());
+                left = self.build_binary_expression(
+                    left,
+                    BinaryOp::Modulo,
+                    right,
+                    start_location.clone(),
+                );
             } else {
                 break;
             }
@@ -3111,7 +3239,10 @@ impl Parser {
                 let explicit_type_arguments = self.parse_explicit_type_arguments()?;
 
                 // Then check for the left parenthesis for actual arguments
-                self.expect(&TokenType::LeftParen, "expected '(' after function name or type arguments")?;
+                self.expect(
+                    &TokenType::LeftParen,
+                    "expected '(' after function name or type arguments",
+                )?;
 
                 let args_with_labels = self.parse_argument_list()?;
 
@@ -3150,7 +3281,8 @@ impl Parser {
                     },
                     source_location: start_location.clone(),
                 };
-            } else if self.check(&TokenType::LeftParen) { // Original logic for function call without explicit type arguments
+            } else if self.check(&TokenType::LeftParen) {
+                // Original logic for function call without explicit type arguments
                 // Function call: expr(args)
                 let args_with_labels = self.parse_argument_list()?;
 
@@ -3192,7 +3324,6 @@ impl Parser {
                     source_location: start_location.clone(),
                 };
             } else if self.check(&TokenType::LeftBracket) {
-
                 // Array indexing: expr[index]
                 self.advance();
                 let index = self.parse_expression()?;
@@ -3345,7 +3476,9 @@ impl Parser {
             }
 
             // Check for struct construction: TypeName { field: value, ... }
-            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction_with_name(&name) {
+            if self.check(&TokenType::LeftBrace)
+                && self.looks_like_struct_construction_with_name(&name)
+            {
                 return self.parse_struct_construction(name, start_location);
             }
 
@@ -3382,12 +3515,12 @@ impl Parser {
             // Actually, `{ expr }` is a braced expression. `{ stmt; }` is a block.
             // `{ key: value }` is a map.
             // `{}` is typically an empty Map literal in this context.
-            
+
             // Lookahead to see if it's a map literal
             if self.looks_like_map_literal() {
                 return self.parse_map_literal();
             }
-            
+
             // Otherwise parse as braced expression
             return self.parse_braced_expression();
         }
@@ -3467,7 +3600,7 @@ impl Parser {
             let start_location = self.current_location();
             self.advance(); // consume 'range'
             let name = "range".to_string();
-            
+
             let mut expr = Expression::Variable {
                 name: Identifier {
                     name: name.clone(),
@@ -3475,7 +3608,7 @@ impl Parser {
                 },
                 source_location: start_location.clone(),
             };
-            
+
             // Handle postfix operators (copied from Identifier block)
             loop {
                 if self.check(&TokenType::LeftParen) {
@@ -3538,7 +3671,9 @@ impl Parser {
 
             // Check for struct construction: TypeName { field: value, ... }
             // Only parse as struct construction if it looks like one (has field: value syntax)
-            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction_with_name(&name) {
+            if self.check(&TokenType::LeftBrace)
+                && self.looks_like_struct_construction_with_name(&name)
+            {
                 return self.parse_struct_construction(name, start_location);
             }
 
@@ -3903,7 +4038,7 @@ impl Parser {
             // Check if this is followed by `}` (single expression body)
             if self.check(&TokenType::RightBrace) {
                 self.advance(); // consume '}'
-                // Wrap the expression in an implicit return statement
+                                // Wrap the expression in an implicit return statement
                 let return_stmt = Statement::Return {
                     value: Some(Box::new(expr)),
                     source_location: block_start.clone(),
@@ -4072,19 +4207,27 @@ impl Parser {
         // Infer element type from first element or default to Int
         let element_type = if let Some(first) = elements.first() {
             match &**first {
-                Expression::IntegerLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                Expression::IntegerLiteral {
+                    source_location, ..
+                } => Box::new(TypeSpecifier::Primitive {
                     type_name: PrimitiveType::Integer,
                     source_location: source_location.clone(),
                 }),
-                Expression::FloatLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                Expression::FloatLiteral {
+                    source_location, ..
+                } => Box::new(TypeSpecifier::Primitive {
                     type_name: PrimitiveType::Float,
                     source_location: source_location.clone(),
                 }),
-                Expression::StringLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                Expression::StringLiteral {
+                    source_location, ..
+                } => Box::new(TypeSpecifier::Primitive {
                     type_name: PrimitiveType::String,
                     source_location: source_location.clone(),
                 }),
-                Expression::BooleanLiteral { source_location, .. } => Box::new(TypeSpecifier::Primitive {
+                Expression::BooleanLiteral {
+                    source_location, ..
+                } => Box::new(TypeSpecifier::Primitive {
                     type_name: PrimitiveType::Boolean,
                     source_location: source_location.clone(),
                 }),
@@ -4113,14 +4256,14 @@ impl Parser {
         if !self.check(&TokenType::LeftBrace) {
             return false;
         }
-        
+
         // Empty map {}
         if let Some(next) = self.tokens.get(self.position + 1) {
             if matches!(next.token_type, TokenType::RightBrace) {
-                return true; 
+                return true;
             }
         }
-        
+
         // Check for { Identifier : ... } or { StringLiteral : ... }
         if let Some(key_candidate) = self.peek_at(self.position + 1) {
             match &key_candidate.token_type {
@@ -4130,11 +4273,11 @@ impl Parser {
                             return true;
                         }
                     }
-                },
+                }
                 _ => { /* not an identifier or string literal, so not a simple map key */ }
             }
         }
-        
+
         false
     }
 
@@ -4148,13 +4291,13 @@ impl Parser {
         // Check for empty map
         if self.check(&TokenType::RightBrace) {
             self.advance();
-            let key_type = Box::new(TypeSpecifier::Primitive { 
+            let key_type = Box::new(TypeSpecifier::Primitive {
                 type_name: PrimitiveType::String,
-                source_location: start_location.clone() 
+                source_location: start_location.clone(),
             });
-            let value_type = Box::new(TypeSpecifier::Primitive { 
+            let value_type = Box::new(TypeSpecifier::Primitive {
                 type_name: PrimitiveType::Integer,
-                source_location: start_location.clone() 
+                source_location: start_location.clone(),
             });
             return Ok(Expression::MapLiteral {
                 key_type,
@@ -4167,36 +4310,36 @@ impl Parser {
         while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
             // Parse key expression
             let key = self.parse_expression()?;
-            
+
             self.expect(&TokenType::Colon, "expected ':' after map key")?;
-            
+
             // Parse value expression
             let value = self.parse_expression()?;
-            
+
             entries.push(crate::ast::MapEntry {
                 key: Box::new(key),
                 value: Box::new(value),
                 source_location: self.current_location(),
             });
-            
+
             if self.check(&TokenType::Comma) {
                 self.advance();
             } else {
                 break;
             }
         }
-        
+
         self.expect(&TokenType::RightBrace, "expected '}' after map entries")?;
-        
+
         // Inferred types (String -> Integer for now as default)
         // In a real compiler, we'd infer from context or first entry
-        let key_type = Box::new(TypeSpecifier::Primitive { 
+        let key_type = Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::String,
-            source_location: start_location.clone() 
+            source_location: start_location.clone(),
         });
-        let value_type = Box::new(TypeSpecifier::Primitive { 
+        let value_type = Box::new(TypeSpecifier::Primitive {
             type_name: PrimitiveType::Integer,
-            source_location: start_location.clone() 
+            source_location: start_location.clone(),
         });
 
         Ok(Expression::MapLiteral {
@@ -4435,17 +4578,20 @@ impl Parser {
                 let bindings = if self.check(&TokenType::LeftParen) {
                     self.advance(); // consume '('
                     let mut bindings_vec = Vec::new();
-                    
+
                     if !self.check(&TokenType::RightParen) {
                         loop {
                             if self.check(&TokenType::Underscore) {
                                 self.advance();
                                 // Represent wildcard binding as "_"
-                                bindings_vec.push(Identifier::new("_".to_string(), self.current_location()));
+                                bindings_vec.push(Identifier::new(
+                                    "_".to_string(),
+                                    self.current_location(),
+                                ));
                             } else {
                                 bindings_vec.push(self.parse_identifier()?);
                             }
-                            
+
                             if self.check(&TokenType::Comma) {
                                 self.advance();
                             } else {
@@ -4472,11 +4618,11 @@ impl Parser {
             if self.check(&TokenType::LeftBrace) {
                 self.advance(); // consume '{'
                 let mut fields = Vec::new();
-                
+
                 while !self.check(&TokenType::RightBrace) && !self.is_at_end() {
                     // Field name
                     let field_name = self.parse_identifier()?;
-                    
+
                     let pattern = if self.check(&TokenType::Colon) {
                         self.advance(); // consume ':'
                         self.parse_pattern()?
@@ -4488,18 +4634,21 @@ impl Parser {
                             source_location: field_name.source_location.clone(),
                         }
                     };
-                    
+
                     fields.push((field_name, pattern));
-                    
+
                     if self.check(&TokenType::Comma) {
                         self.advance();
                     } else {
                         break;
                     }
                 }
-                
-                self.expect(&TokenType::RightBrace, "expected '}' after struct pattern fields")?;
-                
+
+                self.expect(
+                    &TokenType::RightBrace,
+                    "expected '}' after struct pattern fields",
+                )?;
+
                 return Ok(Pattern::Struct {
                     struct_name: Identifier::new(name, start_location.clone()),
                     fields,
@@ -4730,7 +4879,6 @@ impl Parser {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests;

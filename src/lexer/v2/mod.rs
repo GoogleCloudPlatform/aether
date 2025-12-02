@@ -32,10 +32,10 @@ pub enum TokenType {
     RightBracket, // ]
 
     // Punctuation
-    Semicolon,    // ;
-    Colon,        // :
-    DoubleColon,  // ::
-    Comma,        // ,
+    Semicolon,   // ;
+    Colon,       // :
+    DoubleColon, // ::
+    Comma,       // ,
     Dot,         // .
     DotDot,      // ..
     DotDotEqual, // ..=
@@ -270,8 +270,10 @@ impl Lexer {
         self.keywords.insert("Int32".to_string(), Keyword::Int32);
         self.keywords.insert("Int64".to_string(), Keyword::Int64);
         self.keywords.insert("Float".to_string(), Keyword::Float);
-        self.keywords.insert("Float32".to_string(), Keyword::Float32);
-        self.keywords.insert("Float64".to_string(), Keyword::Float64);
+        self.keywords
+            .insert("Float32".to_string(), Keyword::Float32);
+        self.keywords
+            .insert("Float64".to_string(), Keyword::Float64);
         self.keywords.insert("String".to_string(), Keyword::String_);
         self.keywords.insert("Char".to_string(), Keyword::Char);
         self.keywords.insert("Bool".to_string(), Keyword::Bool);
@@ -666,7 +668,11 @@ impl Lexer {
                 self.advance();
                 if self.current_char == Some(':') {
                     self.advance();
-                    Ok(Token::new(TokenType::DoubleColon, location, "::".to_string()))
+                    Ok(Token::new(
+                        TokenType::DoubleColon,
+                        location,
+                        "::".to_string(),
+                    ))
                 } else {
                     Ok(Token::new(TokenType::Colon, location, ":".to_string()))
                 }
@@ -856,7 +862,6 @@ impl Lexer {
         self.keywords.get(name)
     }
 }
-
 
 #[cfg(test)]
 mod tests;

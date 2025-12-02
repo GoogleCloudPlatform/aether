@@ -224,9 +224,8 @@ fn test_parse_module_with_dotted_import() {
 
 #[test]
 fn test_parse_module_with_multiple_imports() {
-    let mut parser = parser_from_source(
-        "module Test { import std.io; import std.collections; import math; }",
-    );
+    let mut parser =
+        parser_from_source("module Test { import std.io; import std.collections; import math; }");
     let result = parser.parse_module();
 
     assert!(result.is_ok());
@@ -239,8 +238,7 @@ fn test_parse_module_with_multiple_imports() {
 
 #[test]
 fn test_parse_module_with_deeply_nested_import() {
-    let mut parser =
-        parser_from_source("module Test { import std.collections.hashmap.HashMap; }");
+    let mut parser = parser_from_source("module Test { import std.collections.hashmap.HashMap; }");
     let result = parser.parse_module();
 
     assert!(result.is_ok());
@@ -811,9 +809,8 @@ fn test_parse_function_multiple_params() {
 
 #[test]
 fn test_parse_function_complex_types() {
-    let mut parser = parser_from_source(
-        "func process(items: Array<Int>, config: Map<String, Int>) -> Bool { }",
-    );
+    let mut parser =
+        parser_from_source("func process(items: Array<Int>, config: Map<String, Int>) -> Bool { }");
     let result = parser.parse_function();
 
     assert!(result.is_ok());
@@ -965,9 +962,7 @@ fn test_parse_annotation_with_labeled_string_arg() {
     assert_eq!(annotation.name, "extern");
     assert_eq!(annotation.arguments.len(), 1);
     assert_eq!(annotation.arguments[0].label, Some("library".to_string()));
-    assert!(
-        matches!(&annotation.arguments[0].value, AnnotationValue::String(s) if s == "libc")
-    );
+    assert!(matches!(&annotation.arguments[0].value, AnnotationValue::String(s) if s == "libc"));
 }
 
 #[test]
@@ -981,9 +976,7 @@ fn test_parse_annotation_with_multiple_args() {
     assert_eq!(annotation.arguments.len(), 2);
     assert_eq!(annotation.arguments[0].label, Some("library".to_string()));
     assert_eq!(annotation.arguments[1].label, Some("symbol".to_string()));
-    assert!(
-        matches!(&annotation.arguments[1].value, AnnotationValue::String(s) if s == "malloc")
-    );
+    assert!(matches!(&annotation.arguments[1].value, AnnotationValue::String(s) if s == "malloc"));
 }
 
 #[test]
@@ -996,23 +989,21 @@ fn test_parse_annotation_with_braced_expression() {
     assert_eq!(annotation.name, "requires");
     assert_eq!(annotation.arguments.len(), 1);
     assert!(annotation.arguments[0].label.is_none());
-    
+
     match &annotation.arguments[0].value {
-        AnnotationValue::Expression(expr) => {
-            match &**expr {
-                Expression::GreaterThan { left, right, .. } => {
-                    match &**left {
-                        Expression::Variable { name, .. } => assert_eq!(name.name, "n"),
-                        _ => panic!("Expected variable left"),
-                    }
-                    match &**right {
-                        Expression::IntegerLiteral { value, .. } => assert_eq!(*value, 0),
-                        _ => panic!("Expected integer right"),
-                    }
+        AnnotationValue::Expression(expr) => match &**expr {
+            Expression::GreaterThan { left, right, .. } => {
+                match &**left {
+                    Expression::Variable { name, .. } => assert_eq!(name.name, "n"),
+                    _ => panic!("Expected variable left"),
                 }
-                _ => panic!("Expected GreaterThan expression, found {:?}", expr),
+                match &**right {
+                    Expression::IntegerLiteral { value, .. } => assert_eq!(*value, 0),
+                    _ => panic!("Expected integer right"),
+                }
             }
-        }
+            _ => panic!("Expected GreaterThan expression, found {:?}", expr),
+        },
         _ => panic!("Expected Expression value"),
     }
 }
@@ -1090,9 +1081,8 @@ fn test_parse_annotation_error_missing_close_paren() {
 
 #[test]
 fn test_parse_external_function_basic() {
-    let mut parser = parser_from_source(
-        "@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>;",
-    );
+    let mut parser =
+        parser_from_source("@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>;");
 
     // First parse the annotation
     let annotation = parser.parse_annotation().unwrap();
@@ -1111,7 +1101,9 @@ fn test_parse_external_function_basic() {
 
 #[test]
 fn test_parse_external_function_with_symbol() {
-    let mut parser = parser_from_source("@extern(library: \"c\", symbol: \"_malloc\") func malloc(size: SizeT) -> Pointer<Void>;");
+    let mut parser = parser_from_source(
+        "@extern(library: \"c\", symbol: \"_malloc\") func malloc(size: SizeT) -> Pointer<Void>;",
+    );
 
     let annotation = parser.parse_annotation().unwrap();
     let result = parser.parse_external_function(annotation);
@@ -1138,9 +1130,8 @@ fn test_parse_external_function_multiple_params() {
 
 #[test]
 fn test_parse_external_function_error_missing_semicolon() {
-    let mut parser = parser_from_source(
-        "@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>",
-    );
+    let mut parser =
+        parser_from_source("@extern(library: \"libc\") func malloc(size: SizeT) -> Pointer<Void>");
 
     let annotation = parser.parse_annotation().unwrap();
     let result = parser.parse_external_function(annotation);
@@ -1213,9 +1204,7 @@ fn test_parse_variable_declaration_string_value() {
     if let Statement::VariableDeclaration { initial_value, .. } = stmt {
         assert!(initial_value.is_some());
         let value = initial_value.unwrap();
-        assert!(
-            matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello")
-        );
+        assert!(matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello"));
     } else {
         panic!("Expected VariableDeclaration");
     }
@@ -1381,9 +1370,7 @@ fn test_parse_expression_string() {
 
     assert!(result.is_ok());
     let expr = result.unwrap();
-    assert!(
-        matches!(expr, Expression::StringLiteral { ref value, .. } if value == "hello world")
-    );
+    assert!(matches!(expr, Expression::StringLiteral { ref value, .. } if value == "hello world"));
 }
 
 #[test]
@@ -1437,12 +1424,8 @@ fn test_parse_assignment_string_value() {
     assert!(result.is_ok());
     let stmt = result.unwrap();
     if let Statement::Assignment { target, value, .. } = stmt {
-        assert!(
-            matches!(target, AssignmentTarget::Variable { ref name } if name.name == "name")
-        );
-        assert!(
-            matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello")
-        );
+        assert!(matches!(target, AssignmentTarget::Variable { ref name } if name.name == "name"));
+        assert!(matches!(*value, Expression::StringLiteral { ref value, .. } if value == "hello"));
     } else {
         panic!("Expected Assignment");
     }
@@ -1471,9 +1454,7 @@ fn test_parse_assignment_array_element() {
     let stmt = result.unwrap();
     if let Statement::Assignment { target, .. } = stmt {
         if let AssignmentTarget::ArrayElement { array, index } = target {
-            assert!(
-                matches!(*array, Expression::Variable { ref name, .. } if name.name == "arr")
-            );
+            assert!(matches!(*array, Expression::Variable { ref name, .. } if name.name == "arr"));
             assert!(matches!(
                 *index,
                 Expression::IntegerLiteral { value: 0, .. }
@@ -1859,7 +1840,11 @@ fn test_parse_expression_without_braces() {
     let mut parser = parser_from_source("x > 0");
     let result = parser.parse_expression();
 
-    assert!(result.is_ok(), "Expected expression without braces to parse: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Expected expression without braces to parse: {:?}",
+        result.err()
+    );
     let expr = result.unwrap();
     assert!(matches!(expr, Expression::GreaterThan { .. }));
 }
@@ -1870,7 +1855,11 @@ fn test_parse_if_without_braces() {
     let mut parser = parser_from_source("if x > 0 { return x; }");
     let result = parser.parse_if_statement();
 
-    assert!(result.is_ok(), "Expected if without braces to parse: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Expected if without braces to parse: {:?}",
+        result.err()
+    );
     let stmt = result.unwrap();
     if let Statement::If { condition, .. } = stmt {
         assert!(matches!(*condition, Expression::GreaterThan { .. }));
@@ -1885,9 +1874,16 @@ fn test_parse_return_without_braces() {
     let mut parser = parser_from_source("return x + 1;");
     let result = parser.parse_return_statement();
 
-    assert!(result.is_ok(), "Expected return without braces to parse: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Expected return without braces to parse: {:?}",
+        result.err()
+    );
     let stmt = result.unwrap();
-    if let Statement::Return { value: Some(expr), .. } = stmt {
+    if let Statement::Return {
+        value: Some(expr), ..
+    } = stmt
+    {
         assert!(matches!(*expr, Expression::Add { .. }));
     } else {
         panic!("Expected Return statement with Add expression");
@@ -1900,7 +1896,11 @@ fn test_parse_arithmetic_precedence() {
     let mut parser = parser_from_source("1 + 2 * 3");
     let result = parser.parse_expression();
 
-    assert!(result.is_ok(), "Expected precedence expression to parse: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Expected precedence expression to parse: {:?}",
+        result.err()
+    );
     let expr = result.unwrap();
     // Should be Add { left: 1, right: Multiply { 2, 3 } }
     if let Expression::Add { left, right, .. } = expr {
@@ -3257,7 +3257,10 @@ fn test_for_loop_with_range() {
     let result = parser.parse_for_loop();
     assert!(result.is_ok());
     let stmt = result.unwrap();
-    if let Statement::FixedIterationLoop { counter, inclusive, .. } = stmt {
+    if let Statement::FixedIterationLoop {
+        counter, inclusive, ..
+    } = stmt
+    {
         assert_eq!(counter.name, "i");
         assert!(!inclusive); // exclusive range
     } else {
@@ -3273,7 +3276,10 @@ fn test_for_loop_with_inclusive_range() {
     let result = parser.parse_for_loop();
     assert!(result.is_ok());
     let stmt = result.unwrap();
-    if let Statement::FixedIterationLoop { counter, inclusive, .. } = stmt {
+    if let Statement::FixedIterationLoop {
+        counter, inclusive, ..
+    } = stmt
+    {
         assert_eq!(counter.name, "i");
         assert!(inclusive); // inclusive range
     } else {
@@ -3432,7 +3438,10 @@ fn test_combined_for_range() {
     let result = parser.parse_for_loop();
     assert!(result.is_ok());
     let stmt = result.unwrap();
-    if let Statement::FixedIterationLoop { counter, inclusive, .. } = stmt {
+    if let Statement::FixedIterationLoop {
+        counter, inclusive, ..
+    } = stmt
+    {
         assert_eq!(counter.name, "i");
         assert!(!inclusive);
     } else {
@@ -3778,7 +3787,12 @@ fn test_generic_struct_single_parameter() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
     let module = result.unwrap();
     assert_eq!(module.type_definitions.len(), 1);
-    if let TypeDefinition::Structured { name, generic_parameters, .. } = &module.type_definitions[0] {
+    if let TypeDefinition::Structured {
+        name,
+        generic_parameters,
+        ..
+    } = &module.type_definitions[0]
+    {
         assert_eq!(name.name, "Box");
         assert_eq!(generic_parameters.len(), 1);
         assert_eq!(generic_parameters[0].name.name, "T");
@@ -3801,7 +3815,12 @@ fn test_generic_struct_multiple_parameters() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
     let module = result.unwrap();
     assert_eq!(module.type_definitions.len(), 1);
-    if let TypeDefinition::Structured { name, generic_parameters, .. } = &module.type_definitions[0] {
+    if let TypeDefinition::Structured {
+        name,
+        generic_parameters,
+        ..
+    } = &module.type_definitions[0]
+    {
         assert_eq!(name.name, "Pair");
         assert_eq!(generic_parameters.len(), 2);
         assert_eq!(generic_parameters[0].name.name, "K");
@@ -3844,7 +3863,12 @@ fn test_generic_enum_single_parameter() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
     let module = result.unwrap();
     assert_eq!(module.type_definitions.len(), 1);
-    if let TypeDefinition::Enumeration { name, generic_parameters, .. } = &module.type_definitions[0] {
+    if let TypeDefinition::Enumeration {
+        name,
+        generic_parameters,
+        ..
+    } = &module.type_definitions[0]
+    {
         assert_eq!(name.name, "Option");
         assert_eq!(generic_parameters.len(), 1);
         assert_eq!(generic_parameters[0].name.name, "T");
@@ -3867,7 +3891,12 @@ fn test_generic_enum_multiple_parameters() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
     let module = result.unwrap();
     assert_eq!(module.type_definitions.len(), 1);
-    if let TypeDefinition::Enumeration { name, generic_parameters, .. } = &module.type_definitions[0] {
+    if let TypeDefinition::Enumeration {
+        name,
+        generic_parameters,
+        ..
+    } = &module.type_definitions[0]
+    {
         assert_eq!(name.name, "Result");
         assert_eq!(generic_parameters.len(), 2);
         assert_eq!(generic_parameters[0].name.name, "T");
@@ -3975,7 +4004,13 @@ fn test_where_clause_struct() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
     let module = result.unwrap();
     assert_eq!(module.type_definitions.len(), 1);
-    if let TypeDefinition::Structured { name, generic_parameters, where_clause, .. } = &module.type_definitions[0] {
+    if let TypeDefinition::Structured {
+        name,
+        generic_parameters,
+        where_clause,
+        ..
+    } = &module.type_definitions[0]
+    {
         assert_eq!(name.name, "Container");
         assert_eq!(generic_parameters.len(), 1);
         assert_eq!(where_clause.len(), 1);
@@ -4108,7 +4143,10 @@ fn test_parse_trait_axiom_simple() {
     assert_eq!(module.trait_definitions.len(), 1);
     let trait_def = &module.trait_definitions[0];
     assert_eq!(trait_def.axioms.len(), 1);
-    assert_eq!(trait_def.axioms[0].name.as_ref().unwrap().name, "reflexivity");
+    assert_eq!(
+        trait_def.axioms[0].name.as_ref().unwrap().name,
+        "reflexivity"
+    );
     assert_eq!(trait_def.methods.len(), 1);
 }
 
@@ -4197,9 +4235,15 @@ fn test_parse_trait_multiple_axioms() {
     let module = result.unwrap();
     let trait_def = &module.trait_definitions[0];
     assert_eq!(trait_def.axioms.len(), 3);
-    assert_eq!(trait_def.axioms[0].name.as_ref().unwrap().name, "reflexivity");
+    assert_eq!(
+        trait_def.axioms[0].name.as_ref().unwrap().name,
+        "reflexivity"
+    );
     assert_eq!(trait_def.axioms[1].name.as_ref().unwrap().name, "symmetry");
-    assert_eq!(trait_def.axioms[2].name.as_ref().unwrap().name, "transitivity");
+    assert_eq!(
+        trait_def.axioms[2].name.as_ref().unwrap().name,
+        "transitivity"
+    );
 }
 
 #[test]
@@ -4211,14 +4255,18 @@ module Test {
     }
 }
 "#;
-    let mut tokens = crate::lexer::v2::Lexer::new(source, "test.aether".to_string()).tokenize().unwrap();
+    let mut tokens = crate::lexer::v2::Lexer::new(source, "test.aether".to_string())
+        .tokenize()
+        .unwrap();
     let mut parser = Parser::new(tokens);
     let module = parser.parse_module().unwrap();
 
     assert_eq!(module.impl_blocks.len(), 1);
     let impl_block = &module.impl_blocks[0];
     assert!(impl_block.trait_name.is_none());
-    assert!(matches!(*impl_block.for_type, TypeSpecifier::Named { ref name, .. } if name.name == "MyType"));
+    assert!(
+        matches!(*impl_block.for_type, TypeSpecifier::Named { ref name, .. } if name.name == "MyType")
+    );
     assert_eq!(impl_block.methods.len(), 1);
     assert_eq!(impl_block.methods[0].name.name, "new");
 }
@@ -4232,13 +4280,16 @@ module Test {
     }
 }
 "#;
-    let mut tokens = crate::lexer::v2::Lexer::new(source, "test.aether".to_string()).tokenize().unwrap();
+    let mut tokens = crate::lexer::v2::Lexer::new(source, "test.aether".to_string())
+        .tokenize()
+        .unwrap();
     let mut parser = Parser::new(tokens);
     let module = parser.parse_module().unwrap();
 
     assert_eq!(module.impl_blocks.len(), 1);
     let impl_block = &module.impl_blocks[0];
     assert!(matches!(impl_block.trait_name, Some(ref name) if name.name == "MyTrait"));
-    assert!(matches!(*impl_block.for_type, TypeSpecifier::Named { ref name, .. } if name.name == "MyType"));
+    assert!(
+        matches!(*impl_block.for_type, TypeSpecifier::Named { ref name, .. } if name.name == "MyType")
+    );
 }
-

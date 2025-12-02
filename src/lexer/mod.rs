@@ -47,9 +47,9 @@ pub enum TokenType {
     NullValue,
 
     // Ownership annotations
-    Caret,     // ^ for owned
-    Ampersand, // & for borrowed
-    Tilde,     // ~ for shared
+    Caret,            // ^ for owned
+    Ampersand,        // & for borrowed
+    Tilde,            // ~ for shared
     Lifetime(String), // 'a, 'b, etc.
 
     // Comments and whitespace
@@ -565,7 +565,9 @@ impl Lexer {
                 if content.len() == 1 {
                     // Single character - treat as character literal
                     // Safe: we just verified content.len() == 1
-                    let character = content.chars().next()
+                    let character = content
+                        .chars()
+                        .next()
                         .expect("content verified to have exactly 1 char");
                     return Ok(Token::new(
                         TokenType::Character(character),

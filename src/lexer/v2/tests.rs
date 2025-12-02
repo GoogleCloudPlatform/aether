@@ -761,9 +761,7 @@ fn test_lexer_tokenize_string_with_spaces() {
     let mut lexer = Lexer::new("\"hello world\"", "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
 
-    assert!(
-        matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello world")
-    );
+    assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello world"));
 }
 
 #[test]
@@ -779,9 +777,7 @@ fn test_lexer_tokenize_string_escape_newline() {
     let mut lexer = Lexer::new("\"hello\\nworld\"", "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
 
-    assert!(
-        matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello\nworld")
-    );
+    assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello\nworld"));
 }
 
 #[test]
@@ -789,9 +785,7 @@ fn test_lexer_tokenize_string_escape_tab() {
     let mut lexer = Lexer::new("\"hello\\tworld\"", "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
 
-    assert!(
-        matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello\tworld")
-    );
+    assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "hello\tworld"));
 }
 
 #[test]
@@ -799,9 +793,7 @@ fn test_lexer_tokenize_string_escape_quote() {
     let mut lexer = Lexer::new("\"say \\\"hi\\\"\"", "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
 
-    assert!(
-        matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "say \"hi\"")
-    );
+    assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "say \"hi\""));
 }
 
 #[test]
@@ -809,9 +801,7 @@ fn test_lexer_tokenize_string_escape_backslash() {
     let mut lexer = Lexer::new("\"path\\\\file\"", "test.aether".to_string());
     let tokens = lexer.tokenize().unwrap();
 
-    assert!(
-        matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "path\\file")
-    );
+    assert!(matches!(tokens[0].token_type, TokenType::StringLiteral(ref s) if s == "path\\file"));
 }
 
 #[test]
@@ -1664,4 +1654,3 @@ fn test_keyword_impl() {
         TokenType::Keyword(Keyword::Impl)
     ));
 }
-

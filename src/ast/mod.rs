@@ -1336,7 +1336,12 @@ impl ASTPrettyPrinter {
                 } else {
                     "".to_string()
                 };
-                format!("{}{}{}", prefix, lifetime_str, self.print_type_specifier(base_type))
+                format!(
+                    "{}{}{}",
+                    prefix,
+                    lifetime_str,
+                    self.print_type_specifier(base_type)
+                )
             }
             TypeSpecifier::TypeParameter {
                 name, constraints, ..
@@ -1503,7 +1508,9 @@ impl ASTPrettyPrinter {
                     FunctionReference::External { name } => name.name.clone(),
                 };
                 let type_args_str = if !call.explicit_type_arguments.is_empty() {
-                    let args: Vec<String> = call.explicit_type_arguments.iter()
+                    let args: Vec<String> = call
+                        .explicit_type_arguments
+                        .iter()
                         .map(|ts| self.print_type_specifier(ts))
                         .collect();
                     format!("<{}>", args.join(", "))
@@ -1533,7 +1540,6 @@ impl Default for ASTPrettyPrinter {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 mod tests;
