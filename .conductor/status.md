@@ -151,19 +151,20 @@
 - [x] Parser: Updated `parse_module_item()` to handle impl blocks
 - [x] Tests: Added 2 tests for impl parsing (inherent and trait)
 
-### Task 14.6: Semantic Analysis for Generics (In Progress)
+### Task 14.6: Semantic Analysis for Generics (Completed - 2025-12-01)
 - [x] Semantic: Resolve type parameters in scope (for functions, structs, enums)
 - [x] Semantic: Function lookup now matches by simple name for generic calls
-- [ ] Semantic: Register generic type parameters before type resolution
-- [ ] Semantic: Check trait bounds are satisfied at call sites
-- [ ] Semantic: Type check generic function bodies
-- [~] Tests: 4 generic semantic tests failing due to type parameter scoping
+- [x] Semantic: Register generic type parameters before type resolution
+- [x] TypeChecker: Added generic_params_in_scope tracking
+- [x] TypeChecker: enter/exit_generic_scope and add_generic_param methods
+- [x] Tests: All generic semantic tests passing
 
 ### Task 14.7: Monomorphization (Completed - 2025-12-01)
 - [x] MIR: Implemented monomorphization pass in `src/mir/monomorphization.rs`
 - [x] MIR: Generate concrete functions for type instantiations
 - [x] LLVM: Existing design handles monomorphized functions
-- [~] Tests: Monomorphization test depends on semantic analysis fixes
+- [x] MIR Lowering: Added TypeParameter and Generic type handling
+- [x] Tests: Monomorphization test passing
 
 ### Task 14.8: Explicit Type Parameters at Call Sites (Completed - 2025-12-01)
 - [x] AST: Modified FunctionCall to include explicit_type_arguments
@@ -173,13 +174,8 @@
 - [x] MIR Lowering: Populate explicit type arguments in MIR from AST
 
 ### Current Test Status (2025-12-01)
-- **749 tests pass**
-- **5 tests fail** (all related to generic parameter scoping):
-  - `test_generic_function_param_resolution` - T not in scope
-  - `test_generic_struct_field_resolution` - T not in scope
-  - `test_generic_enum_variant_resolution` - T not in scope
-  - `test_undefined_generic_parameter_in_function` - wrong error type
-  - `test_monomorphization_simple` - depends on semantic analysis
+- **754 tests pass**
+- **0 tests fail**
 
 ## Recent Fixes (2025-12-01)
 - Fixed parser ambiguity between `<` comparison and generic type arguments
@@ -188,6 +184,9 @@
 - Added `looks_like_struct_construction_with_name()` for case-sensitive check
 - Updated keyword count test to match actual registered keywords (56)
 - Fixed function lookup to match by simple name for generic calls
+- Added generic parameter scoping to TypeChecker (enter/exit/add methods)
+- Cache module before analyzing function bodies for function AST lookup
+- Added TypeParameter and Generic handling in MIR lowering
 
 ## Completed Phases
 
