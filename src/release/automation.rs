@@ -1182,7 +1182,6 @@ impl Default for RetryConfig {
     }
 }
 
-
 #[cfg(test)]
 #[path = "automation_tests.rs"]
 mod automation_tests;

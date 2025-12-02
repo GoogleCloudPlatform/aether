@@ -3,9 +3,9 @@ use crate::release::packaging::*;
 use crate::release::{
     AnnouncementConfig, AudienceConfig, AuthConfig, ChangelogConfig, ChangelogFormat,
     ChannelMetadata, ChannelType, ChannelVisibility, CommitParsingConfig, FailoverConfig,
-    FailoverThreshold, HealthCheckConfig, LoadBalancingConfig, LoadBalancingStrategy,
-    MirrorConfig, OptOutConfig, RecoveryConfig, ReleaseNotesConfig, ReleaseNotesFormat,
-    ReleaseNotesSection, SchedulingConfig, SyncConfig, SyncFrequency, SyncMethod,
+    FailoverThreshold, HealthCheckConfig, LoadBalancingConfig, LoadBalancingStrategy, MirrorConfig,
+    OptOutConfig, RecoveryConfig, ReleaseNotesConfig, ReleaseNotesFormat, ReleaseNotesSection,
+    SchedulingConfig, SyncConfig, SyncFrequency, SyncMethod,
 };
 use std::path::PathBuf;
 // Import conflicting types with aliases to avoid conflicts
