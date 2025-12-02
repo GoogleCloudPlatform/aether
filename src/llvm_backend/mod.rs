@@ -2088,8 +2088,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                     }
 
                     mir::AggregateKind::Enum(enum_name, variant_name) => {
-                        // TODO: Implement enum aggregate construction
-                        // For now, enums are represented as tagged unions
+                        // Enums with data are represented as heap-allocated tagged unions
                         // Layout: [discriminant: i32][data: largest variant size]
 
                         eprintln!(
@@ -2101,12 +2100,51 @@ impl<'ctx> LLVMBackend<'ctx> {
                         let discriminant_size = self.get_enum_discriminant_size(enum_name);
                         let data_size = 8; // TODO: Calculate based on largest variant data
                         let enum_size = discriminant_size + data_size;
-                        let enum_type = self.context.i8_type().array_type(enum_size as u32);
-                        let enum_alloca = builder
-                            .build_alloca(enum_type, &format!("{}_alloca", enum_name))
-                            .map_err(|e| SemanticError::CodeGenError {
-                                message: e.to_string(),
-                            })?;
+
+                        // Check if this enum has data - if so, use heap allocation
+                        // to ensure the memory survives function returns
+                        let enum_has_data = if let Some(type_def) = self.type_definitions.get(enum_name) {
+                            if let crate::types::TypeDefinition::Enum { variants, .. } = type_def {
+                                variants.iter().any(|v| !v.associated_types.is_empty())
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+
+                        let enum_alloca = if enum_has_data {
+                            // Heap-allocate enums with data to ensure memory survives returns
+                            let func_decls = self.function_declarations.as_ref()
+                                .ok_or_else(|| SemanticError::CodeGenError {
+                                    message: "function_declarations not initialized".to_string(),
+                                })?;
+                            let malloc_fn = func_decls.get("aether_malloc")
+                                .ok_or_else(|| SemanticError::CodeGenError {
+                                    message: "aether_malloc function not found".to_string(),
+                                })?;
+                            let size_val = self.context.i32_type().const_int(enum_size as u64, false);
+                            let heap_ptr = builder
+                                .build_call(*malloc_fn, &[size_val.into()], &format!("{}_heap", enum_name))
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?
+                                .try_as_basic_value()
+                                .left()
+                                .ok_or_else(|| SemanticError::CodeGenError {
+                                    message: "aether_malloc did not return a value".to_string(),
+                                })?
+                                .into_pointer_value();
+                            heap_ptr
+                        } else {
+                            // Stack-allocate simple enums without data
+                            let enum_type = self.context.i8_type().array_type(enum_size as u32);
+                            builder
+                                .build_alloca(enum_type, &format!("{}_alloca", enum_name))
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?
+                        };
 
                         // Map variant names to discriminant values based on declaration order
                         // This is a simple approach - variants get indices based on their position
@@ -2447,7 +2485,7 @@ impl<'ctx> LLVMBackend<'ctx> {
 
             mir::Rvalue::Discriminant(place) => {
                 // Get the discriminant of an enum
-                // First, get the type of the enum to determine discriminant size
+                // First, get the type of the enum to determine if it has data
                 let enum_type_name = if let Some(local) = function.locals.get(&place.local) {
                     match &local.ty {
                         crate::types::Type::Named { name, .. } => name.clone(),
@@ -2463,91 +2501,111 @@ impl<'ctx> LLVMBackend<'ctx> {
                     });
                 };
 
-                let discriminant_size = self.get_enum_discriminant_size(&enum_type_name);
+                // Check if this enum has associated data
+                let enum_has_data = if let Some(type_def) = self.type_definitions.get(&enum_type_name) {
+                    if let crate::types::TypeDefinition::Enum { variants, .. } = type_def {
+                        variants.iter().any(|v| !v.associated_types.is_empty())
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
 
-                // Get the pointer to the enum
-                let enum_ptr = if let Some(&alloca) = local_allocas.get(&place.local) {
-                    // Load the enum pointer
+                let alloca = local_allocas.get(&place.local).ok_or_else(|| {
+                    SemanticError::CodeGenError {
+                        message: format!("Local {:?} not found in allocas", place.local),
+                    }
+                })?;
+
+                if !enum_has_data {
+                    // Simple enum without data - the stored value IS the discriminant (an i32)
+                    let disc_value = builder
+                        .build_load(self.context.i32_type(), *alloca, "discriminant")
+                        .map_err(|e| SemanticError::CodeGenError {
+                            message: e.to_string(),
+                        })?;
+                    Ok(disc_value)
+                } else {
+                    // Enum with data - load the pointer and extract discriminant from tagged union
                     let loaded_ptr = builder
                         .build_load(
                             self.context.i8_type().ptr_type(AddressSpace::default()),
-                            alloca,
+                            *alloca,
                             "loaded_enum_ptr",
                         )
                         .map_err(|e| SemanticError::CodeGenError {
                             message: e.to_string(),
                         })?;
-                    loaded_ptr.into_pointer_value()
-                } else {
-                    return Err(SemanticError::CodeGenError {
-                        message: format!("Local {:?} not found in allocas", place.local),
-                    });
-                };
+                    let enum_ptr = loaded_ptr.into_pointer_value();
 
-                // Determine the discriminant type and cast appropriately
-                let (disc_type, disc_ptr) = match discriminant_size {
-                    1 => {
-                        let ptr = builder
-                            .build_pointer_cast(
-                                enum_ptr,
-                                self.context.i8_type().ptr_type(AddressSpace::default()),
-                                "discriminant_ptr_i8",
-                            )
-                            .map_err(|e| SemanticError::CodeGenError {
-                                message: e.to_string(),
-                            })?;
-                        (self.context.i8_type(), ptr)
-                    }
-                    2 => {
-                        let ptr = builder
-                            .build_pointer_cast(
-                                enum_ptr,
-                                self.context.i16_type().ptr_type(AddressSpace::default()),
-                                "discriminant_ptr_i16",
-                            )
-                            .map_err(|e| SemanticError::CodeGenError {
-                                message: e.to_string(),
-                            })?;
-                        (self.context.i16_type(), ptr)
-                    }
-                    _ => {
-                        let ptr = builder
-                            .build_pointer_cast(
-                                enum_ptr,
-                                self.context.i32_type().ptr_type(AddressSpace::default()),
-                                "discriminant_ptr_i32",
-                            )
-                            .map_err(|e| SemanticError::CodeGenError {
-                                message: e.to_string(),
-                            })?;
-                        (self.context.i32_type(), ptr)
-                    }
-                };
+                    let discriminant_size = self.get_enum_discriminant_size(&enum_type_name);
 
-                // Load discriminant value
-                let disc_value = builder
-                    .build_load(disc_type, disc_ptr, "discriminant")
-                    .map_err(|e| SemanticError::CodeGenError {
-                        message: e.to_string(),
-                    })?;
+                    // Determine the discriminant type and cast appropriately
+                    let (disc_type, disc_ptr) = match discriminant_size {
+                        1 => {
+                            let ptr = builder
+                                .build_pointer_cast(
+                                    enum_ptr,
+                                    self.context.i8_type().ptr_type(AddressSpace::default()),
+                                    "discriminant_ptr_i8",
+                                )
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?;
+                            (self.context.i8_type(), ptr)
+                        }
+                        2 => {
+                            let ptr = builder
+                                .build_pointer_cast(
+                                    enum_ptr,
+                                    self.context.i16_type().ptr_type(AddressSpace::default()),
+                                    "discriminant_ptr_i16",
+                                )
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?;
+                            (self.context.i16_type(), ptr)
+                        }
+                        _ => {
+                            let ptr = builder
+                                .build_pointer_cast(
+                                    enum_ptr,
+                                    self.context.i32_type().ptr_type(AddressSpace::default()),
+                                    "discriminant_ptr_i32",
+                                )
+                                .map_err(|e| SemanticError::CodeGenError {
+                                    message: e.to_string(),
+                                })?;
+                            (self.context.i32_type(), ptr)
+                        }
+                    };
 
-                // Zero-extend to i32 if necessary for consistency
-                let disc_i32 = if discriminant_size < 4 {
-                    builder
-                        .build_int_z_extend(
-                            disc_value.into_int_value(),
-                            self.context.i32_type(),
-                            "discriminant_i32",
-                        )
+                    // Load discriminant value
+                    let disc_value = builder
+                        .build_load(disc_type, disc_ptr, "discriminant")
                         .map_err(|e| SemanticError::CodeGenError {
                             message: e.to_string(),
-                        })?
-                        .into()
-                } else {
-                    disc_value
-                };
+                        })?;
 
-                Ok(disc_i32)
+                    // Zero-extend to i32 if necessary for consistency
+                    let disc_i32 = if discriminant_size < 4 {
+                        builder
+                            .build_int_z_extend(
+                                disc_value.into_int_value(),
+                                self.context.i32_type(),
+                                "discriminant_i32",
+                            )
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })?
+                            .into()
+                    } else {
+                        disc_value
+                    };
+
+                    Ok(disc_i32)
+                }
             }
         }
     }

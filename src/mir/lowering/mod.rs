@@ -945,40 +945,26 @@ impl LoweringContext {
         // Clone switch_values for use after the terminator is set
         let switch_values_copy = switch_values.clone();
 
-        // Check if we're matching on an enum with associated data
-        // If so, we need to extract the discriminant first
-        let switch_discriminant = if let Some(ast::Pattern::EnumVariant { enum_name: Some(enum_ident), source_location, .. }) = arms.first().map(|a| &a.pattern) {
-            // Check if this enum has associated data
-            if let Some(enum_def) = self.program.type_definitions.get(&enum_ident.name) {
-                if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
-                    let has_data = variants.iter().any(|v| !v.associated_types.is_empty());
-                    if has_data {
-                        // For enums with data, extract the discriminant from the pointer
-                        let disc_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
-                        self.builder.push_statement(Statement::Assign {
-                            place: Place {
-                                local: disc_local,
-                                projection: vec![],
-                            },
-                            rvalue: Rvalue::Discriminant(value_place.clone()),
-                            source_info: SourceInfo {
-                                span: source_location.clone(),
-                                scope: 0,
-                            },
-                        });
-                        Operand::Copy(Place {
-                            local: disc_local,
-                            projection: vec![],
-                        })
-                    } else {
-                        match_op.clone()
-                    }
-                } else {
-                    match_op.clone()
-                }
-            } else {
-                match_op.clone()
-            }
+        // For enum patterns, we ALWAYS need to extract the discriminant first
+        // (even for simple enums without data, since they're stored as pointers)
+        let switch_discriminant = if let Some(ast::Pattern::EnumVariant { enum_name: Some(_enum_ident), source_location, .. }) = arms.first().map(|a| &a.pattern) {
+            // Extract the discriminant from the enum pointer
+            let disc_local = self.builder.new_local(Type::primitive(ast::PrimitiveType::Integer), false);
+            self.builder.push_statement(Statement::Assign {
+                place: Place {
+                    local: disc_local,
+                    projection: vec![],
+                },
+                rvalue: Rvalue::Discriminant(value_place.clone()),
+                source_info: SourceInfo {
+                    span: source_location.clone(),
+                    scope: 0,
+                },
+            });
+            Operand::Copy(Place {
+                local: disc_local,
+                projection: vec![],
+            })
         } else {
             match_op.clone()
         };
