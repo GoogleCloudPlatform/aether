@@ -896,6 +896,7 @@ impl SemanticAnalyzer {
             }
 
             // First pass: register signatures and dispatch entries
+            let mut impl_signatures: HashMap<String, MethodSignatureInfo> = HashMap::new();
             for method in &impl_block.methods {
                 let trait_generics = if let Some(trait_ident) = &impl_block.trait_name {
                     self.trait_definitions
@@ -926,6 +927,8 @@ impl SemanticAnalyzer {
                     signature.return_type.clone(),
                 );
 
+                impl_signatures.insert(method.name.name.clone(), signature.clone());
+
                 let func_symbol = Symbol {
                     name: symbol_name.clone(),
                     symbol_type: func_type,
@@ -954,6 +957,101 @@ impl SemanticAnalyzer {
                         symbol_name,
                     };
                     self.trait_dispatch_table.insert(key, dispatch);
+                }
+            }
+
+            // Verify required trait methods are implemented and signatures match
+            if let Some(trait_ident) = &impl_block.trait_name {
+                if let Some(trait_def) = self.trait_definitions.get(&trait_ident.name) {
+                    for trait_method in &trait_def.methods {
+                        if trait_method.default_body.is_some() {
+                            continue;
+                        }
+
+                        let expected_sig = self.compute_method_signature(
+                            &trait_method.parameters,
+                            &trait_method.return_type,
+                            &trait_def.generic_parameters,
+                            &trait_method.generic_parameters,
+                            &self_type,
+                            &trait_substitutions,
+                        )?;
+
+                        if let Some(impl_sig) = impl_signatures.get(&trait_method.name.name) {
+                            if expected_sig.call_param_types.len() != impl_sig.call_param_types.len()
+                            {
+                                return Err(SemanticError::TraitMethodSignatureMismatch {
+                                    trait_name: trait_ident.name.clone(),
+                                    method_name: trait_method.name.name.clone(),
+                                    impl_type: self_type.to_string(),
+                                    expected: format!(
+                                        "fn({}) -> {}",
+                                        expected_sig
+                                            .call_param_types
+                                            .iter()
+                                            .map(|t| t.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", "),
+                                        expected_sig.return_type
+                                    ),
+                                    found: format!(
+                                        "fn({}) -> {}",
+                                        impl_sig
+                                            .call_param_types
+                                            .iter()
+                                            .map(|t| t.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", "),
+                                        impl_sig.return_type
+                                    ),
+                                    location: impl_block.source_location.clone(),
+                                });
+                            }
+
+                            for (expected_ty, actual_ty) in expected_sig
+                                .call_param_types
+                                .iter()
+                                .zip(impl_sig.call_param_types.iter())
+                            {
+                                if !self
+                                    .type_checker
+                                    .borrow()
+                                    .types_compatible(expected_ty, actual_ty)
+                                {
+                                    return Err(SemanticError::TraitMethodSignatureMismatch {
+                                        trait_name: trait_ident.name.clone(),
+                                        method_name: trait_method.name.name.clone(),
+                                        impl_type: self_type.to_string(),
+                                        expected: expected_ty.to_string(),
+                                        found: actual_ty.to_string(),
+                                        location: trait_method.source_location.clone(),
+                                    });
+                                }
+                            }
+
+                            if !self
+                                .type_checker
+                                .borrow()
+                                .types_compatible(&expected_sig.return_type, &impl_sig.return_type)
+                            {
+                                return Err(SemanticError::TraitMethodSignatureMismatch {
+                                    trait_name: trait_ident.name.clone(),
+                                    method_name: trait_method.name.name.clone(),
+                                    impl_type: self_type.to_string(),
+                                    expected: expected_sig.return_type.to_string(),
+                                    found: impl_sig.return_type.to_string(),
+                                    location: trait_method.source_location.clone(),
+                                });
+                            }
+                        } else {
+                            return Err(SemanticError::TraitMethodNotImplemented {
+                                trait_name: trait_ident.name.clone(),
+                                method_name: trait_method.name.name.clone(),
+                                impl_type: self_type.to_string(),
+                                location: impl_block.source_location.clone(),
+                            });
+                        }
+                    }
                 }
             }
 

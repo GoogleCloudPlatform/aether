@@ -486,9 +486,9 @@ See: [Architecture - Generics and Contract Verification](architecture.md#generic
 - [x] **Tests**: Trait method resolution tests
 
 ### Task 15.2: Trait Implementation Verification
-- [ ] **Semantic**: Verify impl blocks satisfy trait requirements
-- [ ] **Verification**: Check implementations satisfy trait axioms (if present)
-- [ ] **Tests**: Implementation verification tests
+- [x] **Semantic**: Verify impl blocks satisfy trait requirements
+- [x] **Verification**: Check implementations satisfy trait axioms (if present)
+- [x] **Tests**: Implementation verification tests
 
 ---
 

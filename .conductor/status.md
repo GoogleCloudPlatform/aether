@@ -206,6 +206,7 @@
 ## Status Update (2025-12-02)
 
 - Completed Task 15.1 (Trait Method Resolution): added trait dispatch table, `Self` substitution, generic-bound resolution (including `where` clauses), and trait method tests.
+- Completed Task 15.2 (Trait Implementation Verification): verify required trait methods exist with compatible signatures; added trait impl validation errors and tests.
 - Added `Self` handling in type conversion and a symbol-table helper for cross-scope lookups.
-- Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (all tests pass).
-- Next action: begin Task 15.2 (Trait Implementation Verification).
+- Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (all 759 tests pass).
+- Next action: begin Task 16.1 (Instantiation Verification) or deepen trait verification/axioms as needed.

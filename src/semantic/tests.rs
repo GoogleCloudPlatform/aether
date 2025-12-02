@@ -474,3 +474,63 @@ fn test_trait_method_resolution_missing_impl_errors() {
         errors
     );
 }
+
+#[test]
+fn test_trait_impl_missing_required_method() {
+    let source = r#"
+    module test;
+
+    trait Printable {
+        func print(self: &Self) -> Void;
+    }
+
+    struct Label { value: String; }
+
+    impl Printable for Label {
+        // Missing print implementation
+    }
+    "#;
+
+    let result = analyze_program_result(source);
+    assert!(result.is_err(), "expected error for missing required method");
+    let errors = result.err().unwrap();
+    assert!(
+        errors.iter().any(|e| matches!(
+            e,
+            SemanticError::TraitMethodNotImplemented { trait_name, method_name, .. }
+            if trait_name == "Printable" && method_name == "print"
+        )),
+        "expected TraitMethodNotImplemented error, got {:?}", errors
+    );
+}
+
+#[test]
+fn test_trait_impl_signature_mismatch() {
+    let source = r#"
+    module test;
+
+    trait Showable {
+        func show(self: &Self, value: Int) -> String;
+    }
+
+    struct Box { value: Int; }
+
+    impl Showable for Box {
+        func show(self: &Self) -> String { // missing parameter
+            return "oops";
+        }
+    }
+    "#;
+
+    let result = analyze_program_result(source);
+    assert!(result.is_err(), "expected signature mismatch error");
+    let errors = result.err().unwrap();
+    assert!(
+        errors.iter().any(|e| matches!(
+            e,
+            SemanticError::TraitMethodSignatureMismatch { trait_name, method_name, .. }
+            if trait_name == "Showable" && method_name == "show"
+        )),
+        "expected TraitMethodSignatureMismatch error, got {:?}", errors
+    );
+}

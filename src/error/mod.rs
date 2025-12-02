@@ -353,6 +353,24 @@ pub enum SemanticError {
         location: SourceLocation,
     },
 
+    #[error("Trait '{trait_name}' method '{method_name}' not implemented for type '{impl_type}' at {location}")]
+    TraitMethodNotImplemented {
+        trait_name: String,
+        method_name: String,
+        impl_type: String,
+        location: SourceLocation,
+    },
+
+    #[error("Trait '{trait_name}' method '{method_name}' signature mismatch for type '{impl_type}': expected {expected}, found {found} at {location}")]
+    TraitMethodSignatureMismatch {
+        trait_name: String,
+        method_name: String,
+        impl_type: String,
+        expected: String,
+        found: String,
+        location: SourceLocation,
+    },
+
     #[error("Internal error: {message} at {location}")]
     InternalError {
         message: String,
