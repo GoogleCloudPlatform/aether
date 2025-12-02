@@ -210,3 +210,10 @@
 - Added `Self` handling in type conversion and a symbol-table helper for cross-scope lookups.
 - Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (all 759 tests pass).
 - Next action: begin Task 16.1 (Instantiation Verification) or deepen trait verification/axioms as needed.
+
+## Status Update (2025-12-02 - later)
+
+- Completed Task 16.1 (Instantiation Verification): verification engine now reuses generic contracts for monomorphized functions.
+- Added unit test to ensure monomorphized functions produce verification conditions via generic contracts.
+- Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (full suite, 760 passing).
+- Next action: start Task 16.2 (Abstract Verification with Axioms).

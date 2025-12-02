@@ -148,7 +148,7 @@ impl VerificationEngine {
         self.context.current_function = Some(name.to_string());
 
         // Get function contract if it exists
-        let contract = self.context.function_contracts.get(name).cloned();
+        let contract = self.resolve_contract_for(name);
 
         // Generate verification conditions
         let conditions = self
@@ -206,7 +206,8 @@ impl VerificationEngine {
     }
 
     /// Add a function contract
-    pub fn add_function_contract(&mut self, name: String, contract: contracts::FunctionContract) {
+    pub fn add_function_contract(&mut self, name: String, mut contract: contracts::FunctionContract) {
+        contract.function_name = name.clone();
         self.context.function_contracts.insert(name, contract);
     }
 
@@ -259,6 +260,50 @@ impl VerificationEngine {
             ),
         }
     }
+
+    /// Resolve a contract for the given function name, falling back to generic bases for monomorphized functions.
+    fn resolve_contract_for(
+        &mut self,
+        function_name: &str,
+    ) -> Option<contracts::FunctionContract> {
+        if let Some(contract) = self
+            .context
+            .function_contracts
+            .get(function_name)
+            .cloned()
+        {
+            return Some(contract);
+        }
+
+        // Attempt to match monomorphized names of the form `generic_T1_T2`
+        let mut best_match: Option<(usize, contracts::FunctionContract)> = None;
+        for (base_name, contract) in &self.context.function_contracts {
+            if function_name.starts_with(base_name) {
+                let suffix = &function_name[base_name.len()..];
+                if suffix.starts_with('_') && !suffix.is_empty() {
+                    let base_len = base_name.len();
+                    if best_match
+                        .as_ref()
+                        .map_or(true, |(existing_len, _)| base_len > *existing_len)
+                    {
+                        let mut cloned = contract.clone();
+                        cloned.function_name = function_name.to_string();
+                        best_match = Some((base_len, cloned));
+                    }
+                }
+            }
+        }
+
+        if let Some((_, resolved)) = best_match {
+            // Cache the resolved contract for future lookups.
+            self.context
+                .function_contracts
+                .insert(function_name.to_string(), resolved.clone());
+            Some(resolved)
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for VerificationEngine {
@@ -270,11 +315,94 @@ impl Default for VerificationEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::PrimitiveType;
+    use crate::mir::{BasicBlock, Function, Parameter, Program, Terminator};
+    use crate::types::Type;
+    use std::collections::HashMap;
 
     #[test]
     fn test_verification_engine_creation() {
         let engine = VerificationEngine::new();
         assert!(engine.context.current_function.is_none());
         assert!(engine.context.function_contracts.is_empty());
+    }
+
+    #[test]
+    fn applies_contracts_to_monomorphized_functions() {
+        let mut engine = VerificationEngine::new();
+
+        // Contract on the generic function: result must equal input parameter.
+        let mut contract = contracts::FunctionContract::new("identity".to_string());
+        contract.add_postcondition(
+            "returns_input".to_string(),
+            contracts::Expression::BinaryOp {
+                op: contracts::BinaryOp::Eq,
+                left: Box::new(contracts::Expression::Result),
+                right: Box::new(contracts::Expression::Variable("x".to_string())),
+            },
+            SourceLocation::unknown(),
+        );
+        engine.add_function_contract("identity".to_string(), contract);
+
+        // Minimal MIR for the generic function and a monomorphized instantiation.
+        let int_type = Type::primitive(PrimitiveType::Integer);
+        let parameters = vec![Parameter {
+            name: "x".to_string(),
+            ty: int_type.clone(),
+            local_id: 0,
+        }];
+        let entry_block = BasicBlock {
+            id: 0,
+            statements: vec![],
+            terminator: Terminator::Return,
+        };
+
+        let mut base_blocks = HashMap::new();
+        base_blocks.insert(0, entry_block.clone());
+        let mut instantiated_blocks = HashMap::new();
+        instantiated_blocks.insert(0, entry_block);
+
+        let base_function = Function {
+            name: "identity".to_string(),
+            parameters: parameters.clone(),
+            return_type: int_type.clone(),
+            locals: HashMap::new(),
+            basic_blocks: base_blocks,
+            entry_block: 0,
+            return_local: Some(0),
+        };
+
+        let instantiated_function = Function {
+            name: "identity_Int".to_string(),
+            parameters,
+            return_type: int_type,
+            locals: HashMap::new(),
+            basic_blocks: instantiated_blocks,
+            entry_block: 0,
+            return_local: Some(0),
+        };
+
+        let mut program = Program {
+            functions: HashMap::new(),
+            global_constants: HashMap::new(),
+            external_functions: HashMap::new(),
+            type_definitions: HashMap::new(),
+        };
+        program
+            .functions
+            .insert("identity".to_string(), base_function);
+        program
+            .functions
+            .insert("identity_Int".to_string(), instantiated_function);
+
+        let results = engine.verify_program(&program).unwrap();
+
+        // The monomorphized function should reuse the generic contract.
+        let instantiation = results
+            .iter()
+            .find(|res| res.name == "identity_Int")
+            .expect("expected verification result for monomorphized function");
+        assert!(!instantiation.conditions.is_empty());
+        assert!(instantiation.verified);
     }
 }

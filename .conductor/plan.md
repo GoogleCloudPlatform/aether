@@ -497,9 +497,9 @@ See: [Architecture - Generics and Contract Verification](architecture.md#generic
 See: [Architecture - Verification Strategy](architecture.md#verification-strategy)
 
 ### Task 16.1: Instantiation Verification (Option B)
-- [ ] **Verification**: Verify contracts at monomorphization
-- [ ] **VCGen**: Generate verification conditions for concrete types
-- [ ] **Tests**: Instantiation verification tests
+- [x] **Verification**: Verify contracts at monomorphization
+- [x] **VCGen**: Generate verification conditions for concrete types
+- [x] **Tests**: Instantiation verification tests
 
 ### Task 16.2: Abstract Verification with Axioms (Option C)
 - [ ] **Verification**: Convert trait axioms to Z3 assertions
