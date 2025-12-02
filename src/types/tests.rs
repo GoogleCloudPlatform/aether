@@ -157,8 +157,7 @@ fn test_generic_instantiation() {
     assert!(result.is_ok());
 
     // Test constraint violation
-    let result =
-        checker.instantiate_generic("List", &[string_type.clone()], &numeric_constraints);
+    let result = checker.instantiate_generic("List", &[string_type.clone()], &numeric_constraints);
     assert!(result.is_err());
 
     // Test wrong number of arguments
@@ -178,8 +177,7 @@ fn test_generic_unification() {
 
     let list_int1 = Type::generic_instance("List".to_string(), vec![int_type.clone()], None);
     let list_int2 = Type::generic_instance("List".to_string(), vec![int_type.clone()], None);
-    let list_string =
-        Type::generic_instance("List".to_string(), vec![string_type.clone()], None);
+    let list_string = Type::generic_instance("List".to_string(), vec![string_type.clone()], None);
 
     // Same generic instances should unify
     assert!(checker.unify(&list_int1, &list_int2).is_ok());

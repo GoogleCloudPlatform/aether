@@ -14,14 +14,14 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::semantic::SemanticAnalyzer;
     use crate::ast::*;
-    use crate::error::{SourceLocation, SemanticError};
-    
+    use crate::error::{SemanticError, SourceLocation};
+    use crate::semantic::SemanticAnalyzer;
+
     #[test]
     fn test_ownership_transfer() {
         let mut analyzer = SemanticAnalyzer::new();
-        
+
         // Create a module with ownership-aware functions
         let module = Module {
             name: Identifier::new("test".to_string(), SourceLocation::unknown()),
@@ -39,24 +39,22 @@ mod tests {
                     intent: None,
                     generic_parameters: vec![],
                     lifetime_parameters: vec![],
-                    parameters: vec![
-                        Parameter {
-                            name: Identifier::new("value".to_string(), SourceLocation::unknown()),
-                            param_type: Box::new(TypeSpecifier::Owned {
-                                ownership: OwnershipKind::Owned,
-                                base_type: Box::new(TypeSpecifier::Primitive {
-                                    type_name: PrimitiveType::String,
-                                    source_location: SourceLocation::unknown(),
-                                }),
-                                lifetime: None,
+                    parameters: vec![Parameter {
+                        name: Identifier::new("value".to_string(), SourceLocation::unknown()),
+                        param_type: Box::new(TypeSpecifier::Owned {
+                            ownership: OwnershipKind::Owned,
+                            base_type: Box::new(TypeSpecifier::Primitive {
+                                type_name: PrimitiveType::String,
                                 source_location: SourceLocation::unknown(),
                             }),
-                            intent: None,
-                            constraint: None,
-                            passing_mode: PassingMode::ByValue,
+                            lifetime: None,
                             source_location: SourceLocation::unknown(),
-                        }
-                    ],
+                        }),
+                        intent: None,
+                        constraint: None,
+                        passing_mode: PassingMode::ByValue,
+                        source_location: SourceLocation::unknown(),
+                    }],
                     return_type: Box::new(TypeSpecifier::Primitive {
                         type_name: PrimitiveType::Void,
                         source_location: SourceLocation::unknown(),
@@ -87,24 +85,22 @@ mod tests {
                     intent: None,
                     generic_parameters: vec![],
                     lifetime_parameters: vec![],
-                    parameters: vec![
-                        Parameter {
-                            name: Identifier::new("value".to_string(), SourceLocation::unknown()),
-                            param_type: Box::new(TypeSpecifier::Owned {
-                                ownership: OwnershipKind::Borrowed,
-                                base_type: Box::new(TypeSpecifier::Primitive {
-                                    type_name: PrimitiveType::String,
-                                    source_location: SourceLocation::unknown(),
-                                }),
-                                lifetime: None,
+                    parameters: vec![Parameter {
+                        name: Identifier::new("value".to_string(), SourceLocation::unknown()),
+                        param_type: Box::new(TypeSpecifier::Owned {
+                            ownership: OwnershipKind::Borrowed,
+                            base_type: Box::new(TypeSpecifier::Primitive {
+                                type_name: PrimitiveType::String,
                                 source_location: SourceLocation::unknown(),
                             }),
-                            intent: None,
-                            constraint: None,
-                            passing_mode: PassingMode::ByValue,
+                            lifetime: None,
                             source_location: SourceLocation::unknown(),
-                        }
-                    ],
+                        }),
+                        intent: None,
+                        constraint: None,
+                        passing_mode: PassingMode::ByValue,
+                        source_location: SourceLocation::unknown(),
+                    }],
                     return_type: Box::new(TypeSpecifier::Primitive {
                         type_name: PrimitiveType::Void,
                         source_location: SourceLocation::unknown(),
@@ -133,11 +129,11 @@ mod tests {
             external_functions: vec![],
             source_location: SourceLocation::unknown(),
         };
-        
+
         // Analyze the module to register the functions
         let result = analyzer.analyze_module(&module);
         assert!(result.is_ok(), "Module analysis failed: {:?}", result.err());
-        
+
         // Now test ownership tracking with a function that uses these
         let test_function = Function {
             name: Identifier::new("test_ownership".to_string(), SourceLocation::unknown()),
@@ -187,19 +183,26 @@ mod tests {
                         expr: Box::new(Expression::FunctionCall {
                             call: FunctionCall {
                                 function_reference: FunctionReference::Local {
-                                    name: Identifier::new("borrow".to_string(), SourceLocation::unknown()),
+                                    name: Identifier::new(
+                                        "borrow".to_string(),
+                                        SourceLocation::unknown(),
+                                    ),
                                 },
                                 explicit_type_arguments: vec![],
-                                arguments: vec![
-                                    Argument {
-                                        parameter_name: Identifier::new("value".to_string(), SourceLocation::unknown()),
-                                        value: Box::new(Expression::Variable {
-                                            name: Identifier::new("s".to_string(), SourceLocation::unknown()),
-                                            source_location: SourceLocation::unknown(),
-                                        }),
+                                arguments: vec![Argument {
+                                    parameter_name: Identifier::new(
+                                        "value".to_string(),
+                                        SourceLocation::unknown(),
+                                    ),
+                                    value: Box::new(Expression::Variable {
+                                        name: Identifier::new(
+                                            "s".to_string(),
+                                            SourceLocation::unknown(),
+                                        ),
                                         source_location: SourceLocation::unknown(),
-                                    }
-                                ],
+                                    }),
+                                    source_location: SourceLocation::unknown(),
+                                }],
                                 variadic_arguments: vec![],
                             },
                             source_location: SourceLocation::unknown(),
@@ -211,19 +214,26 @@ mod tests {
                         expr: Box::new(Expression::FunctionCall {
                             call: FunctionCall {
                                 function_reference: FunctionReference::Local {
-                                    name: Identifier::new("consume".to_string(), SourceLocation::unknown()),
+                                    name: Identifier::new(
+                                        "consume".to_string(),
+                                        SourceLocation::unknown(),
+                                    ),
                                 },
                                 explicit_type_arguments: vec![],
-                                arguments: vec![
-                                    Argument {
-                                        parameter_name: Identifier::new("value".to_string(), SourceLocation::unknown()),
-                                        value: Box::new(Expression::Variable {
-                                            name: Identifier::new("s".to_string(), SourceLocation::unknown()),
-                                            source_location: SourceLocation::unknown(),
-                                        }),
+                                arguments: vec![Argument {
+                                    parameter_name: Identifier::new(
+                                        "value".to_string(),
+                                        SourceLocation::unknown(),
+                                    ),
+                                    value: Box::new(Expression::Variable {
+                                        name: Identifier::new(
+                                            "s".to_string(),
+                                            SourceLocation::unknown(),
+                                        ),
                                         source_location: SourceLocation::unknown(),
-                                    }
-                                ],
+                                    }),
+                                    source_location: SourceLocation::unknown(),
+                                }],
                                 variadic_arguments: vec![],
                             },
                             source_location: SourceLocation::unknown(),
@@ -235,19 +245,26 @@ mod tests {
                         expr: Box::new(Expression::FunctionCall {
                             call: FunctionCall {
                                 function_reference: FunctionReference::Local {
-                                    name: Identifier::new("borrow".to_string(), SourceLocation::unknown()),
+                                    name: Identifier::new(
+                                        "borrow".to_string(),
+                                        SourceLocation::unknown(),
+                                    ),
                                 },
                                 explicit_type_arguments: vec![],
-                                arguments: vec![
-                                    Argument {
-                                        parameter_name: Identifier::new("value".to_string(), SourceLocation::unknown()),
-                                        value: Box::new(Expression::Variable {
-                                            name: Identifier::new("s".to_string(), SourceLocation::unknown()),
-                                            source_location: SourceLocation::unknown(),
-                                        }),
+                                arguments: vec![Argument {
+                                    parameter_name: Identifier::new(
+                                        "value".to_string(),
+                                        SourceLocation::unknown(),
+                                    ),
+                                    value: Box::new(Expression::Variable {
+                                        name: Identifier::new(
+                                            "s".to_string(),
+                                            SourceLocation::unknown(),
+                                        ),
                                         source_location: SourceLocation::unknown(),
-                                    }
-                                ],
+                                    }),
+                                    source_location: SourceLocation::unknown(),
+                                }],
                                 variadic_arguments: vec![],
                             },
                             source_location: SourceLocation::unknown(),
@@ -267,15 +284,15 @@ mod tests {
         // Note: analyze_function_body is private, so we wrap it in a module to test via analyze_module
         // or expose it for tests. Since we can't easily change visibility here without modifying main code again,
         // let's put the test function in the module and expect analyze_module to fail.
-        
+
         let mut test_module = module.clone();
         test_module.function_definitions.push(test_function);
-        
+
         let mut analyzer2 = SemanticAnalyzer::new();
         let result = analyzer2.analyze_module(&test_module);
-        
+
         assert!(result.is_err(), "Expected error for use-after-move");
-        
+
         // Check that the error is specifically UseAfterMove
         // Since analyze_module returns a single error (the first one), this should work.
         if let Err(e) = result {

@@ -264,7 +264,11 @@ pub fn ast_expr_to_contract_expr(ast_expr: &ast::Expression) -> Result<Expressio
         }
 
         // Field access
-        ast::Expression::FieldAccess { instance, field_name, .. } => {
+        ast::Expression::FieldAccess {
+            instance,
+            field_name,
+            ..
+        } => {
             let object_expr = ast_expr_to_contract_expr(instance)?;
             Ok(Expression::FieldAccess {
                 object: Box::new(object_expr),
@@ -340,9 +344,7 @@ pub fn ast_assertion_to_condition(
 }
 
 /// Extract a FunctionContract from an AST function definition
-pub fn extract_function_contract(
-    func: &ast::Function,
-) -> Result<Option<FunctionContract>, String> {
+pub fn extract_function_contract(func: &ast::Function) -> Result<Option<FunctionContract>, String> {
     let metadata = &func.metadata;
 
     // If no contracts, return None

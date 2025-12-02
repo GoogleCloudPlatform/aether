@@ -118,19 +118,20 @@ impl ASTVisitor<()> for CaptureAnalyzer {
 
         // Visit body
         self.visit_statement(&Statement::Expression {
-            expr: Box::new(Expression::Variable { // Dummy expression to wrap block? No, just visit block.
+            expr: Box::new(Expression::Variable {
+                // Dummy expression to wrap block? No, just visit block.
                 name: Identifier::new("".to_string(), SourceLocation::unknown()),
                 source_location: SourceLocation::unknown(),
             }),
             source_location: SourceLocation::unknown(),
         });
-        
+
         // Actually, better to call visit_block logic directly or via a helper
         // But Block is usually visited via Statement::Block or similar.
         // In Aether AST, Function has a `body: Block`.
         // And `Block` is not a `Statement` itself, but contains statements.
         // Let's manually handle the block content here to avoid `Statement` wrapper mess
-        
+
         // The Block structure:
         for stmt in &node.body.statements {
             self.visit_statement(stmt);
@@ -141,18 +142,25 @@ impl ASTVisitor<()> for CaptureAnalyzer {
 
     fn visit_statement(&mut self, node: &Statement) {
         match node {
-            Statement::VariableDeclaration { name, initial_value, .. } => {
-                // Visit initializer BEFORE defining the variable (to avoid self-reference if disallowed, 
+            Statement::VariableDeclaration {
+                name,
+                initial_value,
+                ..
+            } => {
+                // Visit initializer BEFORE defining the variable (to avoid self-reference if disallowed,
                 // or handled correctly for captures if it refers to others)
                 if let Some(expr) = initial_value {
                     self.visit_expression(expr);
                 }
                 self.define_variable(&name.name);
             }
-            Statement::Concurrent { block, source_location } => {
+            Statement::Concurrent {
+                block,
+                source_location,
+            } => {
                 // Start of concurrent block
                 // The block's scope will be created inside visit_block (or manually here)
-                
+
                 // We mark the current scope depth. Any variable defined at `current_depth` or less (if we haven't entered block scope yet)
                 // will be outside.
                 // Actually, we are about to enter the block.
@@ -165,55 +173,86 @@ impl ASTVisitor<()> for CaptureAnalyzer {
                 // Actually, variable defined at <= N is captured.
                 // So if defined_depth < scopes.len() (which is N+1 after enter), it is captured.
                 // So `block_start_depth` should be `self.scopes.len()`.
-                
+
                 let start_depth = self.scopes.len();
-                self.concurrent_stack.push((start_depth, source_location.clone()));
-                
+                self.concurrent_stack
+                    .push((start_depth, source_location.clone()));
+
                 // Enter scope for the block
                 self.enter_scope();
-                
+
                 for stmt in &block.statements {
                     self.visit_statement(stmt);
                 }
-                
+
                 self.exit_scope();
-                
+
                 self.concurrent_stack.pop();
             }
-            Statement::If { condition, then_block, else_ifs, else_block, .. } => {
+            Statement::If {
+                condition,
+                then_block,
+                else_ifs,
+                else_block,
+                ..
+            } => {
                 self.visit_expression(condition);
-                
+
                 self.enter_scope();
-                for stmt in &then_block.statements { self.visit_statement(stmt); }
+                for stmt in &then_block.statements {
+                    self.visit_statement(stmt);
+                }
                 self.exit_scope();
 
                 for else_if in else_ifs {
                     self.visit_expression(&else_if.condition);
                     self.enter_scope();
-                    for stmt in &else_if.block.statements { self.visit_statement(stmt); }
+                    for stmt in &else_if.block.statements {
+                        self.visit_statement(stmt);
+                    }
                     self.exit_scope();
                 }
 
                 if let Some(block) = else_block {
                     self.enter_scope();
-                    for stmt in &block.statements { self.visit_statement(stmt); }
+                    for stmt in &block.statements {
+                        self.visit_statement(stmt);
+                    }
                     self.exit_scope();
                 }
             }
-            Statement::WhileLoop { condition, body, .. } => {
+            Statement::WhileLoop {
+                condition, body, ..
+            } => {
                 self.visit_expression(condition);
                 self.enter_scope();
-                for stmt in &body.statements { self.visit_statement(stmt); }
+                for stmt in &body.statements {
+                    self.visit_statement(stmt);
+                }
                 self.exit_scope();
             }
-            Statement::ForEachLoop { collection, element_binding, body, .. } => {
+            Statement::ForEachLoop {
+                collection,
+                element_binding,
+                body,
+                ..
+            } => {
                 self.visit_expression(collection);
                 self.enter_scope();
                 self.define_variable(&element_binding.name);
-                for stmt in &body.statements { self.visit_statement(stmt); }
+                for stmt in &body.statements {
+                    self.visit_statement(stmt);
+                }
                 self.exit_scope();
             }
-            Statement::FixedIterationLoop { from_value, to_value, step_value, counter, body, .. } => {
+            Statement::FixedIterationLoop {
+                from_value,
+                to_value,
+                step_value,
+                counter,
+                body,
+                ..
+            } => {
                 self.visit_expression(from_value);
                 self.visit_expression(to_value);
                 if let Some(step) = step_value {
@@ -221,7 +260,9 @@ impl ASTVisitor<()> for CaptureAnalyzer {
                 }
                 self.enter_scope();
                 self.define_variable(&counter.name);
-                for stmt in &body.statements { self.visit_statement(stmt); }
+                for stmt in &body.statements {
+                    self.visit_statement(stmt);
+                }
                 self.exit_scope();
             }
             Statement::Assignment { target, value, .. } => {
@@ -232,7 +273,9 @@ impl ASTVisitor<()> for CaptureAnalyzer {
                         self.visit_expression(array);
                         self.visit_expression(index);
                     }
-                    AssignmentTarget::StructField { instance, .. } => self.visit_expression(instance),
+                    AssignmentTarget::StructField { instance, .. } => {
+                        self.visit_expression(instance)
+                    }
                     AssignmentTarget::MapValue { map, key } => {
                         self.visit_expression(map);
                         self.visit_expression(key);
@@ -248,9 +291,16 @@ impl ASTVisitor<()> for CaptureAnalyzer {
             Statement::Expression { expr, .. } => {
                 self.visit_expression(expr);
             }
-            Statement::TryBlock { protected_block, catch_clauses, finally_block, .. } => {
+            Statement::TryBlock {
+                protected_block,
+                catch_clauses,
+                finally_block,
+                ..
+            } => {
                 self.enter_scope();
-                for stmt in &protected_block.statements { self.visit_statement(stmt); }
+                for stmt in &protected_block.statements {
+                    self.visit_statement(stmt);
+                }
                 self.exit_scope();
 
                 for clause in catch_clauses {
@@ -258,13 +308,17 @@ impl ASTVisitor<()> for CaptureAnalyzer {
                     if let Some(binding) = &clause.binding_variable {
                         self.define_variable(&binding.name);
                     }
-                    for stmt in &clause.handler_block.statements { self.visit_statement(stmt); }
+                    for stmt in &clause.handler_block.statements {
+                        self.visit_statement(stmt);
+                    }
                     self.exit_scope();
                 }
 
                 if let Some(block) = finally_block {
                     self.enter_scope();
-                    for stmt in &block.statements { self.visit_statement(stmt); }
+                    for stmt in &block.statements {
+                        self.visit_statement(stmt);
+                    }
                     self.exit_scope();
                 }
             }
@@ -274,11 +328,11 @@ impl ASTVisitor<()> for CaptureAnalyzer {
                     self.enter_scope();
                     // Bind pattern variables
                     self.visit_pattern(&arm.pattern);
-                    
+
                     if let Some(guard) = &arm.guard {
                         self.visit_expression(guard);
                     }
-                    
+
                     for stmt in &arm.body.statements {
                         self.visit_statement(stmt);
                     }
@@ -287,10 +341,10 @@ impl ASTVisitor<()> for CaptureAnalyzer {
             }
             Statement::Throw { exception, .. } => self.visit_expression(exception),
             Statement::FunctionCall { call, .. } => {
-                 self.visit_expression(&Expression::FunctionCall { 
-                     call: call.clone(), 
-                     source_location: SourceLocation::unknown() 
-                 });
+                self.visit_expression(&Expression::FunctionCall {
+                    call: call.clone(),
+                    source_location: SourceLocation::unknown(),
+                });
             }
             Statement::ResourceScope { scope, .. } => {
                 self.enter_scope();
@@ -298,7 +352,9 @@ impl ASTVisitor<()> for CaptureAnalyzer {
                     self.visit_expression(&resource.acquisition);
                     self.define_variable(&resource.binding.name);
                 }
-                for stmt in &scope.body.statements { self.visit_statement(stmt); }
+                for stmt in &scope.body.statements {
+                    self.visit_statement(stmt);
+                }
                 self.exit_scope();
             }
             _ => {}
@@ -312,40 +368,44 @@ impl ASTVisitor<()> for CaptureAnalyzer {
             }
             _ => {}
         }
-        
+
         // Generic traversal for all children
         // Ideally I'd use a macro or a default visitor, but I have to implement it manually here.
         // Let's be comprehensive.
         match node {
-            Expression::Add { left, right, .. } |
-            Expression::Subtract { left, right, .. } |
-            Expression::Multiply { left, right, .. } |
-            Expression::Divide { left, right, .. } |
-            Expression::IntegerDivide { left, right, .. } |
-            Expression::Modulo { left, right, .. } |
-            Expression::Equals { left, right, .. } |
-            Expression::NotEquals { left, right, .. } |
-            Expression::LessThan { left, right, .. } |
-            Expression::LessThanOrEqual { left, right, .. } |
-            Expression::GreaterThan { left, right, .. } |
-            Expression::GreaterThanOrEqual { left, right, .. } |
-            Expression::StringEquals { left, right, .. } |
-            Expression::StringContains { haystack: left, needle: right, .. } => {
+            Expression::Add { left, right, .. }
+            | Expression::Subtract { left, right, .. }
+            | Expression::Multiply { left, right, .. }
+            | Expression::Divide { left, right, .. }
+            | Expression::IntegerDivide { left, right, .. }
+            | Expression::Modulo { left, right, .. }
+            | Expression::Equals { left, right, .. }
+            | Expression::NotEquals { left, right, .. }
+            | Expression::LessThan { left, right, .. }
+            | Expression::LessThanOrEqual { left, right, .. }
+            | Expression::GreaterThan { left, right, .. }
+            | Expression::GreaterThanOrEqual { left, right, .. }
+            | Expression::StringEquals { left, right, .. }
+            | Expression::StringContains {
+                haystack: left,
+                needle: right,
+                ..
+            } => {
                 self.visit_expression(left);
                 self.visit_expression(right);
             }
-            Expression::Negate { operand: expr, .. } |
-            Expression::LogicalNot { operand: expr, .. } |
-            Expression::StringLength { string: expr, .. } |
-            Expression::TypeCast { value: expr, .. } |
-            Expression::AddressOf { operand: expr, .. } |
-            Expression::Dereference { pointer: expr, .. } |
-            Expression::ArrayLength { array: expr, .. } => {
+            Expression::Negate { operand: expr, .. }
+            | Expression::LogicalNot { operand: expr, .. }
+            | Expression::StringLength { string: expr, .. }
+            | Expression::TypeCast { value: expr, .. }
+            | Expression::AddressOf { operand: expr, .. }
+            | Expression::Dereference { pointer: expr, .. }
+            | Expression::ArrayLength { array: expr, .. } => {
                 self.visit_expression(expr);
             }
-            Expression::LogicalAnd { operands, .. } |
-            Expression::LogicalOr { operands, .. } |
-            Expression::StringConcat { operands, .. } => {
+            Expression::LogicalAnd { operands, .. }
+            | Expression::LogicalOr { operands, .. }
+            | Expression::StringConcat { operands, .. } => {
                 for op in operands {
                     self.visit_expression(op);
                 }
@@ -360,21 +420,31 @@ impl ASTVisitor<()> for CaptureAnalyzer {
                 }
             }
             Expression::ArrayLiteral { elements, .. } => {
-                for elem in elements { self.visit_expression(elem); }
+                for elem in elements {
+                    self.visit_expression(elem);
+                }
             }
             Expression::ArrayAccess { array, index, .. } => {
                 self.visit_expression(array);
                 self.visit_expression(index);
             }
             Expression::StructConstruct { field_values, .. } => {
-                for fv in field_values { self.visit_expression(&fv.value); }
+                for fv in field_values {
+                    self.visit_expression(&fv.value);
+                }
             }
             Expression::FieldAccess { instance, .. } => {
                 self.visit_expression(instance);
             }
-            Expression::MethodCall { receiver, arguments, .. } => {
+            Expression::MethodCall {
+                receiver,
+                arguments,
+                ..
+            } => {
                 self.visit_expression(receiver);
-                for arg in arguments { self.visit_expression(&arg.value); }
+                for arg in arguments {
+                    self.visit_expression(&arg.value);
+                }
             }
             Expression::Lambda { .. } => {
                 // TODO: Handle lambdas. They also capture!
@@ -393,7 +463,11 @@ impl ASTVisitor<()> for CaptureAnalyzer {
 impl CaptureAnalyzer {
     fn visit_pattern(&mut self, pattern: &Pattern) {
         match pattern {
-            Pattern::EnumVariant { bindings, nested_pattern, .. } => {
+            Pattern::EnumVariant {
+                bindings,
+                nested_pattern,
+                ..
+            } => {
                 for binding in bindings {
                     self.define_variable(&binding.name);
                 }
@@ -445,7 +519,7 @@ mod tests {
 
         // We expect one concurrent block with "x" captured
         assert_eq!(analyzer.captures.len(), 1);
-        
+
         let captured_vars = analyzer.captures.values().next().unwrap();
         assert!(captured_vars.contains("x"));
         assert!(!captured_vars.contains("y"));
@@ -477,14 +551,14 @@ mod tests {
         analyzer.analyze(&module);
 
         assert_eq!(analyzer.captures.len(), 2);
-        
+
         // Check captures
         // Since we don't have easy access to keys (SourceLocation), we check that *some* block has 'a'
         // and another has 'a', 'b', 'c'.
-        
+
         let mut found_outer = false;
         let mut found_inner = false;
-        
+
         for vars in analyzer.captures.values() {
             if vars.len() == 1 && vars.contains("a") {
                 found_outer = true;
@@ -492,7 +566,7 @@ mod tests {
                 found_inner = true;
             }
         }
-        
+
         assert!(found_outer, "Outer block should capture 'a'");
         assert!(found_inner, "Inner block should capture 'a' and 'c'");
     }

@@ -154,8 +154,10 @@ impl VcGenerator {
                         let local_name = format!("local_{}", return_local);
                         if let Some(return_formula) = self.state.get(&local_name).cloned() {
                             // Bind both "result" and "return_value" to the actual return
-                            self.state.insert("result".to_string(), return_formula.clone());
-                            self.state.insert("return_value".to_string(), return_formula);
+                            self.state
+                                .insert("result".to_string(), return_formula.clone());
+                            self.state
+                                .insert("return_value".to_string(), return_formula);
                         }
                     }
 

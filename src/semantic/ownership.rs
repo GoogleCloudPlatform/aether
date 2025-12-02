@@ -24,7 +24,10 @@ impl SemanticAnalyzer {
         arg_expr: &Expression,
         param_type: &Type,
     ) -> Result<(), SemanticError> {
-        eprintln!("Checking ownership for arg: {:?}, param_type: {:?}", arg_expr, param_type);
+        eprintln!(
+            "Checking ownership for arg: {:?}, param_type: {:?}",
+            arg_expr, param_type
+        );
         if let Expression::Variable {
             name,
             source_location,
