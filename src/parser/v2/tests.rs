@@ -1620,7 +1620,7 @@ fn test_parse_binary_less_than() {
     let mut parser = parser_from_source("{x < 10}");
     let result = parser.parse_expression();
 
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Parse error: {:?}", result.err());
     let expr = result.unwrap();
     assert!(matches!(expr, Expression::LessThan { .. }));
 }

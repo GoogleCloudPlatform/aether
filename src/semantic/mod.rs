@@ -934,16 +934,21 @@ impl SemanticAnalyzer {
         Ok(())
     }
 
-    /// Helper to look up an AST Function by its qualified name
-    fn lookup_ast_function_in_modules(&self, qualified_name: &str) -> Option<Function> {
+    /// Helper to look up an AST Function by its qualified or unqualified name
+    fn lookup_ast_function_in_modules(&self, name: &str) -> Option<Function> {
         for loaded_module in self.analyzed_modules.values() {
             for func_def in &loaded_module.module.function_definitions {
+                // Match by fully qualified name
                 let full_name = if loaded_module.module.name.name == "main" {
                     func_def.name.name.clone()
                 } else {
                     format!("{}.{}", loaded_module.module.name.name, func_def.name.name)
                 };
-                if full_name == qualified_name {
+                if full_name == name {
+                    return Some(func_def.clone());
+                }
+                // Also match by simple name (for calls within the same module)
+                if func_def.name.name == name {
                     return Some(func_def.clone());
                 }
             }

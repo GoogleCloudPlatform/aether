@@ -288,12 +288,12 @@ impl Parser {
         self.peek().location.clone()
     }
 
-    /// Check if what follows looks like a struct construction: { field: value, ... }
+    /// Check if what follows looks like a struct construction: { field: value, ... } or {}
     /// This requires looking ahead: after '{', if we see 'identifier :' it's struct construction.
     /// Called when current token is '{'.
-    /// Note: Empty braces `{ }` are NOT treated as struct construction because they are
-    /// ambiguous (could be a block in control flow like `when x { }`).
-    fn looks_like_struct_construction(&self) -> bool {
+    /// The `type_name` parameter is the identifier that precedes the `{`.
+    /// For empty braces `{}`, only treat as struct construction if the type name starts with uppercase.
+    fn looks_like_struct_construction_with_name(&self, type_name: &str) -> bool {
         // Current token should be '{'
         if !matches!(self.peek().token_type, TokenType::LeftBrace) {
             return false;
@@ -301,6 +301,12 @@ impl Parser {
 
         // Look at token after '{'
         if let Some(after_brace) = self.peek_at(self.position + 1) {
+            // Check for empty braces `{}` - only struct construction if type_name looks like a type
+            if matches!(after_brace.token_type, TokenType::RightBrace) {
+                // Treat as struct construction only if the name starts with uppercase (type convention)
+                return type_name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false);
+            }
+
             // Check for field: value pattern
             // Only treat as struct construction if we see `identifier :` pattern
             if let TokenType::Identifier(_) = &after_brace.token_type {
@@ -376,6 +382,42 @@ impl Parser {
         }
 
         true // default to array
+    }
+
+    /// Check if what follows `<` looks like type arguments rather than comparison.
+    /// Called when current token is `<`.
+    /// Returns true if the token after `<` looks like a type (uppercase identifier or type keyword).
+    fn looks_like_type_arguments(&self) -> bool {
+        // Current token should be '<'
+        if !matches!(self.peek().token_type, TokenType::Less) {
+            return false;
+        }
+
+        // Look at token after '<'
+        if let Some(after_less) = self.peek_at(self.position + 1) {
+            match &after_less.token_type {
+                // Type keywords always indicate type arguments
+                TokenType::Keyword(kw) => {
+                    matches!(kw,
+                        Keyword::Int | Keyword::Int32 | Keyword::Int64 |
+                        Keyword::Float | Keyword::Float32 | Keyword::Float64 |
+                        Keyword::String_ | Keyword::Char | Keyword::Bool |
+                        Keyword::Void | Keyword::Array | Keyword::Map | Keyword::SizeT
+                    )
+                }
+                // Identifiers that start with uppercase are likely types
+                TokenType::Identifier(name) => {
+                    name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
+                }
+                // Reference types: &Type, ^Type, ~Type
+                TokenType::Ampersand | TokenType::Caret | TokenType::Tilde => {
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
     }
 
     /// Peek at a specific position in the token stream
@@ -3062,7 +3104,10 @@ impl Parser {
 
         // Handle postfix operators: (args), [index], and .field
         loop {
-            if self.check(&TokenType::Less) { // NEW: Check for explicit type arguments
+            // Check for explicit type arguments: identifier<Type>(args)
+            // Only parse as type arguments if `<` is followed by something that looks like a type
+            if self.check(&TokenType::Less) && self.looks_like_type_arguments() {
+                self.advance(); // consume '<'
                 let explicit_type_arguments = self.parse_explicit_type_arguments()?;
 
                 // Then check for the left parenthesis for actual arguments
@@ -3300,7 +3345,7 @@ impl Parser {
             }
 
             // Check for struct construction: TypeName { field: value, ... }
-            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction() {
+            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction_with_name(&name) {
                 return self.parse_struct_construction(name, start_location);
             }
 
@@ -3493,7 +3538,7 @@ impl Parser {
 
             // Check for struct construction: TypeName { field: value, ... }
             // Only parse as struct construction if it looks like one (has field: value syntax)
-            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction() {
+            if self.check(&TokenType::LeftBrace) && self.looks_like_struct_construction_with_name(&name) {
                 return self.parse_struct_construction(name, start_location);
             }
 
