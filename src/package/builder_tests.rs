@@ -70,9 +70,7 @@ fn create_test_manifest() -> PackageManifest {
             aether_version: None,
             build: None,
             publish: None,
-            metadata: crate::package::manifest::TomlValue::Table(
-                std::collections::HashMap::new(),
-            ),
+            metadata: crate::package::manifest::TomlValue::Table(std::collections::HashMap::new()),
         },
         dependencies: vec![],
         dev_dependencies: vec![],

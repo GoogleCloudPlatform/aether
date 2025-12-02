@@ -939,7 +939,6 @@ fn is_valid_package_name(name: &str) -> bool {
         .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
 
-
 #[cfg(test)]
 #[path = "manifest_tests.rs"]
 mod manifest_tests;

@@ -1024,7 +1024,6 @@ impl BuildScriptRunner {
     }
 }
 
-
 #[cfg(test)]
 #[path = "builder_tests.rs"]
 mod builder_tests;
