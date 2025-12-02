@@ -350,9 +350,7 @@ impl Default for CompletionProvider {
             })
             .collect();
 
-        Self {
-            keywords,
-        }
+        Self { keywords }
     }
 }
 

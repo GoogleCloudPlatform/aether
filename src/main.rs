@@ -284,13 +284,13 @@ async fn main() {
         Some(Commands::Lsp) => {
             use aether::lsp::Backend;
             use tower_lsp::{LspService, Server};
-            
+
             let stdin = tokio::io::stdin();
             let stdout = tokio::io::stdout();
 
             let (service, socket) = LspService::new(|client| Backend::new(client));
             Server::new(stdin, stdout, socket).serve(service).await;
-            
+
             Ok(aether::pipeline::CompilationResult {
                 executable_path: PathBuf::new(),
                 intermediate_files: vec![],
@@ -497,10 +497,13 @@ async fn main() {
 
                     if let Some(output_dir) = output {
                         let output_path = std::path::Path::new(&output_dir)
-                            .join(input.file_stem().expect("input file should have a file stem"))
+                            .join(
+                                input
+                                    .file_stem()
+                                    .expect("input file should have a file stem"),
+                            )
                             .with_extension("ast");
-                        fs::create_dir_all(&output_dir)
-                            .expect("failed to create output directory");
+                        fs::create_dir_all(&output_dir).expect("failed to create output directory");
                         fs::write(output_path, output_content)
                             .expect("failed to write output file");
                     } else {
@@ -563,12 +566,14 @@ async fn main() {
 
             if let Some(output_dir) = output {
                 let output_path = std::path::Path::new(&output_dir)
-                    .join(input.file_stem().expect("input file should have a file stem"))
+                    .join(
+                        input
+                            .file_stem()
+                            .expect("input file should have a file stem"),
+                    )
                     .with_extension("tokens");
-                fs::create_dir_all(&output_dir)
-                    .expect("failed to create output directory");
-                fs::write(output_path, output_content)
-                    .expect("failed to write output file");
+                fs::create_dir_all(&output_dir).expect("failed to create output directory");
+                fs::write(output_path, output_content).expect("failed to write output file");
             } else {
                 println!("{}", output_content);
             }

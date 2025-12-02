@@ -201,7 +201,12 @@ impl CompilationPipeline {
     }
 
     /// Parse a single source file using V2 parser
-    fn parse_file(&self, path: &Path, source: &str, verbose: bool) -> Result<Module, CompilerError> {
+    fn parse_file(
+        &self,
+        path: &Path,
+        source: &str,
+        verbose: bool,
+    ) -> Result<Module, CompilerError> {
         Self::parse_source(path, source, verbose)
     }
 
@@ -259,7 +264,8 @@ impl CompilationPipeline {
                 let verbose_for_parallel = self.options.verbose; // Capture verbose flag for parallel closure
                 let results: Result<Vec<_>, _> = input_files
                     .par_iter()
-                    .map(move |input_file| { // Add 'move' to transfer ownership of captured variables
+                    .map(move |input_file| {
+                        // Add 'move' to transfer ownership of captured variables
                         // Read file
                         let source =
                             fs::read_to_string(input_file).map_err(|e| CompilerError::IoError {
@@ -334,12 +340,12 @@ impl CompilationPipeline {
             };
 
             let mut analyzer = SemanticAnalyzer::new();
-            
+
             // Add library paths to module search paths
             for path in &self.options.library_paths {
                 analyzer.add_module_search_path(path.clone());
             }
-            
+
             analyzer.analyze_program(&program)?;
 
             let analysis_stats = analyzer.get_statistics().clone();
@@ -356,11 +362,11 @@ impl CompilationPipeline {
             // AST of the modules we are compiling. Imported modules are needed for
             // symbol resolution, which is handled by the symbol table.
             // So we might not need `get_analyzed_modules` if `symbol_table` has everything.
-            
-            let complete_prog = program.clone(); 
+
+            let complete_prog = program.clone();
             // If we need to inline code from imported modules, we'd need their ASTs.
             // For now, let's proceed with just the explicit program modules.
-            
+
             (analyzer.get_symbol_table().clone(), captures, complete_prog)
         };
 
@@ -423,7 +429,11 @@ impl CompilationPipeline {
                 }
             }
 
-            mir::lowering::lower_ast_to_mir_with_symbols_and_captures(&complete_program, symbol_table, captures)?
+            mir::lowering::lower_ast_to_mir_with_symbols_and_captures(
+                &complete_program,
+                symbol_table,
+                captures,
+            )?
         };
 
         stats.phase_times.insert(
@@ -440,10 +450,10 @@ impl CompilationPipeline {
             println!("Phase 3.1: Running monomorphization...");
         }
         let mono_start = std::time::Instant::now();
-        
+
         let mut monomorphizer = mir::monomorphization::Monomorphizer::new();
         monomorphizer.run(&mut mir_program);
-        
+
         stats.phase_times.insert(
             "monomorphization".to_string(),
             mono_start.elapsed().as_millis(),
@@ -466,16 +476,22 @@ impl CompilationPipeline {
 
                 // Extract contracts from AST
                 let contracts = ast_to_contract::extract_program_contracts(&complete_program)
-                    .map_err(|e| CompilerError::SemanticError(SemanticError::VerificationError {
-                        message: format!("Failed to extract contracts: {}", e),
-                        location: crate::error::SourceLocation::unknown(),
-                    }))?;
+                    .map_err(|e| {
+                        CompilerError::SemanticError(SemanticError::VerificationError {
+                            message: format!("Failed to extract contracts: {}", e),
+                            location: crate::error::SourceLocation::unknown(),
+                        })
+                    })?;
 
                 if self.options.verbose {
                     println!("  Extracted {} contracts from AST", contracts.len());
                     for (name, contract) in &contracts {
-                        println!("    Contract '{}': {} pre, {} post",
-                            name, contract.preconditions.len(), contract.postconditions.len());
+                        println!(
+                            "    Contract '{}': {} pre, {} post",
+                            name,
+                            contract.preconditions.len(),
+                            contract.postconditions.len()
+                        );
                     }
                     println!("  MIR functions:");
                     for name in mir_program.functions.keys() {
