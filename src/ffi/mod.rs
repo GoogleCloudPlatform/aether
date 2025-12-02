@@ -309,15 +309,16 @@ impl FFIAnalyzer {
                 let type_checker = self.type_checker.borrow();
 
                 // Try with just the name first, then with module prefix
-                let type_def = type_checker.lookup_type_definition(name)
+                let type_def = type_checker
+                    .lookup_type_definition(name)
                     .or_else(|| type_checker.lookup_type_definition(&full_name));
 
                 match type_def {
                     Some(TypeDefinition::Struct { fields, .. }) => {
                         // Struct is FFI-compatible if all fields are FFI-compatible
-                        fields.iter().all(|(_, field_type)| {
-                            self.is_ffi_compatible_impl(field_type, visited)
-                        })
+                        fields
+                            .iter()
+                            .all(|(_, field_type)| self.is_ffi_compatible_impl(field_type, visited))
                     }
                     Some(TypeDefinition::Enum { .. }) => {
                         // Enums need special handling for FFI
@@ -1205,7 +1206,6 @@ impl Default for FFITypeMapper {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 mod tests;

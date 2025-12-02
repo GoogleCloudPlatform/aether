@@ -609,9 +609,7 @@ impl AetherRwLock {
                     metrics.read_locks += 1;
                 }
 
-                Ok(ReadGuard {
-                    _rw_lock: self,
-                })
+                Ok(ReadGuard { _rw_lock: self })
             }
             Err(_) => Err(LockError::Poisoned),
         }
@@ -625,9 +623,7 @@ impl AetherRwLock {
                     metrics.write_locks += 1;
                 }
 
-                Ok(WriteGuard {
-                    _rw_lock: self,
-                })
+                Ok(WriteGuard { _rw_lock: self })
             }
             Err(_) => Err(LockError::Poisoned),
         }

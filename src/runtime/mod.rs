@@ -96,7 +96,10 @@ pub unsafe extern "C" fn array_create_from_elements(
 /// Set an element in an array
 #[no_mangle]
 pub unsafe extern "C" fn array_set(array_ptr: *mut c_void, index: c_int, value: c_int) {
-    eprintln!("RUNTIME: array_set ptr={:?} index={} value={}", array_ptr, index, value);
+    eprintln!(
+        "RUNTIME: array_set ptr={:?} index={} value={}",
+        array_ptr, index, value
+    );
     if array_ptr.is_null() {
         eprintln!("RUNTIME: array_set ptr is null");
         return;
@@ -107,7 +110,10 @@ pub unsafe extern "C" fn array_set(array_ptr: *mut c_void, index: c_int, value: 
     // Bounds check
     let len = (*array).length;
     if index < 0 || index >= len {
-        eprintln!("RUNTIME: array_set out of bounds index={} length={}", index, len);
+        eprintln!(
+            "RUNTIME: array_set out of bounds index={} length={}",
+            index, len
+        );
         return;
     }
 

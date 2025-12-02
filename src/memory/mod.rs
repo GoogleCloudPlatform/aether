@@ -160,10 +160,10 @@ impl MemoryAnalyzer {
         match expr {
             Expression::AddressOf { operand, .. } => {
                 self.analyze_expression_memory(operand, function, region_id)
-            },
+            }
             Expression::Dereference { pointer, .. } => {
                 self.analyze_expression_memory(pointer, function, region_id)
-            },
+            }
             // Add other expression types as needed
             _ => Ok(()),
         }
@@ -306,7 +306,7 @@ impl MemoryAnalyzer {
 
             Statement::Expression { expr, .. } => {
                 // Check for AddressOf in expression statements
-                if let Expression::AddressOf {  .. } = &**expr {
+                if let Expression::AddressOf { .. } = &**expr {
                     // This is a simplification. Ideally we'd pass function/region context down.
                     // For now, we just need to make sure we don't crash on AddressOf.
                     // In a real implementation, we'd want to register the address-taken variable as escaping.

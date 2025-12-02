@@ -133,7 +133,7 @@ impl ModuleLoader {
         let exact_name = module_name.replace('.', "/");
         let snake_name = to_snake_case(&exact_name);
         let pascal_name = to_pascal_case(&exact_name);
-        
+
         // Prefer exact match, then snake_case, then PascalCase
         let mut variants = vec![exact_name.clone()];
         if snake_name != exact_name {
@@ -209,11 +209,9 @@ impl ModuleLoader {
         })?;
 
         let mut parser = Parser::new(tokens);
-        let module = parser
-            .parse_module()
-            .map_err(|e| SemanticError::Internal {
-                message: format!("Failed to parse module '{}': {}", module_name, e),
-            })?;
+        let module = parser.parse_module().map_err(|e| SemanticError::Internal {
+            message: format!("Failed to parse module '{}': {}", module_name, e),
+        })?;
 
         Ok(module)
     }
@@ -370,7 +368,12 @@ fn to_snake_case(s: &str) -> String {
     let mut result = String::new();
     for (i, c) in s.chars().enumerate() {
         if c.is_uppercase() {
-            if i > 0 && s.chars().nth(i-1).map(|p| !p.is_uppercase()).unwrap_or(true) {
+            if i > 0
+                && s.chars()
+                    .nth(i - 1)
+                    .map(|p| !p.is_uppercase())
+                    .unwrap_or(true)
+            {
                 result.push('_');
             }
             result.push(c.to_ascii_lowercase());

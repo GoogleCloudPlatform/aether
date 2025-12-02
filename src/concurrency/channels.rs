@@ -314,9 +314,7 @@ impl<T> ChannelSender<T> {
                 .send(message)
                 .map_err(|mpsc::SendError(msg)| SendError::Disconnected(msg)),
             SenderImpl::Bounded(state) => {
-                let mut state = state
-                    .lock()
-                    .expect("channel mutex should not be poisoned");
+                let mut state = state.lock().expect("channel mutex should not be poisoned");
                 if state.closed {
                     return Err(SendError::Closed(message));
                 }
@@ -347,9 +345,7 @@ impl<T> ChannelReceiver<T> {
         match &self.inner {
             ReceiverImpl::Mpsc(receiver) => receiver.recv().map_err(|_| ReceiveError::Disconnected),
             ReceiverImpl::Bounded(state, _condvar) => {
-                let mut state = state
-                    .lock()
-                    .expect("channel mutex should not be poisoned");
+                let mut state = state.lock().expect("channel mutex should not be poisoned");
                 if let Some(message) = state.buffer.pop_front() {
                     Ok(message)
                 } else if state.closed {
