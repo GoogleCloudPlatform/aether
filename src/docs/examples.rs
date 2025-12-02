@@ -1268,7 +1268,6 @@ GET /api/users - 200 (3ms)"#
     }
 }
 
-
 #[cfg(test)]
 #[path = "examples_tests.rs"]
 mod examples_tests;

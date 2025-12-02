@@ -1263,6 +1263,5 @@ impl Default for SearchConfig {
     }
 }
 
-
 #[cfg(test)]
 mod tests;

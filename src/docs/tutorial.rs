@@ -19,9 +19,7 @@
 
 #![allow(dead_code)]
 
-use crate::docs::{
-    CodeExample, DifficultyLevel, DocConfig, Exercise, Tutorial, TutorialSection,
-};
+use crate::docs::{CodeExample, DifficultyLevel, DocConfig, Exercise, Tutorial, TutorialSection};
 use crate::error::SemanticError;
 
 /// Tutorial generator
