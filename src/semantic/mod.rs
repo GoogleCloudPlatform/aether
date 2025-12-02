@@ -189,6 +189,21 @@ impl SemanticAnalyzer {
             self.add_function_signature(func_def)?;
         }
 
+        // Cache the module BEFORE analyzing function bodies
+        // This allows function body analysis to look up generic parameters of
+        // other functions in the same module
+        let dependencies: Vec<String> = module
+            .imports
+            .iter()
+            .map(|import| import.module_name.name.clone())
+            .collect();
+        let loaded_module = LoadedModule {
+            module: module.clone(),
+            source: crate::module_loader::ModuleSource::Memory("".to_string()),
+            dependencies,
+        };
+        self.analyzed_modules.insert(module.name.name.clone(), loaded_module);
+
         // Second pass: Analyze function bodies
         for func_def in &module.function_definitions {
             self.analyze_function_body(func_def)?;
@@ -212,20 +227,7 @@ impl SemanticAnalyzer {
 
         self.stats.modules_analyzed += 1;
 
-        // Cache the analyzed module
-        let dependencies: Vec<String> = module
-            .imports
-            .iter()
-            .map(|import| import.module_name.name.clone())
-            .collect();
-
-        let loaded_module = LoadedModule {
-            module: module.clone(),
-            source: crate::module_loader::ModuleSource::Memory("".to_string()), // Placeholder
-            dependencies,
-        };
-        
-        self.analyzed_modules.insert(module.name.name.clone(), loaded_module);
+        // Module was already cached before analyzing function bodies (line 205)
 
         Ok(())
     }
@@ -559,7 +561,15 @@ impl SemanticAnalyzer {
                 source_location,
                 ..
             } => {
-                // Add generic parameters to the current scope
+                // Enter generic scope on type checker FIRST
+                self.type_checker.borrow_mut().enter_generic_scope();
+                for generic_param in generic_parameters {
+                    self.type_checker
+                        .borrow_mut()
+                        .add_generic_param(generic_param.name.name.clone());
+                }
+
+                // Add generic parameters to symbol table as well
                 for generic_param in generic_parameters {
                     let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
                         name: generic_param.name.clone(),
@@ -588,6 +598,9 @@ impl SemanticAnalyzer {
                     field_types.push((field.name.name.clone(), field_type));
                 }
 
+                // Exit generic scope on type checker
+                self.type_checker.borrow_mut().exit_generic_scope();
+
                 // Add the type definition
                 let definition = crate::types::TypeDefinition::Struct {
                     fields: field_types.clone(),
@@ -612,7 +625,15 @@ impl SemanticAnalyzer {
                 source_location,
                 ..
             } => {
-                // Add generic parameters to the current scope
+                // Enter generic scope on type checker FIRST
+                self.type_checker.borrow_mut().enter_generic_scope();
+                for generic_param in generic_parameters {
+                    self.type_checker
+                        .borrow_mut()
+                        .add_generic_param(generic_param.name.name.clone());
+                }
+
+                // Add generic parameters to symbol table as well
                 for generic_param in generic_parameters {
                     let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
                         name: generic_param.name.clone(),
@@ -644,6 +665,9 @@ impl SemanticAnalyzer {
                         discriminant: idx, // Variants get indices based on declaration order
                     });
                 }
+
+                // Exit generic scope on type checker
+                self.type_checker.borrow_mut().exit_generic_scope();
 
                 let definition = crate::types::TypeDefinition::Enum {
                     variants: variant_infos.clone(),
@@ -727,7 +751,16 @@ impl SemanticAnalyzer {
 
     /// Add function signature to symbol table (first pass)
     fn add_function_signature(&mut self, func_def: &Function) -> Result<(), SemanticError> {
-        // Get the return type
+        // Enter generic scope on type checker FIRST
+        // This must happen before analyzing parameter types and return type
+        self.type_checker.borrow_mut().enter_generic_scope();
+        for generic_param in &func_def.generic_parameters {
+            self.type_checker
+                .borrow_mut()
+                .add_generic_param(generic_param.name.name.clone());
+        }
+
+        // Get the return type (now with generic params in scope)
         let return_type = self
             .type_checker
             .borrow()
@@ -742,6 +775,9 @@ impl SemanticAnalyzer {
                 .ast_type_to_type(&param.param_type)?;
             param_types.push(param_type);
         }
+
+        // Exit generic scope on type checker
+        self.type_checker.borrow_mut().exit_generic_scope();
 
         // Create function type
         let func_type = Type::function(param_types, return_type);
@@ -764,17 +800,26 @@ impl SemanticAnalyzer {
 
     /// Analyze function body (second pass)
     fn analyze_function_body(&mut self, func_def: &Function) -> Result<(), SemanticError> {
-        // Set current function return type
+        // Enter function scope
+        self.symbol_table.enter_scope(ScopeKind::Function);
+
+        // Enter generic scope on type checker and add generic parameters FIRST
+        // This must happen before analyzing parameter types and return type
+        self.type_checker.borrow_mut().enter_generic_scope();
+        for generic_param in &func_def.generic_parameters {
+            self.type_checker
+                .borrow_mut()
+                .add_generic_param(generic_param.name.name.clone());
+        }
+
+        // Now we can safely analyze the return type (generic params are in scope)
         let return_type = self
             .type_checker
             .borrow()
             .ast_type_to_type(&func_def.return_type)?;
         self.current_function_return_type = Some(return_type);
 
-        // Enter function scope
-        self.symbol_table.enter_scope(ScopeKind::Function);
-
-        // Add generic parameters to function scope
+        // Add generic parameters to symbol table as well
         for generic_param in &func_def.generic_parameters {
             let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
                 name: generic_param.name.clone(),
@@ -831,10 +876,13 @@ impl SemanticAnalyzer {
         // Validate function metadata and contracts
         self.validate_function_contracts(func_def)?;
 
+        // Exit generic scope on type checker
+        self.type_checker.borrow_mut().exit_generic_scope();
+
         // Exit function scope
         self.symbol_table.exit_scope()?;
         self.stats.functions_analyzed += 1;
-        
+
         // Clear current function return type
         self.current_function_return_type = None;
 

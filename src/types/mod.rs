@@ -19,7 +19,7 @@
 use crate::ast::{PrimitiveType, TypeConstraint, TypeConstraintKind, TypeSpecifier};
 use crate::error::{SemanticError, SourceLocation};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 /// Ownership kind for AetherScript's ownership system
@@ -488,6 +488,10 @@ pub struct TypeChecker {
 
     /// Type variable substitutions
     substitutions: HashMap<usize, Type>,
+
+    /// Stack of generic type parameters currently in scope
+    /// Each entry is a set of generic parameter names for that scope level
+    generic_params_in_scope: Vec<HashSet<String>>,
 }
 
 /// Enum variant information
@@ -544,11 +548,36 @@ impl TypeChecker {
             current_module: None,
             next_type_var_id: 0,
             substitutions: HashMap::new(),
+            generic_params_in_scope: Vec::new(),
         };
 
         // Initialize built-in types
         checker.initialize_builtin_types();
         checker
+    }
+
+    /// Enter a new generic scope (e.g., for a function or type definition)
+    pub fn enter_generic_scope(&mut self) {
+        self.generic_params_in_scope.push(HashSet::new());
+    }
+
+    /// Exit the current generic scope
+    pub fn exit_generic_scope(&mut self) {
+        self.generic_params_in_scope.pop();
+    }
+
+    /// Add a generic type parameter to the current scope
+    pub fn add_generic_param(&mut self, name: String) {
+        if let Some(scope) = self.generic_params_in_scope.last_mut() {
+            scope.insert(name);
+        }
+    }
+
+    /// Check if a name is a generic type parameter in the current scope
+    pub fn is_generic_param(&self, name: &str) -> bool {
+        self.generic_params_in_scope
+            .iter()
+            .any(|scope| scope.contains(name))
     }
 
     /// Initialize built-in primitive types
@@ -638,6 +667,11 @@ impl TypeChecker {
                         id: 0,
                         constraints: vec![],
                     }));
+                }
+
+                // Check if this is a generic type parameter in scope
+                if self.is_generic_param(&name.name) {
+                    return Ok(Type::generic(name.name.clone(), vec![]));
                 }
 
                 // Check if this is a known type

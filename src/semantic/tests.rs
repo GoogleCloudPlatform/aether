@@ -266,7 +266,9 @@ fn test_generic_function_param_resolution() {
     "#;
     let analyzer = semantic_analyzer_from_source(source);
 
-    let func_symbol = analyzer.symbol_table.lookup_symbol("identity").unwrap();
+    // Use get_all_symbols() since the module scope has been exited after analysis
+    let all_symbols = analyzer.symbol_table.get_all_symbols();
+    let func_symbol = all_symbols.iter().find(|s| s.name == "identity").expect("Function 'identity' should exist");
     if let Type::Function { parameter_types, return_type, .. } = &func_symbol.symbol_type {
         assert_eq!(parameter_types.len(), 1);
         assert!(matches!(parameter_types[0], Type::Generic { ref name, .. } if name == "T"));

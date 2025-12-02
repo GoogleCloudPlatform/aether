@@ -2858,6 +2858,49 @@ impl LoweringContext {
                     base_type: Box::new(base),
                 })
             }
+            ast::TypeSpecifier::TypeParameter { name, constraints, .. } => {
+                // Convert type parameter constraints to TypeConstraintInfo
+                let constraint_infos: Vec<crate::types::TypeConstraintInfo> = constraints
+                    .iter()
+                    .filter_map(|c| {
+                        match &c.constraint_type {
+                            ast::TypeConstraintKind::TraitBound { trait_name } => {
+                                Some(crate::types::TypeConstraintInfo::TraitBound {
+                                    trait_name: trait_name.name.clone(),
+                                    module: None,
+                                })
+                            }
+                            ast::TypeConstraintKind::NumericBound => {
+                                Some(crate::types::TypeConstraintInfo::NumericBound)
+                            }
+                            ast::TypeConstraintKind::EqualityBound => {
+                                Some(crate::types::TypeConstraintInfo::EqualityBound)
+                            }
+                            ast::TypeConstraintKind::OrderBound => {
+                                Some(crate::types::TypeConstraintInfo::OrderBound)
+                            }
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                Ok(Type::generic(name.name.clone(), constraint_infos))
+            }
+            ast::TypeSpecifier::Generic {
+                base_type,
+                type_arguments,
+                ..
+            } => {
+                // Convert generic instantiation like Vec<Int>
+                let args: Result<Vec<Type>, SemanticError> = type_arguments
+                    .iter()
+                    .map(|arg| self.ast_type_to_mir_type(arg))
+                    .collect();
+                Ok(Type::generic_instance(
+                    base_type.name.clone(),
+                    args?,
+                    self.current_module.clone(),
+                ))
+            }
             _ => Err(SemanticError::UnsupportedFeature {
                 feature: format!("Type {:?} not yet supported in MIR", ast_type),
                 location: SourceLocation::unknown(),
