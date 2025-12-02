@@ -202,3 +202,10 @@
 - Phase 10: Language Server Protocol
 - Phase 11: Optimization Passes
 - Phase 12: Tango Project Fixes
+
+## Status Update (2025-12-02)
+
+- Completed Task 15.1 (Trait Method Resolution): added trait dispatch table, `Self` substitution, generic-bound resolution (including `where` clauses), and trait method tests.
+- Added `Self` handling in type conversion and a symbol-table helper for cross-scope lookups.
+- Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (all tests pass).
+- Next action: begin Task 15.2 (Trait Implementation Verification).

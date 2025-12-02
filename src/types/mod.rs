@@ -316,7 +316,13 @@ impl Type {
 
     /// Check if this type is a variadic function type
     pub fn is_variadic(&self) -> bool {
-        matches!(self, Type::Function { is_variadic: true, .. })
+        matches!(
+            self,
+            Type::Function {
+                is_variadic: true,
+                ..
+            }
+        )
     }
 
     /// Get the size in bytes of this type (if known at compile time)
@@ -418,7 +424,8 @@ impl fmt::Display for Type {
                 return_type,
                 is_variadic,
             } => {
-                let mut params: Vec<String> = parameter_types.iter().map(|t| t.to_string()).collect();
+                let mut params: Vec<String> =
+                    parameter_types.iter().map(|t| t.to_string()).collect();
                 if *is_variadic {
                     params.push("...".to_string());
                 }
@@ -669,6 +676,11 @@ impl TypeChecker {
                     }));
                 }
 
+                // Special case: `Self` placeholder (resolved later by semantic passes)
+                if name.name == "Self" {
+                    return Ok(Type::named("Self".to_string(), self.current_module.clone()));
+                }
+
                 // Check if this is a generic type parameter in scope
                 if self.is_generic_param(&name.name) {
                     return Ok(Type::generic(name.name.clone(), vec![]));
@@ -687,7 +699,7 @@ impl TypeChecker {
                     // If the name is qualified (contains dot), use the module prefix
                     if let Some(idx) = name.name.rfind('.') {
                         let module_name = Some(name.name[..idx].to_string());
-                        let simple_name = name.name[idx+1..].to_string();
+                        let simple_name = name.name[idx + 1..].to_string();
                         Ok(Type::named(simple_name, module_name))
                     } else {
                         Ok(Type::named(name.name.clone(), self.current_module.clone()))
@@ -862,28 +874,43 @@ impl TypeChecker {
 
             // Reference to Pointer coercion (implicit cast for unsafe contexts)
             (
-                Type::Pointer { target_type: ptr_target, is_mutable: ptr_mut },
-                Type::Owned { ownership: OwnershipKind::Borrowed, base_type: ref_base },
+                Type::Pointer {
+                    target_type: ptr_target,
+                    is_mutable: ptr_mut,
+                },
+                Type::Owned {
+                    ownership: OwnershipKind::Borrowed,
+                    base_type: ref_base,
+                },
             ) => {
                 // &T -> *const T is allowed
                 // &T -> *mut T is NOT allowed
                 self.types_compatible(ptr_target, ref_base) && !*ptr_mut
-            },
+            }
             (
-                Type::Pointer { target_type: ptr_target, is_mutable: _ },
-                Type::Owned { ownership: OwnershipKind::MutableBorrow, base_type: ref_base },
+                Type::Pointer {
+                    target_type: ptr_target,
+                    is_mutable: _,
+                },
+                Type::Owned {
+                    ownership: OwnershipKind::MutableBorrow,
+                    base_type: ref_base,
+                },
             ) => {
                 // &mut T -> *mut T or *const T is allowed
                 self.types_compatible(ptr_target, ref_base)
-            },
+            }
 
             // String to Pointer<Char> coercion (CString compatibility)
             (
-                Type::Pointer { target_type, is_mutable: false },
+                Type::Pointer {
+                    target_type,
+                    is_mutable: false,
+                },
                 Type::Primitive(PrimitiveType::String),
             ) => {
                 matches!(target_type.as_ref(), Type::Primitive(PrimitiveType::Char))
-            },
+            }
 
             // Array compatibility (dynamic vs sized arrays)
             (
@@ -921,7 +948,7 @@ impl TypeChecker {
                 match (o1, o2) {
                     // Same ownership kind with compatible base types
                     (a, b) if a == b => self.types_compatible(b1, b2),
-                    
+
                     // Owned can be borrowed (Expected: Borrowed, Actual: Owned)
                     (OwnershipKind::Borrowed, OwnershipKind::Owned) => {
                         self.types_compatible(b1, b2)
@@ -929,17 +956,17 @@ impl TypeChecker {
                     (OwnershipKind::MutableBorrow, OwnershipKind::Owned) => {
                         self.types_compatible(b1, b2)
                     }
-                    
+
                     // Mutable borrow can be used where immutable borrow is expected (Expected: Borrowed, Actual: MutableBorrow)
                     (OwnershipKind::Borrowed, OwnershipKind::MutableBorrow) => {
                         self.types_compatible(b1, b2)
                     }
-                    
+
                     // Shared can be borrowed immutably (Expected: Borrowed, Actual: Shared)
                     (OwnershipKind::Borrowed, OwnershipKind::Shared) => {
                         self.types_compatible(b1, b2)
                     }
-                    
+
                     _ => false,
                 }
             }
@@ -966,7 +993,10 @@ impl TypeChecker {
             ) => {
                 p1.len() == p2.len()
                     && v1 == v2
-                    && p1.iter().zip(p2.iter()).all(|(t1, t2)| self.types_compatible(t1, t2))
+                    && p1
+                        .iter()
+                        .zip(p2.iter())
+                        .all(|(t1, t2)| self.types_compatible(t1, t2))
                     && self.types_compatible(r1, r2)
             }
 
@@ -1395,7 +1425,6 @@ impl Default for TypeChecker {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 mod tests;

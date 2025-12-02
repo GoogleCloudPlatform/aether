@@ -481,9 +481,9 @@ See: [Architecture - Generics and Contract Verification](architecture.md#generic
 ## Phase 15: Trait System
 
 ### Task 15.1: Trait Method Resolution
-- [ ] **Semantic**: Resolve trait method calls on generic types
-- [ ] **Semantic**: Build vtable-like dispatch info (for monomorphization)
-- [ ] **Tests**: Trait method resolution tests
+- [x] **Semantic**: Resolve trait method calls on generic types
+- [x] **Semantic**: Build vtable-like dispatch info (for monomorphization)
+- [x] **Tests**: Trait method resolution tests
 
 ### Task 15.2: Trait Implementation Verification
 - [ ] **Semantic**: Verify impl blocks satisfy trait requirements
@@ -574,4 +574,3 @@ See: [Architecture - Bootstrapping Roadmap](architecture.md#bootstrapping-roadma
 ### Task 19.4: Self-Hosting
 - [ ] **Build**: Compile Aether compiler with itself
 - [ ] **Verify**: Stage 2 compiler produces identical output to Stage 1
-

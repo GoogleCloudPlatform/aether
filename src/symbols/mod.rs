@@ -243,6 +243,22 @@ impl SymbolTable {
         None
     }
 
+    /// Look up a symbol in any scope (useful for tests or cross-module queries)
+    pub fn lookup_symbol_any_scope(&self, name: &str) -> Option<&Symbol> {
+        for scope in &self.scopes {
+            if let Some(symbol) = scope.lookup_local(name) {
+                return Some(symbol);
+            }
+        }
+        // Check imports as a fallback
+        for imported_symbols in self.imports.values() {
+            if let Some(symbol) = imported_symbols.get(name) {
+                return Some(symbol);
+            }
+        }
+        None
+    }
+
     /// Look up a symbol in a specific scope only
     pub fn lookup_in_scope(&self, name: &str, scope_index: usize) -> Option<&Symbol> {
         if scope_index < self.scopes.len() {
@@ -254,7 +270,10 @@ impl SymbolTable {
 
     /// Get all symbols across all scopes
     pub fn get_all_symbols(&self) -> Vec<&Symbol> {
-        self.scopes.iter().flat_map(|scope| scope.symbols.values()).collect()
+        self.scopes
+            .iter()
+            .flat_map(|scope| scope.symbols.values())
+            .collect()
     }
 
     /// Add a type definition

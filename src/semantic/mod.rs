@@ -16,8 +16,8 @@
 //!
 //! Performs type checking, symbol resolution, and semantic validation
 
-pub mod metadata;
 pub mod capture_analysis;
+pub mod metadata;
 pub mod ownership;
 #[cfg(test)]
 mod ownership_tests;
@@ -47,7 +47,7 @@ pub struct SemanticAnalyzer {
 
     /// FFI analyzer for external function declarations
     ffi_analyzer: FFIAnalyzer,
-    
+
     /// Expected return type of the function currently being analyzed
     current_function_return_type: Option<Type>,
 
@@ -80,6 +80,15 @@ pub struct SemanticAnalyzer {
 
     /// Capture analysis results for concurrent blocks
     pub captures: HashMap<SourceLocation, std::collections::HashSet<String>>,
+
+    /// Registered trait definitions (by simple name)
+    trait_definitions: HashMap<String, TraitDefinition>,
+
+    /// Dispatch table for trait method calls keyed by receiver type and method name
+    trait_dispatch_table: HashMap<TraitMethodKey, TraitMethodDispatch>,
+
+    /// Constraints for generic parameters in the current function (from where clauses)
+    current_generic_constraints: HashMap<String, Vec<crate::types::TypeConstraintInfo>>,
 }
 
 /// Statistics about the semantic analysis
@@ -91,6 +100,34 @@ pub struct AnalysisStats {
     pub types_defined: usize,
     pub external_functions_analyzed: usize,
     pub errors_found: usize,
+}
+
+/// Key for trait method dispatch lookup
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TraitMethodKey {
+    pub receiver: Type,
+    pub method_name: String,
+}
+
+/// Dispatch information for a resolved trait method
+#[derive(Debug, Clone)]
+pub struct TraitMethodDispatch {
+    pub trait_name: String,
+    pub impl_type: Type,
+    pub method_name: String,
+    pub self_param_type: Option<Type>,
+    pub param_types: Vec<Type>,
+    pub return_type: Type,
+    pub symbol_name: String,
+}
+
+/// Internal representation of a method signature after substituting `Self` and generics
+#[derive(Debug, Clone)]
+struct MethodSignatureInfo {
+    self_param_type: Option<Type>,
+    call_param_types: Vec<Type>,
+    all_param_types: Vec<Type>,
+    return_type: Type,
 }
 
 impl SemanticAnalyzer {
@@ -117,6 +154,9 @@ impl SemanticAnalyzer {
             analyzed_modules: HashMap::new(),
             captures: HashMap::new(),
             current_function_return_type: None,
+            trait_definitions: HashMap::new(),
+            trait_dispatch_table: HashMap::new(),
+            current_generic_constraints: HashMap::new(),
         }
     }
 
@@ -173,6 +213,16 @@ impl SemanticAnalyzer {
             self.analyze_type_definition(type_def)?;
         }
 
+        // Register trait definitions
+        for trait_def in &module.trait_definitions {
+            self.analyze_trait_definition(trait_def)?;
+        }
+
+        // Process impl blocks (both trait and inherent)
+        for impl_block in &module.impl_blocks {
+            self.analyze_impl_block(impl_block)?;
+        }
+
         // Process constant declarations
         for const_decl in &module.constant_declarations {
             self.analyze_constant_declaration(const_decl)?;
@@ -202,7 +252,8 @@ impl SemanticAnalyzer {
             source: crate::module_loader::ModuleSource::Memory("".to_string()),
             dependencies,
         };
-        self.analyzed_modules.insert(module.name.name.clone(), loaded_module);
+        self.analyzed_modules
+            .insert(module.name.name.clone(), loaded_module);
 
         // Second pass: Analyze function bodies
         for func_def in &module.function_definitions {
@@ -317,7 +368,7 @@ impl SemanticAnalyzer {
             location.clone(),
         );
         self.symbol_table.add_symbol(module_symbol.clone())?;
-        
+
         // Also add module symbol to imports map for global lookup
         exported_symbols.insert(module_symbol_name, module_symbol);
 
@@ -334,24 +385,54 @@ impl SemanticAnalyzer {
 
                     // Resolve function signature from AST
                     let (parameter_types, return_type, is_variadic) = {
-                        if let Some(func) = loaded_module.module.function_definitions.iter().find(|f| f.name.name == name.name) {
+                        if let Some(func) = loaded_module
+                            .module
+                            .function_definitions
+                            .iter()
+                            .find(|f| f.name.name == name.name)
+                        {
                             let mut params = Vec::new();
                             for param in &func.parameters {
-                                let p_type = self.type_checker.borrow().ast_type_to_type(&param.param_type).unwrap_or(Type::Error);
+                                let p_type = self
+                                    .type_checker
+                                    .borrow()
+                                    .ast_type_to_type(&param.param_type)
+                                    .unwrap_or(Type::Error);
                                 params.push(p_type);
                             }
-                            let ret_type = self.type_checker.borrow().ast_type_to_type(&func.return_type).unwrap_or(Type::Error);
+                            let ret_type = self
+                                .type_checker
+                                .borrow()
+                                .ast_type_to_type(&func.return_type)
+                                .unwrap_or(Type::Error);
                             (params, Box::new(ret_type), false)
-                        } else if let Some(func) = loaded_module.module.external_functions.iter().find(|f| f.name.name == name.name) {
+                        } else if let Some(func) = loaded_module
+                            .module
+                            .external_functions
+                            .iter()
+                            .find(|f| f.name.name == name.name)
+                        {
                             let mut params = Vec::new();
                             for param in &func.parameters {
-                                let p_type = self.type_checker.borrow().ast_type_to_type(&param.param_type).unwrap_or(Type::Error);
+                                let p_type = self
+                                    .type_checker
+                                    .borrow()
+                                    .ast_type_to_type(&param.param_type)
+                                    .unwrap_or(Type::Error);
                                 params.push(p_type);
                             }
-                            let ret_type = self.type_checker.borrow().ast_type_to_type(&func.return_type).unwrap_or(Type::Error);
+                            let ret_type = self
+                                .type_checker
+                                .borrow()
+                                .ast_type_to_type(&func.return_type)
+                                .unwrap_or(Type::Error);
                             (params, Box::new(ret_type), func.variadic)
                         } else {
-                            (vec![], Box::new(Type::Primitive(PrimitiveType::Void)), false)
+                            (
+                                vec![],
+                                Box::new(Type::Primitive(PrimitiveType::Void)),
+                                false,
+                            )
                         }
                     };
 
@@ -380,37 +461,55 @@ impl SemanticAnalyzer {
                     };
 
                     // Find the type definition in the loaded module
-                    if let Some(type_def) = loaded_module.module.type_definitions.iter().find(|td| {
-                        match td {
-                            crate::ast::TypeDefinition::Structured { name: n, .. } => n.name == name.name,
-                            crate::ast::TypeDefinition::Enumeration { name: n, .. } => n.name == name.name,
-                            crate::ast::TypeDefinition::Alias { new_name: n, .. } => n.name == name.name,
-                        }
-                    }) {
+                    if let Some(type_def) =
+                        loaded_module
+                            .module
+                            .type_definitions
+                            .iter()
+                            .find(|td| match td {
+                                crate::ast::TypeDefinition::Structured { name: n, .. } => {
+                                    n.name == name.name
+                                }
+                                crate::ast::TypeDefinition::Enumeration { name: n, .. } => {
+                                    n.name == name.name
+                                }
+                                crate::ast::TypeDefinition::Alias { new_name: n, .. } => {
+                                    n.name == name.name
+                                }
+                            })
+                    {
                         // Convert AST definition to TypeDefinition
                         // Note: This is a simplified conversion, ideally we should reuse analyze_type_definition logic
                         // but we need to store it with the qualified name.
                         // For now, we can try to extract the converted definition from the loaded module's semantic analysis result?
                         // But we don't have access to the other module's TypeChecker.
                         // We must reconstruct it.
-                        
+
                         // BUT! types::TypeDefinition is different from ast::TypeDefinition.
                         // We need to convert.
                         // Since we are inside SemanticAnalyzer, we can use helper methods?
                         // analyze_type_definition adds to symbol table.
                         // Let's implement a minimal conversion here or refactor analyze_type_definition to return the definition.
-                        
+
                         // Refactoring analyze_type_definition is better but risky.
                         // Let's implement minimal conversion matching analyze_type_definition logic.
-                        
+
                         let definition = match type_def {
-                            crate::ast::TypeDefinition::Structured { fields, source_location, .. } => {
+                            crate::ast::TypeDefinition::Structured {
+                                fields,
+                                source_location,
+                                ..
+                            } => {
                                 let mut field_types = Vec::new();
                                 for field in fields {
                                     // Note: We might fail to resolve types used inside the struct if they are not fully qualified
                                     // This is a known limitation of this simple import mechanism.
                                     // Assuming types are primitive or fully qualified.
-                                    let field_type = self.type_checker.borrow().ast_type_to_type(&field.field_type).unwrap_or(Type::Error);
+                                    let field_type = self
+                                        .type_checker
+                                        .borrow()
+                                        .ast_type_to_type(&field.field_type)
+                                        .unwrap_or(Type::Error);
                                     field_types.push((field.name.name.clone(), field_type));
                                 }
                                 crate::types::TypeDefinition::Struct {
@@ -418,12 +517,20 @@ impl SemanticAnalyzer {
                                     source_location: source_location.clone(),
                                 }
                             }
-                            crate::ast::TypeDefinition::Enumeration { variants, source_location, .. } => {
+                            crate::ast::TypeDefinition::Enumeration {
+                                variants,
+                                source_location,
+                                ..
+                            } => {
                                 let mut variant_infos = Vec::new();
                                 for (idx, variant) in variants.iter().enumerate() {
                                     let mut associated_types = Vec::new();
                                     for type_spec in &variant.associated_types {
-                                        let t = self.type_checker.borrow().ast_type_to_type(type_spec).unwrap_or(Type::Error);
+                                        let t = self
+                                            .type_checker
+                                            .borrow()
+                                            .ast_type_to_type(type_spec)
+                                            .unwrap_or(Type::Error);
                                         associated_types.push(t);
                                     }
                                     variant_infos.push(crate::types::EnumVariantInfo {
@@ -437,16 +544,26 @@ impl SemanticAnalyzer {
                                     source_location: source_location.clone(),
                                 }
                             }
-                            crate::ast::TypeDefinition::Alias { original_type, source_location, .. } => {
-                                let target_type = self.type_checker.borrow().ast_type_to_type(original_type).unwrap_or(Type::Error);
+                            crate::ast::TypeDefinition::Alias {
+                                original_type,
+                                source_location,
+                                ..
+                            } => {
+                                let target_type = self
+                                    .type_checker
+                                    .borrow()
+                                    .ast_type_to_type(original_type)
+                                    .unwrap_or(Type::Error);
                                 crate::types::TypeDefinition::Alias {
                                     target_type,
                                     source_location: source_location.clone(),
                                 }
                             }
                         };
-                        
-                        self.type_checker.borrow_mut().add_type_definition(qualified_name.clone(), definition);
+
+                        self.type_checker
+                            .borrow_mut()
+                            .add_type_definition(qualified_name.clone(), definition);
                     }
 
                     // For now, add as a named type
@@ -490,7 +607,8 @@ impl SemanticAnalyzer {
             }
         }
 
-        self.symbol_table.add_import(module_name.to_string(), exported_symbols);
+        self.symbol_table
+            .add_import(module_name.to_string(), exported_symbols);
         Ok(())
     }
 
@@ -504,24 +622,38 @@ impl SemanticAnalyzer {
                     ty.clone()
                 }
             }
-            Type::Array { element_type, size } => Type::Array { 
-                element_type: Box::new(self.substitute_type(element_type, type_map)), 
-                size: *size 
+            Type::Array { element_type, size } => Type::Array {
+                element_type: Box::new(self.substitute_type(element_type, type_map)),
+                size: *size,
             },
-            Type::Map { key_type, value_type } => Type::Map { 
-                key_type: Box::new(self.substitute_type(key_type, type_map)), 
-                value_type: Box::new(self.substitute_type(value_type, type_map)), 
+            Type::Map {
+                key_type,
+                value_type,
+            } => Type::Map {
+                key_type: Box::new(self.substitute_type(key_type, type_map)),
+                value_type: Box::new(self.substitute_type(value_type, type_map)),
             },
-            Type::Pointer { target_type, is_mutable } => Type::Pointer { 
-                target_type: Box::new(self.substitute_type(target_type, type_map)), 
-                is_mutable: *is_mutable 
+            Type::Pointer {
+                target_type,
+                is_mutable,
+            } => Type::Pointer {
+                target_type: Box::new(self.substitute_type(target_type, type_map)),
+                is_mutable: *is_mutable,
             },
-            Type::Owned { base_type, ownership } => Type::Owned { 
-                base_type: Box::new(self.substitute_type(base_type, type_map)), 
-                ownership: *ownership 
+            Type::Owned {
+                base_type,
+                ownership,
+            } => Type::Owned {
+                base_type: Box::new(self.substitute_type(base_type, type_map)),
+                ownership: *ownership,
             },
-            Type::Function { parameter_types, return_type, is_variadic } => {
-                let substituted_params = parameter_types.iter()
+            Type::Function {
+                parameter_types,
+                return_type,
+                is_variadic,
+            } => {
+                let substituted_params = parameter_types
+                    .iter()
                     .map(|p_ty| self.substitute_type(p_ty, type_map))
                     .collect();
                 let substituted_return = Box::new(self.substitute_type(return_type, type_map));
@@ -531,8 +663,13 @@ impl SemanticAnalyzer {
                     is_variadic: *is_variadic,
                 }
             }
-            Type::GenericInstance { base_type, type_arguments, module } => {
-                let substituted_args = type_arguments.iter()
+            Type::GenericInstance {
+                base_type,
+                type_arguments,
+                module,
+            } => {
+                let substituted_args = type_arguments
+                    .iter()
                     .map(|arg_ty| self.substitute_type(arg_ty, type_map))
                     .collect();
                 Type::GenericInstance {
@@ -541,8 +678,305 @@ impl SemanticAnalyzer {
                     module: module.clone(),
                 }
             }
-            _ => ty.clone()
+            _ => ty.clone(),
         }
+    }
+
+    /// Replace occurrences of `Self` in a type with the concrete receiver type
+    fn substitute_self_type(&self, ty: &Type, self_type: &Type) -> Type {
+        match ty {
+            Type::Named { name, module } if name == "Self" => {
+                // Preserve module information if present on the receiver
+                match self_type {
+                    Type::Named { .. } | Type::GenericInstance { .. } | Type::Generic { .. } => {
+                        self_type.clone()
+                    }
+                    _ => Type::Named {
+                        name: name.clone(),
+                        module: module.clone(),
+                    },
+                }
+            }
+            Type::Array { element_type, size } => Type::Array {
+                element_type: Box::new(self.substitute_self_type(element_type, self_type)),
+                size: *size,
+            },
+            Type::Map {
+                key_type,
+                value_type,
+            } => Type::Map {
+                key_type: Box::new(self.substitute_self_type(key_type, self_type)),
+                value_type: Box::new(self.substitute_self_type(value_type, self_type)),
+            },
+            Type::Pointer {
+                target_type,
+                is_mutable,
+            } => Type::Pointer {
+                target_type: Box::new(self.substitute_self_type(target_type, self_type)),
+                is_mutable: *is_mutable,
+            },
+            Type::Owned {
+                base_type,
+                ownership,
+            } => Type::Owned {
+                base_type: Box::new(self.substitute_self_type(base_type, self_type)),
+                ownership: *ownership,
+            },
+            Type::Function {
+                parameter_types,
+                return_type,
+                is_variadic,
+            } => {
+                let params: Vec<Type> = parameter_types
+                    .iter()
+                    .map(|p| self.substitute_self_type(p, self_type))
+                    .collect();
+                let ret = Box::new(self.substitute_self_type(return_type, self_type));
+                Type::Function {
+                    parameter_types: params,
+                    return_type: ret,
+                    is_variadic: *is_variadic,
+                }
+            }
+            Type::GenericInstance {
+                base_type,
+                type_arguments,
+                module,
+            } => Type::GenericInstance {
+                base_type: base_type.clone(),
+                type_arguments: type_arguments
+                    .iter()
+                    .map(|arg| self.substitute_self_type(arg, self_type))
+                    .collect(),
+                module: module.clone(),
+            },
+            _ => ty.clone(),
+        }
+    }
+
+    /// Convert AST type to a Type, allowing `Self` as a placeholder before substitution
+    fn ast_type_to_type_allow_self(&self, type_spec: &TypeSpecifier) -> Result<Type, SemanticError> {
+        if let TypeSpecifier::Named { name, .. } = type_spec {
+            if name.name == "Self" {
+                return Ok(Type::named("Self".to_string(), self.current_module.clone()));
+            }
+        }
+        self.type_checker.borrow().ast_type_to_type(type_spec)
+    }
+
+    /// Compute a method signature after substituting generics and `Self`
+    fn compute_method_signature(
+        &self,
+        method_params: &[Parameter],
+        method_return: &TypeSpecifier,
+        trait_generics: &[GenericParameter],
+        method_generics: &[GenericParameter],
+        self_type: &Type,
+        substitutions: &HashMap<String, Type>,
+    ) -> Result<MethodSignatureInfo, SemanticError> {
+        {
+            let mut checker = self.type_checker.borrow_mut();
+            checker.enter_generic_scope();
+            for gen in trait_generics {
+                checker.add_generic_param(gen.name.name.clone());
+            }
+            for gen in method_generics {
+                checker.add_generic_param(gen.name.name.clone());
+            }
+        }
+
+        let result: Result<MethodSignatureInfo, SemanticError> = (|| {
+            let mut self_param_type = None;
+            let mut call_param_types = Vec::new();
+            let mut all_param_types = Vec::new();
+
+            for (idx, param) in method_params.iter().enumerate() {
+                let raw_type = self.ast_type_to_type_allow_self(&param.param_type)?;
+                let with_self = self.substitute_self_type(&raw_type, self_type);
+                let substituted = self.substitute_type(&with_self, substitutions);
+                all_param_types.push(substituted.clone());
+
+                if idx == 0 && param.name.name == "self" {
+                    self_param_type = Some(substituted);
+                } else {
+                    call_param_types.push(substituted);
+                }
+            }
+
+            let raw_return = self.ast_type_to_type_allow_self(method_return)?;
+            let with_self_return = self.substitute_self_type(&raw_return, self_type);
+            let return_type = self.substitute_type(&with_self_return, substitutions);
+
+            Ok(MethodSignatureInfo {
+                self_param_type,
+                call_param_types,
+                all_param_types,
+                return_type,
+            })
+        })();
+
+        {
+            let mut checker = self.type_checker.borrow_mut();
+            checker.exit_generic_scope();
+        }
+
+        result
+    }
+
+    /// Register a trait definition for later method resolution
+    fn analyze_trait_definition(
+        &mut self,
+        trait_def: &TraitDefinition,
+    ) -> Result<(), SemanticError> {
+        // Track generic parameters for trait-level type resolution
+        {
+            let mut checker = self.type_checker.borrow_mut();
+            checker.enter_generic_scope();
+            for gen in &trait_def.generic_parameters {
+                checker.add_generic_param(gen.name.name.clone());
+            }
+        }
+
+        self.trait_definitions
+            .insert(trait_def.name.name.clone(), trait_def.clone());
+
+        {
+            let mut checker = self.type_checker.borrow_mut();
+            checker.exit_generic_scope();
+        }
+
+        Ok(())
+    }
+
+    /// Analyze an impl block (trait or inherent) and register dispatch info
+    fn analyze_impl_block(&mut self, impl_block: &TraitImpl) -> Result<(), SemanticError> {
+        // Track impl-level generics
+        {
+            let mut checker = self.type_checker.borrow_mut();
+            checker.enter_generic_scope();
+            for gen in &impl_block.generic_parameters {
+                checker.add_generic_param(gen.name.name.clone());
+            }
+        }
+
+        let result: Result<(), SemanticError> = (|| {
+            // Resolve the concrete type being implemented
+            let self_type = self
+                .type_checker
+                .borrow()
+                .ast_type_to_type(&impl_block.for_type)?;
+
+            // Build substitutions for trait generic parameters, if any
+            let mut trait_substitutions: HashMap<String, Type> = HashMap::new();
+            if let Some(trait_ident) = &impl_block.trait_name {
+                if let Some(trait_def) = self.trait_definitions.get(&trait_ident.name) {
+                    if trait_def.generic_parameters.len() != impl_block.trait_generic_args.len() {
+                        return Err(SemanticError::GenericArgumentCountMismatch {
+                            function: trait_ident.name.clone(),
+                            expected: trait_def.generic_parameters.len(),
+                            found: impl_block.trait_generic_args.len(),
+                            location: impl_block.source_location.clone(),
+                        });
+                    }
+
+                    for (gen, arg_spec) in trait_def
+                        .generic_parameters
+                        .iter()
+                        .zip(impl_block.trait_generic_args.iter())
+                    {
+                        let arg_type = self.type_checker.borrow().ast_type_to_type(arg_spec)?;
+                        trait_substitutions.insert(gen.name.name.clone(), arg_type);
+                    }
+                } else {
+                    return Err(SemanticError::UndefinedSymbol {
+                        symbol: trait_ident.name.clone(),
+                        location: impl_block.source_location.clone(),
+                    });
+                }
+            }
+
+            // First pass: register signatures and dispatch entries
+            for method in &impl_block.methods {
+                let trait_generics = if let Some(trait_ident) = &impl_block.trait_name {
+                    self.trait_definitions
+                        .get(&trait_ident.name)
+                        .map(|t| t.generic_parameters.clone())
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
+
+                let signature = self.compute_method_signature(
+                    &method.parameters,
+                    &method.return_type,
+                    &trait_generics,
+                    &method.generic_parameters,
+                    &self_type,
+                    &trait_substitutions,
+                )?;
+
+                let symbol_name = if let Some(trait_ident) = &impl_block.trait_name {
+                    format!("{}::{}", trait_ident.name, method.name.name)
+                } else {
+                    format!("{}::{}", self_type, method.name.name)
+                };
+
+                let func_type = Type::function(
+                    signature.all_param_types.clone(),
+                    signature.return_type.clone(),
+                );
+
+                let func_symbol = Symbol {
+                    name: symbol_name.clone(),
+                    symbol_type: func_type,
+                    kind: SymbolKind::Function,
+                    is_mutable: false,
+                    is_initialized: true,
+                    declaration_location: method.source_location.clone(),
+                    is_moved: false,
+                    borrow_state: BorrowState::None,
+                };
+                // Signature-only registration; errors about duplicates bubble up
+                self.symbol_table.add_symbol(func_symbol)?;
+
+                if let Some(trait_ident) = &impl_block.trait_name {
+                    let key = TraitMethodKey {
+                        receiver: self_type.clone(),
+                        method_name: method.name.name.clone(),
+                    };
+                    let dispatch = TraitMethodDispatch {
+                        trait_name: trait_ident.name.clone(),
+                        impl_type: self_type.clone(),
+                        method_name: method.name.name.clone(),
+                        self_param_type: signature.self_param_type.clone(),
+                        param_types: signature.call_param_types.clone(),
+                        return_type: signature.return_type.clone(),
+                        symbol_name,
+                    };
+                    self.trait_dispatch_table.insert(key, dispatch);
+                }
+            }
+
+            // Second pass: analyze method bodies with namespaced symbols
+            for method in &impl_block.methods {
+                let mut namespaced = method.clone();
+                if let Some(trait_ident) = &impl_block.trait_name {
+                    namespaced.name.name = format!("{}::{}", trait_ident.name, method.name.name);
+                } else {
+                    namespaced.name.name = format!("{}::{}", self_type, method.name.name);
+                }
+                self.analyze_function_body(&namespaced)?;
+            }
+
+            Ok(())
+        })();
+
+        {
+            let mut checker = self.type_checker.borrow_mut();
+            checker.exit_generic_scope();
+        }
+
+        result
     }
 
     /// Analyze a type definition
@@ -571,11 +1005,13 @@ impl SemanticAnalyzer {
 
                 // Add generic parameters to symbol table as well
                 for generic_param in generic_parameters {
-                    let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
-                        name: generic_param.name.clone(),
-                        constraints: generic_param.constraints.clone(),
-                        source_location: generic_param.source_location.clone(),
-                    })?;
+                    let generic_type = self.type_checker.borrow().ast_type_to_type(
+                        &TypeSpecifier::TypeParameter {
+                            name: generic_param.name.clone(),
+                            constraints: generic_param.constraints.clone(),
+                            source_location: generic_param.source_location.clone(),
+                        },
+                    )?;
                     let generic_symbol = Symbol::new(
                         generic_param.name.name.clone(),
                         generic_type,
@@ -635,11 +1071,13 @@ impl SemanticAnalyzer {
 
                 // Add generic parameters to symbol table as well
                 for generic_param in generic_parameters {
-                    let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
-                        name: generic_param.name.clone(),
-                        constraints: generic_param.constraints.clone(),
-                        source_location: generic_param.source_location.clone(),
-                    })?;
+                    let generic_type = self.type_checker.borrow().ast_type_to_type(
+                        &TypeSpecifier::TypeParameter {
+                            name: generic_param.name.clone(),
+                            constraints: generic_param.constraints.clone(),
+                            source_location: generic_param.source_location.clone(),
+                        },
+                    )?;
                     let generic_symbol = Symbol::new(
                         generic_param.name.name.clone(),
                         generic_type,
@@ -656,7 +1094,8 @@ impl SemanticAnalyzer {
                 for (idx, variant) in variants.iter().enumerate() {
                     let mut associated_types = Vec::new();
                     for type_spec in &variant.associated_types {
-                        associated_types.push(self.type_checker.borrow().ast_type_to_type(type_spec)?);
+                        associated_types
+                            .push(self.type_checker.borrow().ast_type_to_type(type_spec)?);
                     }
 
                     variant_infos.push(crate::types::EnumVariantInfo {
@@ -812,6 +1251,20 @@ impl SemanticAnalyzer {
                 .add_generic_param(generic_param.name.name.clone());
         }
 
+        // Capture where-clause constraints for generic parameters
+        self.current_generic_constraints.clear();
+        for where_clause in &func_def.where_clause {
+            let mut constraints = Vec::new();
+            for constraint in &where_clause.constraints {
+                constraints.push(crate::types::TypeConstraintInfo::TraitBound {
+                    trait_name: constraint.name.clone(),
+                    module: self.current_module.clone(),
+                });
+            }
+            self.current_generic_constraints
+                .insert(where_clause.type_param.name.clone(), constraints);
+        }
+
         // Now we can safely analyze the return type (generic params are in scope)
         let return_type = self
             .type_checker
@@ -821,11 +1274,14 @@ impl SemanticAnalyzer {
 
         // Add generic parameters to symbol table as well
         for generic_param in &func_def.generic_parameters {
-            let generic_type = self.type_checker.borrow().ast_type_to_type(&TypeSpecifier::TypeParameter {
-                name: generic_param.name.clone(),
-                constraints: generic_param.constraints.clone(),
-                source_location: generic_param.source_location.clone(),
-            })?;
+            let generic_type =
+                self.type_checker
+                    .borrow()
+                    .ast_type_to_type(&TypeSpecifier::TypeParameter {
+                        name: generic_param.name.clone(),
+                        constraints: generic_param.constraints.clone(),
+                        source_location: generic_param.source_location.clone(),
+                    })?;
             let generic_symbol = Symbol::new(
                 generic_param.name.name.clone(),
                 generic_type,
@@ -878,6 +1334,7 @@ impl SemanticAnalyzer {
 
         // Exit generic scope on type checker
         self.type_checker.borrow_mut().exit_generic_scope();
+        self.current_generic_constraints.clear();
 
         // Exit function scope
         self.symbol_table.exit_scope()?;
@@ -970,7 +1427,11 @@ impl SemanticAnalyzer {
                 source_location,
             } => {
                 // Check that the exported type exists
-                if self.symbol_table.lookup_type_definition(&name.name).is_none() {
+                if self
+                    .symbol_table
+                    .lookup_type_definition(&name.name)
+                    .is_none()
+                {
                     return Err(SemanticError::UndefinedSymbol {
                         symbol: name.name.clone(),
                         location: source_location.clone(),
@@ -1024,7 +1485,11 @@ impl SemanticAnalyzer {
 
         for statement in &block.statements {
             // Check for return statements and track their types
-            if let Statement::Return { value, source_location } = statement {
+            if let Statement::Return {
+                value,
+                source_location,
+            } = statement
+            {
                 let stmt_return_type = if let Some(expr) = value {
                     self.analyze_expression(expr)?
                 } else {
@@ -1033,7 +1498,11 @@ impl SemanticAnalyzer {
 
                 if let Some(ref existing_type) = return_type {
                     // Check consistency of return types
-                    if !self.type_checker.borrow().are_types_equal(existing_type, &stmt_return_type) {
+                    if !self
+                        .type_checker
+                        .borrow()
+                        .are_types_equal(existing_type, &stmt_return_type)
+                    {
                         return Err(SemanticError::TypeMismatch {
                             expected: existing_type.to_string(),
                             found: stmt_return_type.to_string(),
@@ -1166,16 +1635,23 @@ impl SemanticAnalyzer {
                 }
             }
 
-            Statement::Return { value, source_location } => {
+            Statement::Return {
+                value,
+                source_location,
+            } => {
                 let return_type = if let Some(return_expr) = value {
                     self.analyze_expression(return_expr)?
                 } else {
                     Type::primitive(PrimitiveType::Void)
                 };
-                
+
                 if let Some(expected_type) = &self.current_function_return_type {
-                    if !self.type_checker.borrow().types_compatible(expected_type, &return_type) {
-                         return Err(SemanticError::TypeMismatch {
+                    if !self
+                        .type_checker
+                        .borrow()
+                        .types_compatible(expected_type, &return_type)
+                    {
+                        return Err(SemanticError::TypeMismatch {
                             expected: expected_type.to_string(),
                             found: return_type.to_string(),
                             location: source_location.clone(),
@@ -1320,13 +1796,13 @@ impl SemanticAnalyzer {
             Statement::Concurrent { block, .. } => {
                 // Save previous state
                 let prev_concurrent = self.in_concurrent_block;
-                
+
                 // Enter concurrent context
                 self.in_concurrent_block = true;
-                
+
                 // Analyze the block
                 self.analyze_block(block)?;
-                
+
                 // Restore state
                 self.in_concurrent_block = prev_concurrent;
             }
@@ -1751,7 +2227,10 @@ impl SemanticAnalyzer {
             } => {
                 // Get the type of the instance
                 let instance_type = self.analyze_expression(instance)?;
-                eprintln!("Semantic: Analyzing FieldAccess. Instance type: {:?}", instance_type);
+                eprintln!(
+                    "Semantic: Analyzing FieldAccess. Instance type: {:?}",
+                    instance_type
+                );
 
                 // Unwrap owned/reference types for field access (auto-deref)
                 let mut current_type = &instance_type;
@@ -1767,17 +2246,26 @@ impl SemanticAnalyzer {
                         }
                         // TODO: Handle Reference if it exists distinct from Pointer
                         _ => {
-                            eprintln!("Semantic: Unwrap loop hit default case for type: {:?}", current_type);
+                            eprintln!(
+                                "Semantic: Unwrap loop hit default case for type: {:?}",
+                                current_type
+                            );
                             break;
                         }
                     }
                 }
-                eprintln!("Semantic: Resolved type for field access: {:?}", current_type);
+                eprintln!(
+                    "Semantic: Resolved type for field access: {:?}",
+                    current_type
+                );
 
                 // Check if it's a named type (struct)
                 match current_type {
                     Type::Named { name, module } => {
-                        eprintln!("Semantic: Matched Type::Named: {} (module: {:?})", name, module);
+                        eprintln!(
+                            "Semantic: Matched Type::Named: {} (module: {:?})",
+                            name, module
+                        );
                         // Look up the struct definition
                         let full_name = if let Some(mod_name) = module {
                             format!("{}::{}", mod_name, name)
@@ -1814,16 +2302,13 @@ impl SemanticAnalyzer {
                             })
                         }
                     }
-                    _ => {
-                        Err(SemanticError::TypeMismatch {
-                            expected: "named struct type".to_string(),
-                            found: current_type.to_string(),
-                            location: source_location.clone(),
-                        })
-                    },
+                    _ => Err(SemanticError::TypeMismatch {
+                        expected: "named struct type".to_string(),
+                        found: current_type.to_string(),
+                        location: source_location.clone(),
+                    }),
                 }
             }
-
 
             Expression::Equals {
                 left,
@@ -2117,9 +2602,16 @@ impl SemanticAnalyzer {
                 source_location,
             } => {
                 let receiver_type = self.analyze_expression(receiver)?;
-                
-                match &receiver_type {
-                    Type::Map { key_type, value_type } => {
+                let normalized_receiver: Type = match &receiver_type {
+                    Type::Owned { base_type, .. } => (**base_type).clone(),
+                    _ => receiver_type.clone(),
+                };
+
+                match &normalized_receiver {
+                    Type::Map {
+                        key_type,
+                        value_type,
+                    } => {
                         if method_name.name == "insert" {
                             if arguments.len() != 2 {
                                 return Err(SemanticError::ArgumentCountMismatch {
@@ -2129,27 +2621,35 @@ impl SemanticAnalyzer {
                                     location: source_location.clone(),
                                 });
                             }
-                            
+
                             // Check key type
                             let arg_key_type = self.analyze_expression(&arguments[0].value)?;
-                            if !self.type_checker.borrow().types_compatible(key_type, &arg_key_type) {
+                            if !self
+                                .type_checker
+                                .borrow()
+                                .types_compatible(&*key_type, &arg_key_type)
+                            {
                                 return Err(SemanticError::TypeMismatch {
                                     expected: key_type.to_string(),
                                     found: arg_key_type.to_string(),
                                     location: arguments[0].source_location.clone(),
                                 });
                             }
-                            
+
                             // Check value type
                             let arg_value_type = self.analyze_expression(&arguments[1].value)?;
-                            if !self.type_checker.borrow().types_compatible(value_type, &arg_value_type) {
+                            if !self
+                                .type_checker
+                                .borrow()
+                                .types_compatible(&*value_type, &arg_value_type)
+                            {
                                 return Err(SemanticError::TypeMismatch {
                                     expected: value_type.to_string(),
                                     found: arg_value_type.to_string(),
                                     location: arguments[1].source_location.clone(),
                                 });
                             }
-                            
+
                             Ok(Type::Primitive(PrimitiveType::Void))
                         } else if method_name.name == "get" {
                             if arguments.len() != 1 {
@@ -2160,17 +2660,21 @@ impl SemanticAnalyzer {
                                     location: source_location.clone(),
                                 });
                             }
-                            
+
                             // Check key type
                             let arg_key_type = self.analyze_expression(&arguments[0].value)?;
-                            if !self.type_checker.borrow().types_compatible(key_type, &arg_key_type) {
+                            if !self
+                                .type_checker
+                                .borrow()
+                                .types_compatible(&*key_type, &arg_key_type)
+                            {
                                 return Err(SemanticError::TypeMismatch {
                                     expected: key_type.to_string(),
                                     found: arg_key_type.to_string(),
                                     location: arguments[0].source_location.clone(),
                                 });
                             }
-                            
+
                             // Returns value type
                             Ok(*value_type.clone())
                         } else {
@@ -2188,12 +2692,19 @@ impl SemanticAnalyzer {
                         } else {
                             module_name.clone()
                         };
-                        
+
                         let qualified_name = format!("{}.{}", module_prefix, method_name.name);
-                        
+
                         // Clone the function type info to avoid holding a borrow on symbol_table
-                        let (parameter_types, return_type) = if let Some(symbol) = self.symbol_table.lookup_symbol(&qualified_name) {
-                            if let Type::Function { parameter_types, return_type, is_variadic: _ } = &symbol.symbol_type {
+                        let (parameter_types, return_type) = if let Some(symbol) =
+                            self.symbol_table.lookup_symbol(&qualified_name)
+                        {
+                            if let Type::Function {
+                                parameter_types,
+                                return_type,
+                                is_variadic: _,
+                            } = &symbol.symbol_type
+                            {
                                 (parameter_types.clone(), return_type.clone())
                             } else {
                                 return Err(SemanticError::InvalidOperation {
@@ -2218,10 +2729,14 @@ impl SemanticAnalyzer {
                                 location: source_location.clone(),
                             });
                         }
-                        
+
                         for (param_type, arg) in parameter_types.iter().zip(arguments.iter()) {
                             let arg_type = self.analyze_expression(&arg.value)?;
-                            if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
+                            if !self
+                                .type_checker
+                                .borrow()
+                                .types_compatible(param_type, &arg_type)
+                            {
                                 return Err(SemanticError::TypeMismatch {
                                     expected: param_type.to_string(),
                                     found: arg_type.to_string(),
@@ -2229,16 +2744,27 @@ impl SemanticAnalyzer {
                                 });
                             }
                         }
-                        
+
                         Ok(*return_type)
                     }
                     _ => {
-                        // For now, only Maps and Modules have methods supported here
-                        Err(SemanticError::InvalidOperation {
-                            operation: format!("method call '{}'", method_name.name),
-                            reason: format!("type '{}' does not support methods", receiver_type),
-                            location: source_location.clone(),
-                        })
+                        if let Some(return_ty) = self.resolve_trait_method_call(
+                            &receiver_type,
+                            method_name,
+                            arguments,
+                            source_location,
+                        )? {
+                            Ok(return_ty)
+                        } else {
+                            Err(SemanticError::InvalidOperation {
+                                operation: format!("method call '{}'", method_name.name),
+                                reason: format!(
+                                    "type '{}' does not support methods",
+                                    receiver_type
+                                ),
+                                location: source_location.clone(),
+                            })
+                        }
                     }
                 }
             }
@@ -2455,7 +2981,7 @@ impl SemanticAnalyzer {
                         name: symbol.name.clone(),
                         symbol_type: symbol.symbol_type.clone(),
                         kind: SymbolKind::Variable, // Captured as a local variable
-                        is_mutable: false, // Captures are immutable by default
+                        is_mutable: false,          // Captures are immutable by default
                         is_initialized: true,
                         declaration_location: symbol.declaration_location.clone(),
                         is_moved: false,
@@ -2646,7 +3172,11 @@ impl SemanticAnalyzer {
                     let arg_type = self.analyze_expression(&arg.value)?;
 
                     if let Some(param_type) = parameter_types.get(i) {
-                        if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
+                        if !self
+                            .type_checker
+                            .borrow()
+                            .types_compatible(param_type, &arg_type)
+                        {
                             return Err(SemanticError::TypeMismatch {
                                 expected: param_type.to_string(),
                                 found: arg_type.to_string(),
@@ -2665,14 +3195,18 @@ impl SemanticAnalyzer {
                     let param_index = call.arguments.len() + i;
 
                     if let Some(param_type) = parameter_types.get(param_index) {
-                        if !self.type_checker.borrow().types_compatible(param_type, &arg_type) {
+                        if !self
+                            .type_checker
+                            .borrow()
+                            .types_compatible(param_type, &arg_type)
+                        {
                             return Err(SemanticError::TypeMismatch {
                                 expected: param_type.to_string(),
                                 found: arg_type.to_string(),
                                 location: SourceLocation::unknown(),
                             });
                         }
-                        
+
                         // Check ownership transfer for variadic args that happen to match a parameter
                         // (e.g. if parameter_types includes them but they were passed as variadic in AST?)
                         // Note: usually parameter_types only has fixed args.
@@ -2697,24 +3231,22 @@ impl SemanticAnalyzer {
         source_location: &SourceLocation,
     ) -> Result<Symbol, SemanticError> {
         match reference {
-            FunctionReference::Local { name } => {
-                self.symbol_table
-                    .lookup_symbol(&name.name)
-                    .cloned()
-                    .ok_or_else(|| SemanticError::UndefinedSymbol {
-                        symbol: name.name.clone(),
-                        location: source_location.clone(),
-                    })
-            }
-            FunctionReference::External { name } => {
-                self.symbol_table
-                    .lookup_symbol(&name.name)
-                    .cloned()
-                    .ok_or_else(|| SemanticError::UndefinedSymbol {
-                        symbol: name.name.clone(),
-                        location: source_location.clone(),
-                    })
-            }
+            FunctionReference::Local { name } => self
+                .symbol_table
+                .lookup_symbol(&name.name)
+                .cloned()
+                .ok_or_else(|| SemanticError::UndefinedSymbol {
+                    symbol: name.name.clone(),
+                    location: source_location.clone(),
+                }),
+            FunctionReference::External { name } => self
+                .symbol_table
+                .lookup_symbol(&name.name)
+                .cloned()
+                .ok_or_else(|| SemanticError::UndefinedSymbol {
+                    symbol: name.name.clone(),
+                    location: source_location.clone(),
+                }),
             FunctionReference::Qualified { module, name } => {
                 // TODO: Implement qualified lookup
                 // For now, try fully qualified name "module.name"
@@ -2730,7 +3262,7 @@ impl SemanticAnalyzer {
         }
     }
 
-        fn analyze_function_call_expression(
+    fn analyze_function_call_expression(
         &mut self,
         call: &FunctionCall,
         source_location: &SourceLocation,
@@ -2764,19 +3296,25 @@ impl SemanticAnalyzer {
             // 2. Build type map from generic parameter names to concrete types
             let mut type_map = HashMap::new();
             let mut generic_param_names_vec = Vec::new();
-            for (gen_param, explicit_arg_spec) in ast_generic_params.iter().zip(explicit_type_args.iter()) {
-                let explicit_type = self.type_checker.borrow().ast_type_to_type(explicit_arg_spec)?;
+            for (gen_param, explicit_arg_spec) in
+                ast_generic_params.iter().zip(explicit_type_args.iter())
+            {
+                let explicit_type = self
+                    .type_checker
+                    .borrow()
+                    .ast_type_to_type(explicit_arg_spec)?;
                 type_map.insert(gen_param.name.name.clone(), explicit_type);
                 generic_param_names_vec.push(gen_param.name.name.clone());
             }
 
             // 3. Get the base function type from the symbol table
-            let symbol = self.symbol_table.lookup_symbol(&function_name).ok_or_else(|| {
-                SemanticError::UndefinedSymbol {
+            let symbol = self
+                .symbol_table
+                .lookup_symbol(&function_name)
+                .ok_or_else(|| SemanticError::UndefinedSymbol {
                     symbol: function_name.clone(),
                     location: source_location.clone(),
-                }
-            })?;
+                })?;
 
             let base_func_type = match &symbol.symbol_type {
                 Type::Function {
@@ -2811,12 +3349,13 @@ impl SemanticAnalyzer {
                 });
             }
 
-            let symbol = self.symbol_table.lookup_symbol(&function_name).ok_or_else(|| {
-                SemanticError::UndefinedSymbol {
+            let symbol = self
+                .symbol_table
+                .lookup_symbol(&function_name)
+                .ok_or_else(|| SemanticError::UndefinedSymbol {
                     symbol: function_name.clone(),
                     location: source_location.clone(),
-                }
-            })?;
+                })?;
 
             let func_type = match &symbol.symbol_type {
                 Type::Function {
@@ -2840,7 +3379,10 @@ impl SemanticAnalyzer {
         };
 
         // Continue with argument type checking using the instantiated_func_type
-        let expected_param_count = if let Type::Function { parameter_types, .. } = &instantiated_func_type {
+        let expected_param_count = if let Type::Function {
+            parameter_types, ..
+        } = &instantiated_func_type
+        {
             parameter_types.len()
         } else {
             0
@@ -2858,7 +3400,10 @@ impl SemanticAnalyzer {
         }
 
         // Analyze arguments and check types
-        if let Type::Function { parameter_types, .. } = &instantiated_func_type {
+        if let Type::Function {
+            parameter_types, ..
+        } = &instantiated_func_type
+        {
             for (i, arg) in call.arguments.iter().enumerate() {
                 let arg_type = self.analyze_expression(&arg.value)?;
 
@@ -2901,9 +3446,184 @@ impl SemanticAnalyzer {
         } else {
             // Should not happen due to match above
             Err(SemanticError::Internal {
-                message: "Function symbol did not resolve to a function type after instantiation".to_string(),
+                message: "Function symbol did not resolve to a function type after instantiation"
+                    .to_string(),
             })
         }
+    }
+
+    /// Look up a trait method signature using a trait bound only (no concrete impl)
+    fn trait_method_signature_from_trait(
+        &self,
+        trait_name: &str,
+        method_name: &str,
+        self_type: &Type,
+    ) -> Result<Option<MethodSignatureInfo>, SemanticError> {
+        let trait_def = match self.trait_definitions.get(trait_name) {
+            Some(def) => def,
+            None => return Ok(None),
+        };
+
+        let substitutions = HashMap::new();
+        for method in &trait_def.methods {
+            if method.name.name == method_name {
+                let sig = self.compute_method_signature(
+                    &method.parameters,
+                    &method.return_type,
+                    &trait_def.generic_parameters,
+                    &method.generic_parameters,
+                    self_type,
+                    &substitutions,
+                )?;
+                return Ok(Some(sig));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Attempt to resolve a trait method call on a generic receiver using its constraints
+    fn resolve_trait_method_on_generic(
+        &mut self,
+        receiver_type: &Type,
+        normalized_receiver: &Type,
+        method_name: &str,
+        arguments: &[Argument],
+        source_location: &SourceLocation,
+    ) -> Result<Option<Type>, SemanticError> {
+        if let Type::Generic { constraints, name, .. } = normalized_receiver {
+            let mut all_constraints: Vec<crate::types::TypeConstraintInfo> = constraints.clone();
+
+            // Merge in constraints from current function where-clause if present
+            if let Some(extra) = self.current_generic_constraints.get(name) {
+                all_constraints.extend_from_slice(extra);
+            }
+
+            for constraint in all_constraints {
+                if let crate::types::TypeConstraintInfo::TraitBound { trait_name, .. } = constraint {
+                    if let Some(sig) = self.trait_method_signature_from_trait(
+                        &trait_name,
+                        method_name,
+                        receiver_type,
+                    )? {
+                        if arguments.len() != sig.call_param_types.len() {
+                            return Err(SemanticError::ArgumentCountMismatch {
+                                function: method_name.to_string(),
+                                expected: sig.call_param_types.len(),
+                                found: arguments.len(),
+                                location: source_location.clone(),
+                            });
+                        }
+
+                        if let Some(self_ty) = sig.self_param_type {
+                            if !self
+                                .type_checker
+                                .borrow()
+                                .types_compatible(&self_ty, receiver_type)
+                            {
+                                return Err(SemanticError::TypeMismatch {
+                                    expected: self_ty.to_string(),
+                                    found: receiver_type.to_string(),
+                                    location: source_location.clone(),
+                                });
+                            }
+                        }
+
+                        for (arg, expected_ty) in arguments.iter().zip(sig.call_param_types.iter()) {
+                            let actual_ty = self.analyze_expression(&arg.value)?;
+                            if !self
+                                .type_checker
+                                .borrow()
+                                .types_compatible(expected_ty, &actual_ty)
+                            {
+                                return Err(SemanticError::TypeMismatch {
+                                    expected: expected_ty.to_string(),
+                                    found: actual_ty.to_string(),
+                                    location: arg.source_location.clone(),
+                                });
+                            }
+                        }
+
+                        return Ok(Some(sig.return_type));
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Resolve trait-based method calls using dispatch table or generic bounds
+    fn resolve_trait_method_call(
+        &mut self,
+        receiver_type: &Type,
+        method_name: &Identifier,
+        arguments: &[Argument],
+        source_location: &SourceLocation,
+    ) -> Result<Option<Type>, SemanticError> {
+        let normalized_receiver: Type = match receiver_type {
+            Type::Owned { base_type, .. } => (**base_type).clone(),
+            _ => receiver_type.clone(),
+        };
+
+        let key = TraitMethodKey {
+            receiver: normalized_receiver.clone(),
+            method_name: method_name.name.clone(),
+        };
+
+        if let Some(dispatch) = self.trait_dispatch_table.get(&key).cloned() {
+            if let Some(self_ty) = &dispatch.self_param_type {
+                if !self
+                    .type_checker
+                    .borrow()
+                    .types_compatible(self_ty, receiver_type)
+                {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: self_ty.to_string(),
+                        found: receiver_type.to_string(),
+                        location: source_location.clone(),
+                    });
+                }
+            }
+
+            if arguments.len() != dispatch.param_types.len() {
+                return Err(SemanticError::ArgumentCountMismatch {
+                    function: method_name.name.clone(),
+                    expected: dispatch.param_types.len(),
+                    found: arguments.len(),
+                    location: source_location.clone(),
+                });
+            }
+
+            for (arg, expected_ty) in arguments.iter().zip(dispatch.param_types.iter()) {
+                let actual_ty = self.analyze_expression(&arg.value)?;
+                if !self
+                    .type_checker
+                    .borrow()
+                    .types_compatible(expected_ty, &actual_ty)
+                {
+                    return Err(SemanticError::TypeMismatch {
+                        expected: expected_ty.to_string(),
+                        found: actual_ty.to_string(),
+                        location: arg.source_location.clone(),
+                    });
+                }
+            }
+
+            return Ok(Some(dispatch.return_type.clone()));
+        }
+
+        if let Some(return_type) = self.resolve_trait_method_on_generic(
+            receiver_type,
+            &normalized_receiver,
+            &method_name.name,
+            arguments,
+            source_location,
+        )? {
+            return Ok(Some(return_type));
+        }
+
+        Ok(None)
     }
 
     /// Analyze an if statement
@@ -3417,7 +4137,7 @@ impl SemanticAnalyzer {
             .type_checker
             .borrow()
             .ast_type_to_type(&ext_func.return_type)?;
-        
+
         let func_type = if ext_func.variadic {
             Type::variadic_function(param_types.clone(), return_type.clone())
         } else {
@@ -3493,6 +4213,11 @@ impl SemanticAnalyzer {
     /// Get capture analysis results
     pub fn get_captures(&self) -> &HashMap<SourceLocation, std::collections::HashSet<String>> {
         &self.captures
+    }
+
+    /// Get trait dispatch table for method resolution
+    pub fn get_trait_dispatch_table(&self) -> &HashMap<TraitMethodKey, TraitMethodDispatch> {
+        &self.trait_dispatch_table
     }
 
     /// Get collected errors
@@ -3575,7 +4300,9 @@ impl SemanticAnalyzer {
                                     });
                                 }
 
-                                for (binding_id, associated_type) in bindings.iter().zip(variant.associated_types.iter()) {
+                                for (binding_id, associated_type) in
+                                    bindings.iter().zip(variant.associated_types.iter())
+                                {
                                     self.symbol_table.add_symbol(Symbol {
                                         name: binding_id.name.clone(),
                                         symbol_type: associated_type.clone(),
@@ -3639,7 +4366,7 @@ impl SemanticAnalyzer {
                             location: source_location.clone(),
                         });
                     }
-                    
+
                     // Look up struct definition
                     let type_def = self
                         .type_checker
@@ -3650,19 +4377,24 @@ impl SemanticAnalyzer {
                             symbol: name.clone(),
                             location: source_location.clone(),
                         })?;
-                        
-                    if let crate::types::TypeDefinition::Struct { fields: def_fields, .. } = type_def {
+
+                    if let crate::types::TypeDefinition::Struct {
+                        fields: def_fields, ..
+                    } = type_def
+                    {
                         // Check fields
                         for (field_name, field_pattern) in fields {
                             // Find field type
-                            let field_type = def_fields.iter().find(|(fname, _)| fname == &field_name.name)
+                            let field_type = def_fields
+                                .iter()
+                                .find(|(fname, _)| fname == &field_name.name)
                                 .map(|(_, ftype)| ftype)
                                 .ok_or_else(|| SemanticError::UnknownField {
                                     struct_name: name.clone(),
                                     field_name: field_name.name.clone(),
                                     location: source_location.clone(),
                                 })?;
-                                
+
                             // Recursively analyze
                             self.analyze_pattern(field_pattern, field_type)?;
                         }
@@ -3759,7 +4491,6 @@ impl Default for SemanticAnalyzer {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 mod tests;

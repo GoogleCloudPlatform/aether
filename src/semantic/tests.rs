@@ -41,6 +41,18 @@ fn semantic_analyzer_from_source(source: &str) -> SemanticAnalyzer {
     analyzer
 }
 
+fn analyze_program_result(source: &str) -> Result<SemanticAnalyzer, Vec<SemanticError>> {
+    let mut lexer = crate::lexer::v2::Lexer::new(source, "test.aether".to_string());
+    let tokens = lexer.tokenize().unwrap();
+    let mut parser = crate::parser::v2::Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    let mut analyzer = SemanticAnalyzer::new();
+    match analyzer.analyze_program(&program) {
+        Ok(()) => Ok(analyzer),
+        Err(errors) => Err(errors),
+    }
+}
+
 #[test]
 fn test_semantic_analyzer_creation() {
     let analyzer = SemanticAnalyzer::new();
@@ -136,9 +148,8 @@ fn test_variable_initialization_checking() {
 #[test]
 fn test_contract_validation_integration() {
     use crate::ast::{
-        ComplexityExpectation, ComplexityNotation, ComplexityType, ContractAssertion,
-        Expression, FailureAction, FunctionMetadata, PerformanceExpectation, PerformanceMetric,
-        PrimitiveType,
+        ComplexityExpectation, ComplexityNotation, ComplexityType, ContractAssertion, Expression,
+        FailureAction, FunctionMetadata, PerformanceExpectation, PerformanceMetric, PrimitiveType,
     };
     use crate::contracts::{ContractContext, ContractValidator};
     use crate::error::SourceLocation;
@@ -268,8 +279,16 @@ fn test_generic_function_param_resolution() {
 
     // Use get_all_symbols() since the module scope has been exited after analysis
     let all_symbols = analyzer.symbol_table.get_all_symbols();
-    let func_symbol = all_symbols.iter().find(|s| s.name == "identity").expect("Function 'identity' should exist");
-    if let Type::Function { parameter_types, return_type, .. } = &func_symbol.symbol_type {
+    let func_symbol = all_symbols
+        .iter()
+        .find(|s| s.name == "identity")
+        .expect("Function 'identity' should exist");
+    if let Type::Function {
+        parameter_types,
+        return_type,
+        ..
+    } = &func_symbol.symbol_type
+    {
         assert_eq!(parameter_types.len(), 1);
         assert!(matches!(parameter_types[0], Type::Generic { ref name, .. } if name == "T"));
         assert!(matches!(**return_type, Type::Generic { ref name, .. } if name == "T"));
@@ -279,7 +298,9 @@ fn test_generic_function_param_resolution() {
 
     // Within the function's scope, 'T' should be resolvable as a type
     let func_scope_symbols = analyzer.symbol_table.get_all_symbols();
-    let generic_t_symbol = func_scope_symbols.iter().find(|s| s.name == "T" && matches!(s.symbol_type, Type::Generic {..}));
+    let generic_t_symbol = func_scope_symbols
+        .iter()
+        .find(|s| s.name == "T" && matches!(s.symbol_type, Type::Generic { .. }));
     assert!(generic_t_symbol.is_some());
 }
 
@@ -316,12 +337,17 @@ fn test_generic_enum_variant_resolution() {
     "#;
     let analyzer = semantic_analyzer_from_source(source);
 
-    let enum_def = analyzer.symbol_table.lookup_type_definition("Option").unwrap();
+    let enum_def = analyzer
+        .symbol_table
+        .lookup_type_definition("Option")
+        .unwrap();
     if let crate::types::TypeDefinition::Enum { variants, .. } = enum_def {
         assert_eq!(variants.len(), 2);
         assert_eq!(&variants[0].name, "Some");
         assert_eq!(variants[0].associated_types.len(), 1);
-        assert!(matches!(&variants[0].associated_types[0], Type::Generic { ref name, .. } if name == "T"));
+        assert!(
+            matches!(&variants[0].associated_types[0], Type::Generic { ref name, .. } if name == "T")
+        );
         assert_eq!(&variants[1].name, "None");
         assert_eq!(variants[1].associated_types.len(), 0);
     } else {
@@ -345,5 +371,106 @@ fn test_undefined_generic_parameter_in_function() {
     let mut analyzer = SemanticAnalyzer::new();
     let analysis_result = analyzer.analyze_module(&program.modules[0]);
     assert!(analysis_result.is_err());
-    assert!(matches!(analysis_result.unwrap_err(), SemanticError::UndefinedSymbol { symbol, .. } if symbol == "U"));
+    assert!(
+        matches!(analysis_result.unwrap_err(), SemanticError::UndefinedSymbol { symbol, .. } if symbol == "U")
+    );
+}
+
+#[test]
+fn test_trait_method_resolution_for_concrete_type() {
+    let source = r#"
+    module test;
+
+    trait Printable {
+        func print(self: &Self) -> Int;
+    }
+
+    struct Label {
+        value: String;
+    }
+
+    impl Printable for Label {
+        func print(self: &Self) -> Int {
+            return 42;
+        }
+    }
+
+    func demo(label: Label) -> Int {
+        return label.print();
+    }
+    "#;
+
+    let analyzer = analyze_program_result(source).expect("semantic analysis should succeed");
+    let dispatch = analyzer.get_trait_dispatch_table();
+    let key = TraitMethodKey {
+        receiver: Type::named("Label".to_string(), Some("test".to_string())),
+        method_name: "print".to_string(),
+    };
+
+    assert!(
+        dispatch.contains_key(&key),
+        "expected dispatch entry for Label.print"
+    );
+
+    let info = dispatch.get(&key).unwrap();
+    assert_eq!(info.trait_name, "Printable");
+    assert_eq!(info.return_type, Type::primitive(PrimitiveType::Integer));
+}
+
+#[test]
+fn test_trait_method_resolution_for_generic_param() {
+    let source = r#"
+    module test;
+
+    trait Displayable {
+        func display(self: &Self) -> String;
+    }
+
+    func render<T>(value: T) -> String where T: Displayable {
+        return value.display();
+    }
+    "#;
+
+    let analyzer = analyze_program_result(source).expect("semantic analysis should succeed");
+    let symbol_table = analyzer.get_symbol_table();
+    let render_fn = symbol_table
+        .lookup_symbol_any_scope("render")
+        .expect("render function should be registered");
+
+    if let Type::Function { return_type, .. } = &render_fn.symbol_type {
+        assert_eq!(**return_type, Type::primitive(PrimitiveType::String));
+    } else {
+        panic!("render should be a function");
+    }
+}
+
+#[test]
+fn test_trait_method_resolution_missing_impl_errors() {
+    let source = r#"
+    module test;
+
+    trait Serializable {
+        func serialize(self: &Self) -> String;
+    }
+
+    struct Plain {}
+
+    func demo(value: Plain) -> String {
+        return value.serialize();
+    }
+    "#;
+
+    let result = analyze_program_result(source);
+    assert!(result.is_err(), "expected error for missing trait impl");
+    let errors = result.err().unwrap();
+    assert!(
+        errors.iter().any(|e| matches!(
+            e,
+            SemanticError::InvalidOperation { .. }
+                | SemanticError::UndefinedSymbol { .. }
+                | SemanticError::TypeMismatch { .. }
+        )),
+        "expected a semantic error about trait method resolution, got {:?}",
+        errors
+    );
 }
