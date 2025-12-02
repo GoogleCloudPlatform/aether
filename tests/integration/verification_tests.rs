@@ -71,7 +71,7 @@ module contract_violation {
 
     let result = compiler.compile_source(source, "contract_violation.aether");
     // Should either fail compilation or issue a strong warning
-    // In V2 pipeline, we might just compile. 
+    // In V2 pipeline, we might just compile.
     // If the test runner checks runtime, it might panic.
     // Assert success for compilation at least.
     assert!(result.is_success());

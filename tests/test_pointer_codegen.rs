@@ -41,7 +41,11 @@ module test_pointers {
     let result = analyzer.analyze_program(&program);
 
     // Should compile successfully
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -68,7 +72,11 @@ module test_pointers {
     let result = analyzer.analyze_program(&program);
 
     // Should compile successfully
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -90,5 +98,9 @@ module test_pointers {
     let result = analyzer.analyze_program(&program);
 
     // Should compile successfully
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }

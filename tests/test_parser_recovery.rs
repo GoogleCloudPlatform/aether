@@ -28,10 +28,7 @@ fn main() {
         Ok(program) => {
             println!("Parse succeeded with {} modules", program.modules.len());
             if parser.has_errors() {
-                println!(
-                    "But found {} errors during parsing:",
-                    parser.errors().len()
-                );
+                println!("But found {} errors during parsing:", parser.errors().len());
                 for error in parser.errors() {
                     println!("  - {}", error);
                 }

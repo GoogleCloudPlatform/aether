@@ -39,7 +39,11 @@ module test_arrays {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -60,7 +64,11 @@ module test_indexing {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -88,7 +96,11 @@ module test_iteration {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -114,5 +126,9 @@ module test_calls {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }

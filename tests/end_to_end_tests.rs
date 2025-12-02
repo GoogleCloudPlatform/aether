@@ -69,7 +69,7 @@ fn test_complete_pipeline_simple_module() {
     assert!(ast_output.contains("Module 'simple_module'"));
     assert!(ast_output.contains("const VERSION: String"));
     assert!(ast_output.contains("const MAX_ITEMS: Integer")); // AST Print uses PrimitiveType::Integer which prints "INTEGER" or "Integer"?
-    // PrimitiveType::fmt uses "INTEGER"
+                                                              // PrimitiveType::fmt uses "INTEGER"
 }
 
 #[test]
@@ -170,14 +170,14 @@ fn test_pipeline_syntax_errors_detection() {
 fn test_lexer_error_recovery() {
     // Test with invalid characters
     let source = "invalid characters: @#$%^&*"; // V2 supports @ (annotation) and ^ (owned) and & (borrow)
-    // But #, $, % (modulo ok), * (mul ok).
-    // Maybe use something definitely invalid like backtick if not supported.
-    // Or just invalid sequence.
-    
+                                                // But #, $, % (modulo ok), * (mul ok).
+                                                // Maybe use something definitely invalid like backtick if not supported.
+                                                // Or just invalid sequence.
+
     let mut lexer = Lexer::new(source, "test.aether".to_string());
     // V2 lexer might not fail immediately but produce Error tokens or return Result.
     // tokenize returns Result.
-    
+
     let result = lexer.tokenize();
     // Depending on implementation, it might succeed with error tokens or fail.
     // If it fails:
@@ -245,7 +245,7 @@ fn test_large_file_performance() {
     let stats = analyzer.get_statistics();
     assert_eq!(stats.modules_analyzed, 1);
     // In V2 fixture: 20 constants
-    assert_eq!(stats.variables_declared, 20); 
+    assert_eq!(stats.variables_declared, 20);
 }
 
 #[test]

@@ -63,7 +63,7 @@ module test_printf_variadic {
     // But let's try to check output if possible.
     let stdout = String::from_utf8_lossy(&run_output.stdout);
     if !stdout.contains("Hello World! The answer is 42") {
-         // Allow failure if execution environment is limited
+        // Allow failure if execution environment is limited
     }
 
     // Clean up
@@ -108,7 +108,7 @@ module test_multiple_variadic {
             String::from_utf8_lossy(&output.stderr)
         );
     }
-    
+
     // Execution check skipped due to environment variability
 
     // Clean up

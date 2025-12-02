@@ -130,7 +130,7 @@ module test_nested_struct {
         .arg("test_nested_struct")
         .output()
         .expect("Failed to run compiler");
-        
+
     fs::remove_file(test_file).ok();
     fs::remove_file("test_nested_struct").ok();
     fs::remove_file("test_nested_struct.o").ok();
@@ -171,7 +171,7 @@ module test_struct_alignment {
         .arg("test_struct_alignment")
         .output()
         .expect("Failed to run compiler");
-        
+
     fs::remove_file(test_file).ok();
     fs::remove_file("test_struct_alignment").ok();
     fs::remove_file("test_struct_alignment.o").ok();

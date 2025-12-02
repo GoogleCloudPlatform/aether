@@ -170,7 +170,8 @@ fn test_struct_type_generation() {
     let symbol_table = analyzer.get_symbol_table().clone();
 
     // Convert to MIR with symbol table
-    let mir_program = lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
+    let mir_program =
+        lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
 
     // Create LLVM backend
     let context = inkwell::context::Context::create();
@@ -221,7 +222,8 @@ fn test_struct_passing_by_value() {
     let symbol_table = analyzer.get_symbol_table().clone();
 
     // Convert to MIR with symbol table
-    let mir_program = lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
+    let mir_program =
+        lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
 
     // Create LLVM backend
     let context = inkwell::context::Context::create();
@@ -238,7 +240,10 @@ fn test_struct_passing_by_value() {
     // Verify the test function was created with correct signature
     // Function names are prefixed with module name
     let func = llvm_module.get_function("test_module.test_struct_passing");
-    assert!(func.is_some(), "test_module.test_struct_passing function not found");
+    assert!(
+        func.is_some(),
+        "test_module.test_struct_passing function not found"
+    );
 
     if let Some(f) = func {
         // Should have one parameter (the struct, possibly passed by pointer for ABI compatibility)
@@ -247,7 +252,10 @@ fn test_struct_passing_by_value() {
         // Parameter should be either struct value or pointer to struct (ABI-dependent)
         let param = f.get_first_param().unwrap();
         let is_struct_or_ptr = param.is_struct_value() || param.is_pointer_value();
-        assert!(is_struct_or_ptr, "Parameter should be a struct or pointer to struct");
+        assert!(
+            is_struct_or_ptr,
+            "Parameter should be a struct or pointer to struct"
+        );
     }
 }
 
@@ -269,7 +277,8 @@ fn test_external_struct_function() {
     let symbol_table = analyzer.get_symbol_table().clone();
 
     // Convert to MIR with symbol table
-    let mir_program = lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
+    let mir_program =
+        lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
 
     // Create LLVM backend
     let context = inkwell::context::Context::create();
@@ -406,7 +415,8 @@ fn test_nested_struct_generation() {
     let symbol_table = analyzer.get_symbol_table().clone();
 
     // Convert to MIR with symbol table
-    let mir_program = lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
+    let mir_program =
+        lower_ast_to_mir_with_symbols(&program, symbol_table).expect("MIR lowering failed");
 
     // Create LLVM backend
     let context = inkwell::context::Context::create();

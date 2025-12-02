@@ -305,9 +305,14 @@ fn test_use_after_move() {
 
     assert!(result.is_err(), "Use after move should fail analysis");
     let errors = result.unwrap_err();
-    
-    let use_after_move_error = errors.iter().find(|e| matches!(e, SemanticError::UseAfterMove { .. }));
-    assert!(use_after_move_error.is_some(), "Expected UseAfterMove error");
+
+    let use_after_move_error = errors
+        .iter()
+        .find(|e| matches!(e, SemanticError::UseAfterMove { .. }));
+    assert!(
+        use_after_move_error.is_some(),
+        "Expected UseAfterMove error"
+    );
 }
 
 #[test]
@@ -378,9 +383,12 @@ fn test_move_on_assignment() {
     let program = create_ownership_test_module(body);
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
-    
-    assert!(result.is_err(), "Use after move assignment should fail analysis");
-    
+
+    assert!(
+        result.is_err(),
+        "Use after move assignment should fail analysis"
+    );
+
     // Note: Currently variable declaration initialization doesn't trigger move tracking in semantic analyzer
     // because it handles expressions generically. We might need to check if we implemented move tracking for Variable expressions.
     // Let's check `analyze_expression` in `src/semantic/mod.rs`.

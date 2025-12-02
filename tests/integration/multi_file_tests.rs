@@ -142,7 +142,7 @@ fn test_circular_dependency_detection() {
             "module_a.aether",
             r#"module module_a {
   import module_b;
-  
+
   pub func function_a() -> Int {
       return module_b.function_b();
   }
@@ -153,7 +153,7 @@ fn test_circular_dependency_detection() {
             "module_b.aether",
             r#"module module_b {
   import module_a;
-  
+
   pub func function_b() -> Int {
       return module_a.function_a();
   }
@@ -174,7 +174,7 @@ fn test_circular_dependency_detection() {
 fn test_standard_library_imports() {
     let compiler = TestCompiler::new("stdlib_imports");
 
-    let files = &[( 
+    let files = &[(
         "main.aether",
         r#"module main {
   // import std.string; // Stdlib mock

@@ -52,7 +52,7 @@ impl TestCompiler {
     /// Compile a single file
     pub fn compile_file<P: AsRef<Path>>(&self, input: P) -> TestCompilationResult {
         let input_path = input.as_ref();
-        
+
         // Determine output path in temp dir
         let file_stem = input_path.file_stem().unwrap_or_default();
         let output_path = self.temp_dir.join(file_stem);

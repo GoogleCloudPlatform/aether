@@ -23,9 +23,9 @@ mod lsp_tests {
     // we will rely on unit tests within the module if possible, or just verify the structure compiles and runs.
     // However, `Backend` struct takes a `Client` which is hard to mock directly as it's from tower_lsp.
     // We can instead test the logic functions if we expose them, or trust the integration test.
-    
+
     // For now, let's just verify we can instantiate the backend (conceptually) or check that the module compiles (which we did).
-    
+
     #[test]
     fn test_lsp_types() {
         // Verify we can construct LSP types we use

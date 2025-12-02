@@ -131,7 +131,7 @@ module resource_leak_detection {
     "#;
 
     let result = compiler.compile_source(source, "resource_leak_detection.aether");
-    
+
     // In V2 with strict ownership, resources must be properly managed.
     // If the compiler detects issues (like use after move or unconsumed linear types), it will fail.
     // We expect this to fail if leak detection or ownership rules are active.

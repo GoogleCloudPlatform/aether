@@ -48,7 +48,11 @@ module test_math {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -80,7 +84,11 @@ module test_power {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -112,7 +120,11 @@ module test_trig {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -160,5 +172,9 @@ module test_minmax {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }

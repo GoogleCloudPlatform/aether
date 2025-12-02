@@ -73,17 +73,15 @@ module test_nested_pointers {
 
     // Should be a Pointer<Pointer<Int>> type
     match param_type.as_ref() {
-        TypeSpecifier::Pointer { target_type, .. } => {
-            match target_type.as_ref() {
-                TypeSpecifier::Pointer { target_type: inner, .. } => {
-                    match inner.as_ref() {
-                        TypeSpecifier::Primitive { .. } => {}
-                        _ => panic!("Expected primitive inner target type"),
-                    }
-                }
-                _ => panic!("Expected nested Pointer type"),
-            }
-        }
+        TypeSpecifier::Pointer { target_type, .. } => match target_type.as_ref() {
+            TypeSpecifier::Pointer {
+                target_type: inner, ..
+            } => match inner.as_ref() {
+                TypeSpecifier::Primitive { .. } => {}
+                _ => panic!("Expected primitive inner target type"),
+            },
+            _ => panic!("Expected nested Pointer type"),
+        },
         _ => panic!("Expected Pointer type"),
     }
 }

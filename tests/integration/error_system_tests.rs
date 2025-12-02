@@ -48,7 +48,9 @@ module structured_errors {
 
         // Should contain location information (standard format path:line:col)
         assert!(
-            error_msg.contains(".aether:") || error_msg.contains("line") || error_msg.contains("column"),
+            error_msg.contains(".aether:")
+                || error_msg.contains("line")
+                || error_msg.contains("column"),
             "Error should contain location information"
         );
     }
@@ -223,7 +225,7 @@ module error_recovery {
 
     let result = compiler.compile_source(source, "error_recovery.aether");
     assert_compilation_failure(&result, "Error recovery test");
-    
+
     if let Some(error) = result.error() {
         // Check if it reports the specific error
         assert!(format!("{}", error).contains("Undefined symbol"));

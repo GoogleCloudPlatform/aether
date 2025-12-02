@@ -48,7 +48,11 @@ module test_io {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -74,7 +78,11 @@ module test_console {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -111,5 +119,9 @@ module test_file_limits {
     let mut analyzer = SemanticAnalyzer::new();
     let result = analyzer.analyze_program(&program);
 
-    assert!(result.is_ok(), "Semantic analysis failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Semantic analysis failed: {:?}",
+        result.err()
+    );
 }

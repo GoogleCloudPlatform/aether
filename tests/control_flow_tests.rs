@@ -39,7 +39,8 @@ fn create_control_flow_module() -> String {
         }
         return count;
     }
-}"#.to_string()
+}"#
+    .to_string()
 }
 
 #[test]
@@ -222,7 +223,7 @@ fn test_nested_control_flow() {
     assert_eq!(stats.functions_analyzed, 1);
     // count variables: sum, i, j (inner loop), and function parameter n
     // Note: 'n' is a parameter, 'sum', 'i', 'j' are declared variables.
-    // The statistics might verify 'variables_declared'. 
+    // The statistics might verify 'variables_declared'.
     // In V2, 'var' declarations count.
     assert_eq!(stats.variables_declared, 3); // sum, i, j
 }
