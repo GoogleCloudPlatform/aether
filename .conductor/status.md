@@ -217,3 +217,10 @@
 - Added unit test to ensure monomorphized functions produce verification conditions via generic contracts.
 - Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (full suite, 760 passing).
 - Next action: start Task 16.2 (Abstract Verification with Axioms).
+
+## Status Update (2025-12-02 - evening)
+
+- Completed Task 16.2 (Abstract Verification with Axioms): verification engine now asserts global axioms (e.g., trait axioms) for all VCs and solver supports axioms explicitly.
+- Added solver and verification tests demonstrating axioms enabling previously failing contracts.
+- Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (targeted new tests and full suite).
+- Next action: begin Task 16.3 (Combined Verification Strategy).

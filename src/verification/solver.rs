@@ -37,6 +37,7 @@ pub enum SolverValue {
 }
 
 /// Result of checking a condition
+#[derive(Debug)]
 pub enum CheckResult {
     /// Condition is verified (unsatisfiable negation)
     Verified,
@@ -46,6 +47,7 @@ pub enum CheckResult {
 }
 
 /// Model (counterexample) from solver
+#[derive(Debug)]
 pub struct Model {
     /// Variable assignments
     pub assignments: HashMap<String, SolverValue>,
@@ -150,6 +152,15 @@ impl SmtSolver {
 
     /// Check a verification condition using Z3
     pub fn check_condition(&mut self, vc: &VerificationCondition) -> Result<CheckResult, String> {
+        self.check_condition_with_axioms(vc, &[])
+    }
+
+    /// Check a verification condition with additional axioms asserted.
+    pub fn check_condition_with_axioms(
+        &mut self,
+        vc: &VerificationCondition,
+        axioms: &[Formula],
+    ) -> Result<CheckResult, String> {
         eprintln!("Verifying condition: {}", vc.name);
 
         // Create fresh Z3 context and solver for this check
@@ -163,9 +174,19 @@ impl SmtSolver {
         // Convert formula to Z3 AST
         let z3_formula = formula_to_z3(&ctx, &vc.formula, &mut variables)?;
 
+        // Assert axioms (assumptions) first.
+        for axiom in axioms {
+            let z3_axiom = formula_to_z3(&ctx, axiom, &mut variables)?;
+            let z3_bool = z3_axiom
+                .as_bool()
+                .ok_or_else(|| "Axiom must evaluate to boolean".to_string())?;
+            solver.assert(&z3_bool);
+        }
+
         // To verify a formula is always true, we assert its negation
         // If the negation is unsatisfiable, the original is valid
-        let z3_bool = z3_formula.as_bool()
+        let z3_bool = z3_formula
+            .as_bool()
             .ok_or_else(|| "Formula must evaluate to boolean".to_string())?;
         solver.assert(&z3_bool.not());
 
@@ -184,7 +205,9 @@ impl SmtSolver {
                 } else {
                     Model {
                         assignments: HashMap::new(),
-                        execution_trace: vec!["Counterexample exists but model unavailable".to_string()],
+                        execution_trace: vec![
+                            "Counterexample exists but model unavailable".to_string()
+                        ],
                     }
                 };
                 Ok(CheckResult::Failed(model))
@@ -406,9 +429,7 @@ fn formula_to_z3<'ctx>(
             Ok(z3::ast::exists_const(ctx, &bound_refs, &[], &body_bool).into())
         }
 
-        Formula::Select(_array, _index) => {
-            Err("Array select not yet implemented".to_string())
-        }
+        Formula::Select(_array, _index) => Err("Array select not yet implemented".to_string()),
 
         Formula::Store(_array, _index, _value) => {
             Err("Array store not yet implemented".to_string())
@@ -417,10 +438,7 @@ fn formula_to_z3<'ctx>(
 }
 
 /// Extract counterexample model from Z3
-fn extract_model(
-    z3_model: &z3::Model,
-    variables: &HashMap<String, z3::ast::Int>,
-) -> Model {
+fn extract_model(z3_model: &z3::Model, variables: &HashMap<String, z3::ast::Int>) -> Model {
     let mut assignments = HashMap::new();
 
     for (name, var) in variables {
@@ -503,6 +521,37 @@ mod tests {
             Err(e) => {
                 panic!("Solver error: {}", e);
             }
+        }
+    }
+
+    #[test]
+    fn test_verification_with_axioms() {
+        let mut solver = SmtSolver::new();
+
+        // VC requires x == y, which is not provable without an axiom.
+        let vc = VerificationCondition {
+            name: "needs_axiom".to_string(),
+            formula: Formula::Eq(
+                Box::new(Formula::Var("x".to_string())),
+                Box::new(Formula::Var("y".to_string())),
+            ),
+            location: SourceLocation::unknown(),
+        };
+
+        // Without axioms, verification should fail.
+        match solver.check_condition(&vc) {
+            Ok(CheckResult::Failed(_)) => {}
+            _ => panic!("Verification should fail without supporting axioms"),
+        }
+
+        // With an axiom asserting x == y, it should verify.
+        let axioms = vec![Formula::Eq(
+            Box::new(Formula::Var("x".to_string())),
+            Box::new(Formula::Var("y".to_string())),
+        )];
+        match solver.check_condition_with_axioms(&vc, &axioms) {
+            Ok(CheckResult::Verified) => {}
+            other => panic!("Verification with axiom should succeed, got {:?}", other),
         }
     }
 }

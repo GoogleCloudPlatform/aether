@@ -111,6 +111,9 @@ struct VerificationContext {
 
     /// Global invariants
     global_invariants: Vec<invariants::GlobalInvariant>,
+
+    /// Global axioms asserted for all verification conditions
+    global_axioms: Vec<solver::Formula>,
 }
 
 impl VerificationEngine {
@@ -163,7 +166,10 @@ impl VerificationEngine {
         for vc in conditions {
             let start_time = std::time::Instant::now();
 
-            match self.solver.check_condition(&vc) {
+            match self
+                .solver
+                .check_condition_with_axioms(&vc, &self.context.global_axioms)
+            {
                 Ok(solver::CheckResult::Verified) => {
                     condition_results.push(ConditionResult {
                         name: vc.name.clone(),
@@ -223,6 +229,11 @@ impl VerificationEngine {
     /// Add a global invariant
     pub fn add_global_invariant(&mut self, invariant: invariants::GlobalInvariant) {
         self.context.global_invariants.push(invariant);
+    }
+
+    /// Add a global axiom that will be available to every verification condition.
+    pub fn add_axiom(&mut self, axiom: solver::Formula) {
+        self.context.global_axioms.push(axiom);
     }
 
     /// Extract a counterexample from a failed verification
@@ -316,7 +327,10 @@ impl Default for VerificationEngine {
 mod tests {
     use super::*;
     use crate::ast::PrimitiveType;
-    use crate::mir::{BasicBlock, Function, Parameter, Program, Terminator};
+    use crate::mir;
+    use crate::mir::{
+        BasicBlock, Function, Operand, Parameter, Place, Program, Rvalue, Statement, Terminator,
+    };
     use crate::types::Type;
     use std::collections::HashMap;
 
@@ -404,5 +418,105 @@ mod tests {
             .expect("expected verification result for monomorphized function");
         assert!(!instantiation.conditions.is_empty());
         assert!(instantiation.verified);
+    }
+
+    #[test]
+    fn applies_global_axioms_during_verification() {
+        let int_type = Type::primitive(PrimitiveType::Integer);
+
+        // Function: returns x but contract requires result == y, which needs an axiom.
+        let parameters = vec![
+            Parameter {
+                name: "x".to_string(),
+                ty: int_type.clone(),
+                local_id: 0,
+            },
+            Parameter {
+                name: "y".to_string(),
+                ty: int_type.clone(),
+                local_id: 1,
+            },
+        ];
+
+        let assign_return = Statement::Assign {
+            place: Place {
+                local: 2,
+                projection: vec![],
+            },
+            rvalue: Rvalue::Use(Operand::Copy(Place {
+                local: 0,
+                projection: vec![],
+            })),
+            source_info: mir::SourceInfo {
+                span: SourceLocation::unknown(),
+                scope: 0,
+            },
+        };
+
+        let entry_block = BasicBlock {
+            id: 0,
+            statements: vec![assign_return],
+            terminator: Terminator::Return,
+        };
+
+        let mut blocks = HashMap::new();
+        blocks.insert(0, entry_block);
+
+        let function = Function {
+            name: "needs_axiom".to_string(),
+            parameters: parameters.clone(),
+            return_type: int_type.clone(),
+            locals: {
+                let mut locals = HashMap::new();
+                locals.insert(
+                    2,
+                    mir::Local {
+                        ty: int_type.clone(),
+                        is_mutable: false,
+                        source_info: None,
+                    },
+                );
+                locals
+            },
+            basic_blocks: blocks,
+            entry_block: 0,
+            return_local: Some(2),
+        };
+
+        let mut contract = contracts::FunctionContract::new("needs_axiom".to_string());
+        contract.add_postcondition(
+            "result_matches_y".to_string(),
+            contracts::Expression::BinaryOp {
+                op: contracts::BinaryOp::Eq,
+                left: Box::new(contracts::Expression::Result),
+                right: Box::new(contracts::Expression::Variable("y".to_string())),
+            },
+            SourceLocation::unknown(),
+        );
+
+        // Without the axiom, verification should fail.
+        let mut engine_without_axiom = VerificationEngine::new();
+        engine_without_axiom.add_function_contract("needs_axiom".to_string(), contract.clone());
+        let failed = engine_without_axiom
+            .verify_function("needs_axiom", &function)
+            .unwrap();
+        assert!(!failed.verified);
+        assert!(!failed.conditions.is_empty());
+        assert!(!failed.conditions[0].verified);
+
+        // Add an axiom equating x and y (locals 0 and 1), enabling the postcondition to prove.
+        let mut engine_with_axiom = VerificationEngine::new();
+        engine_with_axiom.add_function_contract("needs_axiom".to_string(), contract);
+        engine_with_axiom.add_axiom(solver::Formula::Eq(
+            Box::new(solver::Formula::Var("local_0".to_string())),
+            Box::new(solver::Formula::Var("local_1".to_string())),
+        ));
+
+        let verified = engine_with_axiom
+            .verify_function("needs_axiom", &function)
+            .unwrap();
+        assert!(verified.verified);
+        assert!(!verified.conditions.is_empty());
+        assert!(verified.conditions[0].verified);
     }
 }

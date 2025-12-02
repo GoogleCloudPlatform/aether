@@ -502,9 +502,9 @@ See: [Architecture - Verification Strategy](architecture.md#verification-strateg
 - [x] **Tests**: Instantiation verification tests
 
 ### Task 16.2: Abstract Verification with Axioms (Option C)
-- [ ] **Verification**: Convert trait axioms to Z3 assertions
-- [ ] **VCGen**: Support abstract verification using axioms
-- [ ] **Tests**: Abstract verification tests
+- [x] **Verification**: Convert trait axioms to Z3 assertions
+- [x] **VCGen**: Support abstract verification using axioms
+- [x] **Tests**: Abstract verification tests
 
 ### Task 16.3: Combined Verification Strategy
 - [ ] **Verification**: Try abstract first, fall back to instantiation
