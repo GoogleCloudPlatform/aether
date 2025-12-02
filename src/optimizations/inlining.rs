@@ -21,8 +21,7 @@
 use super::OptimizationPass;
 use crate::error::SemanticError;
 use crate::mir::{
-    Function, LocalId, Operand, Place, Program, Rvalue, SourceInfo, Statement,
-    Terminator,
+    Function, LocalId, Operand, Place, Program, Rvalue, SourceInfo, Statement, Terminator,
 };
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -129,11 +128,11 @@ impl InliningPass {
 
         // 1. Create new locals in caller for all locals in callee
         let mut max_local_id = locals.keys().max().copied().unwrap_or(0);
-        
+
         for (callee_local_id, callee_local) in &callee.locals {
             max_local_id += 1;
             let new_local_id = max_local_id;
-            
+
             locals.insert(new_local_id, callee_local.clone());
             local_map.insert(*callee_local_id, new_local_id);
         }
@@ -226,7 +225,10 @@ impl InliningPass {
                 }
             }
             Rvalue::Cast { operand, .. } => self.remap_operand(operand, map),
-            Rvalue::Ref { place, .. } | Rvalue::AddressOf(place) | Rvalue::Len(place) | Rvalue::Discriminant(place) => {
+            Rvalue::Ref { place, .. }
+            | Rvalue::AddressOf(place)
+            | Rvalue::Len(place)
+            | Rvalue::Discriminant(place) => {
                 self.remap_place(place, map);
             }
             Rvalue::Closure { captures, .. } => {
@@ -459,7 +461,7 @@ mod tests {
         );
 
         let dest_local = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
-        
+
         // Add call statement
         builder.push_statement(Statement::Assign {
             place: Place {
@@ -498,9 +500,13 @@ mod tests {
         // Check if caller no longer has the call
         let caller = program.functions.get("caller").unwrap();
         let entry_block = caller.basic_blocks.get(&caller.entry_block).unwrap();
-        
+
         let has_call = entry_block.statements.iter().any(|stmt| {
-            if let Statement::Assign { rvalue: Rvalue::Call { .. }, .. } = stmt {
+            if let Statement::Assign {
+                rvalue: Rvalue::Call { .. },
+                ..
+            } = stmt
+            {
                 true
             } else {
                 false

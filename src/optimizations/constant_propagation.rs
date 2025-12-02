@@ -29,7 +29,7 @@ pub struct ConstantPropagationPass {
 
 impl ConstantPropagationPass {
     pub fn new() -> Self {
-        Self { 
+        Self {
             changed: false,
             propagated_count: 0,
         }
@@ -66,7 +66,11 @@ impl ConstantPropagationPass {
         }
     }
 
-    fn propagate_in_rvalue(&mut self, rvalue: &mut Rvalue, constants: &HashMap<LocalId, ConstantValue>) {
+    fn propagate_in_rvalue(
+        &mut self,
+        rvalue: &mut Rvalue,
+        constants: &HashMap<LocalId, ConstantValue>,
+    ) {
         match rvalue {
             Rvalue::Use(operand) => self.propagate_in_operand(operand, constants),
             Rvalue::UnaryOp { operand, .. } => self.propagate_in_operand(operand, constants),
@@ -80,27 +84,39 @@ impl ConstantPropagationPass {
         }
     }
 
-    fn propagate_in_operand(&mut self, operand: &mut Operand, constants: &HashMap<LocalId, ConstantValue>) {
+    fn propagate_in_operand(
+        &mut self,
+        operand: &mut Operand,
+        constants: &HashMap<LocalId, ConstantValue>,
+    ) {
         if let Operand::Copy(place) | Operand::Move(place) = operand {
             if place.projection.is_empty() {
                 if let Some(const_val) = constants.get(&place.local) {
-                    // Determine type from somewhere? 
+                    // Determine type from somewhere?
                     // Ideally we need the type of the local to create a Constant.
-                    // But Operand::Constant needs a Type. 
+                    // But Operand::Constant needs a Type.
                     // Since we don't have easy access to function locals types here without passing function context,
                     // we might need to change the signature or strategy.
                     // However, ConstantValue usually implies the type (Integer, Float, etc).
                     // We can construct a Type from ConstantValue for primitive types.
-                    
+
                     // Let's construct the type from the value
                     let ty = match const_val {
-                        ConstantValue::Integer(_) => crate::types::Type::primitive(crate::ast::PrimitiveType::Integer),
-                        ConstantValue::Float(_) => crate::types::Type::primitive(crate::ast::PrimitiveType::Float),
-                        ConstantValue::Bool(_) => crate::types::Type::primitive(crate::ast::PrimitiveType::Boolean),
-                        ConstantValue::String(_) => crate::types::Type::primitive(crate::ast::PrimitiveType::String),
+                        ConstantValue::Integer(_) => {
+                            crate::types::Type::primitive(crate::ast::PrimitiveType::Integer)
+                        }
+                        ConstantValue::Float(_) => {
+                            crate::types::Type::primitive(crate::ast::PrimitiveType::Float)
+                        }
+                        ConstantValue::Bool(_) => {
+                            crate::types::Type::primitive(crate::ast::PrimitiveType::Boolean)
+                        }
+                        ConstantValue::String(_) => {
+                            crate::types::Type::primitive(crate::ast::PrimitiveType::String)
+                        }
                         // For Char, we need to handle it if ConstantValue supports it (it doesn't seem to currently?)
                         // Assuming ConstantValue definition from constant_folding.rs/mir/mod.rs
-                        _ => return, 
+                        _ => return,
                     };
 
                     *operand = Operand::Constant(crate::mir::Constant {
@@ -122,15 +138,15 @@ impl OptimizationPass for ConstantPropagationPass {
 
     fn run_on_function(&mut self, function: &mut Function) -> Result<bool, SemanticError> {
         self.changed = false;
-        
-        // We need to iterate over blocks. 
+
+        // We need to iterate over blocks.
         // Since we are doing intra-block propagation, we don't need flow graph analysis yet.
         // However, we need access to function.locals to get types if we wanted to be 100% correct,
         // but inferring from value is okay for primitives.
 
-        // To properly support `run_on_block` needing mutable access to statements 
+        // To properly support `run_on_block` needing mutable access to statements
         // while `propagate_in_operand` might need info, we structure it carefully.
-        
+
         for block in function.basic_blocks.values_mut() {
             self.run_on_block(&mut block.statements);
         }
@@ -150,7 +166,9 @@ mod tests {
     use super::*;
     use crate::ast::PrimitiveType;
     use crate::error::SourceLocation;
-    use crate::mir::{Builder, Constant, ConstantValue, Operand, Place, Rvalue, SourceInfo, Statement};
+    use crate::mir::{
+        Builder, Constant, ConstantValue, Operand, Place, Rvalue, SourceInfo, Statement,
+    };
     use crate::types::Type;
 
     #[test]
@@ -169,19 +187,34 @@ mod tests {
 
         // x = 42
         builder.push_statement(Statement::Assign {
-            place: Place { local: x, projection: vec![] },
+            place: Place {
+                local: x,
+                projection: vec![],
+            },
             rvalue: Rvalue::Use(Operand::Constant(Constant {
                 ty: Type::primitive(PrimitiveType::Integer),
                 value: ConstantValue::Integer(42),
             })),
-            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+            source_info: SourceInfo {
+                span: SourceLocation::unknown(),
+                scope: 0,
+            },
         });
 
         // y = x
         builder.push_statement(Statement::Assign {
-            place: Place { local: y, projection: vec![] },
-            rvalue: Rvalue::Use(Operand::Copy(Place { local: x, projection: vec![] })),
-            source_info: SourceInfo { span: SourceLocation::unknown(), scope: 0 },
+            place: Place {
+                local: y,
+                projection: vec![],
+            },
+            rvalue: Rvalue::Use(Operand::Copy(Place {
+                local: x,
+                projection: vec![],
+            })),
+            source_info: SourceInfo {
+                span: SourceLocation::unknown(),
+                scope: 0,
+            },
         });
 
         let mut function = builder.finish_function();
@@ -194,7 +227,7 @@ mod tests {
         // Check that y = x became y = 42
         let block = function.basic_blocks.values().next().unwrap();
         let stmt = &block.statements[1];
-        
+
         if let Statement::Assign { rvalue, .. } = stmt {
             if let Rvalue::Use(Operand::Constant(constant)) = rvalue {
                 assert_eq!(constant.value, ConstantValue::Integer(42));

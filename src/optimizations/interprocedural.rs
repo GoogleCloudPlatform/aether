@@ -20,9 +20,7 @@
 #![allow(dead_code)]
 
 use crate::error::SemanticError;
-use crate::mir::{
-    BasicBlock, Function, Operand, Place, Program, Rvalue, Statement, Terminator,
-};
+use crate::mir::{BasicBlock, Function, Operand, Place, Program, Rvalue, Statement, Terminator};
 use crate::optimizations::OptimizationPass;
 use std::collections::{HashMap, HashSet};
 
@@ -1022,7 +1020,6 @@ impl Default for InterproceduralAnalysisPass {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 #[path = "interprocedural_tests.rs"]

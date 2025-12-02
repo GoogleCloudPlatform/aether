@@ -156,9 +156,7 @@ impl DeadCodeEliminationPass {
                     _ => false,
                 })
             }
-            Rvalue::Len(place) | Rvalue::Discriminant(place) => {
-                place.local == local
-            }
+            Rvalue::Len(place) | Rvalue::Discriminant(place) => place.local == local,
             Rvalue::Closure { captures, .. } => captures
                 .iter()
                 .any(|capture| self.local_used_in_operand(capture, local)),

@@ -1,9 +1,7 @@
 use super::*;
 use crate::ast::PrimitiveType;
 use crate::error::SourceLocation;
-use crate::mir::{
-    Builder, Constant, ConstantValue, Operand, Place, Rvalue, SourceInfo, Statement,
-};
+use crate::mir::{Builder, Constant, ConstantValue, Operand, Place, Rvalue, SourceInfo, Statement};
 use crate::types::Type;
 
 #[test]
