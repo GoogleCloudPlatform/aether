@@ -533,23 +533,88 @@ See: [Architecture - Verification Strategy](architecture.md#verification-strateg
 
 ---
 
-## Phase 19: Bootstrapping Preparation
+## Phase 19: Starling Tokenizer Service
+
+- [ ] **Task 19.1: Implement Tokenizer Loader**: Implement BPE/WordPiece tokenizer loader (from vocab/merges).
+- [ ] **Task 19.2: Tokenizer Logic**: Encode/decode with canonical round-trip; offsets.
+- [ ] **Task 19.3: Tokenizer API**: HTTP endpoints: `/v1/tokenize` and `/v1/detokenize`.
+- [ ] **Task 19.4: Tokenizer Tests**: Golden fixtures, unicode edge cases, round-trip property, bad-token errors.
+
+## Phase 20: Starling Sampler Pipeline
+
+- [ ] **Task 20.1: Sampler Steps**: Implement masking (stop/eos), repetition penalty, temperature, top-k, top-p, freq/presence penalties, multinomial draw.
+- [ ] **Task 20.2: Deterministic RNG**: Seeded per request.
+- [ ] **Task 20.3: Sampler Tests**: Fixed logits + seeds → expected tokens; probability mass invariants; stop conditions.
+
+## Phase 21: Starling KV Cache Manager
+
+- [ ] **Task 21.1: Allocator**: RAM arena allocator with shape/dtype metadata per block.
+- [ ] **Task 21.2: Lifecycle**: Session lifecycle (allocate, resize, free); LRU eviction (session-level) with protected in-flight sessions.
+- [ ] **Task 21.3: Integrity & Metrics**: Checks on every borrow; metrics for alloc/free/evict; optional spill API stub (future).
+- [ ] **Task 21.4: Cache Tests**: Allocate/resize/evict under load; shape mismatch detection; TTL eviction.
+
+## Phase 22: Starling Model Manager & Registry
+
+- [ ] **Task 22.1: Registry**: Load GGUF from local path/URL; checksum/etag validation; cache directory management.
+- [ ] **Task 22.2: Loader**: Mmap weights, validate tensor shapes, expose ModelRuntime stub (CPU mock).
+- [ ] **Task 22.3: Admin Controls**: List/load/unload models; enforce max_sessions/max_batch per model.
+- [ ] **Task 22.4: Registry Tests**: Cache hit/miss, checksum failure, load/unload lifecycle.
+
+## Phase 23: Starling Scheduler & Batching
+
+- [ ] **Task 23.1: Workers & Queues**: Per-model scheduler worker; request queues with high/low watermarks.
+- [ ] **Task 23.2: Batching**: Micro-batching by seq length/model; configurable batch size and max queue delay.
+- [ ] **Task 23.3: Fairness & Limits**: Weighted round-robin across sessions; per-tenant limits.
+- [ ] **Task 23.4: Backpressure**: 429 on admission when above limits; metrics for queue depth, batch sizes.
+- [ ] **Task 23.5: Scheduler Tests**: Batching correctness, fairness under mixed seq, backpressure triggers, cancellation.
+
+## Phase 24: Starling HTTP Gateway
+
+- [ ] **Task 24.1: Endpoints**: `/v1/generate` (streaming SSE/chunked JSON), `/v1/session/close`, health (`/healthz`, `/readyz`), `/metrics`.
+- [ ] **Task 24.2: Validation & Auth**: Auth (API key), payload validation, per-tenant quotas, max prompt/max_tokens enforcement.
+- [ ] **Task 24.3: Integration**: Stream integration with scheduler and KV cache; session creation/lookup.
+- [ ] **Task 24.4: Gateway Tests**: Request validation, auth failure, quota exceed, streaming happy path.
+
+## Phase 25: Starling Telemetry & Observability
+
+- [ ] **Task 25.1: Metrics**: Prometheus/OpenMetrics export; histograms for latency, tokens/sec; gauges for KV memory.
+- [ ] **Task 25.2: Logs**: Structured logs with request_id/session_id; error logs with classification.
+- [ ] **Task 25.3: Traces**: Spans for gateway, tokenize, schedule, forward, sample.
+- [ ] **Task 25.4: Health**: Health/readiness gating on model load and resource pressure.
+- [ ] **Task 25.5: Telemetry Tests**: Metrics surface expected series; readiness flips under load/no models.
+
+## Phase 26: Starling End-to-End MVP
+
+- [ ] **Task 26.1: Model Runtime**: Integrate CPU-only ModelRuntime that consumes a small GGUF (e.g., tiny model).
+- [ ] **Task 26.2: Generate Path**: Full generate path: text → tokenize → schedule → forward (mock/logits if needed) → sample → stream.
+- [ ] **Task 26.3: Limits**: Resource limits validated (KV cap, queue cap); graceful errors/timeouts.
+- [ ] **Task 26.4: E2E Tests**: E2E tests against tiny model; soak test with concurrent sessions.
+
+## Phase 27: Starling Hardening & Extensions
+
+- [ ] **Task 27.1: KV Spill**: KV spill to mmap; page table; checksum on spill pages.
+- [ ] **Task 27.2: Hot Reload**: Hot reload models without downtime (drain + remap).
+- [ ] **Task 27.3: Routing**: Multi-model routing; per-model threadpools.
+- [ ] **Task 27.4: Safety**: Safety/policy filters; logprob return; logit bias; stop-sequences; EOS handling polish.
+- [ ] **Task 27.5: Admin API**: Stats, drains, config reload.
+
+## Phase 28: Bootstrapping Preparation
 
 See: [Architecture - Bootstrapping Roadmap](architecture.md#bootstrapping-roadmap)
 
-### Task 19.1: Verify FFI Completeness
+### Task 28.1: Verify FFI Completeness (Completed)
 - [x] **Test**: Verify arrays can be passed to C functions
 - [x] **Test**: Verify function pointers work
 - [x] **Test**: Verify all LLVM-C API patterns are supported
 
-### Task 19.2: Port Lexer to Aether
+### Task 28.2: Port Lexer to Aether
 - [ ] **Implement**: Rewrite lexer in Aether
 - [ ] **Test**: Compare output with Rust lexer
 
-### Task 19.3: Port Parser to Aether
+### Task 28.3: Port Parser to Aether
 - [ ] **Implement**: Rewrite parser in Aether
 - [ ] **Test**: Compare output with Rust parser
 
-### Task 19.4: Self-Hosting
+### Task 28.4: Self-Hosting
 - [ ] **Build**: Compile Aether compiler with itself
 - [ ] **Verify**: Stage 2 compiler produces identical output to Stage 1
