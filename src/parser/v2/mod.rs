@@ -954,7 +954,9 @@ impl Parser {
         // Collect annotations
         let mut annotations = Vec::new();
         while self.check(&TokenType::At) {
-            annotations.push(self.parse_annotation()?);
+            let ann = self.parse_annotation()?;
+            eprintln!("DEBUG: Found annotation: {}", ann.name);
+            annotations.push(ann);
         }
 
         // Check for visibility modifier
@@ -1013,6 +1015,24 @@ impl Parser {
                         name: name.clone(),
                         source_location: source_location.clone(),
                     });
+                }
+            }
+            type_definitions.push(type_def);
+        } else if self.check_keyword(Keyword::Type) {
+            let type_def = self.parse_type_alias()?;
+            if is_public {
+                match &type_def {
+                    TypeDefinition::Alias {
+                        new_name,
+                        source_location,
+                        ..
+                    } => {
+                        exports.push(ExportStatement::Type {
+                            name: new_name.clone(),
+                            source_location: source_location.clone(),
+                        });
+                    }
+                    _ => {}
                 }
             }
             type_definitions.push(type_def);
@@ -1422,6 +1442,34 @@ impl Parser {
                         source_location: start_location,
                     });
                 }
+                Keyword::Func => {
+                    self.advance();
+                    self.expect(&TokenType::LeftParen, "expected '(' after func type")?;
+                    let mut parameter_types = Vec::new();
+                    if !self.check(&TokenType::RightParen) {
+                        loop {
+                            parameter_types.push(Box::new(self.parse_type()?));
+                            if self.check(&TokenType::Comma) {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    self.expect(
+                        &TokenType::RightParen,
+                        "expected ')' after function type parameters",
+                    )?;
+
+                    self.expect(&TokenType::Arrow, "expected '->' for function return type")?;
+                    let return_type = Box::new(self.parse_type()?);
+
+                    return Ok(TypeSpecifier::Function {
+                        parameter_types,
+                        return_type,
+                        source_location: start_location,
+                    });
+                }
                 _ => {}
             }
         }
@@ -1812,6 +1860,36 @@ impl Parser {
             may_block: false,
             variadic,
             ownership_info: None,
+            source_location: start_location,
+        })
+    }
+
+    // ==================== TYPE ALIAS PARSING ====================
+
+    /// Parse a type alias
+    /// Grammar: "type" IDENTIFIER generic_params? "=" type ";"
+    pub fn parse_type_alias(&mut self) -> Result<TypeDefinition, ParserError> {
+        let start_location = self.current_location();
+
+        self.expect_keyword(Keyword::Type, "expected 'type'")?;
+
+        let new_name = self.parse_identifier()?;
+
+        // Parse optional generic parameters
+        let generic_parameters = self.parse_generic_parameters()?;
+
+        self.expect(&TokenType::Equal, "expected '='")?;
+
+        let original_type = Box::new(self.parse_type()?);
+
+        self.expect(&TokenType::Semicolon, "expected ';'")?;
+
+        Ok(TypeDefinition::Alias {
+            new_name,
+            original_type,
+            intent: None,
+            generic_parameters,
+            lifetime_parameters: vec![],
             source_location: start_location,
         })
     }

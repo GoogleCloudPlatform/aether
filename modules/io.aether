@@ -52,12 +52,12 @@ pub func close_file(file: File) -> Void {
 
 pub func read_file(path: String) -> String {
   let file_handle = aether_open_file(path, "r");
-  when ({ file_handle == 0 }) {
+  if file_handle == 0 {
     return ""; // Error
   }
   
   let size = aether_file_size(file_handle);
-  when ({ size < 0 }) {
+  if size < 0 {
     aether_close_file(file_handle);
     return "";
   }
@@ -71,7 +71,7 @@ pub func read_file(path: String) -> String {
 
 pub func write_file(path: String, content: String) -> Bool {
   let file_handle = aether_open_file(path, "w");
-  when ({ file_handle == 0 }) {
+  if file_handle == 0 {
     return false;
   }
   
@@ -79,5 +79,5 @@ pub func write_file(path: String, content: String) -> Bool {
   let written = aether_write_file(file_handle, content, len);
   aether_close_file(file_handle);
   
-  return { written == len };
+  return written == len;
 }

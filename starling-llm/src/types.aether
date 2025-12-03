@@ -1,0 +1,27 @@
+module Types;
+
+pub type RequestId = String;
+pub type SessionId = String;
+pub type ModelId = String;
+pub type TokenId = Int;
+
+pub struct GenerationToken {
+    id: TokenId,
+    text: String,
+    logprob: Float,
+    is_end_of_text: Bool,
+}
+
+pub enum SessionStatus {
+    case Active;
+    case Idle;
+    case Completed;
+    case Error(String);
+    case Evicted;
+}
+
+pub struct Logprob {
+    token_id: TokenId,
+    logprob: Float,
+    token_text: String,
+}

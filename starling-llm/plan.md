@@ -7,10 +7,10 @@
 - Minimal viable path: CPU-only, single model, RAM-only KV for v1; iterate toward extensions.
 
 ## Phase 0: Scaffolding & Interfaces
-- [ ] Define core crates/modules layout (gateway, tokenizer, sampler, kv_cache, scheduler, model_runtime, registry, telemetry, config).
-- [ ] Codify public traits/interfaces (Tokenizer, Sampler, KVCache, Scheduler, ModelRuntime).
-- [ ] Add shared types (RequestId, SessionId, ModelId, TokenId, Timestamp) and error enums.
-- [ ] Wire config loader (YAML/JSON) with validation for limits.
+- [x] Define core crates/modules layout (gateway, tokenizer, sampler, kv_cache, scheduler, model_runtime, registry, telemetry, config).
+- [x] Codify public traits/interfaces (Tokenizer, Sampler, KVCache, Scheduler, ModelRuntime).
+- [x] Add shared types (RequestId, SessionId, ModelId, TokenId, Timestamp) and error enums.
+- [x] Wire config loader (YAML/JSON) with validation for limits.
 
 ## Phase 1: Tokenizer Service
 - [ ] Implement BPE/WordPiece tokenizer loader (from vocab/merges).

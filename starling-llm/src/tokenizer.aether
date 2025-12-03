@@ -1,0 +1,10 @@
+module Tokenizer;
+
+import Types;
+
+pub trait Tokenizer {
+    func encode(self: &Self, text: String) -> Array<Types.TokenId>;
+    func decode(self: &Self, tokens: Array<Types.TokenId>) -> String;
+    func vocab_size(self: &Self) -> Int;
+    func eos_token_id(self: &Self) -> Types.TokenId;
+}

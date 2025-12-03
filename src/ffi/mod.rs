@@ -134,6 +134,7 @@ impl FFITypeMapper {
                 let elem_type = self.map_to_c_type(element_type)?;
                 Ok(format!("{}*", elem_type))
             }
+            Type::Function { .. } => Ok("void*".to_string()), // Map function pointers to void* for now
             _ => Err(format!("Unsupported type for C FFI: {:?}", aether_type)),
         }
     }
@@ -163,6 +164,7 @@ impl FFITypeMapper {
                 let elem_type = self.map_to_rust_type(element_type)?;
                 Ok(format!("*const {}", elem_type))
             }
+            Type::Function { .. } => Ok("*const c_void".to_string()), // Map function pointers to void pointer
             _ => Err(format!("Unsupported type for Rust FFI: {:?}", aether_type)),
         }
     }
@@ -192,6 +194,7 @@ impl FFITypeMapper {
                 let elem_type = self.map_to_go_type(element_type)?;
                 Ok(format!("*{}", elem_type))
             }
+            Type::Function { .. } => Ok("unsafe.Pointer".to_string()), // Map function pointers to unsafe.Pointer
             _ => Err(format!("Unsupported type for Go FFI: {:?}", aether_type)),
         }
     }
@@ -288,7 +291,7 @@ impl FFIAnalyzer {
             Type::Primitive(_) => true,
             Type::Pointer { target_type, .. } => self.is_ffi_compatible_impl(target_type, visited),
             Type::Array { element_type, .. } => self.is_ffi_compatible_impl(element_type, visited),
-            Type::Function { .. } => false, // Function pointers need special handling
+            Type::Function { .. } => true, // Function types are compatible (as function pointers)
             Type::Named { name, module } => {
                 // Build full type name for cycle detection
                 let full_name = match module {

@@ -478,18 +478,8 @@ impl SemanticAnalyzer {
                                 }
                             })
                     {
-                        // Convert AST definition to TypeDefinition
-                        // Note: This is a simplified conversion, ideally we should reuse analyze_type_definition logic
-                        // but we need to store it with the qualified name.
-                        // For now, we can try to extract the converted definition from the loaded module's semantic analysis result?
-                        // But we don't have access to the other module's TypeChecker.
-                        // We must reconstruct it.
-
-                        // BUT! types::TypeDefinition is different from ast::TypeDefinition.
-                        // We need to convert.
-                        // Since we are inside SemanticAnalyzer, we can use helper methods?
-                        // analyze_type_definition adds to symbol table.
-                        // Let's implement a minimal conversion here or refactor analyze_type_definition to return the definition.
+                        // Convert AST definition to TypeDefinition (omitted for brevity, existing logic)
+                        // ... (keep existing logic) ...
 
                         // Refactoring analyze_type_definition is better but risky.
                         // Let's implement minimal conversion matching analyze_type_definition logic.
@@ -533,12 +523,12 @@ impl SemanticAnalyzer {
                                             .unwrap_or(Type::Error);
                                         associated_types.push(t);
                                     }
-                                    variant_infos.push(crate::types::EnumVariantInfo {
-                                        name: variant.name.name.clone(),
-                                        associated_types,
-                                        discriminant: idx,
-                                    });
-                                }
+
+                                                                        variant_infos.push(crate::types::EnumVariantInfo {
+                                                                            name: variant.name.name.clone(),
+                                                                            associated_types,
+                                                                            discriminant: idx, // Simple discriminant
+                                                                        });                                }
                                 crate::types::TypeDefinition::Enum {
                                     variants: variant_infos,
                                     source_location: source_location.clone(),
@@ -549,21 +539,37 @@ impl SemanticAnalyzer {
                                 source_location,
                                 ..
                             } => {
-                                let target_type = self
+                                let target = self
                                     .type_checker
                                     .borrow()
                                     .ast_type_to_type(original_type)
                                     .unwrap_or(Type::Error);
                                 crate::types::TypeDefinition::Alias {
-                                    target_type,
+                                    target_type: target,
                                     source_location: source_location.clone(),
                                 }
                             }
                         };
 
-                        self.type_checker
-                            .borrow_mut()
-                            .add_type_definition(qualified_name.clone(), definition);
+                        // Only add if not already defined
+                        if self.symbol_table.lookup_type_definition(&qualified_name).is_none() {
+                            self.symbol_table
+                                .add_type_definition(qualified_name.clone(), definition.clone())?;
+                            self.type_checker
+                                .borrow_mut()
+                                .add_type_definition(qualified_name.clone(), definition);
+                        }
+                    } else if let Some(trait_def) = loaded_module
+                        .module
+                        .trait_definitions
+                        .iter()
+                        .find(|td| td.name.name == name.name)
+                    {
+                        // Register imported trait definition if not already present
+                        if !self.trait_definitions.contains_key(&qualified_name) {
+                            self.trait_definitions
+                                .insert(qualified_name.clone(), trait_def.clone());
+                        }
                     }
 
                     // For now, add as a named type
@@ -1236,7 +1242,10 @@ impl SemanticAnalyzer {
                 };
 
                 self.symbol_table
-                    .add_type_definition(new_name.name.clone(), definition)?;
+                    .add_type_definition(new_name.name.clone(), definition.clone())?;
+                self.type_checker
+                    .borrow_mut()
+                    .add_type_definition(new_name.name.clone(), definition);
             }
         }
 
@@ -1533,6 +1542,7 @@ impl SemanticAnalyzer {
                     .symbol_table
                     .lookup_type_definition(&name.name)
                     .is_none()
+                    && !self.trait_definitions.contains_key(&name.name)
                 {
                     return Err(SemanticError::UndefinedSymbol {
                         symbol: name.name.clone(),
@@ -1935,12 +1945,22 @@ impl SemanticAnalyzer {
                 name,
                 source_location,
             } => {
-                let symbol = self.symbol_table.lookup_symbol(&name.name).ok_or_else(|| {
-                    SemanticError::UndefinedSymbol {
+                let symbol = self
+                    .symbol_table
+                    .lookup_symbol(&name.name)
+                    .or_else(|| {
+                        // Try looking up with module qualification
+                        if let Some(module) = &self.current_module {
+                            let qualified = format!("{}.{}", module, name.name);
+                            self.symbol_table.lookup_symbol(&qualified)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or_else(|| SemanticError::UndefinedSymbol {
                         symbol: name.name.clone(),
                         location: source_location.clone(),
-                    }
-                })?;
+                    })?;
 
                 // Check if variable is initialized
                 if !symbol.is_initialized {
@@ -2710,6 +2730,52 @@ impl SemanticAnalyzer {
                 };
 
                 match &normalized_receiver {
+                    Type::Primitive(PrimitiveType::String) => {
+                        if method_name.name == "to_c_string" {
+                            if !arguments.is_empty() {
+                                return Err(SemanticError::ArgumentCountMismatch {
+                                    function: "String.to_c_string".to_string(),
+                                    expected: 0,
+                                    found: arguments.len(),
+                                    location: source_location.clone(),
+                                });
+                            }
+                            // Returns Pointer<Char>
+                            Ok(Type::Pointer {
+                                target_type: Box::new(Type::Primitive(PrimitiveType::Char)),
+                                is_mutable: false,
+                            })
+                        } else {
+                            Err(SemanticError::InvalidOperation {
+                                operation: format!("method call '{}'", method_name.name),
+                                reason: "method not found on type String".to_string(),
+                                location: source_location.clone(),
+                            })
+                        }
+                    }
+                    Type::Array { element_type, .. } => {
+                        if method_name.name == "as_ptr" {
+                            if !arguments.is_empty() {
+                                return Err(SemanticError::ArgumentCountMismatch {
+                                    function: "Array.as_ptr".to_string(),
+                                    expected: 0,
+                                    found: arguments.len(),
+                                    location: source_location.clone(),
+                                });
+                            }
+                            // Returns Pointer<T>
+                            Ok(Type::Pointer {
+                                target_type: element_type.clone(),
+                                is_mutable: true, 
+                            })
+                        } else {
+                            Err(SemanticError::InvalidOperation {
+                                operation: format!("method call '{}'", method_name.name),
+                                reason: "method not found on type Array".to_string(),
+                                location: source_location.clone(),
+                            })
+                        }
+                    }
                     Type::Map {
                         key_type,
                         value_type,

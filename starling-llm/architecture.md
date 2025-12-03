@@ -10,10 +10,6 @@ Starling is a lean, self-hosted LLM serving stack with a focus on correctness, o
 - First-class metrics/health and debuggability (token/s, latency histograms, cache hit/miss, per-layer memory).
 - Modular tokenizer and sampler components for reuse and testing in isolation.
 
-## Non-Goals (v1)
-- Training or fine-tuning.
-- Multi-host distributed inference; sharding is single-host, multi-GPU is out-of-scope for v1.
-- Multi-modal (audio/vision) support.
 
 ## System Overview
 Components:
@@ -103,7 +99,10 @@ Order: logit masking (eos/stop), repetition penalty, temperature scaling, top-k/
 - Perf: throughput/latency benchmarks; memory pressure + eviction behavior.
 
 ## Minimal Footprint (MVP)
-- Single CPU backend; single model loaded; RAM-only KV cache; SSE streaming; basic auth via static token; Prometheus metrics; local registry.
+- Defined core crates/modules layout.
+- Codified public traits/interfaces (Tokenizer, Sampler, KVCache, Scheduler, ModelRuntime).
+- Added shared types (RequestId, SessionId, ModelId, TokenId, Timestamp) and error enums.
+- Wired config loader (YAML/JSON) with validation for limits.
 
 ## Extensions (Future)
 - GPU/Metal/CUDA backend; quantization-aware runtime; kv-cache compression/quantization; multi-model routing; wasm sampler sandbox; distributed sharding.

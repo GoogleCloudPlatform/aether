@@ -305,7 +305,7 @@ car go fmt && car go clippy && car go test
 16. [x] Task 16.1 - 16.3 | Generic Contract Verification | ✅ Done |
 17. [x] Phase 17: Contract Examples (Real-World) | ✅ Done |
 18. [x] Phase 18: Standard Library in Aether | ✅ Done |
-19. [~] Phase 19: Bootstrapping Preparation | ⏳ In Progress |
+19. [TODO] Phase 19: Bootstrapping Preparation | ⏳ Pending |
 
 **Total Tasks:** 80+
 ## Phase 8: True Asynchronous Backend Implementation
@@ -538,9 +538,9 @@ See: [Architecture - Verification Strategy](architecture.md#verification-strateg
 See: [Architecture - Bootstrapping Roadmap](architecture.md#bootstrapping-roadmap)
 
 ### Task 19.1: Verify FFI Completeness
-- [ ] **Test**: Verify arrays can be passed to C functions
-- [ ] **Test**: Verify function pointers work
-- [ ] **Test**: Verify all LLVM-C API patterns are supported
+- [x] **Test**: Verify arrays can be passed to C functions
+- [x] **Test**: Verify function pointers work
+- [x] **Test**: Verify all LLVM-C API patterns are supported
 
 ### Task 19.2: Port Lexer to Aether
 - [ ] **Implement**: Rewrite lexer in Aether

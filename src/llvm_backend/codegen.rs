@@ -390,7 +390,20 @@ impl<'ctx> CodeGenerator<'ctx> {
             }
 
             Operand::Constant(constant) => {
-                self.value_converter.convert_constant_value(&constant.value)
+                if let crate::mir::ConstantValue::Function(name) = &constant.value {
+                    let func = self.module.get_function(name).ok_or_else(|| {
+                        SemanticError::UndefinedSymbol {
+                            symbol: name.clone(),
+                            location: crate::error::SourceLocation::unknown(),
+                        }
+                    })?;
+                    Ok(BasicValueEnum::PointerValue(
+                        func.as_global_value().as_pointer_value(),
+                    ))
+                } else {
+                    self.value_converter
+                        .convert_constant_value(&constant.value)
+                }
             }
         }
     }

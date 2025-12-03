@@ -1,0 +1,15 @@
+module Config;
+
+pub struct ServerConfig {
+    port: Int,
+    model_path: String,
+    max_concurrent_requests: Int,
+}
+
+pub func create_config(port: Int, model_path: String, max_concurrent_requests: Int) -> ServerConfig {
+    return ServerConfig {
+        port: port,
+        model_path: model_path,
+        max_concurrent_requests: max_concurrent_requests,
+    };
+}

@@ -1,0 +1,15 @@
+module Scheduler;
+
+import Types;
+import Sampler;
+
+pub struct Request {
+    id: Types.RequestId,
+    prompt: Array<Types.TokenId>,
+    params: Sampler.SamplingParameters,
+}
+
+pub trait Scheduler {
+    func enqueue(self: &Self, req: Request) -> Void;
+    func step(self: &Self) -> Void;
+}

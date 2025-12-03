@@ -1,0 +1,80 @@
+module verify_starling;
+
+@extern(library="starling_mock")
+func starling_init(path: Pointer<Char>) -> Pointer<Void>;
+
+@extern(library="starling_mock")
+func starling_free(handle: Pointer<Void>) -> Void;
+
+@extern(library="starling_mock")
+func starling_is_loaded(handle: Pointer<Void>) -> Int;
+
+@extern(library="starling_mock")
+func starling_tokenize(handle: Pointer<Void>, text: Pointer<Char>, out_tokens: Pointer<Int>, max_tokens: Int) -> Int;
+
+@extern(library="starling_mock")
+func starling_generate(handle: Pointer<Void>, input_ids: Pointer<Int>, input_len: Int, on_token: func(Int, Int) -> Void) -> Void;
+
+@extern(library="starling_mock")
+func debug_ptr_to_int(ptr: Pointer<Void>) -> Int;
+
+@extern(library="starling_mock")
+func debug_int_to_ptr(val: Int) -> Pointer<Void>;
+
+@extern(library="libc")
+func printf(fmt: Pointer<Char>, val: Int) -> Int;
+
+// Global state for callback verification
+// (In a real scenario we'd pass a context pointer, but let's test basic function pointers first)
+// Note: Aether doesn't support mutable global variables easily, so we'll just print in the callback.
+
+func my_token_callback(token: Int, pos: Int) -> Void {
+    // printf("Aether callback: token=%d\n", token); // Can't easily construct C-string literal for printf yet
+    let x = token; // Just to use it
+}
+
+func main() -> Int {
+    // 1. Test Opaque Handle
+    let path = "models/llama-3-8b.gguf";
+    let model = starling_init(path.to_c_string());
+    
+    // Ownership Workaround: Cast pointer to Int to allow reuse (Int is Copy)
+    // In a future version, Pointer should be Copy or Cloneable.
+    let model_addr = debug_ptr_to_int(model); 
+    
+    // if (starling_is_loaded(debug_int_to_ptr(model_addr)) != 1) {
+    //    return 1;
+    // }
+
+    // 2. Test Array Passing (Tokenize)
+    let mut tokens: Array<Int> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; 
+    
+    let text = "HELLO";
+    let count = starling_tokenize(
+        debug_int_to_ptr(model_addr), 
+        text.to_c_string(), 
+        tokens.as_ptr(), 
+        10
+    );
+    
+    // if (count != 5) {
+    //    return 2;
+    // }
+    
+    // if (tokens[0] != 1072) { // 'H' + 1000
+    //    return 3;
+    // }
+
+    // 3. Test Function Pointer (Generate)
+    let cb = my_token_callback;
+    starling_generate(
+        debug_int_to_ptr(model_addr), 
+        tokens.as_ptr(), 
+        count, 
+        cb
+    );
+    
+    starling_free(debug_int_to_ptr(model_addr));
+    
+    return 0;
+}

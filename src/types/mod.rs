@@ -1000,6 +1000,44 @@ impl TypeChecker {
                     && self.types_compatible(r1, r2)
             }
 
+            // Handle Type Aliases for Named types
+            (Type::Named { name, module }, other) => {
+                let qualified_key = if let Some(m) = module {
+                    format!("{}.{}", m, name)
+                } else {
+                    name.clone()
+                };
+                
+                // Try qualified name first
+                if let Some(TypeDefinition::Alias { target_type, .. }) = self.type_definitions.get(&qualified_key) {
+                    return self.types_compatible(target_type, other);
+                }
+                
+                // Try simple name
+                if let Some(TypeDefinition::Alias { target_type, .. }) = self.type_definitions.get(name) {
+                    return self.types_compatible(target_type, other);
+                }
+
+                false
+            }
+            (other, Type::Named { name, module }) => {
+                let qualified_key = if let Some(m) = module {
+                    format!("{}.{}", m, name)
+                } else {
+                    name.clone()
+                };
+                
+                if let Some(TypeDefinition::Alias { target_type, .. }) = self.type_definitions.get(&qualified_key) {
+                    return self.types_compatible(other, target_type);
+                }
+                
+                if let Some(TypeDefinition::Alias { target_type, .. }) = self.type_definitions.get(name) {
+                    return self.types_compatible(other, target_type);
+                }
+
+                false
+            }
+
             _ => false,
         }
     }

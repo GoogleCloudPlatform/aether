@@ -1,0 +1,14 @@
+module Errors;
+
+pub enum StarlingError {
+    case Config(String);
+    case Model(String);
+    case Tokenizer(String);
+    case Sampler(String);
+    case KVCache(String);
+    case Scheduler(String);
+    case Gateway(String);
+    case Internal(String);
+    case NotFound(String);
+    case Timeout(String);
+}

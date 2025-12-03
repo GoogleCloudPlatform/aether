@@ -65,12 +65,22 @@ impl SemanticAnalyzer {
                 _ => {
                     // For types not explicitly wrapped in Owned, default to Move for non-primitives
                     // and Copy for primitives.
-                    if !param_type.is_primitive() {
+                    // Functions are also Copy (pointers).
+                    if !param_type.is_primitive() && !matches!(param_type, Type::Function { .. }) {
                         if let Err(_e) = self.symbol_table.mark_variable_moved(&name.name) {
-                            return Err(SemanticError::UseAfterMove {
-                                variable: name.name.clone(),
-                                location: source_location.clone(),
-                            });
+                            // Try qualified lookup
+                            let qualified_name = if let Some(module) = &self.current_module {
+                                format!("{}.{}", module, name.name)
+                            } else {
+                                name.name.clone()
+                            };
+
+                            if let Err(_) = self.symbol_table.mark_variable_moved(&qualified_name) {
+                                return Err(SemanticError::UseAfterMove {
+                                    variable: name.name.clone(),
+                                    location: source_location.clone(),
+                                });
+                            }
                         }
                     }
                 }

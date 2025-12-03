@@ -3180,30 +3180,38 @@ impl<'ctx> LLVMBackend<'ctx> {
                     mir::ConstantValue::Char(val) => {
                         Ok(self.context.i8_type().const_int(*val as u64, false).into())
                     }
-                    mir::ConstantValue::String(string_value) => {
-                        // Create global string and return pointer to it
-                        let global_ptr = self.get_or_create_string_global(string_value);
-
-                        // Create GEP to get pointer to first character
-                        let zero = self.context.i32_type().const_zero();
-                        let string_ptr = unsafe {
-                            builder
-                                .build_gep(
-                                    self.context
-                                        .i8_type()
-                                        .array_type(string_value.len() as u32 + 1),
-                                    global_ptr,
-                                    &[zero, zero],
-                                    "str_ptr",
-                                )
-                                .map_err(|e| SemanticError::CodeGenError {
-                                    message: e.to_string(),
-                                })?
-                        };
-
-                        Ok(string_ptr.into())
-                    }
-                    mir::ConstantValue::Null => {
+                                        mir::ConstantValue::String(string_value) => {
+                                            // Create global string and return pointer to it
+                                            let global_ptr = self.get_or_create_string_global(string_value);
+                    
+                                            // Create GEP to get pointer to first character
+                                            let zero = self.context.i32_type().const_zero();
+                                            let string_ptr = unsafe {
+                                                builder
+                                                    .build_gep(
+                                                        self.context
+                                                            .i8_type()
+                                                            .array_type(string_value.len() as u32 + 1),
+                                                        global_ptr,
+                                                        &[zero, zero],
+                                                        "str_ptr",
+                                                    )
+                                                    .map_err(|e| SemanticError::CodeGenError {
+                                                        message: e.to_string(),
+                                                    })?
+                                            };
+                                            Ok(string_ptr.into())
+                                        }
+                                        mir::ConstantValue::Function(name) => {
+                                            let func = self.module.get_function(name).ok_or_else(|| {
+                                                SemanticError::UndefinedSymbol {
+                                                    symbol: name.clone(),
+                                                    location: crate::error::SourceLocation::unknown(),
+                                                }
+                                            })?;
+                                            Ok(func.as_global_value().as_pointer_value().into())
+                                        }
+                                        mir::ConstantValue::Null => {
                         // Null constants need type information
                         Err(SemanticError::CodeGenError {
                             message: "Null constants not yet implemented".to_string(),

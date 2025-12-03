@@ -99,6 +99,7 @@ pub enum Keyword {
     Const,
     Struct,
     Enum,
+    Type,
 
     // Modifiers
     Mut,
@@ -227,6 +228,7 @@ impl Lexer {
         self.keywords.insert("const".to_string(), Keyword::Const);
         self.keywords.insert("struct".to_string(), Keyword::Struct);
         self.keywords.insert("enum".to_string(), Keyword::Enum);
+        self.keywords.insert("type".to_string(), Keyword::Type);
 
         // Modifier keywords
         self.keywords.insert("mut".to_string(), Keyword::Mut);

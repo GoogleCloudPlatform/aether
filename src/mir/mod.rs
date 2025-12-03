@@ -353,6 +353,7 @@ pub enum ConstantValue {
     Float(f64),
     String(String),
     Char(char),
+    Function(String),
     Null,
 }
 
@@ -364,6 +365,7 @@ impl PartialEq for ConstantValue {
             (ConstantValue::Float(a), ConstantValue::Float(b)) => (a - b).abs() < f64::EPSILON,
             (ConstantValue::String(a), ConstantValue::String(b)) => a == b,
             (ConstantValue::Char(a), ConstantValue::Char(b)) => a == b,
+            (ConstantValue::Function(a), ConstantValue::Function(b)) => a == b,
             (ConstantValue::Null, ConstantValue::Null) => true,
             _ => false,
         }
@@ -395,6 +397,10 @@ impl std::hash::Hash for ConstantValue {
             ConstantValue::Char(c) => {
                 4u8.hash(state);
                 c.hash(state);
+            }
+            ConstantValue::Function(s) => {
+                6u8.hash(state);
+                s.hash(state);
             }
             ConstantValue::Null => {
                 5u8.hash(state);

@@ -440,6 +440,7 @@ impl VcGenerator {
                         Formula::Bool(true)
                     }
                     mir::ConstantValue::Char(c) => Formula::Int(*c as i64),
+                    mir::ConstantValue::Function(_) => Formula::Bool(true),
                     mir::ConstantValue::Null => Formula::Bool(false),
                 })
             }

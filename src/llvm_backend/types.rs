@@ -193,12 +193,9 @@ impl<'ctx> TypeConverter<'ctx> {
                 BasicTypeEnum::IntType(self.context.i8_type())
             }
             PrimitiveType::Void => {
-                // Void type can't be used as BasicTypeEnum, we'll handle this specially
-                return Err(SemanticError::InvalidType {
-                    type_name: "void".to_string(),
-                    reason: "Void type cannot be used as a basic type".to_string(),
-                    location: crate::error::SourceLocation::unknown(),
-                });
+                // Void type can't be used as BasicTypeEnum normally, but for Pointer<Void> we need a concrete type.
+                // Map to i8 (char) so Pointer<Void> becomes i8* (void*)
+                BasicTypeEnum::IntType(self.context.i8_type())
             }
             PrimitiveType::SizeT => {
                 // Size type - use pointer-sized integer

@@ -1,0 +1,14 @@
+module ModelRuntime;
+
+import Types;
+import KVCache as KV;
+
+pub trait ModelRuntime {
+    func load_model(self: &Self, path: String) -> Types.ModelId;
+    func forward(
+        self: &Self, 
+        model_id: Types.ModelId, 
+        input_tokens: Array<Types.TokenId>, 
+        kv_cache: Array<KV.KVCacheHandle>
+    ) -> Array<Float>; 
+}

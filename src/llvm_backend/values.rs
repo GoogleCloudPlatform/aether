@@ -74,6 +74,13 @@ impl<'ctx> ValueConverter<'ctx> {
                     .const_null();
                 BasicValueEnum::PointerValue(null_ptr)
             }
+
+            ConstantValue::Function(_) => {
+                return Err(SemanticError::UnsupportedFeature {
+                    feature: "Function constant in value converter (should be handled by CodeGenerator)".to_string(),
+                    location: crate::error::SourceLocation::unknown(),
+                });
+            }
         };
 
         Ok(llvm_value)
