@@ -409,6 +409,17 @@ impl<'ctx> LLVMBackend<'ctx> {
                 continue;
             }
 
+            // Get the symbol name (for LLVM linking)
+            let extern_symbol = ext_func.symbol.as_ref().unwrap_or(name);
+
+            // Skip if the symbol is already declared in the LLVM module (e.g., a builtin with same symbol)
+            if self.module.get_function(extern_symbol).is_some() {
+                // Symbol already exists - reuse it with the Aether function name as key
+                let existing_fn = self.module.get_function(extern_symbol).unwrap();
+                function_declarations.insert(name.clone(), existing_fn);
+                continue;
+            }
+
             let param_types: Vec<inkwell::types::BasicMetadataTypeEnum> = ext_func
                 .parameters
                 .iter()
@@ -453,8 +464,7 @@ impl<'ctx> LLVMBackend<'ctx> {
                 }
             };
 
-            // Use symbol name for the LLVM declaration (for linking), but use Aether function name as lookup key
-            let extern_symbol = ext_func.symbol.as_ref().unwrap_or(name);
+            // Add the function to LLVM module and store with Aether function name as lookup key
             let llvm_func = self.module.add_function(extern_symbol, fn_type, None);
             function_declarations.insert(name.clone(), llvm_func);
         }
@@ -2003,12 +2013,18 @@ impl<'ctx> LLVMBackend<'ctx> {
                         .map_err(|e| SemanticError::CodeGenError {
                             message: e.to_string(),
                         }),
-                    (mir::UnOp::Not, BasicValueEnum::IntValue(v)) => builder
-                        .build_not(v, "not")
-                        .map(|v| v.into())
-                        .map_err(|e| SemanticError::CodeGenError {
-                            message: e.to_string(),
-                        }),
+                    (mir::UnOp::Not, BasicValueEnum::IntValue(v)) => {
+                        // Use XOR with 1 for logical NOT instead of bitwise NOT
+                        // Bitwise NOT (~1 = -2) doesn't work for booleans because -2 is still truthy
+                        // XOR with 1: 1 ^ 1 = 0, 0 ^ 1 = 1
+                        let one = v.get_type().const_int(1, false);
+                        builder
+                            .build_xor(v, one, "not")
+                            .map(|v| v.into())
+                            .map_err(|e| SemanticError::CodeGenError {
+                                message: e.to_string(),
+                            })
+                    }
                     _ => Err(SemanticError::CodeGenError {
                         message: format!("Unsupported unary operation or type mismatch: {:?}", op),
                     }),

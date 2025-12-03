@@ -607,7 +607,13 @@ impl<'ctx> CodeGenerator<'ctx> {
                         let zero = self.context.i64_type().const_zero();
                         self.builder.build_int_sub(zero, val, "neg")
                     }
-                    UnOp::Not => self.builder.build_not(val, "not"),
+                    UnOp::Not => {
+                        // For logical NOT on booleans, use XOR with 1 instead of bitwise NOT
+                        // Bitwise NOT (~1 = -2) doesn't work for booleans because -2 is still truthy
+                        // XOR with 1: 1 ^ 1 = 0, 0 ^ 1 = 1
+                        let one = val.get_type().const_int(1, false);
+                        self.builder.build_xor(val, one, "not")
+                    }
                 }
                 .map_err(|e| SemanticError::CodeGenError {
                     message: e.to_string(),

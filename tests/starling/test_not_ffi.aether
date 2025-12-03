@@ -1,0 +1,58 @@
+module TestNotFFI;
+
+// Test NOT operator with FFI function return values
+
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Bool;
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+func main() -> Int {
+    println("=== NOT with FFI Return Values ===");
+
+    // Test 1: string_equals returns true, NOT should make it false
+    let eq_result = string_equals("hello", "hello");
+    println("Test 1: string_equals('hello', 'hello')");
+    if (eq_result) {
+        println("  eq_result is true (correct)");
+    } else {
+        println("  eq_result is false (WRONG!)");
+    }
+
+    // Now apply NOT
+    println("Test 2: !string_equals('hello', 'hello')");
+    if (!eq_result) {
+        println("  !eq_result is true (WRONG - should be false!)");
+        return 1;
+    } else {
+        println("  !eq_result is false (correct)");
+    }
+
+    // Test 3: inline NOT
+    println("Test 3: inline !string_equals('hello', 'hello')");
+    if (!string_equals("hello", "hello")) {
+        println("  FAIL: should not enter this branch");
+        return 1;
+    } else {
+        println("  PASS: correctly skipped true branch");
+    }
+
+    // Test 4: NOT on false FFI result
+    println("Test 4: !string_equals('hello', 'world')");
+    if (!string_equals("hello", "world")) {
+        println("  PASS: correctly entered true branch");
+    } else {
+        println("  FAIL: should have entered true branch");
+        return 1;
+    }
+
+    println("");
+    println("All FFI NOT tests passed!");
+    return 0;
+}
