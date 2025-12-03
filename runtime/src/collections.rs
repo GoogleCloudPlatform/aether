@@ -208,13 +208,249 @@ pub extern "C" fn aether_collections_map_size(map: *const c_void) -> usize {
     if map.is_null() {
         return 0;
     }
-    
+
     unsafe {
         let map_ref = &*(map as *const AetherMap);
         if let Some(hashmap) = map_ref.data.as_ref() {
             (*hashmap).len()
         } else {
             0
+        }
+    }
+}
+
+// ============================================================================
+// String-keyed Map (String -> i64)
+// Used for vocabulary: token string -> token ID
+// ============================================================================
+
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+
+/// String to Int64 map structure
+#[repr(C)]
+pub struct StringIntMap {
+    data: *mut HashMap<String, i64>,
+}
+
+/// Create a new String -> Int map
+#[no_mangle]
+pub extern "C" fn string_int_map_new() -> *mut StringIntMap {
+    let map = Box::new(StringIntMap {
+        data: Box::into_raw(Box::new(HashMap::new())),
+    });
+    Box::into_raw(map)
+}
+
+/// Insert a key-value pair into a String -> Int map
+#[no_mangle]
+pub unsafe extern "C" fn string_int_map_insert(
+    map: *mut StringIntMap,
+    key: *const c_char,
+    value: i64,
+) -> bool {
+    if map.is_null() || key.is_null() {
+        return false;
+    }
+
+    let key_str = match CStr::from_ptr(key).to_str() {
+        Ok(s) => s.to_string(),
+        Err(_) => return false,
+    };
+
+    let map_ref = &mut *map;
+    if let Some(hashmap) = map_ref.data.as_mut() {
+        hashmap.insert(key_str, value);
+        true
+    } else {
+        false
+    }
+}
+
+/// Get a value from a String -> Int map
+/// Returns the value if found, or -1 if not found
+#[no_mangle]
+pub unsafe extern "C" fn string_int_map_get(
+    map: *const StringIntMap,
+    key: *const c_char,
+) -> i64 {
+    if map.is_null() || key.is_null() {
+        return -1;
+    }
+
+    let key_str = match CStr::from_ptr(key).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let map_ref = &*map;
+    if let Some(hashmap) = map_ref.data.as_ref() {
+        hashmap.get(key_str).copied().unwrap_or(-1)
+    } else {
+        -1
+    }
+}
+
+/// Check if a key exists in the map
+#[no_mangle]
+pub unsafe extern "C" fn string_int_map_contains(
+    map: *const StringIntMap,
+    key: *const c_char,
+) -> bool {
+    if map.is_null() || key.is_null() {
+        return false;
+    }
+
+    let key_str = match CStr::from_ptr(key).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    let map_ref = &*map;
+    if let Some(hashmap) = map_ref.data.as_ref() {
+        hashmap.contains_key(key_str)
+    } else {
+        false
+    }
+}
+
+/// Get the size of a String -> Int map
+#[no_mangle]
+pub unsafe extern "C" fn string_int_map_size(map: *const StringIntMap) -> i64 {
+    if map.is_null() {
+        return 0;
+    }
+
+    let map_ref = &*map;
+    if let Some(hashmap) = map_ref.data.as_ref() {
+        hashmap.len() as i64
+    } else {
+        0
+    }
+}
+
+/// Free a String -> Int map
+#[no_mangle]
+pub unsafe extern "C" fn string_int_map_free(map: *mut StringIntMap) {
+    if !map.is_null() {
+        let map_box = Box::from_raw(map);
+        if !map_box.data.is_null() {
+            let _ = Box::from_raw(map_box.data);
+        }
+    }
+}
+
+// ============================================================================
+// Int-keyed String Map (i64 -> String)
+// Used for reverse vocabulary: token ID -> token string
+// ============================================================================
+
+/// Int to String map structure
+#[repr(C)]
+pub struct IntStringMap {
+    data: *mut HashMap<i64, String>,
+}
+
+/// Create a new Int -> String map
+#[no_mangle]
+pub extern "C" fn int_string_map_new() -> *mut IntStringMap {
+    let map = Box::new(IntStringMap {
+        data: Box::into_raw(Box::new(HashMap::new())),
+    });
+    Box::into_raw(map)
+}
+
+/// Insert a key-value pair into an Int -> String map
+#[no_mangle]
+pub unsafe extern "C" fn int_string_map_insert(
+    map: *mut IntStringMap,
+    key: i64,
+    value: *const c_char,
+) -> bool {
+    if map.is_null() || value.is_null() {
+        return false;
+    }
+
+    let value_str = match CStr::from_ptr(value).to_str() {
+        Ok(s) => s.to_string(),
+        Err(_) => return false,
+    };
+
+    let map_ref = &mut *map;
+    if let Some(hashmap) = map_ref.data.as_mut() {
+        hashmap.insert(key, value_str);
+        true
+    } else {
+        false
+    }
+}
+
+/// Get a value from an Int -> String map
+/// Returns the string if found, or null if not found
+#[no_mangle]
+pub unsafe extern "C" fn int_string_map_get(
+    map: *const IntStringMap,
+    key: i64,
+) -> *mut c_char {
+    if map.is_null() {
+        return ptr::null_mut();
+    }
+
+    let map_ref = &*map;
+    if let Some(hashmap) = map_ref.data.as_ref() {
+        if let Some(value) = hashmap.get(&key) {
+            match CString::new(value.as_str()) {
+                Ok(cstr) => cstr.into_raw(),
+                Err(_) => ptr::null_mut(),
+            }
+        } else {
+            ptr::null_mut()
+        }
+    } else {
+        ptr::null_mut()
+    }
+}
+
+/// Check if a key exists in the Int -> String map
+#[no_mangle]
+pub unsafe extern "C" fn int_string_map_contains(
+    map: *const IntStringMap,
+    key: i64,
+) -> bool {
+    if map.is_null() {
+        return false;
+    }
+
+    let map_ref = &*map;
+    if let Some(hashmap) = map_ref.data.as_ref() {
+        hashmap.contains_key(&key)
+    } else {
+        false
+    }
+}
+
+/// Get the size of an Int -> String map
+#[no_mangle]
+pub unsafe extern "C" fn int_string_map_size(map: *const IntStringMap) -> i64 {
+    if map.is_null() {
+        return 0;
+    }
+
+    let map_ref = &*map;
+    if let Some(hashmap) = map_ref.data.as_ref() {
+        hashmap.len() as i64
+    } else {
+        0
+    }
+}
+
+/// Free an Int -> String map
+#[no_mangle]
+pub unsafe extern "C" fn int_string_map_free(map: *mut IntStringMap) {
+    if !map.is_null() {
+        let map_box = Box::from_raw(map);
+        if !map_box.data.is_null() {
+            let _ = Box::from_raw(map_box.data);
         }
     }
 }
