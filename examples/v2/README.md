@@ -2,6 +2,15 @@
 
 This directory contains comprehensive examples demonstrating every feature of the AetherScript V2 syntax.
 
+## Flagship Example: Starling LLM Server
+
+For a complete, production-quality project example, see **[examples/starling/](../starling/)** - a full LLM inference server written entirely in AetherScript. Starling demonstrates:
+
+- Go-style project structure (directory = package)
+- Pure AetherScript implementation (no FFI for performance)
+- Complex memory management and HTTP serving
+- The recommended patterns for Aether projects
+
 ## Directory Structure
 
 ```

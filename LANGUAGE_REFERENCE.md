@@ -196,3 +196,63 @@ External functions can be declared using `@extern`.
 @extern(library: "libc")
 func malloc(size: Int) -> Pointer<Void>;
 ```
+
+## 13. Project Structure
+
+AetherScript projects follow a Go-inspired package-per-directory structure.
+
+### Standard Layout
+
+```
+project_name/
+├── aether.toml              # Project manifest
+├── cmd/                     # Binary entry points
+│   └── project_name/
+│       └── main.aether      # Main entry point
+├── package_a/               # Directory = package name
+│   ├── package_a.aether     # Implementation
+│   └── package_a_test.aether    # Tests alongside code
+└── package_b/
+    ├── package_b.aether
+    └── package_b_test.aether
+```
+
+### Conventions
+
+| Concept | Rule |
+|---------|------|
+| **Package** | Directory name = package name |
+| **Implementation** | `name.aether` |
+| **Tests** | `name_test.aether` alongside implementation |
+| **Entry point** | `cmd/{binary}/main.aether` |
+| **Import path** | `project/package` |
+
+### Project Manifest (aether.toml)
+
+```toml
+[project]
+name = "project_name"
+version = "0.1.0"
+description = "Project description"
+
+[build]
+entry = "cmd/project_name/main.aether"
+
+[dependencies]
+# package_name = "version"
+```
+
+### Import Syntax
+
+```aether
+// Import entire package
+import starling/tokenizer;
+
+// Import specific items
+import starling/tokenizer { encode, decode };
+
+// Aliased import
+import starling/tokenizer as tok;
+```
+
+See [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for full details.

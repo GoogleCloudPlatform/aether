@@ -111,14 +111,41 @@ aether ast program.aether
 aether tokens program.aether
 ```
 
-## 🏗️ Project Structure
+## 🏗️ Aether Project Structure
+
+Aether uses a Go-inspired package-per-directory layout:
+
+```
+project_name/
+├── aether.toml              # Project manifest
+├── cmd/
+│   └── project_name/
+│       └── main.aether      # Binary entry point
+├── package_a/               # Directory = package name
+│   ├── package_a.aether     # Implementation
+│   └── package_a_test.aether    # Tests alongside code
+└── package_b/
+    ├── package_b.aether
+    └── package_b_test.aether
+```
+
+**Conventions:**
+- Directory name = package name
+- Tests alongside code: `*_test.aether`
+- Entry points: `cmd/{binary}/main.aether`
+- Import: `import project/package`
+
+See [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) for full details.
+
+### Compiler Repository Structure
 
 ```
 ├── src/           # Compiler source code
 ├── runtime/       # Runtime library (Rust)
 ├── stdlib/        # Standard library modules
-├── examples/      # Example programs and demos
-├── tests/         # Test suite
+├── examples/      # Example programs
+│   └── starling/  # LLM inference server (flagship example)
+├── tests/         # Compiler test suite
 ├── scripts/       # Build and development scripts
 ├── docs/          # Technical documentation
 └── tutorials/     # Learning materials
