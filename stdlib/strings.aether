@@ -1,0 +1,79 @@
+module Strings;
+
+// Returns the length of the string
+@extern("C")
+@export
+func string_length(s: String) -> Int;
+
+// Returns the character code at the specified index
+// Returns 0 if index is out of bounds
+@extern("C")
+@export
+func string_char_at(s: String, index: Int) -> Int;
+
+// Returns a substring starting at 'start' with 'length' characters
+// Returns null/empty if invalid
+@extern("C")
+@export
+func substring(s: String, start: Int, length: Int) -> String;
+
+// Checks if two strings are equal
+@extern("C")
+@export
+func string_equals(a: String, b: String) -> Bool;
+
+// Checks if 'haystack' contains 'needle'  
+@extern("C")
+@export
+func string_contains(haystack: String, needle: String) -> Bool;
+
+// Finds the index of 'needle' in 'haystack'
+// Returns -1 if not found
+@extern("C")
+@export
+func string_index_of(haystack: String, needle: String) -> Int;
+
+// Splits the string by the given delimiter
+@extern("C")
+@export
+func string_split(s: String, delimiter: String) -> Array<String>;
+
+// Joins an array of strings with a delimiter
+@extern("C")
+@export
+func string_join(strings: Array<String>, delimiter: String) -> String;
+
+// Checks if the string starts with the given prefix
+@extern("C")
+@export
+func string_starts_with(s: String, prefix: String) -> Bool;
+
+// Checks if the string ends with the given suffix
+@extern("C")
+@export
+func string_ends_with(s: String, suffix: String) -> Bool;
+
+// Replaces all occurrences of 'find' with 'replace'
+@extern("C")
+@export
+func string_replace(s: String, find: String, replace: String) -> String;
+
+// Trims whitespace from the beginning and end of the string
+@extern("C")
+@export
+func string_trim(s: String) -> String;
+
+// Parses an integer from a string
+@extern("C")
+@export
+func parse_int(s: String) -> Int;
+
+// Parses a float from a string
+@extern("C")
+@export
+func parse_float(s: String) -> Float;
+
+// Converts an integer to a string
+@extern("C")
+@export
+func to_string(i: Int) -> String;

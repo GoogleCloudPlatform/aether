@@ -4,19 +4,24 @@ module Io;
 // @pre({max_size > 0}, message="Max size must be positive.")
 // @post({result.length <= max_size}, message="Read content length respects max_size.")
 @extern("C")
+@export
 func read_file_safe(path: String, max_size: Int) -> String;
 
 // @pre({path.length > 0}, message="File path cannot be empty.")
 // @post({result == true}, message="File write operation should succeed.")
 @extern("C")
+@export
 func write_file_safe(path: String, content: String, append: Bool) -> Bool;
 
 @extern("C")
+@export
 func print(message: String) -> Void;
 
 @extern("C")
+@export
 func println(message: String) -> Void;
 
 // @post({result.length >= 0}, message="Read line might be empty but not null.")
 @extern("C")
+@export
 func read_line() -> String;

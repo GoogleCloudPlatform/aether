@@ -3,25 +3,33 @@ module Json;
 pub type JsonValue = String;
 
 @extern(library="aether_runtime")
+@export
 func parse_json(json_string: String) -> JsonValue;
 
 @extern(library="aether_runtime")
+@export
 func stringify_json(value: JsonValue) -> String;
 
 @extern(library="aether_runtime")
+@export
 func json_get_field(json_value: JsonValue, field_name: String) -> JsonValue;
 
 @extern(library="aether_runtime")
+@export
 func json_array_length(json_array: JsonValue) -> Int;
 
 @extern(library="aether_runtime")
+@export
 func json_array_get(json_array: JsonValue, index: Int) -> JsonValue;
 
 @extern(library="aether_runtime")
+@export
 func from_string(value: String) -> JsonValue;
 
 @extern(library="aether_runtime")
-func to_string(json_value: JsonValue) -> String;
+@export
+func json_to_string(json_value: JsonValue) -> String;
 
 @extern(library="aether_runtime")
+@export
 func to_integer(json_value: JsonValue) -> Int;
