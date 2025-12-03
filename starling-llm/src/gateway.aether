@@ -1,9 +1,0 @@
-module Gateway;
-
-import Types;
-import Scheduler;
-
-pub trait Gateway {
-    func start(self: &Self, port: Int) -> Void;
-    func stop(self: &Self) -> Void;
-}
