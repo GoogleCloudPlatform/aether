@@ -1,0 +1,370 @@
+module Vocab;
+
+// ============================================================================
+// Vocabulary Loader for BPE Tokenizer
+//
+// Loads vocab.json (token -> ID mapping) and merges.txt (BPE merge rules)
+// into efficient data structures for encoding/decoding.
+// ============================================================================
+
+// --- FFI: File I/O ---
+@extern(library="aether_runtime", symbol="read_file_safe")
+func read_file_safe(path: String, max_size: Int) -> String;
+
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+// --- FFI: JSON ---
+@extern(library="aether_runtime", symbol="parse_json")
+func parse_json(json_string: String) -> String;
+
+@extern(library="aether_runtime", symbol="json_get_field")
+func json_get_field(json_value: String, field_name: String) -> String;
+
+@extern(library="aether_runtime", symbol="json_object_keys")
+func json_object_keys(json_value: String) -> String;
+
+@extern(library="aether_runtime", symbol="json_array_length")
+func json_array_length(json_array: String) -> Int;
+
+@extern(library="aether_runtime", symbol="json_array_get")
+func json_array_get(json_array: String, index: Int) -> String;
+
+@extern(library="aether_runtime", symbol="json_to_string")
+func json_to_string(json_value: String) -> String;
+
+@extern(library="aether_runtime", symbol="to_integer")
+func to_integer(json_value: String) -> Int;
+
+// --- FFI: String operations ---
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_split")
+func string_split(s: String, delimiter: String) -> Array<String>;
+
+@extern(library="aether_runtime", symbol="string_trim")
+func string_trim(s: String) -> String;
+
+@extern(library="aether_runtime", symbol="string_starts_with")
+func string_starts_with(s: String, prefix: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+@extern(library="aether_runtime", symbol="aether_strdup")
+func aether_strdup(s: String) -> String;
+
+// --- FFI: String-Int Map (token -> ID) ---
+// Using Int64 for map handles (pointers are 64-bit)
+
+@extern(library="aether_runtime", symbol="string_int_map_new")
+func string_int_map_new() -> Int64;
+
+@extern(library="aether_runtime", symbol="string_int_map_insert")
+func string_int_map_insert(map: Int64, key: String, value: Int) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_int_map_get")
+func string_int_map_get(map: Int64, key: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_int_map_contains")
+func string_int_map_contains(map: Int64, key: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_int_map_size")
+func string_int_map_size(map: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="string_int_map_free")
+func string_int_map_free(map: Int64) -> Void;
+
+// --- FFI: Int-String Map (ID -> token) ---
+
+@extern(library="aether_runtime", symbol="int_string_map_new")
+func int_string_map_new() -> Int64;
+
+@extern(library="aether_runtime", symbol="int_string_map_insert")
+func int_string_map_insert(map: Int64, key: Int, value: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="int_string_map_get")
+func int_string_map_get(map: Int64, key: Int) -> String;
+
+@extern(library="aether_runtime", symbol="int_string_map_contains")
+func int_string_map_contains(map: Int64, key: Int) -> Bool;
+
+@extern(library="aether_runtime", symbol="int_string_map_size")
+func int_string_map_size(map: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_string_map_free")
+func int_string_map_free(map: Int64) -> Void;
+
+// --- FFI: Array operations ---
+@extern(library="aether_runtime", symbol="array_length")
+func array_length(arr: Array<String>) -> Int;
+
+@extern(library="aether_runtime", symbol="array_get_string")
+func array_get_string(arr: Array<String>, index: Int) -> String;
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+// BPE merge rule: merge "left" + "right" into a single token
+struct MergeRule {
+    left: String;
+    right: String;
+}
+
+// Vocabulary holds both forward (token->ID) and reverse (ID->token) maps
+struct Vocabulary {
+    token_to_id: Int64;
+    id_to_token: Int64;
+    vocab_size: Int;
+}
+
+// Full tokenizer configuration
+struct TokenizerConfig {
+    vocab: Vocabulary;
+    merges: Array<MergeRule>;
+    merge_count: Int;
+    unk_token_id: Int;
+    bos_token_id: Int;
+    eos_token_id: Int;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// Vocabulary Loading
+// ============================================================================
+
+// Create an empty vocabulary
+func vocab_new() -> Vocabulary {
+    return Vocabulary {
+        token_to_id: string_int_map_new(),
+        id_to_token: int_string_map_new(),
+        vocab_size: 0
+    };
+}
+
+// Free vocabulary resources
+func vocab_free(vocab: Vocabulary) -> Void {
+    string_int_map_free(vocab.token_to_id);
+    int_string_map_free(vocab.id_to_token);
+}
+
+// Load vocabulary from JSON string (parsed vocab.json content)
+// Returns true on success, false on failure
+func vocab_load_from_json(vocab: Vocabulary, json_str: String) -> Bool {
+    // Parse the JSON
+    let parsed = parse_json(json_str);
+    if (string_length(parsed) == 0) {
+        println("ERROR: Failed to parse vocab JSON");
+        return false;
+    }
+
+    // Get all keys from the JSON object
+    let keys_json = json_object_keys(parsed);
+    let key_count = json_array_length(keys_json);
+
+    if (key_count == 0) {
+        println("ERROR: Vocab JSON has no keys");
+        return false;
+    }
+
+    // Iterate over keys and populate both maps
+    let mut i = 0;
+    while ({i < key_count}) {
+        // Get the key (token string) - it comes as a JSON string with quotes
+        let key_json = json_array_get(keys_json, i);
+        let token = json_to_string(key_json);
+
+        // Get the value (token ID)
+        // Need to re-parse to get the field value
+        let reparsed = parse_json(json_str);
+        let id_json = json_get_field(reparsed, token);
+        let id = to_integer(id_json);
+
+        // Insert into both maps
+        let token_copy = aether_strdup(token);
+        string_int_map_insert(vocab.token_to_id, token_copy, id);
+        int_string_map_insert(vocab.id_to_token, id, token_copy);
+
+        i = {i + 1};
+    }
+
+    return true;
+}
+
+// Load vocabulary from a file path
+func vocab_load_from_file(vocab: Vocabulary, path: String) -> Bool {
+    // Read the file (10MB max for vocab files)
+    let content = read_file_safe(path, 10485760);
+
+    if (string_length(content) == 0) {
+        aether_print("ERROR: Failed to read vocab file: ");
+        println(path);
+        return false;
+    }
+
+    return vocab_load_from_json(vocab, content);
+}
+
+// Get token ID by token string (-1 if not found)
+func vocab_get_id(vocab: Vocabulary, token: String) -> Int {
+    return string_int_map_get(vocab.token_to_id, token);
+}
+
+// Get token string by ID (empty string if not found)
+func vocab_get_token(vocab: Vocabulary, id: Int) -> String {
+    return int_string_map_get(vocab.id_to_token, id);
+}
+
+// Check if token exists in vocabulary
+func vocab_has_token(vocab: Vocabulary, token: String) -> Bool {
+    return string_int_map_contains(vocab.token_to_id, token);
+}
+
+// Check if ID exists in vocabulary
+func vocab_has_id(vocab: Vocabulary, id: Int) -> Bool {
+    return int_string_map_contains(vocab.id_to_token, id);
+}
+
+// Get vocabulary size
+func vocab_size(vocab: Vocabulary) -> Int {
+    return string_int_map_size(vocab.token_to_id);
+}
+
+// ============================================================================
+// Merge Rules Loading
+// ============================================================================
+
+// Parse a single merge rule line "left right" into MergeRule
+// Returns MergeRule with empty strings if parsing fails
+func parse_merge_line(line: String) -> MergeRule {
+    let trimmed = string_trim(line);
+
+    // Skip empty lines and comments
+    if (string_length(trimmed) == 0) {
+        return MergeRule { left: "", right: "" };
+    }
+    if (string_starts_with(trimmed, "#")) {
+        return MergeRule { left: "", right: "" };
+    }
+
+    // Split by space
+    let parts = string_split(trimmed, " ");
+    let part_count = array_length(parts);
+
+    if ({part_count < 2}) {
+        return MergeRule { left: "", right: "" };
+    }
+
+    let left = array_get_string(parts, 0);
+    let right = array_get_string(parts, 1);
+
+    return MergeRule {
+        left: aether_strdup(left),
+        right: aether_strdup(right)
+    };
+}
+
+// Load merge rules from merges.txt content
+// Returns array of valid merge rules
+func load_merges_from_string(content: String) -> Array<MergeRule> {
+    let lines = string_split(content, "\n");
+    let line_count = array_length(lines);
+
+    // First pass: count valid merges
+    let mut valid_count = 0;
+    let mut i = 0;
+    while ({i < line_count}) {
+        let line = array_get_string(lines, i);
+        let rule = parse_merge_line(line);
+        if (string_length(rule.left) > 0) {
+            valid_count = {valid_count + 1};
+        }
+        i = {i + 1};
+    }
+
+    // TODO: Allocate array of MergeRule and populate
+    // For now, return empty array - need array allocation FFI
+    let empty: Array<MergeRule>;
+    return empty;
+}
+
+// Load merge rules from a file path
+func load_merges_from_file(path: String) -> Array<MergeRule> {
+    // Read the file (50MB max for merge files)
+    let content = read_file_safe(path, 52428800);
+
+    if (string_length(content) == 0) {
+        aether_print("ERROR: Failed to read merges file: ");
+        println(path);
+        let empty: Array<MergeRule>;
+        return empty;
+    }
+
+    return load_merges_from_string(content);
+}
+
+// ============================================================================
+// TokenizerConfig Construction
+// ============================================================================
+
+// Create a new tokenizer config with default special token IDs
+func tokenizer_config_new() -> TokenizerConfig {
+    let empty_merges: Array<MergeRule>;
+    return TokenizerConfig {
+        vocab: vocab_new(),
+        merges: empty_merges,
+        merge_count: 0,
+        unk_token_id: -1,
+        bos_token_id: -1,
+        eos_token_id: -1
+    };
+}
+
+// Load tokenizer from vocab.json and merges.txt paths
+func tokenizer_config_load(config: TokenizerConfig, vocab_path: String, merges_path: String) -> Bool {
+    // Load vocabulary
+    if (vocab_load_from_file(config.vocab, vocab_path) == false) {
+        println("ERROR: Failed to load vocabulary");
+        return false;
+    }
+
+    aether_print("Loaded vocabulary with ");
+    aether_print(int_to_string(vocab_size(config.vocab)));
+    println(" tokens");
+
+    // Load merges
+    config.merges = load_merges_from_file(merges_path);
+    // config.merge_count = array_length(config.merges);
+
+    // Try to find special token IDs
+    if (vocab_has_token(config.vocab, "<unk>")) {
+        config.unk_token_id = vocab_get_id(config.vocab, "<unk>");
+    }
+    if (vocab_has_token(config.vocab, "<s>")) {
+        config.bos_token_id = vocab_get_id(config.vocab, "<s>");
+    }
+    if (vocab_has_token(config.vocab, "</s>")) {
+        config.eos_token_id = vocab_get_id(config.vocab, "</s>");
+    }
+
+    return true;
+}
+
+// Free tokenizer config resources
+func tokenizer_config_free(config: TokenizerConfig) -> Void {
+    vocab_free(config.vocab);
+    // TODO: Free merge rules array
+}

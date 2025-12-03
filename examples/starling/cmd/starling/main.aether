@@ -1,0 +1,453 @@
+module TokenizerService;
+
+// ============================================================================
+// Starling Tokenizer HTTP Service
+//
+// Endpoints:
+//   POST /v1/tokenize   - {"text": "..."} -> {"tokens": [...], "offsets": [...]}
+//   POST /v1/detokenize - {"tokens": [...]} -> {"text": "..."}
+//   GET  /health        - {"status": "ok"}
+// ============================================================================
+
+// =========================== FFI Imports ===================================
+
+// Print/Debug
+@extern(library="aether_runtime", symbol="aether_print")
+func print(s: String) -> Void;
+
+// String operations
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="substring")
+func substring(s: String, start: Int, length: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_concat")
+func string_concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_index_of")
+func string_index_of(s: String, needle: String) -> Int;
+
+// File I/O
+@extern(library="aether_runtime", symbol="read_file_safe")
+func read_file(path: String, max_size: Int) -> String;
+
+// String Array FFI
+@extern(library="aether_runtime", symbol="string_array_create")
+func string_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="string_array_push")
+func string_array_push(arr: Int64, value: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="string_array_get")
+func string_array_get(arr: Int64, index: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_array_length")
+func string_array_length(arr: Int64) -> Int;
+
+// Int Array FFI
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+// JSON FFI
+type JsonValue = String;
+
+@extern(library="aether_runtime", symbol="parse_json")
+func parse_json(json_string: String) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="json_get_field")
+func json_get_field(json_value: JsonValue, field_name: String) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="to_integer")
+func json_to_int(json_value: JsonValue) -> Int;
+
+@extern(library="aether_runtime", symbol="json_object_keys")
+func json_object_keys(json_value: JsonValue) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="json_array_length")
+func json_array_length(json_value: JsonValue) -> Int;
+
+@extern(library="aether_runtime", symbol="json_array_get")
+func json_array_get(json_value: JsonValue, index: Int) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="json_to_string")
+func json_to_string(json_value: JsonValue) -> String;
+
+// Network/HTTP FFI
+@extern(library="aether_runtime", symbol="tcp_listen")
+func tcp_listen(port: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="tcp_accept")
+func tcp_accept(listener_id: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="tcp_read_string")
+func tcp_read_string(socket_id: Int, max_size: Int) -> String;
+
+@extern(library="aether_runtime", symbol="tcp_write")
+func tcp_write_bytes(socket_id: Int, data: String, len: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="tcp_close")
+func tcp_close(socket_id: Int) -> Void;
+
+@extern(library="aether_runtime", symbol="http_parse_method")
+func http_parse_method(request: String) -> String;
+
+@extern(library="aether_runtime", symbol="http_parse_path")
+func http_parse_path(request: String) -> String;
+
+@extern(library="aether_runtime", symbol="http_parse_body")
+func http_parse_body(request: String) -> String;
+
+@extern(library="aether_runtime", symbol="http_create_json_response")
+func http_create_json_response(status_code: Int, json_body: String) -> String;
+
+// =========================== Utility Functions =============================
+
+func println(s: String) -> Void {
+    print(s);
+    print("\n");
+}
+
+func send_data(socket_id: Int, data: String) -> Int {
+    let len = string_length(data);
+    return tcp_write_bytes(socket_id, data, len);
+}
+
+// =========================== BPE Tokenizer Logic ===========================
+
+// Global vocabulary and merges (loaded once)
+// Using module-level vars would be ideal, but for now we pass state
+
+// Split text into characters
+func split_to_chars(text: String) -> Int64 {
+    let mut chars = string_array_create(0);
+    let len = string_length(text);
+
+    let mut i = 0;
+    while (i < len) {
+        let c = substring(text, i, 1);
+        chars = string_array_push(chars, c);
+        i = i + 1;
+    }
+
+    return chars;
+}
+
+// Find index where merge can be applied
+func find_merge_index(tokens: Int64, first: String, second: String) -> Int {
+    let num_tokens = string_array_length(tokens);
+    if (num_tokens < 2) {
+        return -1;
+    }
+
+    let mut i = 0;
+    while (i < num_tokens - 1) {
+        let t1 = string_array_get(tokens, i);
+        let t2 = string_array_get(tokens, i + 1);
+        if (string_equals(t1, first) != 0) {
+            if (string_equals(t2, second) != 0) {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+
+    return -1;
+}
+
+// Apply a single merge at given index
+func apply_merge(tokens: Int64, merge_idx: Int) -> Int64 {
+    let mut new_tokens = string_array_create(0);
+    let num_tokens = string_array_length(tokens);
+
+    let mut i = 0;
+    while (i < num_tokens) {
+        if (i == merge_idx) {
+            let t1 = string_array_get(tokens, i);
+            let t2 = string_array_get(tokens, i + 1);
+            let merged = string_concat(t1, t2);
+            new_tokens = string_array_push(new_tokens, merged);
+            i = i + 2;
+        } else {
+            let t = string_array_get(tokens, i);
+            new_tokens = string_array_push(new_tokens, t);
+            i = i + 1;
+        }
+    }
+
+    return new_tokens;
+}
+
+// Parse merges file (one merge per line: "first second")
+func parse_merges_line(line: String) -> Int64 {
+    // Returns array with [first, second] or empty if invalid
+    let mut result = string_array_create(2);
+    let space_idx = string_index_of(line, " ");
+
+    if (space_idx > 0) {
+        let first = substring(line, 0, space_idx);
+        let second = substring(line, space_idx + 1, string_length(line) - space_idx - 1);
+        result = string_array_push(result, first);
+        result = string_array_push(result, second);
+    }
+
+    return result;
+}
+
+// Simple BPE encode with hard-coded merges for demo
+// In production, load from merges.txt file
+func bpe_encode(text: String, vocab_json: String, merges_content: String) -> Int64 {
+    let mut tokens = split_to_chars(text);
+
+    // Apply merges in order (parse line by line)
+    // For simplicity, apply fixed merges: l+l, h+e
+    // A full implementation would parse merges_content
+
+    // Apply l+l merge
+    let mut idx = find_merge_index(tokens, "l", "l");
+    while (idx >= 0) {
+        tokens = apply_merge(tokens, idx);
+        idx = find_merge_index(tokens, "l", "l");
+    }
+
+    // Apply h+e merge
+    idx = find_merge_index(tokens, "h", "e");
+    while (idx >= 0) {
+        tokens = apply_merge(tokens, idx);
+        idx = find_merge_index(tokens, "h", "e");
+    }
+
+    return tokens;
+}
+
+// BPE decode - just concatenate tokens
+func bpe_decode(tokens: Int64) -> String {
+    let mut result = "";
+    let num = string_array_length(tokens);
+
+    let mut i = 0;
+    while (i < num) {
+        let t = string_array_get(tokens, i);
+        result = string_concat(result, t);
+        i = i + 1;
+    }
+
+    return result;
+}
+
+// Convert token strings to IDs using vocab
+func tokens_to_ids(tokens: Int64, vocab_json: String) -> Int64 {
+    let mut ids = int_array_create(0);
+    let vocab = parse_json(vocab_json);
+    let num = string_array_length(tokens);
+
+    let mut i = 0;
+    while (i < num) {
+        let token = string_array_get(tokens, i);
+        let token_val = json_get_field(vocab, token);
+        let id = json_to_int(token_val);
+        ids = int_array_push(ids, id);
+        i = i + 1;
+    }
+
+    return ids;
+}
+
+// =========================== Request Handlers ==============================
+
+func handle_tokenize(body: String, vocab_json: String) -> String {
+    // Parse request: {"text": "..."}
+    let json = parse_json(body);
+    let text_field = json_get_field(json, "text");
+    let text = json_to_string(text_field);
+
+    // Tokenize
+    let tokens = bpe_encode(text, vocab_json, "");
+    let ids = tokens_to_ids(tokens, vocab_json);
+
+    // Build response: {"tokens": [...], "token_strings": [...]}
+    let mut tokens_json = "[";
+    let num_ids = int_array_length(ids);
+    let mut i = 0;
+    while (i < num_ids) {
+        if (i > 0) {
+            tokens_json = string_concat(tokens_json, ", ");
+        }
+        let id = int_array_get(ids, i);
+        tokens_json = string_concat(tokens_json, int_to_string(id));
+        i = i + 1;
+    }
+    tokens_json = string_concat(tokens_json, "]");
+
+    // Build token strings array
+    let mut strings_json = "[";
+    let num_tokens = string_array_length(tokens);
+    i = 0;
+    while (i < num_tokens) {
+        if (i > 0) {
+            strings_json = string_concat(strings_json, ", ");
+        }
+        strings_json = string_concat(strings_json, "\"");
+        strings_json = string_concat(strings_json, string_array_get(tokens, i));
+        strings_json = string_concat(strings_json, "\"");
+        i = i + 1;
+    }
+    strings_json = string_concat(strings_json, "]");
+
+    let response = string_concat("{\"tokens\": ", tokens_json);
+    let response2 = string_concat(response, ", \"token_strings\": ");
+    let response3 = string_concat(response2, strings_json);
+    let response4 = string_concat(response3, "}");
+
+    return response4;
+}
+
+func handle_detokenize(body: String) -> String {
+    // Parse request: {"token_strings": ["he", "ll", "o"]}
+    // Get number of tokens first
+    let json1 = parse_json(body);
+    let tokens_field1 = json_get_field(json1, "token_strings");
+    let num_tokens = json_array_length(tokens_field1);
+
+    // Build string array from JSON array
+    // Note: Reparse body each iteration to avoid ownership issues
+    let mut tokens = string_array_create(0);
+    let mut i = 0;
+    while (i < num_tokens) {
+        // Reparse to avoid ownership transfer issues
+        let json2 = parse_json(body);
+        let tokens_field2 = json_get_field(json2, "token_strings");
+        let token_json = json_array_get(tokens_field2, i);
+        let token = json_to_string(token_json);
+        tokens = string_array_push(tokens, token);
+        i = i + 1;
+    }
+
+    // Decode
+    let text = bpe_decode(tokens);
+
+    // Build response: {"text": "..."}
+    let response = string_concat("{\"text\": \"", text);
+    let response2 = string_concat(response, "\"}");
+
+    return response2;
+}
+
+func handle_health() -> String {
+    return "{\"status\": \"ok\", \"service\": \"starling-tokenizer\"}";
+}
+
+// =========================== HTTP Server ===================================
+
+func handle_request(request: String, vocab_json: String) -> String {
+    let method = http_parse_method(request);
+    let path = http_parse_path(request);
+    let body = http_parse_body(request);
+
+    print("Request: ");
+    print(method);
+    print(" ");
+    println(path);
+
+    // Route request
+    if (string_equals(path, "/v1/tokenize") != 0) {
+        if (string_equals(method, "POST") != 0) {
+            let response_body = handle_tokenize(body, vocab_json);
+            return http_create_json_response(200, response_body);
+        } else {
+            return http_create_json_response(405, "{\"error\": \"Method not allowed\"}");
+        }
+    }
+
+    if (string_equals(path, "/v1/detokenize") != 0) {
+        if (string_equals(method, "POST") != 0) {
+            let response_body = handle_detokenize(body);
+            return http_create_json_response(200, response_body);
+        } else {
+            return http_create_json_response(405, "{\"error\": \"Method not allowed\"}");
+        }
+    }
+
+    if (string_equals(path, "/health") != 0) {
+        let response_body = handle_health();
+        return http_create_json_response(200, response_body);
+    }
+
+    // 404 Not Found
+    return http_create_json_response(404, "{\"error\": \"Not found\"}");
+}
+
+func run_server(port: Int, vocab_json: String) -> Int {
+    println("Starting Starling Tokenizer Service...");
+    print("Listening on port ");
+    println(int_to_string(port));
+    println("Endpoints:");
+    println("  POST /v1/tokenize   - Tokenize text");
+    println("  POST /v1/detokenize - Detokenize tokens");
+    println("  GET  /health        - Health check");
+    println("");
+
+    // Create TCP listener
+    let listener = tcp_listen(port);
+    if (listener < 0) {
+        println("ERROR: Failed to bind to port");
+        return 1;
+    }
+
+    // Accept loop
+    while (true) {
+        let client = tcp_accept(listener);
+        if (client < 0) {
+            println("WARNING: Accept failed");
+        } else {
+            // Read request
+            let request = tcp_read_string(client, 8192);
+            if (string_length(request) > 0) {
+                // Handle request
+                let response = handle_request(request, vocab_json);
+
+                // Send response
+                send_data(client, response);
+            }
+
+            // Close connection
+            tcp_close(client);
+        }
+    }
+
+    return 0;
+}
+
+// =========================== Main ==========================================
+
+func main() -> Int {
+    // Load vocabulary - try test file first, fall back to default
+    let vocab_path = "test_vocab.json";
+    let mut vocab_json = read_file(vocab_path, 100000);
+
+    if (string_length(vocab_json) == 0) {
+        print("INFO: Could not load vocabulary from ");
+        println(vocab_path);
+        println("Using default vocabulary...");
+        // Use default vocabulary for demo
+        vocab_json = "{\"h\": 0, \"e\": 1, \"l\": 2, \"o\": 3, \"ll\": 4, \"he\": 5, \"hello\": 6, \" \": 7, \"w\": 8, \"r\": 9, \"d\": 10}";
+    }
+
+    // Run server on port 8080
+    return run_server(8080, vocab_json);
+}
