@@ -131,6 +131,35 @@ impl<'ctx> LLVMBackend<'ctx> {
         }
     }
 
+    /// Resolve type aliases to their underlying types
+    fn resolve_type_alias(&self, ty: &crate::types::Type) -> crate::types::Type {
+        match ty {
+            crate::types::Type::Named { name, module } => {
+                let full_name = match module {
+                    Some(m) => format!("{}.{}", m, name),
+                    None => name.clone(),
+                };
+
+                // Try to find the type definition
+                if let Some(type_def) = self.type_definitions.get(&full_name) {
+                    if let crate::types::TypeDefinition::Alias { target_type, .. } = type_def {
+                        return self.resolve_type_alias(target_type);
+                    }
+                }
+                // Also try without module prefix
+                if let Some(type_def) = self.type_definitions.get(name) {
+                    if let crate::types::TypeDefinition::Alias { target_type, .. } = type_def {
+                        return self.resolve_type_alias(target_type);
+                    }
+                }
+
+                // Not an alias, return as-is
+                ty.clone()
+            }
+            _ => ty.clone(),
+        }
+    }
+
     /// Convert an AetherScript type to an LLVM basic type
     fn get_basic_type(&self, ty: &crate::types::Type) -> inkwell::types::BasicTypeEnum<'ctx> {
         match ty {
@@ -154,8 +183,28 @@ impl<'ctx> LLVMBackend<'ctx> {
                     .into(),
                 crate::ast::PrimitiveType::Void => self.context.i8_type().into(),
             },
-            crate::types::Type::Named { .. } => {
-                // Structs and Enums are passed by pointer (reference)
+            crate::types::Type::Named { name, module } => {
+                // First, check if this is a type alias and resolve it
+                let full_name = match module {
+                    Some(m) => format!("{}.{}", m, name),
+                    None => name.clone(),
+                };
+
+                // Try to find the type definition
+                if let Some(type_def) = self.type_definitions.get(&full_name) {
+                    if let crate::types::TypeDefinition::Alias { target_type, .. } = type_def {
+                        // Recursively resolve the target type
+                        return self.get_basic_type(target_type);
+                    }
+                }
+                // Also try without module prefix
+                if let Some(type_def) = self.type_definitions.get(name) {
+                    if let crate::types::TypeDefinition::Alias { target_type, .. } = type_def {
+                        return self.get_basic_type(target_type);
+                    }
+                }
+
+                // Not an alias - Structs and Enums are passed by pointer (reference)
                 self.context
                     .i8_type()
                     .ptr_type(AddressSpace::default())
@@ -366,7 +415,10 @@ impl<'ctx> LLVMBackend<'ctx> {
                 .map(|param_ty| self.get_basic_type(param_ty).into())
                 .collect();
 
-            let fn_type = match &ext_func.return_type {
+            // Resolve return type (handles type aliases)
+            let resolved_return_type = self.resolve_type_alias(&ext_func.return_type);
+
+            let fn_type = match &resolved_return_type {
                 crate::types::Type::Primitive(crate::ast::PrimitiveType::Void) => self
                     .context
                     .void_type()
@@ -393,14 +445,17 @@ impl<'ctx> LLVMBackend<'ctx> {
                     .ptr_type(AddressSpace::default())
                     .fn_type(&param_types, ext_func.variadic),
                 _ => {
-                    // For other types, default to i32
+                    // For other types (structs, etc), use pointer
                     self.context
-                        .i32_type()
+                        .i8_type()
+                        .ptr_type(AddressSpace::default())
                         .fn_type(&param_types, ext_func.variadic)
                 }
             };
 
-            let llvm_func = self.module.add_function(name, fn_type, None);
+            // Use symbol name for the LLVM declaration (for linking), but use Aether function name as lookup key
+            let extern_symbol = ext_func.symbol.as_ref().unwrap_or(name);
+            let llvm_func = self.module.add_function(extern_symbol, fn_type, None);
             function_declarations.insert(name.clone(), llvm_func);
         }
 

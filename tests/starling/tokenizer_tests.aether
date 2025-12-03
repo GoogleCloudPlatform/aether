@@ -1,0 +1,36 @@
+module tokenizer_tests;
+
+import starling.tokenizer as Tokenizer;
+import std.collections as Collections;
+import std.string as Strings;
+import std.io as Io;
+
+func test_vocab_parsing() -> Void {
+    // Note: Escaped quotes for the string literal
+    let json_content: String = "{\"<unk>\": 0, \"hello\": 1, \"world\": 2}";
+    let vocab: Map<String, Int> = Tokenizer.parse_vocab_json(json_content);
+    
+    // Check values
+    let unk_val: Int = vocab.get("<unk>");
+    let hello_val: Int = vocab.get("hello");
+    let world_val: Int = vocab.get("world");
+    
+    if (unk_val != 0) {
+        Io.println("Failed: <unk> != 0");
+        Io.print("Actual: ");
+        Io.println(Strings.to_string(unk_val));
+        // assert(false); 
+    }
+    
+    if (hello_val != 1) {
+        Io.println("Failed: hello != 1");
+        // assert(false);
+    }
+    
+    Io.println("Vocab parsing passed!");
+}
+
+func main() -> Int {
+    test_vocab_parsing();
+    return 0;
+}

@@ -1,0 +1,426 @@
+module TestBpeTokenizer;
+
+// ============================================================================
+// Test BPE Tokenizer encode/decode
+// ============================================================================
+
+// FFI imports
+@extern(library="aether_runtime", symbol="aether_print")
+func print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="substring")
+func substring(s: String, start: Int, length: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_concat")
+func string_concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+@extern(library="aether_runtime", symbol="write_file_safe")
+func write_file_safe(path: String, content: String, append: Int) -> Int;
+
+func write_file(path: String, content: String) -> Int {
+    return write_file_safe(path, content, 0);
+}
+
+@extern(library="aether_runtime", symbol="read_file_safe")
+func read_file(path: String, max_size: Int) -> String;
+
+// String Array FFI - using Int64 to hold 64-bit pointers without ownership tracking
+@extern(library="aether_runtime", symbol="string_array_create")
+func string_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="string_array_push")
+func string_array_push(arr: Int64, value: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="string_array_get")
+func string_array_get(arr: Int64, index: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_array_length")
+func string_array_length(arr: Int64) -> Int;
+
+// JSON FFI
+type JsonValue = String;
+
+@extern(library="aether_runtime", symbol="parse_json")
+func parse_json(json_string: String) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="json_get_field")
+func json_get_field(json_value: JsonValue, field_name: String) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="to_integer")
+func json_to_int(json_value: JsonValue) -> Int;
+
+@extern(library="aether_runtime", symbol="json_object_keys")
+func json_object_keys(json_value: JsonValue) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="json_array_length")
+func json_array_length(json_value: JsonValue) -> Int;
+
+@extern(library="aether_runtime", symbol="json_array_get")
+func json_array_get(json_value: JsonValue, index: Int) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="json_to_string")
+func json_to_string(json_value: JsonValue) -> String;
+
+func println(s: String) -> Void {
+    print(s);
+    print("\n");
+}
+
+// ============================================================================
+// Simple BPE implementation for testing
+// ============================================================================
+
+// Split text into characters (returns raw pointer as Int64)
+func split_to_chars(text: String) -> Int64 {
+    let mut chars = string_array_create(0);
+    let len = string_length(text);
+
+    let mut i = 0;
+    while (i < len) {
+        let c = substring(text, i, 1);
+        chars = string_array_push(chars, c);
+        i = i + 1;
+    }
+
+    return chars;
+}
+
+// Simple merge: find adjacent pair and merge them
+func find_merge_index(tokens: Int64, first: String, second: String) -> Int {
+    let num_tokens = string_array_length(tokens);
+    if (num_tokens < 2) {
+        return -1;
+    }
+
+    let mut i = 0;
+    while (i < num_tokens - 1) {
+        let t1 = string_array_get(tokens, i);
+        let t2 = string_array_get(tokens, i + 1);
+        if (string_equals(t1, first) != 0) {
+            if (string_equals(t2, second) != 0) {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+
+    return -1;
+}
+
+// Apply a single merge
+func apply_merge(tokens: Int64, merge_idx: Int) -> Int64 {
+    let mut new_tokens = string_array_create(0);
+    let num_tokens = string_array_length(tokens);
+
+    let mut i = 0;
+    while (i < num_tokens) {
+        if (i == merge_idx) {
+            let t1 = string_array_get(tokens, i);
+            let t2 = string_array_get(tokens, i + 1);
+            let merged = string_concat(t1, t2);
+            new_tokens = string_array_push(new_tokens, merged);
+            i = i + 2;
+        } else {
+            let t = string_array_get(tokens, i);
+            new_tokens = string_array_push(new_tokens, t);
+            i = i + 1;
+        }
+    }
+
+    return new_tokens;
+}
+
+// Print array of strings
+func print_tokens(label: String, tokens: Int64) -> Void {
+    print(label);
+    print(": [");
+    let num = string_array_length(tokens);
+    let mut i = 0;
+    while (i < num) {
+        if (i > 0) {
+            print(", ");
+        }
+        print("'");
+        print(string_array_get(tokens, i));
+        print("'");
+        i = i + 1;
+    }
+    println("]");
+}
+
+// ============================================================================
+// Test: Basic character splitting
+// ============================================================================
+func test_split_chars() -> Bool {
+    println("=== Test: Character splitting ===");
+
+    let text = "hello";
+    let chars = split_to_chars(text);
+
+    print("Input: ");
+    println(text);
+    print_tokens("Chars", chars);
+
+    let len = string_array_length(chars);
+    if (len != 5) {
+        print("FAIL: Expected 5 characters, got ");
+        println(int_to_string(len));
+        return false;
+    }
+
+    let c0 = string_array_get(chars, 0);
+    if (string_equals(c0, "h") == 0) {
+        print("FAIL: First char '");
+        print(c0);
+        println("' should be 'h'");
+        return false;
+    }
+
+    let c4 = string_array_get(chars, 4);
+    if (string_equals(c4, "o") == 0) {
+        println("FAIL: Last char should be 'o'");
+        return false;
+    }
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Test: Simple merge operation
+// ============================================================================
+func test_merge() -> Bool {
+    println("=== Test: Merge operation ===");
+
+    // Start with ['h', 'e', 'l', 'l', 'o']
+    let tokens = split_to_chars("hello");
+    print_tokens("Initial", tokens);
+
+    // Find and merge 'l' + 'l' -> 'll'
+    let idx = find_merge_index(tokens, "l", "l");
+    print("Merge index for 'l'+'l': ");
+    println(int_to_string(idx));
+
+    if (idx < 0) {
+        println("FAIL: Should find 'l'+'l' pair");
+        return false;
+    }
+
+    let merged = apply_merge(tokens, idx);
+    print_tokens("After merge", merged);
+
+    let merged_len = string_array_length(merged);
+    if (merged_len != 4) {
+        print("FAIL: Expected 4 tokens after merge, got ");
+        println(int_to_string(merged_len));
+        return false;
+    }
+
+    // Should now be ['h', 'e', 'll', 'o']
+    let t2 = string_array_get(merged, 2);
+    if (string_equals(t2, "ll") == 0) {
+        println("FAIL: Third token should be 'll'");
+        return false;
+    }
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Test: JSON vocab parsing
+// ============================================================================
+func test_json_vocab() -> Bool {
+    println("=== Test: JSON vocab parsing ===");
+
+    // Create test vocab file
+    let vocab_json = "{\"h\": 0, \"e\": 1, \"l\": 2, \"o\": 3, \"ll\": 4, \"he\": 5, \"hello\": 6}";
+    let wrote = write_file("test_vocab.json", vocab_json);
+    if (wrote == 0) {
+        println("FAIL: Could not write vocab file");
+        return false;
+    }
+    println("Wrote test_vocab.json");
+
+    // Read and parse - reparse for each use to avoid ownership issues
+    let content1 = read_file("test_vocab.json", 10000);
+    println("Read content:");
+    println(content1);
+
+    let json1 = parse_json(read_file("test_vocab.json", 10000));
+    println("Parsed JSON:");
+    println(json1);
+
+    // Get keys - reparse to get fresh json
+    let json2 = parse_json(read_file("test_vocab.json", 10000));
+    let keys_json = json_object_keys(json2);
+    println("Keys (as JSON array):");
+    println(keys_json);
+
+    let num_keys = json_array_length(keys_json);
+    print("Number of keys: ");
+    println(int_to_string(num_keys));
+
+    if (num_keys != 7) {
+        println("FAIL: Expected 7 keys");
+        return false;
+    }
+
+    // Get value for 'hello' - reparse again
+    let json3 = parse_json(read_file("test_vocab.json", 10000));
+    let hello_val_json = json_get_field(json3, "hello");
+    let hello_id = json_to_int(hello_val_json);
+    print("ID for 'hello': ");
+    println(int_to_string(hello_id));
+
+    if (hello_id != 6) {
+        println("FAIL: 'hello' should have ID 6");
+        return false;
+    }
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Test: BPE with merges
+// ============================================================================
+func test_bpe_encode() -> Bool {
+    println("=== Test: BPE encoding ===");
+
+    // Create test merges file
+    // Merge order: l+l, h+e, he+llo (simplified)
+    let merges_txt = "l l\nh e\nhe llo\n";
+    let wrote = write_file("test_merges.txt", merges_txt);
+    if (wrote == 0) {
+        println("FAIL: Could not write merges file");
+        return false;
+    }
+    println("Wrote test_merges.txt");
+
+    // Start with "hello"
+    let mut tokens = split_to_chars("hello");
+    print_tokens("Initial", tokens);
+
+    // Apply merge: l + l -> ll
+    let idx1 = find_merge_index(tokens, "l", "l");
+    if (idx1 >= 0) {
+        tokens = apply_merge(tokens, idx1);
+        print_tokens("After l+l merge", tokens);
+    }
+
+    // Apply merge: h + e -> he
+    let idx2 = find_merge_index(tokens, "h", "e");
+    if (idx2 >= 0) {
+        tokens = apply_merge(tokens, idx2);
+        print_tokens("After h+e merge", tokens);
+    }
+
+    // Final: should be ['he', 'll', 'o']
+    let final_len = string_array_length(tokens);
+    if (final_len != 3) {
+        print("FAIL: Expected 3 tokens, got ");
+        println(int_to_string(final_len));
+        return false;
+    }
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Test: Round-trip encode/decode
+// ============================================================================
+func test_round_trip() -> Bool {
+    println("=== Test: Round-trip ===");
+
+    let original = "hello";
+    let tokens = split_to_chars(original);
+
+    // Apply merges
+    let mut merged = tokens;
+    let idx1 = find_merge_index(merged, "l", "l");
+    if (idx1 >= 0) {
+        merged = apply_merge(merged, idx1);
+    }
+
+    // "Decode" by joining
+    let mut decoded = "";
+    let num = string_array_length(merged);
+    let mut i = 0;
+    while (i < num) {
+        let t = string_array_get(merged, i);
+        decoded = string_concat(decoded, t);
+        i = i + 1;
+    }
+
+    print("Original: ");
+    println(original);
+    print("Decoded: ");
+    println(decoded);
+
+    if (string_equals(original, decoded) == 0) {
+        println("FAIL: Round-trip mismatch");
+        return false;
+    }
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+func main() -> Int {
+    println("BPE Tokenizer Tests");
+    println("==================");
+    println("");
+
+    let mut failures = 0;
+
+    if (test_split_chars() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_merge() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_json_vocab() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_bpe_encode() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_round_trip() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (failures == 0) {
+        println("==================");
+        println("ALL TESTS PASSED");
+        return 0;
+    } else {
+        println("==================");
+        print("SOME TESTS FAILED (");
+        print(int_to_string(failures));
+        println(" failures)");
+        return 1;
+    }
+}

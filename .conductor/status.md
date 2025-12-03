@@ -221,18 +221,45 @@
 - Tests run: `Z3_SYS_Z3_HEADER=/opt/homebrew/include/z3.h cargo test` (targeted new tests and full suite).
 - Next action: begin Task 16.3 (Combined Verification Strategy).
 
-## Status Update (2025-12-02 - end of day)
+## Status Update (2025-12-03 - Type Alias Resolution Fix)
 
-### Phase 16: Generic Contract Verification (In Progress)
+### Phase 19: Starling Tokenizer Service (In Progress)
 
-- [x] **Task 16.1: Instantiation Verification (Option B)**: Completed. Verification engine reuses generic contracts for monomorphized functions.
-- [x] **Task 16.2: Abstract Verification with Axioms (Option C)**: Completed. Verification engine asserts global axioms; solver explicitly supports them.
-- [x] **Task 16.3: Combined Verification Strategy**: Completed. Implemented flexible verification strategy allowing per-contract mode specification (`AbstractOnly`, `InstantiationOnly`, `Combined`). Refactored `VerificationEngine::verify_function` to apply modes per-condition. Added comprehensive test suite. All 764 tests pass.
+- [x] **Task 19.1: Implement Tokenizer Loader**: Completed. Fixed critical bug in type alias resolution.
+    - **Bug Fixed**: Type aliases (e.g., `type JsonValue = String;`) were not being resolved in external function return types.
+    - Added `resolve_type_alias()` helper function to LLVM backend.
+    - Updated external function declaration to resolve return types before generating LLVM types.
+    - String manipulation functions (`string_length`, `parse_json`, `json_get_field`, etc.) now work correctly.
+    - `tests/starling/test_tokenizer_loader.aether` passes successfully.
+    - `tests/starling/test_json_simple.aether` demonstrates JSON parsing working correctly.
 
-## Phase 17: Contract Examples (Real-World) (Completed)
+- [x] **Task 19.2: BPE Tokenizer Logic**: Completed. Implemented BPE tokenizer encode/decode with tests.
+    - **Runtime Additions**:
+        - Added `string_array_create`, `string_array_push`, `string_array_get`, `string_array_length`, `string_array_free` FFI functions to runtime.
+        - Added `int_array_create`, `int_array_push`, `int_array_get`, `int_array_length`, `int_array_free` FFI functions to runtime.
+    - **LLVM Backend Fix**: External function declarations now use the `symbol` attribute for linking while keeping function name for internal lookups.
+    - **Test File**: `tests/starling/test_bpe_tokenizer.aether` passes all 5 tests:
+        - Character splitting test
+        - Merge operation test
+        - JSON vocab parsing test
+        - BPE encoding test
+        - Round-trip encode/decode test
+    - **Workarounds Applied**:
+        - Use `Int64` instead of `Pointer<Void>` for array handles to avoid 64-bit pointer truncation on arm64.
+        - Use `Int` return type for boolean-returning FFI functions and compare with `== 0` instead of using Bool directly (to avoid `!` operator issues with Bool type).
+
+## Phase 16: Generic Contract Verification (Completed)
 
 ## Phase 18: Standard Library in Aether (Completed)
 
 - [x] Ported `std.io` module: Created `stdlib/io.aether` with FFI declarations and contracts. Verified compilation and contract parsing.
 - [x] Ported `std.math` module: Created `stdlib/math.aether` with FFI declarations and contracts. Adjusted tuple return types for FFI functions to single `Int` to match current AetherScript capabilities. Verified compilation and contract parsing.
 - [x] Ported `std.collections` module: Created `stdlib/collections.aether` with FFI declarations and contracts. Adjusted function type parameters to `Pointer<Void>` to match current AetherScript FFI limitations. Verified compilation and contract parsing.
+
+## Phase 19: Bootstrapping Preparation (In Progress)
+
+- [x] **Task 19.1: Verify FFI Completeness**: Verified and implemented missing FFI features for Starling.
+    - Implemented `Array.as_ptr()` and `String.to_c_string()`.
+    - Implemented support for "Function as Value" (function pointers) in MIR and LLVM backend (`ConstantValue::Function`).
+    - Verified passing arrays and callbacks to C via `tests/integration/test_starling_ffi.rs`.
+    - Identified and documented 64-bit pointer truncation bug in backend (likely ABI issue), worked around with casting for now.

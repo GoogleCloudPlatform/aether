@@ -252,6 +252,298 @@ pub unsafe extern "C" fn array_free(array_ptr: *mut c_void) {
     crate::memory_alloc::aether_safe_free(array_ptr);
 }
 
+// =============================================================================
+// String Array Functions - for dynamic arrays of strings (pointers)
+// =============================================================================
+
+/// String array structure
+/// Memory layout: [length: i32][capacity: i32][pointers: *mut c_char...]
+#[repr(C)]
+struct StringArray {
+    length: i32,
+    capacity: i32,
+    // String pointers follow immediately after in memory
+}
+
+/// Create a string array with given initial capacity
+/// If capacity is 0, creates an empty array with capacity 4
+#[no_mangle]
+pub unsafe extern "C" fn string_array_create(capacity: c_int) -> *mut c_void {
+    let cap = if capacity <= 0 { 4 } else { capacity as usize };
+
+    // Calculate size needed
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<*mut c_char>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut StringArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = 0;
+    (*array_ptr).capacity = cap as i32;
+
+    // Initialize pointers to null
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut *mut c_char;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
+/// Push a string onto the string array (returns new array pointer, may reallocate)
+#[no_mangle]
+pub unsafe extern "C" fn string_array_push(array_ptr: *mut c_void, value: *const c_char) -> *mut c_void {
+    if array_ptr.is_null() {
+        // Create new array and push
+        let new_array = string_array_create(4);
+        if new_array.is_null() {
+            return ptr::null_mut();
+        }
+        return string_array_push(new_array, value);
+    }
+
+    let array = array_ptr as *mut StringArray;
+    let length = (*array).length;
+    let capacity = (*array).capacity;
+
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+
+    // Check if we need to grow
+    if length >= capacity {
+        let new_capacity = (capacity * 2) as usize;
+        let new_size = aligned_offset + new_capacity * mem::size_of::<*mut c_char>();
+
+        let new_array_ptr = crate::memory_alloc::aether_safe_malloc(new_size) as *mut StringArray;
+        if new_array_ptr.is_null() {
+            return array_ptr; // Return original on failure
+        }
+
+        (*new_array_ptr).length = length;
+        (*new_array_ptr).capacity = new_capacity as i32;
+
+        // Copy existing pointers
+        let old_elements = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+        let new_elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut *mut c_char;
+        ptr::copy_nonoverlapping(old_elements, new_elements, length as usize);
+
+        // Initialize remaining to null
+        for i in length as usize..new_capacity {
+            *new_elements.add(i) = ptr::null_mut();
+        }
+
+        // Free old array (but not the strings it contained - they're now in new array)
+        crate::memory_alloc::aether_safe_free(array_ptr);
+
+        // Continue with new array
+        return string_array_push(new_array_ptr as *mut c_void, value);
+    }
+
+    // Duplicate the string and add to array
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+
+    // Duplicate the string
+    let dup = if value.is_null() {
+        ptr::null_mut()
+    } else {
+        crate::memory::aether_strdup(value)
+    };
+
+    *elements_ptr.add(length as usize) = dup;
+    (*array).length = length + 1;
+
+    array_ptr
+}
+
+/// Get string at index from string array
+#[no_mangle]
+pub unsafe extern "C" fn string_array_get(array_ptr: *mut c_void, index: c_int) -> *mut c_char {
+    if array_ptr.is_null() || index < 0 {
+        return ptr::null_mut();
+    }
+
+    let array = array_ptr as *mut StringArray;
+
+    if index >= (*array).length {
+        return ptr::null_mut();
+    }
+
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+
+    *elements_ptr.add(index as usize)
+}
+
+/// Get length of string array
+#[no_mangle]
+pub unsafe extern "C" fn string_array_length(array_ptr: *mut c_void) -> c_int {
+    if array_ptr.is_null() {
+        return 0;
+    }
+
+    let array = array_ptr as *mut StringArray;
+    (*array).length
+}
+
+/// Free a string array and all its contained strings
+#[no_mangle]
+pub unsafe extern "C" fn string_array_free(array_ptr: *mut c_void) {
+    if array_ptr.is_null() {
+        return;
+    }
+
+    let array = array_ptr as *mut StringArray;
+    let length = (*array).length;
+
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+
+    // Free each string
+    for i in 0..length as usize {
+        let s = *elements_ptr.add(i);
+        if !s.is_null() {
+            crate::memory_alloc::aether_safe_free(s as *mut c_void);
+        }
+    }
+
+    // Free the array itself
+    crate::memory_alloc::aether_safe_free(array_ptr);
+}
+
+// =============================================================================
+// Int Array Functions - for dynamic arrays of integers
+// =============================================================================
+
+/// Int array structure
+/// Memory layout: [length: i32][capacity: i32][elements: i32...]
+#[repr(C)]
+struct IntArray {
+    length: i32,
+    capacity: i32,
+}
+
+/// Create an int array with given initial capacity
+#[no_mangle]
+pub unsafe extern "C" fn int_array_create(capacity: c_int) -> *mut c_void {
+    let cap = if capacity <= 0 { 4 } else { capacity as usize };
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<i32>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut IntArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = 0;
+    (*array_ptr).capacity = cap as i32;
+
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut i32;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
+/// Push an int onto the int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_push(array_ptr: *mut c_void, value: c_int) -> *mut c_void {
+    if array_ptr.is_null() {
+        let new_array = int_array_create(4);
+        if new_array.is_null() {
+            return ptr::null_mut();
+        }
+        return int_array_push(new_array, value);
+    }
+
+    let array = array_ptr as *mut IntArray;
+    let length = (*array).length;
+    let capacity = (*array).capacity;
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+
+    if length >= capacity {
+        let new_capacity = (capacity * 2) as usize;
+        let new_size = aligned_offset + new_capacity * mem::size_of::<i32>();
+
+        let new_array_ptr = crate::memory_alloc::aether_safe_malloc(new_size) as *mut IntArray;
+        if new_array_ptr.is_null() {
+            return array_ptr;
+        }
+
+        (*new_array_ptr).length = length;
+        (*new_array_ptr).capacity = new_capacity as i32;
+
+        let old_elements = (array as *mut u8).add(aligned_offset) as *mut i32;
+        let new_elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut i32;
+        ptr::copy_nonoverlapping(old_elements, new_elements, length as usize);
+
+        for i in length as usize..new_capacity {
+            *new_elements.add(i) = 0;
+        }
+
+        crate::memory_alloc::aether_safe_free(array_ptr);
+
+        return int_array_push(new_array_ptr as *mut c_void, value);
+    }
+
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut i32;
+    *elements_ptr.add(length as usize) = value;
+    (*array).length = length + 1;
+
+    array_ptr
+}
+
+/// Get int at index from int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_get(array_ptr: *mut c_void, index: c_int) -> c_int {
+    if array_ptr.is_null() || index < 0 {
+        return 0;
+    }
+
+    let array = array_ptr as *mut IntArray;
+
+    if index >= (*array).length {
+        return 0;
+    }
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut i32;
+
+    *elements_ptr.add(index as usize)
+}
+
+/// Get length of int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_length(array_ptr: *mut c_void) -> c_int {
+    if array_ptr.is_null() {
+        return 0;
+    }
+
+    let array = array_ptr as *mut IntArray;
+    (*array).length
+}
+
+/// Free an int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_free(array_ptr: *mut c_void) {
+    crate::memory_alloc::aether_safe_free(array_ptr);
+}
+
 /// String concatenation
 #[no_mangle]
 pub unsafe extern "C" fn string_concat(str1: *const c_char, str2: *const c_char) -> *mut c_char {

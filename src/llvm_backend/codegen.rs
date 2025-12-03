@@ -56,6 +56,9 @@ impl<'ctx> CodeGenerator<'ctx> {
     ) -> Result<(), SemanticError> {
         let mut generator = Self::new(context, module);
 
+        // Pass type definitions to the type converter for alias resolution
+        generator.type_converter.set_type_definitions(program.type_definitions.clone());
+
         // Declare the runtime initialization function
         generator.declare_runtime_init_function();
 
@@ -154,7 +157,9 @@ impl<'ctx> CodeGenerator<'ctx> {
             }
         };
 
-        let _function = self.module.add_function(name, fn_type, None);
+        // Use symbol name if available, otherwise use the function name
+        let extern_symbol = ext_func.symbol.as_ref().unwrap_or(&ext_func.name);
+        let _function = self.module.add_function(extern_symbol, fn_type, None);
 
         // Set calling convention
         match ext_func.calling_convention {
