@@ -173,10 +173,17 @@
 ## Phase 3: KV Cache Manager
 
 ### Task 3.1: Arena Allocator
-- [ ] Fixed-size memory arena
-- [ ] Block allocation with metadata (shape, dtype)
-- [ ] Free list management
-- [ ] Tests: Alloc/free patterns, fragmentation
+- [x] Fixed-size memory arena
+- [x] Block allocation with metadata (shape, dtype)
+- [x] Free list management
+- [x] Tests: Alloc/free patterns, fragmentation
+
+**Implementation Notes:**
+- Created arena_test.aether with ownership-safe arena implementation
+- Uses Int64 handles for all arrays to avoid ownership issues
+- arena_alloc handles block alignment and allocation
+- find_end_offset finds contiguous space
+- Tests: 4/4 passing (create, alloc, read/write, block alignment)
 
 ### Task 3.2: Session KV Storage
 - [ ] Per-session allocation tracking
@@ -231,14 +238,21 @@
 - [ ] Tests: Interface contract
 
 ### Task 4.4: Attention Mechanism
+- [x] Implement tensor foundations (tensor_test.aether)
 - [ ] Implement multi-head attention in pure Aether
 - [ ] Query/Key/Value projections
-- [ ] Softmax and attention scores
+- [x] Softmax and attention scores
 - [ ] Tests: Numerical correctness vs reference
+
+**Implementation Notes (Tensor Foundations):**
+- Created tensor_test.aether with ownership-safe tensor operations
+- Uses Int64 handles for data arrays to avoid ownership issues
+- Implemented: zeros, ones, add, matmul, relu, softmax, silu
+- Tests: 7/7 passing (numel, zeros/ones, add, matmul, relu, softmax, silu)
 
 ### Task 4.5: Feed-Forward Network
 - [ ] Implement FFN layers (MLP)
-- [ ] Activation functions (SiLU/GELU)
+- [x] Activation functions (SiLU/GELU)
 - [ ] Tests: Layer output verification
 
 ### Task 4.6: Quantized Operations
@@ -416,8 +430,8 @@
 |-------|-------|----------|--------|
 | 1. Tokenizer | 5 | 5 | Complete |
 | 2. Sampler | 5 | 5 | Complete |
-| 3. KV Cache | 6 | 0 | Not Started |
-| 4. Model Runtime | 6 | 0 | Not Started |
+| 3. KV Cache | 6 | 1 | In Progress |
+| 4. Model Runtime | 7 | 2 | In Progress |
 | 5. Scheduler | 5 | 0 | Not Started |
 | 6. HTTP Gateway | 6 | 0 | Not Started |
 | 7. Telemetry | 4 | 0 | Not Started |

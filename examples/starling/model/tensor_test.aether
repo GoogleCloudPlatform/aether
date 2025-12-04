@@ -1,0 +1,580 @@
+module TensorTest;
+
+// ============================================================================
+// Tests for Tensor Operations
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Float Array ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Math ---
+@extern(library="aether_runtime", symbol="math_exp")
+func math_exp(x: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="math_max_f")
+func math_max_f(a: Float, b: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_to_int")
+func float_to_int(x: Float) -> Int;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+func abs_f(x: Float) -> Float {
+    if ({x < 0.0}) {
+        return {0.0 - x};
+    }
+    return x;
+}
+
+// ============================================================================
+// Tensor Types - Using Int64 handles to avoid ownership issues
+// ============================================================================
+
+// Store tensor data as Int64 handle + metadata as primitives
+// This avoids struct ownership issues
+
+func compute_numel(ndim: Int, d0: Int, d1: Int, d2: Int, d3: Int) -> Int {
+    if (ndim == 1) { return d0; }
+    if (ndim == 2) { return {d0 * d1}; }
+    if (ndim == 3) { return {{d0 * d1} * d2}; }
+    return {{{d0 * d1} * d2} * d3};
+}
+
+// Create 1D tensor of zeros, returns handle
+func create_zeros_1d(size: Int) -> Int64 {
+    let mut data = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        data = float_array_push(data, 0.0);
+        i = i + 1;
+    }
+    return data;
+}
+
+// Create 1D tensor of ones, returns handle
+func create_ones_1d(size: Int) -> Int64 {
+    let mut data = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        data = float_array_push(data, 1.0);
+        i = i + 1;
+    }
+    return data;
+}
+
+// Create 2D tensor of zeros (row-major), returns handle
+func create_zeros_2d(rows: Int, cols: Int) -> Int64 {
+    let size = {rows * cols};
+    let mut data = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        data = float_array_push(data, 0.0);
+        i = i + 1;
+    }
+    return data;
+}
+
+func tensor_get(data: Int64, index: Int) -> Float {
+    return float_array_get(data, index);
+}
+
+func tensor_set(data: Int64, index: Int, value: Float) -> Void {
+    float_array_set(data, index, value);
+}
+
+func tensor_get_2d(data: Int64, cols: Int, i: Int, j: Int) -> Float {
+    let index = {i * cols + j};
+    return float_array_get(data, index);
+}
+
+func tensor_set_2d(data: Int64, cols: Int, i: Int, j: Int, value: Float) -> Void {
+    let index = {i * cols + j};
+    float_array_set(data, index, value);
+}
+
+func tensor_free(data: Int64) -> Void {
+    float_array_free(data);
+}
+
+// Element-wise add for 1D tensors
+func tensor_add_1d(a: Int64, b: Int64, size: Int) -> Int64 {
+    let mut result = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        let va = float_array_get(a, i);
+        let vb = float_array_get(b, i);
+        result = float_array_push(result, {va + vb});
+        i = i + 1;
+    }
+    return result;
+}
+
+// Matrix multiply: A[m,k] @ B[k,n] -> C[m,n]
+func tensor_matmul_2d(a: Int64, b: Int64, m: Int, k: Int, n: Int) -> Int64 {
+    let size = {m * n};
+    let mut result = create_zeros_2d(m, n);
+
+    let mut i = 0;
+    while (i < m) {
+        let mut j = 0;
+        while (j < n) {
+            let mut sum = 0.0;
+            let mut l = 0;
+            while (l < k) {
+                let ai = tensor_get_2d(a, k, i, l);
+                let bj = tensor_get_2d(b, n, l, j);
+                sum = {sum + {ai * bj}};
+                l = l + 1;
+            }
+            tensor_set_2d(result, n, i, j, sum);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// ReLU activation
+func tensor_relu_1d(data: Int64, size: Int) -> Int64 {
+    let mut result = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        let v = float_array_get(data, i);
+        result = float_array_push(result, math_max_f(0.0, v));
+        i = i + 1;
+    }
+    return result;
+}
+
+// SiLU activation: x * sigmoid(x)
+func tensor_silu_1d(data: Int64, size: Int) -> Int64 {
+    let mut result = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        let x = float_array_get(data, i);
+        let neg_x = {0.0 - x};
+        let exp_neg_x = math_exp(neg_x);
+        let sigmoid = 1.0 / {1.0 + exp_neg_x};
+        let silu = {x * sigmoid};
+        result = float_array_push(result, silu);
+        i = i + 1;
+    }
+    return result;
+}
+
+// Softmax for 2D tensor (softmax over each row)
+func tensor_softmax_2d(data: Int64, rows: Int, cols: Int) -> Int64 {
+    let size = {rows * cols};
+    let mut result = create_zeros_2d(rows, cols);
+
+    let mut i = 0;
+    while (i < rows) {
+        // Find max for numerical stability
+        let mut max_val = tensor_get_2d(data, cols, i, 0);
+        let mut j = 1;
+        while (j < cols) {
+            let v = tensor_get_2d(data, cols, i, j);
+            max_val = math_max_f(max_val, v);
+            j = j + 1;
+        }
+
+        // Compute exp and sum
+        let mut sum = 0.0;
+        j = 0;
+        while (j < cols) {
+            let v = tensor_get_2d(data, cols, i, j);
+            let exp_v = math_exp({v - max_val});
+            tensor_set_2d(result, cols, i, j, exp_v);
+            sum = {sum + exp_v};
+            j = j + 1;
+        }
+
+        // Normalize
+        j = 0;
+        while (j < cols) {
+            let v = tensor_get_2d(result, cols, i, j);
+            tensor_set_2d(result, cols, i, j, {v / sum});
+            j = j + 1;
+        }
+
+        i = i + 1;
+    }
+    return result;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+func test_numel() -> Bool {
+    println("=== Test: Numel Computation ===");
+
+    let n1 = compute_numel(1, 10, 0, 0, 0);
+    if ({n1 != 10}) {
+        println("FAIL: 1D numel wrong");
+        return false;
+    }
+
+    let n2 = compute_numel(2, 3, 4, 0, 0);
+    if ({n2 != 12}) {
+        println("FAIL: 2D numel wrong");
+        return false;
+    }
+
+    println("PASS: Numel Computation");
+    return true;
+}
+
+func test_zeros_ones() -> Bool {
+    println("=== Test: Zeros and Ones ===");
+
+    let zeros = create_zeros_1d(5);
+    let z0 = tensor_get(zeros, 0);
+    if ({z0 != 0.0}) {
+        println("FAIL: zeros[0] should be 0");
+        tensor_free(zeros);
+        return false;
+    }
+    tensor_free(zeros);
+
+    let ones = create_ones_1d(5);
+    let o0 = tensor_get(ones, 0);
+    if ({o0 != 1.0}) {
+        println("FAIL: ones[0] should be 1");
+        tensor_free(ones);
+        return false;
+    }
+    tensor_free(ones);
+
+    println("PASS: Zeros and Ones");
+    return true;
+}
+
+func test_add() -> Bool {
+    println("=== Test: Tensor Add ===");
+
+    let a = create_ones_1d(3);
+    let b = create_ones_1d(3);
+    let c = tensor_add_1d(a, b, 3);
+
+    let v0 = tensor_get(c, 0);
+    if ({v0 != 2.0}) {
+        println("FAIL: c[0] should be 2");
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c);
+        return false;
+    }
+
+    tensor_free(a);
+    tensor_free(b);
+    tensor_free(c);
+    println("PASS: Tensor Add");
+    return true;
+}
+
+func test_matmul() -> Bool {
+    println("=== Test: Matrix Multiply ===");
+
+    // A = [[1, 2], [3, 4]] (2x2)
+    let a = create_zeros_2d(2, 2);
+    tensor_set_2d(a, 2, 0, 0, 1.0);
+    tensor_set_2d(a, 2, 0, 1, 2.0);
+    tensor_set_2d(a, 2, 1, 0, 3.0);
+    tensor_set_2d(a, 2, 1, 1, 4.0);
+
+    // B = [[1, 0], [0, 1]] (identity)
+    let b = create_zeros_2d(2, 2);
+    tensor_set_2d(b, 2, 0, 0, 1.0);
+    tensor_set_2d(b, 2, 0, 1, 0.0);
+    tensor_set_2d(b, 2, 1, 0, 0.0);
+    tensor_set_2d(b, 2, 1, 1, 1.0);
+
+    // C = A @ B = A (identity multiplication)
+    let c = tensor_matmul_2d(a, b, 2, 2, 2);
+
+    let c00 = tensor_get_2d(c, 2, 0, 0);
+    let c01 = tensor_get_2d(c, 2, 0, 1);
+    let c10 = tensor_get_2d(c, 2, 1, 0);
+    let c11 = tensor_get_2d(c, 2, 1, 1);
+
+    if ({c00 != 1.0}) {
+        println("FAIL: c[0,0] should be 1");
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c);
+        return false;
+    }
+    if ({c01 != 2.0}) {
+        println("FAIL: c[0,1] should be 2");
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c);
+        return false;
+    }
+    if ({c10 != 3.0}) {
+        println("FAIL: c[1,0] should be 3");
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c);
+        return false;
+    }
+    if ({c11 != 4.0}) {
+        println("FAIL: c[1,1] should be 4");
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c);
+        return false;
+    }
+
+    tensor_free(a);
+    tensor_free(b);
+    tensor_free(c);
+    println("PASS: Matrix Multiply");
+    return true;
+}
+
+func test_relu() -> Bool {
+    println("=== Test: ReLU Activation ===");
+
+    let t = create_zeros_1d(4);
+    tensor_set(t, 0, -2.0);
+    tensor_set(t, 1, -0.5);
+    tensor_set(t, 2, 0.0);
+    tensor_set(t, 3, 1.5);
+
+    let result = tensor_relu_1d(t, 4);
+
+    let r0 = tensor_get(result, 0);
+    let r1 = tensor_get(result, 1);
+    let r2 = tensor_get(result, 2);
+    let r3 = tensor_get(result, 3);
+
+    if ({r0 != 0.0}) {
+        println("FAIL: relu(-2) should be 0");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+    if ({r1 != 0.0}) {
+        println("FAIL: relu(-0.5) should be 0");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+    if ({r3 < 1.4}) {
+        println("FAIL: relu(1.5) should be 1.5");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+
+    tensor_free(t);
+    tensor_free(result);
+    println("PASS: ReLU Activation");
+    return true;
+}
+
+func test_softmax() -> Bool {
+    println("=== Test: Softmax ===");
+
+    // Single row [0, 0, 0] -> [0.333, 0.333, 0.333]
+    let t = create_zeros_2d(1, 3);
+    let result = tensor_softmax_2d(t, 1, 3);
+
+    let p0 = tensor_get_2d(result, 3, 0, 0);
+    let p1 = tensor_get_2d(result, 3, 0, 1);
+    let p2 = tensor_get_2d(result, 3, 0, 2);
+    let sum = {{p0 + p1} + p2};
+
+    if ({sum < 0.99}) {
+        println("FAIL: softmax should sum to 1");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+    if ({sum > 1.01}) {
+        println("FAIL: softmax should sum to 1 (too high)");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+
+    // Check roughly equal
+    let diff = abs_f({p0 - p1});
+    if ({diff > 0.01}) {
+        println("FAIL: uniform input should give uniform output");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+
+    tensor_free(t);
+    tensor_free(result);
+    println("PASS: Softmax");
+    return true;
+}
+
+func test_silu() -> Bool {
+    println("=== Test: SiLU Activation ===");
+
+    let t = create_zeros_1d(3);
+    tensor_set(t, 0, 0.0);
+    tensor_set(t, 1, 1.0);
+    tensor_set(t, 2, -1.0);
+
+    let result = tensor_silu_1d(t, 3);
+
+    // silu(0) = 0 * sigmoid(0) = 0 * 0.5 = 0
+    let v0 = tensor_get(result, 0);
+    if ({abs_f(v0) > 0.01}) {
+        println("FAIL: silu(0) should be 0");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+
+    // silu(1) = 1 * sigmoid(1) ≈ 0.731
+    let v1 = tensor_get(result, 1);
+    if ({v1 < 0.7}) {
+        println("FAIL: silu(1) should be ~0.73");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+    if ({v1 > 0.8}) {
+        println("FAIL: silu(1) should be ~0.73 (too high)");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+
+    // silu(-1) = -1 * sigmoid(-1) ≈ -0.269
+    let v2 = tensor_get(result, 2);
+    if ({v2 > -0.2}) {
+        println("FAIL: silu(-1) should be ~-0.27");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+    if ({v2 < -0.35}) {
+        println("FAIL: silu(-1) should be ~-0.27 (too low)");
+        tensor_free(t);
+        tensor_free(result);
+        return false;
+    }
+
+    tensor_free(t);
+    tensor_free(result);
+    println("PASS: SiLU Activation");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("Tensor Operations Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_numel()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_zeros_ones()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_add()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_matmul()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_relu()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_softmax()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_silu()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}

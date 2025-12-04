@@ -1,0 +1,517 @@
+module Tensor;
+
+// ============================================================================
+// Tensor Operations - Core tensor type and operations for model inference
+//
+// Provides:
+// - Multi-dimensional tensor representation
+// - Basic operations (add, mul, matmul)
+// - Shape manipulation
+// - Quantization support
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Float Array ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Int Array ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+// --- FFI: Math ---
+@extern(library="aether_runtime", symbol="math_exp")
+func math_exp(x: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="math_log")
+func math_log(x: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="math_max_f")
+func math_max_f(a: Float, b: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_to_int")
+func float_to_int(x: Float) -> Int;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// Tensor Shape
+// ============================================================================
+
+// Tensor shape (up to 4 dimensions)
+struct TensorShape {
+    ndim: Int;      // Number of dimensions (1-4)
+    dim0: Int;      // First dimension
+    dim1: Int;      // Second dimension (0 if 1D)
+    dim2: Int;      // Third dimension (0 if 2D or less)
+    dim3: Int;      // Fourth dimension (0 if 3D or less)
+}
+
+// Create 1D shape
+func shape_1d(d0: Int) -> TensorShape {
+    return TensorShape {
+        ndim: 1,
+        dim0: d0,
+        dim1: 0,
+        dim2: 0,
+        dim3: 0
+    };
+}
+
+// Create 2D shape
+func shape_2d(d0: Int, d1: Int) -> TensorShape {
+    return TensorShape {
+        ndim: 2,
+        dim0: d0,
+        dim1: d1,
+        dim2: 0,
+        dim3: 0
+    };
+}
+
+// Create 3D shape
+func shape_3d(d0: Int, d1: Int, d2: Int) -> TensorShape {
+    return TensorShape {
+        ndim: 3,
+        dim0: d0,
+        dim1: d1,
+        dim2: d2,
+        dim3: 0
+    };
+}
+
+// Create 4D shape (batch, seq, heads, dim)
+func shape_4d(d0: Int, d1: Int, d2: Int, d3: Int) -> TensorShape {
+    return TensorShape {
+        ndim: 4,
+        dim0: d0,
+        dim1: d1,
+        dim2: d2,
+        dim3: d3
+    };
+}
+
+// Get total number of elements
+func shape_numel(shape: TensorShape) -> Int {
+    if (shape.ndim == 1) {
+        return shape.dim0;
+    }
+    if (shape.ndim == 2) {
+        return {shape.dim0 * shape.dim1};
+    }
+    if (shape.ndim == 3) {
+        return {{shape.dim0 * shape.dim1} * shape.dim2};
+    }
+    return {{{shape.dim0 * shape.dim1} * shape.dim2} * shape.dim3};
+}
+
+// Check if two shapes are equal
+func shape_equals(a: TensorShape, b: TensorShape) -> Bool {
+    if ({a.ndim != b.ndim}) {
+        return false;
+    }
+    if ({a.dim0 != b.dim0}) {
+        return false;
+    }
+    if ({a.dim1 != b.dim1}) {
+        return false;
+    }
+    if ({a.dim2 != b.dim2}) {
+        return false;
+    }
+    if ({a.dim3 != b.dim3}) {
+        return false;
+    }
+    return true;
+}
+
+// ============================================================================
+// Tensor Type
+// ============================================================================
+
+// Tensor data structure
+struct Tensor {
+    data: Int64;          // Float array handle
+    shape: TensorShape;   // Tensor shape
+    dtype: Int;           // Data type (0=f32, 1=f16, 2=i8)
+}
+
+// Create an empty tensor with given shape
+func tensor_zeros(shape: TensorShape) -> Tensor {
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        data = float_array_push(data, 0.0);
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// Create tensor filled with ones
+func tensor_ones(shape: TensorShape) -> Tensor {
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        data = float_array_push(data, 1.0);
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// Create tensor from float array (takes ownership)
+func tensor_from_data(data: Int64, shape: TensorShape) -> Tensor {
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// Free tensor memory
+func tensor_free(t: Tensor) -> Void {
+    float_array_free(t.data);
+}
+
+// Get element at flat index
+func tensor_get_flat(t: Tensor, index: Int) -> Float {
+    return float_array_get(t.data, index);
+}
+
+// Set element at flat index
+func tensor_set_flat(t: Tensor, index: Int, value: Float) -> Void {
+    float_array_set(t.data, index, value);
+}
+
+// Get element for 2D tensor
+func tensor_get_2d(t: Tensor, i: Int, j: Int) -> Float {
+    let index = {i * t.shape.dim1 + j};
+    return float_array_get(t.data, index);
+}
+
+// Set element for 2D tensor
+func tensor_set_2d(t: Tensor, i: Int, j: Int, value: Float) -> Void {
+    let index = {i * t.shape.dim1 + j};
+    float_array_set(t.data, index, value);
+}
+
+// ============================================================================
+// Basic Operations
+// ============================================================================
+
+// Element-wise addition: c = a + b
+func tensor_add(a: Tensor, b: Tensor) -> Tensor {
+    let shape = a.shape;
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        let va = float_array_get(a.data, i);
+        let vb = float_array_get(b.data, i);
+        data = float_array_push(data, {va + vb});
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// Element-wise multiplication: c = a * b
+func tensor_mul(a: Tensor, b: Tensor) -> Tensor {
+    let shape = a.shape;
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        let va = float_array_get(a.data, i);
+        let vb = float_array_get(b.data, i);
+        data = float_array_push(data, {va * vb});
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// Scalar multiplication: c = a * scalar
+func tensor_scale(a: Tensor, scalar: Float) -> Tensor {
+    let shape = a.shape;
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        let va = float_array_get(a.data, i);
+        data = float_array_push(data, {va * scalar});
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// Matrix multiplication: C[m,n] = A[m,k] @ B[k,n]
+func tensor_matmul(a: Tensor, b: Tensor) -> Tensor {
+    let m = a.shape.dim0;
+    let k = a.shape.dim1;
+    let n = b.shape.dim1;
+
+    let result_shape = shape_2d(m, n);
+    let mut result = tensor_zeros(result_shape);
+
+    let mut i = 0;
+    while (i < m) {
+        let mut j = 0;
+        while (j < n) {
+            let mut sum = 0.0;
+            let mut l = 0;
+            while (l < k) {
+                let ai = tensor_get_2d(a, i, l);
+                let bj = tensor_get_2d(b, l, j);
+                sum = {sum + {ai * bj}};
+                l = l + 1;
+            }
+            tensor_set_2d(result, i, j, sum);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    return result;
+}
+
+// ============================================================================
+// Activation Functions
+// ============================================================================
+
+// ReLU activation: max(0, x)
+func tensor_relu(t: Tensor) -> Tensor {
+    let shape = t.shape;
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        let v = float_array_get(t.data, i);
+        data = float_array_push(data, math_max_f(0.0, v));
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// SiLU activation (Swish): x * sigmoid(x)
+func tensor_silu(t: Tensor) -> Tensor {
+    let shape = t.shape;
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        let x = float_array_get(t.data, i);
+        // sigmoid(x) = 1 / (1 + exp(-x))
+        let neg_x = {0.0 - x};
+        let exp_neg_x = math_exp(neg_x);
+        let sigmoid = 1.0 / {1.0 + exp_neg_x};
+        let silu = {x * sigmoid};
+        data = float_array_push(data, silu);
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// GELU activation (approximate): 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+func tensor_gelu(t: Tensor) -> Tensor {
+    let shape = t.shape;
+    let numel = shape_numel(shape);
+    let mut data = float_array_create(numel);
+
+    // Constants
+    let sqrt_2_over_pi = 0.7978845608;  // sqrt(2/pi)
+    let coeff = 0.044715;
+
+    let mut i = 0;
+    while (i < numel) {
+        let x = float_array_get(t.data, i);
+        let x3 = {{x * x} * x};
+        let inner = {sqrt_2_over_pi * {x + {coeff * x3}}};
+        // tanh approximation: (exp(2x) - 1) / (exp(2x) + 1)
+        let exp_2x = math_exp({2.0 * inner});
+        let tanh_val = {{exp_2x - 1.0} / {exp_2x + 1.0}};
+        let gelu = {0.5 * x * {1.0 + tanh_val}};
+        data = float_array_push(data, gelu);
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape,
+        dtype: 0
+    };
+}
+
+// Softmax along last dimension (for 2D tensor: along dim1)
+func tensor_softmax(t: Tensor) -> Tensor {
+    let m = t.shape.dim0;
+    let n = t.shape.dim1;
+    let mut result = tensor_zeros(t.shape);
+
+    let mut i = 0;
+    while (i < m) {
+        // Find max for numerical stability
+        let mut max_val = tensor_get_2d(t, i, 0);
+        let mut j = 1;
+        while (j < n) {
+            let v = tensor_get_2d(t, i, j);
+            max_val = math_max_f(max_val, v);
+            j = j + 1;
+        }
+
+        // Compute exp and sum
+        let mut sum = 0.0;
+        j = 0;
+        while (j < n) {
+            let v = tensor_get_2d(t, i, j);
+            let exp_v = math_exp({v - max_val});
+            tensor_set_2d(result, i, j, exp_v);
+            sum = {sum + exp_v};
+            j = j + 1;
+        }
+
+        // Normalize
+        j = 0;
+        while (j < n) {
+            let v = tensor_get_2d(result, i, j);
+            tensor_set_2d(result, i, j, {v / sum});
+            j = j + 1;
+        }
+
+        i = i + 1;
+    }
+
+    return result;
+}
+
+// ============================================================================
+// Shape Manipulation
+// ============================================================================
+
+// Transpose 2D tensor
+func tensor_transpose(t: Tensor) -> Tensor {
+    let m = t.shape.dim0;
+    let n = t.shape.dim1;
+    let new_shape = shape_2d(n, m);
+    let mut result = tensor_zeros(new_shape);
+
+    let mut i = 0;
+    while (i < m) {
+        let mut j = 0;
+        while (j < n) {
+            let v = tensor_get_2d(t, i, j);
+            tensor_set_2d(result, j, i, v);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    return result;
+}
+
+// Reshape tensor (must have same number of elements)
+func tensor_reshape(t: Tensor, new_shape: TensorShape) -> Tensor {
+    // Note: This creates a new tensor with the same data
+    // In a real implementation, we'd share the underlying data
+    let numel = shape_numel(t.shape);
+    let mut data = float_array_create(numel);
+
+    let mut i = 0;
+    while (i < numel) {
+        data = float_array_push(data, float_array_get(t.data, i));
+        i = i + 1;
+    }
+
+    return Tensor {
+        data: data,
+        shape: new_shape,
+        dtype: 0
+    };
+}
