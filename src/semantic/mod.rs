@@ -2665,9 +2665,39 @@ impl SemanticAnalyzer {
             Expression::AddressOf {
                 operand,
                 mutability,
-                source_location: _,
+                source_location,
             } => {
                 let operand_type = self.analyze_expression(operand)?;
+
+                // Track the borrow in the symbol table if operand is a variable
+                if let Expression::Variable { name, .. } = operand.as_ref() {
+                    if *mutability {
+                        // Mutable borrow - fails if already borrowed (immutably or mutably)
+                        self.symbol_table.borrow_variable_mut(&name.name).map_err(
+                            |_| SemanticError::InvalidOperation {
+                                operation: "mutable borrow".to_string(),
+                                reason: format!(
+                                    "cannot borrow '{}' as mutable because it is already borrowed",
+                                    name.name
+                                ),
+                                location: source_location.clone(),
+                            },
+                        )?;
+                    } else {
+                        // Immutable borrow - fails if already mutably borrowed
+                        self.symbol_table.borrow_variable(&name.name).map_err(
+                            |_| SemanticError::InvalidOperation {
+                                operation: "immutable borrow".to_string(),
+                                reason: format!(
+                                    "cannot borrow '{}' as immutable because it is already mutably borrowed",
+                                    name.name
+                                ),
+                                location: source_location.clone(),
+                            },
+                        )?;
+                    }
+                }
+
                 // Create a borrowed type (reference) to the operand type
                 if *mutability {
                     Ok(Type::Owned {
