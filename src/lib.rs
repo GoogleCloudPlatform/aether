@@ -17,6 +17,7 @@
 //! A compiler for the AetherScript programming language, designed for
 //! optimal generation by Large Language Models (LLMs).
 
+pub mod abi;
 pub mod ast;
 pub mod codegen;
 pub mod concurrency;

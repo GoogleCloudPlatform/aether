@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 /// A MIR program consists of multiple functions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Program {
     pub functions: HashMap<String, Function>,
     pub global_constants: HashMap<String, Constant>,
@@ -41,7 +41,7 @@ pub struct Program {
 }
 
 /// A MIR function in SSA form
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Function {
     pub name: String,
     pub parameters: Vec<Parameter>,
@@ -53,7 +53,7 @@ pub struct Function {
 }
 
 /// Function parameter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameter {
     pub name: String,
     pub ty: Type,
@@ -61,7 +61,7 @@ pub struct Parameter {
 }
 
 /// Local variable/temporary in SSA form
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Local {
     pub ty: Type,
     pub is_mutable: bool,
@@ -69,14 +69,14 @@ pub struct Local {
 }
 
 /// Source information for debugging
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceInfo {
     pub span: SourceLocation,
     pub scope: ScopeId,
 }
 
 /// A basic block contains a sequence of statements and a terminator
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BasicBlock {
     pub id: BasicBlockId,
     pub statements: Vec<Statement>,
@@ -84,7 +84,7 @@ pub struct BasicBlock {
 }
 
 /// MIR statements (non-branching operations)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Statement {
     /// Assignment: local = rvalue
     Assign {
@@ -102,7 +102,7 @@ pub enum Statement {
 }
 
 /// Right-hand side of assignments
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Rvalue {
     /// Use of an operand
     Use(Operand),
@@ -162,7 +162,7 @@ pub enum Rvalue {
 }
 
 /// Operands (values that can be used)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Operand {
     /// Copy a place
     Copy(Place),
@@ -175,14 +175,14 @@ pub enum Operand {
 }
 
 /// Places (lvalues that can be assigned to)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Place {
     pub local: LocalId,
     pub projection: Vec<PlaceElem>,
 }
 
 /// Place projections (field access, array indexing, etc.)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PlaceElem {
     /// Dereference
     Deref,
@@ -198,7 +198,7 @@ pub enum PlaceElem {
 }
 
 /// Block terminators (control flow)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Terminator {
     /// Unconditional jump
     Goto { target: BasicBlockId },
@@ -251,7 +251,7 @@ pub enum Terminator {
 }
 
 /// Switch targets for conditional branches
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwitchTargets {
     pub values: Vec<u128>,
     pub targets: Vec<BasicBlockId>,
@@ -259,7 +259,7 @@ pub struct SwitchTargets {
 }
 
 /// Assertion messages
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AssertMessage {
     BoundsCheck { len: Operand, index: Operand },
     Overflow(BinOp, Operand, Operand),
@@ -269,7 +269,7 @@ pub enum AssertMessage {
 }
 
 /// Binary operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BinOp {
     // Arithmetic
     Add,
@@ -303,14 +303,14 @@ pub enum BinOp {
 }
 
 /// Unary operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum UnOp {
     Not,
     Neg,
 }
 
 /// Cast kinds
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CastKind {
     /// Numeric cast (int to float, etc.)
     Numeric,
@@ -323,7 +323,7 @@ pub enum CastKind {
 }
 
 /// Aggregate kinds
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AggregateKind {
     Array(Type),
     Tuple,
@@ -332,21 +332,21 @@ pub enum AggregateKind {
 }
 
 /// Mutability
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mutability {
     Not,
     Mut,
 }
 
 /// Constant values
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Constant {
     pub ty: Type,
     pub value: ConstantValue,
 }
 
 /// Constant value representations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConstantValue {
     Bool(bool),
     Integer(i128),

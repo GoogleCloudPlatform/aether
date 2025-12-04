@@ -222,6 +222,23 @@ impl FFIAnalyzer {
         &mut self,
         ext_func: &ExternalFunction,
     ) -> Result<(), SemanticError> {
+        // Special handling for ABI-imported functions (from pre-compiled modules)
+        // These use "__abi__" as a marker library and don't need strict FFI validation
+        if ext_func.library == "__abi__" {
+            // Just validate types exist, skip FFI compatibility checks
+            for param in &ext_func.parameters {
+                let _ = self
+                    .type_checker
+                    .borrow()
+                    .ast_type_to_type(&param.param_type)?;
+            }
+            let _ = self
+                .type_checker
+                .borrow()
+                .ast_type_to_type(&ext_func.return_type)?;
+            return Ok(());
+        }
+
         // Validate library name
         if ext_func.library.is_empty() {
             return Err(SemanticError::InvalidFFI {

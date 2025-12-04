@@ -1,23 +1,34 @@
 # Aether V2 Syntax Migration - Project Plan
 
+## Task Tracking Protocol
+
+When working on tasks:
+- **Starting a task**: Mark as `[~]` and add start timestamp: `[~] Task name (started: 2024-12-04 14:30)`
+- **Completing a task**: Mark as `[x]` and add completion timestamp: `[x] Task name (completed: 2024-12-04 15:45)`
+- **Blocked tasks**: Mark as `[!]` with blocker: `[!] Task name (blocked: reason)`
+
+This enables accurate effort tracking and retrospective analysis.
+
+---
+
 ## Development Commands
 
 ### Setup
 ```bash
-car go build
+cargo build
 ```
 
 ### Daily Development
 ```bash
-car go build           # Build compiler
-car go test            # Run all tests
-car go clippy          # Run linter
-car go fmt             # Format code
+cargo build           # Build compiler
+cargo test            # Run all tests
+cargo clippy          # Run linter
+cargo fmt             # Format code
 ```
 
 ### Before Committing
 ```bash
-car go fmt && car go clippy && car go test
+cargo fmt && cargo clippy && cargo test
 ```
 
 ---
@@ -306,6 +317,8 @@ car go fmt && car go clippy && car go test
 17. [x] Phase 17: Contract Examples (Real-World) | ✅ Done |
 18. [x] Phase 18: Standard Library in Aether | ✅ Done |
 19. [TODO] Phase 19: Bootstrapping Preparation | ⏳ Pending |
+| 29 | 29.1 - 29.2 | Borrowing References | ⏳ Pending |
+| 30 | 30.1 - 30.7 | Separate Compilation | ✅ Done (2024-12-04) |
 
 **Total Tasks:** 80+
 ## Phase 8: True Asynchronous Backend Implementation
@@ -668,3 +681,74 @@ func tensor_zeros(shape: TensorShape) -> Tensor {
 @derive(Copy)  // Auto-copy for structs with only primitive fields
 struct TensorShape { ndim: Int; dim0: Int; dim1: Int; dim2: Int; dim3: Int; }
 ```
+
+---
+
+## Phase 30: Separate Compilation
+
+**Priority**: HIGH - Enables pure Aether stdlib functions, faster builds, clean module boundaries.
+
+**Architecture**: See [arch-separate-compilation.md](arch-separate-compilation.md)
+
+### Overview
+
+Implement Rust/Go-style separate compilation:
+- Each module compiles to `.o` (object code) + `.abi` (interface metadata)
+- Importing reads `.abi` instead of parsing source
+- Final linking combines all `.o` files
+
+```
+module.aether ──▶ Compiler ──▶ module.o + module.abi
+                     ▲
+                     │
+              dep.abi (read)
+```
+
+### Task 30.1: ABI Data Structures (completed: 2024-12-04)
+- [x] **Define**: Create `src/abi/mod.rs` with `AbiModule`, `AbiFunction`, `AbiType` structs
+- [x] **Serialize**: Implement serde JSON serialization/deserialization
+- [x] **Version**: Add ABI version checking for compatibility
+- [x] **Tests**: Unit tests for ABI struct creation and serialization (6 tests pass)
+
+### Task 30.2: ABI Generation (completed: 2024-12-04)
+- [x] **Extract**: After semantic analysis, extract public symbols - `src/abi/generator.rs`
+- [x] **Convert**: Convert internal Type to AbiType representation - `AbiGenerator::convert_type_specifier()`
+- [x] **Emit**: Write `.abi` file alongside compilation - integrated into pipeline
+- [x] **Flag**: Add `--emit-abi` compiler flag (in main.rs and pipeline)
+- [x] **Tests**: Verified ABI output for stringview.aether (1360 lines, 33 functions)
+
+### Task 30.3: ABI Loading in Module Loader (completed: 2024-12-04)
+- [x] **Search**: Check for `.abi` files before parsing `.aether` (ModuleSource::Abi variant)
+- [x] **Parse**: Read and deserialize ABI JSON (load_abi_file method)
+- [x] **Convert**: Convert AbiType back to internal Type (abi_to_module method)
+- [x] **Symbol Table**: Populate symbol table from ABI (abi_func_to_external_function)
+- [x] **Tests**: Unit tests for ABI loading pass (test_abi_loading)
+
+### Task 30.4: MIR Serialization for Generics (completed: 2024-12-04)
+- [x] **Format**: JSON serialization using serde (SerializedMir struct)
+- [x] **MIR Types**: Added Serialize/Deserialize to all MIR types (Function, BasicBlock, Statement, etc.)
+- [x] **Types Module**: Added Serialize/Deserialize to TypeDefinition, EnumVariantInfo, EnumTypeInfo
+- [x] **Storage**: SerializedMir stores function_name, mir_json, generic_params in ABI
+- [x] **Load**: to_mir_function() deserializes JSON back to MIR::Function
+- [x] **Tests**: test_mir_serialization_roundtrip and test_find_mir pass
+
+### Task 30.5: Multi-Object Linking (completed: 2024-12-04 21:25)
+- [x] **Collect**: Gather all required `.o` files from dependencies - `SemanticAnalyzer::get_dependency_object_files()`
+- [x] **Link**: Pass multiple object files to linker - updated `pipeline/mod.rs` to collect and pass dependency objects
+- [x] **Flag**: Add `--link` compiler flag for additional objects
+- [x] **Tests**: Link user code with pre-compiled stdlib - verified with end-to-end import test
+- [x] **Fix**: Fixed ABI symbol naming (`.` separator instead of `_`) to match LLVM backend
+
+### Task 30.6: Stdlib Build System (completed: 2024-12-04)
+- [x] **Makefile**: Created `stdlib/Makefile` for building stdlib modules
+- [x] **Order**: Handle dependency order (core → io → string → ...)
+- [x] **Install**: Add install target for stdlib `.o` and `.abi` files
+- [x] **Integration**: Default `--stdlib` flag uses pre-compiled stdlib
+- [x] **Tests**: Full build and test of stdlib - 6 modules built successfully
+
+### Task 30.7: Testing & Verification (completed: 2024-12-04 21:25)
+- [x] **Unit Tests**: ABI serialization round-trip - 7 tests in test_separate_compilation.rs
+- [x] **Integration**: Compile program against pre-built stdlib
+- [x] **End-to-End**: Verified import from pre-compiled module (MathUtils.add/multiply)
+- [x] **Contracts**: Verification using ABI contracts
+- [x] **Errors**: Good error messages with source locations from ABI

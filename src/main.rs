@@ -214,6 +214,14 @@ enum Commands {
         /// Enable formal verification of contracts (@pre/@post)
         #[arg(long)]
         verify: bool,
+
+        /// Emit ABI files (.abi) for separate compilation
+        #[arg(long)]
+        emit_abi: bool,
+
+        /// Link additional object files (.o)
+        #[arg(long = "link-object", value_name = "FILE")]
+        link_objects: Vec<PathBuf>,
     },
 
     /// Check syntax without generating code
@@ -315,6 +323,8 @@ async fn main() {
             library_paths,
             link_libraries,
             verify,
+            emit_abi,
+            link_objects,
         }) => {
             let mut options = CompileOptions::default();
             options.optimization_level = optimization.min(3);
@@ -325,7 +335,9 @@ async fn main() {
             options.compile_as_library = library;
             options.library_paths = library_paths;
             options.link_libraries = link_libraries;
+            options.link_objects = link_objects;
             options.enable_verification = verify;
+            options.emit_abi = emit_abi;
 
             if let Some(output_path) = output {
                 options.output = Some(output_path);

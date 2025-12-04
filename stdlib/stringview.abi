@@ -1,0 +1,1361 @@
+{
+  "abi_version": "1.0.0",
+  "aether_version": "0.1.0",
+  "module": {
+    "name": "StringView",
+    "path": "stdlib/stringview.aether",
+    "checksum": null
+  },
+  "dependencies": [],
+  "functions": [
+    {
+      "name": "view_create",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "parent",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "start",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "len",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int64"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_create",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 23,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_from_string",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "s",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int64"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_from_string",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 28,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_length",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_length",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 34,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_char_at",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "index",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_char_at",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 40,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_slice",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "start",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "len",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int64"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_slice",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 45,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_equals",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "a",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_equals",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 50,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_equals_str",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "s",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_equals_str",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 55,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_to_string",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "String"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_to_string",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 60,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_free",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Void"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_free",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 65,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_trim",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int64"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_trim",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 70,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_starts_with",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "prefix",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_starts_with",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 75,
+        "column": 1
+      }
+    },
+    {
+      "name": "view_find_byte",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "byte",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "stringview_find_byte",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 80,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_create",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "capacity",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int64"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_create",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 90,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_alloc",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "arena",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "size",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int64"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_alloc",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 95,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_alloc_string",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "arena",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "src",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "String"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_alloc_string",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 100,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_alloc_from_view",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "arena",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "view",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "String"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_alloc_from_view",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 105,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_reset",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "arena",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Void"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_reset",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 110,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_bytes_used",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "arena",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_bytes_used",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 115,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_bytes_remaining",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "arena",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_bytes_remaining",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 120,
+        "column": 1
+      }
+    },
+    {
+      "name": "arena_destroy",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "arena",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int64"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Void"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "arena_destroy",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 125,
+        "column": 1
+      }
+    },
+    {
+      "name": "byte_is_lower",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "byte_is_lower",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 134,
+        "column": 1
+      }
+    },
+    {
+      "name": "byte_is_upper",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "byte_is_upper",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 139,
+        "column": 1
+      }
+    },
+    {
+      "name": "byte_is_digit",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "byte_is_digit",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 144,
+        "column": 1
+      }
+    },
+    {
+      "name": "byte_is_whitespace",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "byte_is_whitespace",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 149,
+        "column": 1
+      }
+    },
+    {
+      "name": "byte_to_upper",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "byte_to_upper",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 154,
+        "column": 1
+      }
+    },
+    {
+      "name": "byte_to_lower",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "byte_to_lower",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 159,
+        "column": 1
+      }
+    },
+    {
+      "name": "byte_to_string",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "String"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "byte_to_string",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 164,
+        "column": 1
+      }
+    },
+    {
+      "name": "concat",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "a",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "b",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "String"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "string_concat",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 172,
+        "column": 1
+      }
+    },
+    {
+      "name": "length",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "s",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "string_length",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 176,
+        "column": 1
+      }
+    },
+    {
+      "name": "char_at",
+      "signature": {
+        "generic_params": [],
+        "where_clauses": [],
+        "parameters": [
+          {
+            "name": "s",
+            "ty": {
+              "kind": "Primitive",
+              "name": "String"
+            },
+            "mode": "Owned"
+          },
+          {
+            "name": "index",
+            "ty": {
+              "kind": "Primitive",
+              "name": "Int"
+            },
+            "mode": "Owned"
+          }
+        ],
+        "return_type": {
+          "kind": "Primitive",
+          "name": "Int"
+        },
+        "is_variadic": false
+      },
+      "kind": {
+        "type": "Extern",
+        "library": "aether_runtime",
+        "symbol": "string_char_at",
+        "calling_convention": "C"
+      },
+      "contracts": {
+        "preconditions": [],
+        "postconditions": [],
+        "verified": false,
+        "assumes_axioms": []
+      },
+      "attributes": [
+        "extern"
+      ],
+      "source_location": {
+        "line": 180,
+        "column": 1
+      }
+    }
+  ],
+  "types": {
+    "structs": [],
+    "enums": [],
+    "type_aliases": []
+  },
+  "traits": [],
+  "impls": []
+}

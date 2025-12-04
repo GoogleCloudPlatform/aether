@@ -18,6 +18,7 @@
 
 #![allow(dead_code)]
 
+use crate::abi;
 use crate::ast::{Module, Program};
 use crate::error::{CompilerError, SemanticError};
 use crate::lexer::v2 as lexer_v2;
@@ -118,6 +119,8 @@ pub struct CompileOptions {
     pub library_paths: Vec<PathBuf>,
     /// Additional libraries to link
     pub link_libraries: Vec<String>,
+    /// Additional object files to link
+    pub link_objects: Vec<PathBuf>,
     /// Verbose output
     pub verbose: bool,
     /// Keep intermediate files
@@ -134,6 +137,8 @@ pub struct CompileOptions {
     pub compile_as_library: bool,
     /// Enable formal verification of contracts (@pre/@post)
     pub enable_verification: bool,
+    /// Emit ABI files (.abi) alongside compilation
+    pub emit_abi: bool,
 }
 
 impl Default for CompileOptions {
@@ -145,6 +150,7 @@ impl Default for CompileOptions {
             target_triple: None,
             library_paths: vec![],
             link_libraries: vec![],
+            link_objects: vec![],
             verbose: false,
             keep_intermediates: false,
             enable_profiling: false,
@@ -153,6 +159,7 @@ impl Default for CompileOptions {
             syntax_only: false,
             compile_as_library: false,
             enable_verification: false, // Disabled by default
+            emit_abi: false, // Disabled by default
         }
     }
 }
@@ -332,7 +339,7 @@ impl CompilationPipeline {
         }
         let semantic_start = std::time::Instant::now();
 
-        let (symbol_table, captures, complete_program) = {
+        let (symbol_table, captures, complete_program, dependency_objects) = {
             let _timer = if self.options.enable_profiling {
                 Some(profiler.start_phase("semantic_analysis"))
             } else {
@@ -367,7 +374,10 @@ impl CompilationPipeline {
             // If we need to inline code from imported modules, we'd need their ASTs.
             // For now, let's proceed with just the explicit program modules.
 
-            (analyzer.get_symbol_table().clone(), captures, complete_prog)
+            // Collect object files from ABI-loaded dependencies for linking
+            let dependency_objects = analyzer.get_dependency_object_files();
+
+            (analyzer.get_symbol_table().clone(), captures, complete_prog, dependency_objects)
         };
 
         stats.phase_times.insert(
@@ -377,6 +387,39 @@ impl CompilationPipeline {
 
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_semantic_analysis");
+        }
+
+        // Phase 2.5: ABI generation (if enabled)
+        if self.options.emit_abi {
+            if self.options.verbose {
+                println!("Phase 2.5: Generating ABI files...");
+            }
+
+            for (idx, module) in complete_program.modules.iter().enumerate() {
+                let source_path = if idx < input_files.len() {
+                    &input_files[idx]
+                } else {
+                    continue; // Skip modules without source files
+                };
+
+                // Generate ABI output path:
+                // - If output path is specified, use output_path.abi (e.g., /tmp/io -> /tmp/io.abi)
+                // - Otherwise, use source_path.abi (e.g., stdlib/io.aether -> stdlib/io.abi)
+                let abi_path = if let Some(ref output) = self.options.output {
+                    output.with_extension("abi")
+                } else {
+                    source_path.with_extension("abi")
+                };
+
+                if self.options.verbose {
+                    println!("  Generating ABI: {}", abi_path.display());
+                }
+
+                abi::generate_abi_file(module, &symbol_table, source_path, &abi_path)?;
+
+                // ABI files are output files, not intermediates - don't add to intermediate_files
+                // so they won't be cleaned up
+            }
         }
 
         // If syntax-only mode, stop here
@@ -673,7 +716,18 @@ impl CompilationPipeline {
             let output_path = if self.options.compile_as_library {
                 self.link_library(&object_file, module_name)?
             } else {
-                self.link_executable(&object_file, module_name)?
+                // Combine the main object file with dependency object files from ABI imports
+                let mut all_objects = vec![object_file];
+                all_objects.extend(dependency_objects.clone());
+
+                if self.options.verbose && !dependency_objects.is_empty() {
+                    println!("  Linking {} dependency object files from ABI imports", dependency_objects.len());
+                    for obj in &dependency_objects {
+                        println!("    - {}", obj.display());
+                    }
+                }
+
+                self.link_executable(&all_objects, module_name)?
             };
 
             stats
@@ -729,7 +783,7 @@ impl CompilationPipeline {
     /// Link object file(s) into executable
     fn link_executable(
         &self,
-        object_file: &Path,
+        object_files: &[PathBuf],
         base_name: &str,
     ) -> Result<PathBuf, CompilerError> {
         let output_path = self
@@ -746,7 +800,16 @@ impl CompilationPipeline {
         };
 
         cmd.arg("-o").arg(&output_path);
-        cmd.arg(object_file);
+
+        // Add primary object files
+        for obj in object_files {
+            cmd.arg(obj);
+        }
+
+        // Add additional object files from options
+        for obj in &self.options.link_objects {
+            cmd.arg(obj);
+        }
 
         // Add library paths
         for lib_path in &self.options.library_paths {

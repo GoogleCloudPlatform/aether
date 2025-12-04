@@ -502,7 +502,7 @@ pub struct TypeChecker {
 }
 
 /// Enum variant information
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnumVariantInfo {
     pub name: String,
     pub associated_types: Vec<Type>,
@@ -510,7 +510,7 @@ pub struct EnumVariantInfo {
 }
 
 /// Enum type information  
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnumTypeInfo {
     pub name: String,
     pub variants: Vec<EnumVariantInfo>,
@@ -525,7 +525,7 @@ impl EnumTypeInfo {
 }
 
 /// Type definition information
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TypeDefinition {
     /// Struct definition
     Struct {

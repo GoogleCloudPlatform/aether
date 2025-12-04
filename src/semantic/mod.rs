@@ -254,6 +254,8 @@ impl SemanticAnalyzer {
             module: module.clone(),
             source: crate::module_loader::ModuleSource::Memory("".to_string()),
             dependencies,
+            from_abi: false,
+            object_file: None,
         };
         self.analyzed_modules
             .insert(module.name.name.clone(), loaded_module);
@@ -4419,6 +4421,15 @@ impl SemanticAnalyzer {
     /// Check if analysis found any errors
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
+    }
+
+    /// Get object files from ABI-loaded dependencies
+    /// Returns paths to .o files that need to be linked for pre-compiled modules
+    pub fn get_dependency_object_files(&self) -> Vec<std::path::PathBuf> {
+        self.analyzed_modules
+            .values()
+            .filter_map(|m| m.object_file.clone())
+            .collect()
     }
 
     /// Analyze a pattern and set up bindings

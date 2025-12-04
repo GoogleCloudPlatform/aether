@@ -26,4 +26,5 @@ mod test_memory_alloc;
 mod test_starling_ffi;
 mod test_string_runtime;
 mod test_variadic_functions;
+mod test_separate_compilation;
 mod verification_tests;
