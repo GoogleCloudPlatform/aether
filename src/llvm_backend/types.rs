@@ -16,7 +16,7 @@
 
 use crate::ast::PrimitiveType;
 use crate::error::SemanticError;
-use crate::types::Type;
+use crate::types::{Type, TypeDefinition};
 use inkwell::context::Context;
 use inkwell::types::{
     BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FloatType, IntType, PointerType, VoidType,
@@ -28,6 +28,7 @@ use std::collections::HashMap;
 pub struct TypeConverter<'ctx> {
     context: &'ctx Context,
     type_cache: HashMap<String, BasicTypeEnum<'ctx>>,
+    type_definitions: HashMap<String, TypeDefinition>,
 }
 
 impl<'ctx> TypeConverter<'ctx> {
@@ -36,7 +37,13 @@ impl<'ctx> TypeConverter<'ctx> {
         Self {
             context,
             type_cache: HashMap::new(),
+            type_definitions: HashMap::new(),
         }
+    }
+
+    /// Set type definitions for alias resolution
+    pub fn set_type_definitions(&mut self, type_defs: HashMap<String, TypeDefinition>) {
+        self.type_definitions = type_defs;
     }
 
     /// Convert a MIR type to an LLVM type
@@ -46,7 +53,7 @@ impl<'ctx> TypeConverter<'ctx> {
 
             Type::Named { name, module } => {
                 let full_name = match module {
-                    Some(module) => format!("{}::{}", module, name),
+                    Some(module) => format!("{}.{}", module, name),
                     None => name.clone(),
                 };
 
@@ -55,8 +62,22 @@ impl<'ctx> TypeConverter<'ctx> {
                     return Ok(*cached_type);
                 }
 
-                // Named types will be resolved by the backend when it has access to type definitions
-                // For now, create an opaque struct that will be defined later
+                // Check if this is a type alias - if so, resolve to target type
+                if let Some(type_def) = self.type_definitions.get(&full_name).cloned() {
+                    if let TypeDefinition::Alias { target_type, .. } = type_def {
+                        // Recursively convert the target type
+                        return self.convert_type(&target_type);
+                    }
+                }
+
+                // Also try without module prefix for local type lookups
+                if let Some(type_def) = self.type_definitions.get(name).cloned() {
+                    if let TypeDefinition::Alias { target_type, .. } = type_def {
+                        return self.convert_type(&target_type);
+                    }
+                }
+
+                // Not an alias - create an opaque struct for struct/enum types
                 let struct_type = self.context.opaque_struct_type(&full_name);
                 let basic_type = BasicTypeEnum::StructType(struct_type);
                 self.type_cache.insert(full_name, basic_type);

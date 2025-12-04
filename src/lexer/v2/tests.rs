@@ -662,7 +662,7 @@ fn test_lexer_tokenize_with_newlines() {
 fn test_lexer_all_keywords_count() {
     let lexer = Lexer::new("", "test.aether".to_string());
     // Count total keywords registered in the lexer
-    assert_eq!(lexer.keywords.len(), 56);
+    assert_eq!(lexer.keywords.len(), 57);
 }
 
 // ==================== LITERAL TOKENIZATION TESTS ====================

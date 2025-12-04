@@ -967,18 +967,32 @@ impl Parser {
             false
         };
 
+        // Check for @export annotation explicitly
+        let has_export_annotation = annotations.iter().any(|a| a.name == "export");
+
         if self.check_keyword(Keyword::Import) {
             imports.push(self.parse_import()?);
         } else if self.check_keyword(Keyword::Func) {
             // Check for @extern in annotations
             if let Some(extern_attr) = annotations.iter().find(|a| a.name == "extern") {
-                external_functions.push(self.parse_external_function(extern_attr.clone())?);
+                let ext_func = self.parse_external_function(extern_attr.clone())?;
+                if has_export_annotation {
+                    exports.push(ExportStatement::Function {
+                        name: ext_func.name.clone(),
+                        source_location: ext_func.source_location.clone(),
+                    });
+                }
+                external_functions.push(ext_func);
             } else {
                 let mut func = self.parse_function()?;
                 // Apply annotations to func.metadata
-                self.apply_annotations(&mut func, annotations)?;
+                // Only apply non-export/extern annotations here
+                let non_export_extern_annotations: Vec<Annotation> = annotations.into_iter()
+                    .filter(|a| a.name != "export" && a.name != "extern")
+                    .collect();
+                self.apply_annotations(&mut func, non_export_extern_annotations)?;
 
-                if is_public {
+                if is_public || has_export_annotation { // Export if pub or has @export annotation
                     exports.push(ExportStatement::Function {
                         name: func.name.clone(),
                         source_location: func.source_location.clone(),

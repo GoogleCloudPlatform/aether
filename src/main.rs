@@ -240,6 +240,10 @@ enum Commands {
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
+
+        /// Additional library search paths
+        #[arg(short = 'L', long = "library-path")]
+        library_paths: Vec<PathBuf>,
     },
 
     /// Print AST (Abstract Syntax Tree)
@@ -424,11 +428,13 @@ async fn main() {
             input,
             args,
             verbose,
+            library_paths,
         }) => {
             // First compile the program
             let mut options = CompileOptions::default();
             options.verbose = verbose;
             options.optimization_level = 2;
+            options.library_paths = library_paths;
 
             let compiler = Compiler::with_options(options);
             match compiler.compile_files(&[input]) {

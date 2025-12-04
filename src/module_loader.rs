@@ -230,32 +230,32 @@ impl ModuleLoader {
         // Core module
         self.stdlib_modules.insert(
             "core".to_string(),
-            std::fs::read_to_string("src/stdlib/core.aether").unwrap_or_else(|_| String::new()),
+            std::fs::read_to_string("stdlib/core.aether").unwrap_or_else(|_| String::new()),
         );
 
         // I/O module
         self.stdlib_modules.insert(
             "io".to_string(),
-            std::fs::read_to_string("src/stdlib/io.aether").unwrap_or_else(|_| String::new()),
+            std::fs::read_to_string("stdlib/io.aether").unwrap_or_else(|_| String::new()),
         );
 
         // Math module
         self.stdlib_modules.insert(
             "math".to_string(),
-            std::fs::read_to_string("src/stdlib/math.aether").unwrap_or_else(|_| String::new()),
+            std::fs::read_to_string("stdlib/math.aether").unwrap_or_else(|_| String::new()),
         );
 
         // Collections module
         self.stdlib_modules.insert(
             "collections".to_string(),
-            std::fs::read_to_string("src/stdlib/collections.aether")
+            std::fs::read_to_string("stdlib/collections.aether")
                 .unwrap_or_else(|_| String::new()),
         );
 
         // String utilities
         self.stdlib_modules.insert(
             "string".to_string(),
-            std::fs::read_to_string("src/stdlib/string.aether").unwrap_or_else(|_| String::new()),
+            std::fs::read_to_string("stdlib/string.aether").unwrap_or_else(|_| String::new()),
         );
     }
 

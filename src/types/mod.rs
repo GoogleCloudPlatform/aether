@@ -598,6 +598,11 @@ impl TypeChecker {
         self.current_module = module_name;
     }
 
+    /// Get the current module for type checking
+    pub fn get_current_module(&self) -> Option<String> {
+        self.current_module.clone()
+    }
+
     /// Add a variable to the type environment
     pub fn add_variable(&mut self, name: String, var_type: Type) {
         self.type_env.insert(name, var_type);
@@ -659,6 +664,7 @@ impl TypeChecker {
 
     /// Convert an AST TypeSpecifier to a Type
     pub fn ast_type_to_type(&self, type_spec: &TypeSpecifier) -> Result<Type, SemanticError> {
+        eprintln!("TypeChecker: ast_type_to_type: Input type_spec: {:?}", type_spec);
         match type_spec {
             TypeSpecifier::Primitive { type_name, .. } => Ok(Type::Primitive(*type_name)),
             TypeSpecifier::Named {
@@ -687,21 +693,16 @@ impl TypeChecker {
                 }
 
                 // Check if this is a known type
-                eprintln!(
-                    "TypeChecker: Looking for type '{}', have {} types",
-                    name.name,
-                    self.type_definitions.len()
-                );
-                for key in self.type_definitions.keys() {
-                    eprintln!("  - Type: '{}'", key);
-                }
+                eprintln!("TypeChecker: ast_type_to_type: Named type '{}', current module: {:?}", name.name, self.current_module);
                 if self.type_definitions.contains_key(&name.name) {
                     // If the name is qualified (contains dot), use the module prefix
                     if let Some(idx) = name.name.rfind('.') {
                         let module_name = Some(name.name[..idx].to_string());
                         let simple_name = name.name[idx + 1..].to_string();
+                        eprintln!("TypeChecker: Qualified named type. Simple: '{}', module: {:?}", simple_name, module_name);
                         Ok(Type::named(simple_name, module_name))
                     } else {
+                        eprintln!("TypeChecker: Unqualified named type. Name: '{}', module: {:?}", name.name, self.current_module);
                         Ok(Type::named(name.name.clone(), self.current_module.clone()))
                     }
                 } else {
@@ -814,6 +815,7 @@ impl TypeChecker {
 
     /// Check if two types are compatible (can be assigned/compared)
     pub fn types_compatible(&self, type1: &Type, type2: &Type) -> bool {
+        eprintln!("TypeChecker: types_compatible: Comparing {:?} and {:?}", type1, type2);
         match (type1, type2) {
             // Same types are always compatible
             (a, b) if a == b => true,

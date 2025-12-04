@@ -219,10 +219,12 @@ impl SymbolTable {
 
     /// Look up a symbol, searching from current scope up to global
     pub fn lookup_symbol(&self, name: &str) -> Option<&Symbol> {
+        eprintln!("SymbolTable: lookup_symbol: Looking for '{}'", name);
         let mut current = self.current_scope;
 
         loop {
             if let Some(symbol) = self.scopes[current].lookup_local(name) {
+                eprintln!("SymbolTable: lookup_symbol: Found '{}' in local scope.", name);
                 return Some(symbol);
             }
 
@@ -233,10 +235,40 @@ impl SymbolTable {
             }
         }
 
-        // Check imports
-        for imported_symbols in self.imports.values() {
-            if let Some(symbol) = imported_symbols.get(name) {
-                return Some(symbol);
+        // If not found in direct scopes, check if it's a qualified name from an imported module
+        // This handles cases like `Alias.functionName`
+        if let Some(dot_idx) = name.find('.') {
+            let module_prefix = &name[..dot_idx];
+            let symbol_name = &name[dot_idx + 1..];
+            eprintln!("SymbolTable: lookup_symbol: Qualified name. Prefix: '{}', Name: '{}'", module_prefix, symbol_name);
+
+            // First, try to resolve the module_prefix as an alias in the current scope
+            let mut current_scope_for_alias_lookup = self.current_scope;
+            let actual_module_name = loop {
+                if let Some(module_alias_symbol) = self.scopes[current_scope_for_alias_lookup].lookup_local(module_prefix) {
+                    eprintln!("SymbolTable: lookup_symbol: Found module alias symbol for '{}': {:?}", module_prefix, module_alias_symbol);
+                    if let Type::Module(actual_mod_name) = &module_alias_symbol.symbol_type {
+                        break Some(actual_mod_name.clone());
+                    }
+                }
+                if let Some(parent) = self.scopes[current_scope_for_alias_lookup].parent {
+                    current_scope_for_alias_lookup = parent;
+                } else {
+                    break None;
+                }
+            };
+            eprintln!("SymbolTable: lookup_symbol: Actual module name resolved: {:?}", actual_module_name);
+
+            if let Some(actual_mod_name) = actual_module_name {
+                eprintln!("SymbolTable: lookup_symbol: Attempting to get from imports with actual name '{}'", actual_mod_name);
+                // Use the actual module name to look up in the imports map
+                if let Some(exported_symbols_map) = self.imports.get(&actual_mod_name) {
+                    eprintln!("SymbolTable: lookup_symbol: Found exported_symbols_map for '{}': {:?}", actual_mod_name, exported_symbols_map);
+                    if let Some(symbol) = exported_symbols_map.get(symbol_name) {
+                        eprintln!("SymbolTable: lookup_symbol: Found symbol '{}' in exported map: {:?}", symbol_name, symbol);
+                        return Some(symbol);
+                    }
+                }
             }
         }
 

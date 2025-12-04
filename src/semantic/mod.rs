@@ -189,6 +189,9 @@ impl SemanticAnalyzer {
             return Ok(());
         }
 
+        let prev_sa_module = self.current_module.clone();
+        let prev_tc_module = self.type_checker.borrow().get_current_module();
+
         self.current_module = Some(module.name.name.clone());
         self.symbol_table
             .set_current_module(self.current_module.clone());
@@ -280,6 +283,9 @@ impl SemanticAnalyzer {
 
         // Module was already cached before analyzing function bodies (line 205)
 
+        self.current_module = prev_sa_module;
+        self.type_checker.borrow_mut().set_current_module(prev_tc_module);
+
         Ok(())
     }
 
@@ -309,12 +315,16 @@ impl SemanticAnalyzer {
         let loaded_module_clone = loaded_module.clone();
 
         // Store current module context
-        let prev_module = self.current_module.clone();
+        let prev_sa_module = self.current_module.clone();
+        let prev_tc_module = self.type_checker.borrow().get_current_module();
 
         // Analyze the imported module
         self.current_module = Some(module_name.clone());
+        self.type_checker.borrow_mut().set_current_module(self.current_module.clone());
+
         if let Err(e) = self.analyze_module(&module_to_analyze) {
-            self.current_module = prev_module;
+            self.current_module = prev_sa_module;
+            self.type_checker.borrow_mut().set_current_module(prev_tc_module.clone());
             return Err(SemanticError::ImportError {
                 module: module_name.clone(),
                 reason: format!("Failed to analyze module: {}", e),
@@ -323,7 +333,8 @@ impl SemanticAnalyzer {
         }
 
         // Restore module context
-        self.current_module = prev_module;
+        self.current_module = prev_sa_module;
+        self.type_checker.borrow_mut().set_current_module(prev_tc_module);
 
         // Cache the analyzed module
         self.analyzed_modules
@@ -369,8 +380,7 @@ impl SemanticAnalyzer {
         );
         self.symbol_table.add_symbol(module_symbol.clone())?;
 
-        // Also add module symbol to imports map for global lookup
-        exported_symbols.insert(module_symbol_name, module_symbol);
+
 
         // Process exports from the imported module
         for export in &loaded_module.module.exports {
@@ -448,9 +458,8 @@ impl SemanticAnalyzer {
                         true,
                         location.clone(),
                     );
-
                     self.symbol_table.add_symbol(symbol.clone())?;
-                    exported_symbols.insert(qualified_name, symbol);
+                    exported_symbols.insert(qualified_name.clone(), symbol.clone());
                 }
                 ExportStatement::Type { name, .. } => {
                     // Add exported type to type system
@@ -572,11 +581,10 @@ impl SemanticAnalyzer {
                         }
                     }
 
-                    // For now, add as a named type
                     let symbol = Symbol::new(
                         qualified_name.clone(),
                         Type::Named {
-                            name: name.name.clone(), // Use simple name to match definition
+                            name: name.name.clone(),
                             module: Some(module_name.to_string()),
                         },
                         SymbolKind::Type,
@@ -584,9 +592,8 @@ impl SemanticAnalyzer {
                         true,
                         location.clone(),
                     );
-
                     self.symbol_table.add_symbol(symbol.clone())?;
-                    exported_symbols.insert(qualified_name, symbol);
+                    exported_symbols.insert(qualified_name.clone(), symbol.clone());
                 }
                 ExportStatement::Constant { name, .. } => {
                     // Add exported constant to symbol table
@@ -1151,10 +1158,6 @@ impl SemanticAnalyzer {
                     source_location: source_location.clone(),
                 };
 
-                eprintln!(
-                    "Semantic: Adding struct type '{}' to symbol table and type checker",
-                    name.name
-                );
                 self.symbol_table
                     .add_type_definition(name.name.clone(), definition.clone())?;
                 self.type_checker
@@ -1645,7 +1648,6 @@ impl SemanticAnalyzer {
                 source_location,
                 ..
             } => {
-                eprintln!("Semantic: About to look up type in variable declaration");
                 let declared_type = self.type_checker.borrow().ast_type_to_type(type_spec)?;
                 let is_mutable = matches!(mutability, Mutability::Mutable);
                 let mut is_initialized = false;
@@ -1655,7 +1657,6 @@ impl SemanticAnalyzer {
                 if let Some(init_expr) = initial_value {
                     let init_type = self.analyze_expression(init_expr)?;
 
-                    // If declared type is a type variable, use the inferred type from the initializer
                     if matches!(declared_type, Type::Variable(_)) {
                         final_type = init_type.clone();
                     } else if !self
@@ -2227,19 +2228,18 @@ impl SemanticAnalyzer {
 
                 // Check that it's an array
                 match array_type {
-                    Type::Array { element_type, .. } => {
-                        // Index must be integer
-                        let index_type = self.analyze_expression(index)?;
-                        if !matches!(index_type, Type::Primitive(PrimitiveType::Integer)) {
-                            return Err(SemanticError::TypeMismatch {
-                                expected: "Integer".to_string(),
-                                found: index_type.to_string(),
-                                location: SourceLocation::unknown(),
-                            });
-                        }
-
-                        Ok((*element_type).clone())
-                    }
+                                        Type::Array { ref element_type, .. } => {
+                                            // Index must be integer
+                                            let index_type = self.analyze_expression(index)?;
+                                            if !matches!(index_type, Type::Primitive(PrimitiveType::Integer)) {
+                                                return Err(SemanticError::TypeMismatch {
+                                                    expected: "Integer".to_string(),
+                                                    found: index_type.to_string(),
+                                                    location: SourceLocation::unknown(),
+                                                });
+                                            }
+                                            Ok(*(*element_type).clone())
+                                        }
                     _ => Err(SemanticError::TypeMismatch {
                         expected: "Array".to_string(),
                         found: array_type.to_string(),
@@ -2359,38 +2359,23 @@ impl SemanticAnalyzer {
                 loop {
                     match current_type {
                         Type::Owned { base_type, .. } => {
-                            eprintln!("Semantic: Unwrapping Owned type");
                             current_type = base_type;
                         }
                         Type::Pointer { target_type, .. } => {
-                            eprintln!("Semantic: Unwrapping Pointer type");
                             current_type = target_type;
                         }
                         // TODO: Handle Reference if it exists distinct from Pointer
                         _ => {
-                            eprintln!(
-                                "Semantic: Unwrap loop hit default case for type: {:?}",
-                                current_type
-                            );
                             break;
                         }
                     }
                 }
-                eprintln!(
-                    "Semantic: Resolved type for field access: {:?}",
-                    current_type
-                );
 
-                // Check if it's a named type (struct)
                 match current_type {
                     Type::Named { name, module } => {
-                        eprintln!(
-                            "Semantic: Matched Type::Named: {} (module: {:?})",
-                            name, module
-                        );
                         // Look up the struct definition
                         let full_name = if let Some(mod_name) = module {
-                            format!("{}::{}", mod_name, name)
+                            format!("{}.{}", mod_name, name)
                         } else {
                             name.clone()
                         };
@@ -2420,6 +2405,17 @@ impl SemanticAnalyzer {
                             Err(SemanticError::TypeMismatch {
                                 expected: "struct type".to_string(),
                                 found: instance_type.to_string(),
+                                location: source_location.clone(),
+                            })
+                        }
+                    }
+                    Type::Array { .. } => {
+                        if field_name.name == "length" {
+                            Ok(Type::primitive(PrimitiveType::Integer))
+                        } else {
+                            Err(SemanticError::UnknownField {
+                                struct_name: "Array".to_string(),
+                                field_name: field_name.name.clone(),
                                 location: source_location.clone(),
                             })
                         }
