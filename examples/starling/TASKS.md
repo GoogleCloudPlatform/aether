@@ -186,10 +186,16 @@
 - Tests: 4/4 passing (create, alloc, read/write, block alignment)
 
 ### Task 3.2: Session KV Storage
-- [ ] Per-session allocation tracking
-- [ ] Shape: (layers, heads, head_dim, seq_len)
-- [ ] Lazy growth as sequence extends
-- [ ] Tests: Session lifecycle
+- [x] Per-session allocation tracking
+- [x] Shape: (layers, heads, head_dim, seq_len)
+- [x] Lazy growth as sequence extends
+- [x] Tests: Session lifecycle
+
+**Implementation Notes:**
+- Created kv_cache_test.aether with ownership-safe KV cache implementation
+- Efficient K/V tensor indexing with separate storage regions
+- Session slot management with find_free_slot and find_session_slot
+- Tests: 6/6 passing (size, create, read/write, K/V independence, slots, lifecycle)
 
 ### Task 3.3: LRU Eviction
 - [ ] Track access times per session
@@ -430,7 +436,7 @@
 |-------|-------|----------|--------|
 | 1. Tokenizer | 5 | 5 | Complete |
 | 2. Sampler | 5 | 5 | Complete |
-| 3. KV Cache | 6 | 1 | In Progress |
+| 3. KV Cache | 6 | 2 | In Progress |
 | 4. Model Runtime | 7 | 2 | In Progress |
 | 5. Scheduler | 5 | 0 | Not Started |
 | 6. HTTP Gateway | 6 | 0 | Not Started |
