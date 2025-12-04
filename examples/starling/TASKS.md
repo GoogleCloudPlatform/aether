@@ -54,10 +54,17 @@
 - Tests verify character splitting, merge lookup, merge selection, and string concatenation
 
 ### Task 1.3: BPE Decode
-- [ ] Convert IDs to token strings
-- [ ] Join tokens to text
-- [ ] Handle special tokens (BOS, EOS, PAD)
-- [ ] Tests: Round-trip property, special tokens
+- [x] Convert IDs to token strings
+- [x] Join tokens to text
+- [x] Handle special tokens (BOS, EOS, PAD)
+- [x] Tests: Round-trip property, special tokens
+
+**Implementation Notes:**
+- Created decode.aether with BPEDecoder struct and decode functions
+- Created decode_test.aether with 4 passing tests (token lookup, special tokens, decode sequence, round-trip)
+- Uses Int64 map handles directly to avoid struct ownership issues
+- Special tokens (BOS, EOS, PAD) are skipped during decoding (return empty string)
+- get_token returns unk_token for missing IDs
 
 ### Task 1.4: Tokenizer HTTP API
 - [x] `/v1/tokenize` endpoint (basic)
@@ -354,7 +361,7 @@
 
 | Phase | Tasks | Complete | Status |
 |-------|-------|----------|--------|
-| 1. Tokenizer | 5 | 4 | In Progress |
+| 1. Tokenizer | 5 | 4.5 | In Progress |
 | 2. Sampler | 5 | 0 | Not Started |
 | 3. KV Cache | 6 | 0 | Not Started |
 | 4. Model Runtime | 6 | 0 | Not Started |

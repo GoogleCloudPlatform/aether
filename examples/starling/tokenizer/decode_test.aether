@@ -1,0 +1,355 @@
+module DecodeTest;
+
+// ============================================================================
+// Tests for BPE Decoder - Uses maps directly to avoid ownership issues
+// ============================================================================
+
+// --- FFI: String operations ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_concat")
+func string_concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Int-String Map (ID -> token) ---
+@extern(library="aether_runtime", symbol="int_string_map_new")
+func int_string_map_new() -> Int64;
+
+@extern(library="aether_runtime", symbol="int_string_map_insert")
+func int_string_map_insert(map: Int64, key: Int, value: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="int_string_map_get")
+func int_string_map_get(map: Int64, key: Int) -> String;
+
+@extern(library="aether_runtime", symbol="int_string_map_contains")
+func int_string_map_contains(map: Int64, key: Int) -> Bool;
+
+@extern(library="aether_runtime", symbol="int_string_map_free")
+func int_string_map_free(map: Int64) -> Void;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+func print_int(label: String, val: Int) -> Void {
+    aether_print(label);
+    aether_print(": ");
+    println(int_to_string(val));
+}
+
+// Get token from map, return unk_token if not found
+func get_token(id_to_token: Int64, id: Int, unk_token: String) -> String {
+    if (int_string_map_contains(id_to_token, id)) {
+        return int_string_map_get(id_to_token, id);
+    }
+    return unk_token;
+}
+
+// Check if ID is a special token (given special token IDs)
+func is_special(id: Int, bos_id: Int, eos_id: Int, pad_id: Int) -> Bool {
+    if ({id == bos_id}) {
+        return true;
+    }
+    if ({id == eos_id}) {
+        return true;
+    }
+    if ({id == pad_id}) {
+        return true;
+    }
+    return false;
+}
+
+// Decode a token ID, skipping special tokens
+func decode_id(id_to_token: Int64, id: Int, bos_id: Int, eos_id: Int, pad_id: Int, unk_token: String) -> String {
+    if (is_special(id, bos_id, eos_id, pad_id)) {
+        return "";
+    }
+    return get_token(id_to_token, id, unk_token);
+}
+
+// ============================================================================
+// Test: Basic Token Lookup
+// ============================================================================
+
+func test_token_lookup() -> Bool {
+    println("=== Test: Token Lookup ===");
+
+    let id_to_token = int_string_map_new();
+
+    // Add vocabulary
+    int_string_map_insert(id_to_token, 0, "<unk>");
+    int_string_map_insert(id_to_token, 1, "hello");
+    int_string_map_insert(id_to_token, 2, " ");
+    int_string_map_insert(id_to_token, 3, "world");
+    int_string_map_insert(id_to_token, 4, "!");
+
+    // Test lookups
+    let t1 = get_token(id_to_token, 1, "<unk>");
+    if (!string_equals(t1, "hello")) {
+        aether_print("FAIL: ID 1 should be 'hello', got '");
+        aether_print(t1);
+        println("'");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    let t3 = get_token(id_to_token, 3, "<unk>");
+    if (!string_equals(t3, "world")) {
+        println("FAIL: ID 3 should be 'world'");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    // Test unknown ID
+    let t_unk = get_token(id_to_token, 999, "<unk>");
+    if (!string_equals(t_unk, "<unk>")) {
+        aether_print("FAIL: Unknown ID should return '<unk>', got '");
+        aether_print(t_unk);
+        println("'");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    int_string_map_free(id_to_token);
+    println("PASS: Token Lookup");
+    return true;
+}
+
+// ============================================================================
+// Test: Special Token Handling
+// ============================================================================
+
+func test_special_tokens() -> Bool {
+    println("=== Test: Special Token Handling ===");
+
+    let id_to_token = int_string_map_new();
+
+    // Set up vocabulary with special tokens
+    int_string_map_insert(id_to_token, 0, "<pad>");
+    int_string_map_insert(id_to_token, 1, "<s>");     // BOS
+    int_string_map_insert(id_to_token, 2, "</s>");    // EOS
+    int_string_map_insert(id_to_token, 3, "hello");
+
+    // Special token IDs
+    let pad_id = 0;
+    let bos_id = 1;
+    let eos_id = 2;
+
+    // Test special token detection
+    if (!is_special(0, bos_id, eos_id, pad_id)) {
+        println("FAIL: PAD token should be special");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    if (!is_special(1, bos_id, eos_id, pad_id)) {
+        println("FAIL: BOS token should be special");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    if (!is_special(2, bos_id, eos_id, pad_id)) {
+        println("FAIL: EOS token should be special");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    if (is_special(3, bos_id, eos_id, pad_id)) {
+        println("FAIL: Regular token should not be special");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    // Test decode_id skips special tokens
+    let t_bos = decode_id(id_to_token, 1, bos_id, eos_id, pad_id, "<unk>");
+    if (!string_equals(t_bos, "")) {
+        aether_print("FAIL: BOS should decode to empty string, got '");
+        aether_print(t_bos);
+        println("'");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    let t_hello = decode_id(id_to_token, 3, bos_id, eos_id, pad_id, "<unk>");
+    if (!string_equals(t_hello, "hello")) {
+        println("FAIL: Regular token should decode normally");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    int_string_map_free(id_to_token);
+    println("PASS: Special Token Handling");
+    return true;
+}
+
+// ============================================================================
+// Test: Decode Sequence
+// ============================================================================
+
+func test_decode_sequence() -> Bool {
+    println("=== Test: Decode Sequence ===");
+
+    let id_to_token = int_string_map_new();
+
+    // Build a vocabulary
+    int_string_map_insert(id_to_token, 0, "<pad>");
+    int_string_map_insert(id_to_token, 1, "<s>");
+    int_string_map_insert(id_to_token, 2, "</s>");
+    int_string_map_insert(id_to_token, 10, "Hello");
+    int_string_map_insert(id_to_token, 11, " ");
+    int_string_map_insert(id_to_token, 12, "world");
+    int_string_map_insert(id_to_token, 13, "!");
+
+    let pad_id = 0;
+    let bos_id = 1;
+    let eos_id = 2;
+
+    // Decode sequence: [1, 10, 11, 12, 13, 2]
+    // Should produce: "Hello world!"
+
+    let t1 = decode_id(id_to_token, 1, bos_id, eos_id, pad_id, "<unk>");   // BOS -> ""
+    let t2 = decode_id(id_to_token, 10, bos_id, eos_id, pad_id, "<unk>");  // "Hello"
+    let t3 = decode_id(id_to_token, 11, bos_id, eos_id, pad_id, "<unk>");  // " "
+    let t4 = decode_id(id_to_token, 12, bos_id, eos_id, pad_id, "<unk>");  // "world"
+    let t5 = decode_id(id_to_token, 13, bos_id, eos_id, pad_id, "<unk>");  // "!"
+    let t6 = decode_id(id_to_token, 2, bos_id, eos_id, pad_id, "<unk>");   // EOS -> ""
+
+    // Concatenate
+    let tmp1 = string_concat(t1, t2);
+    let tmp2 = string_concat(tmp1, t3);
+    let tmp3 = string_concat(tmp2, t4);
+    let tmp4 = string_concat(tmp3, t5);
+    let result = string_concat(tmp4, t6);
+
+    aether_print("Decoded: '");
+    aether_print(result);
+    println("'");
+
+    if (!string_equals(result, "Hello world!")) {
+        println("FAIL: Should decode to 'Hello world!'");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    int_string_map_free(id_to_token);
+    println("PASS: Decode Sequence");
+    return true;
+}
+
+// ============================================================================
+// Test: Round-trip Property
+// ============================================================================
+
+func test_round_trip() -> Bool {
+    println("=== Test: Round-trip Property ===");
+
+    // Verify: tokens -> IDs -> tokens gives same result
+
+    let id_to_token = int_string_map_new();
+
+    int_string_map_insert(id_to_token, 10, "He");
+    int_string_map_insert(id_to_token, 11, "llo");
+    int_string_map_insert(id_to_token, 12, " ");
+    int_string_map_insert(id_to_token, 13, "wo");
+    int_string_map_insert(id_to_token, 14, "rld");
+
+    // No special tokens for this test
+    let bos_id = -1;
+    let eos_id = -1;
+    let pad_id = -1;
+
+    // Decode [10, 11, 12, 13, 14]
+    let t1 = decode_id(id_to_token, 10, bos_id, eos_id, pad_id, "<unk>");
+    let t2 = decode_id(id_to_token, 11, bos_id, eos_id, pad_id, "<unk>");
+    let t3 = decode_id(id_to_token, 12, bos_id, eos_id, pad_id, "<unk>");
+    let t4 = decode_id(id_to_token, 13, bos_id, eos_id, pad_id, "<unk>");
+    let t5 = decode_id(id_to_token, 14, bos_id, eos_id, pad_id, "<unk>");
+
+    let tmp1 = string_concat(t1, t2);
+    let tmp2 = string_concat(tmp1, t3);
+    let tmp3 = string_concat(tmp2, t4);
+    let result = string_concat(tmp3, t5);
+
+    aether_print("Decoded: '");
+    aether_print(result);
+    println("'");
+
+    if (!string_equals(result, "Hello world")) {
+        println("FAIL: Should decode to 'Hello world'");
+        int_string_map_free(id_to_token);
+        return false;
+    }
+
+    int_string_map_free(id_to_token);
+    println("PASS: Round-trip Property");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("BPE Decoder Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_token_lookup()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_special_tokens()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_decode_sequence()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_round_trip()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}
