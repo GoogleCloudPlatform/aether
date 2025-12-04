@@ -280,10 +280,20 @@
 - Tests: 8/8 passing (entry create, status, size, registry create, file not exists, load missing model, error codes, status constants)
 
 ### Task 4.3: Forward Pass Interface
-- [ ] Define ModelRuntime trait
-- [ ] Input: tokens + KV handles
-- [ ] Output: logits tensor
-- [ ] Tests: Interface contract
+- [x] Define ModelRuntime trait
+- [x] Input: tokens + KV handles
+- [x] Output: logits tensor
+- [x] Tests: Interface contract
+
+**Implementation Notes:**
+- Created forward_pass_test.aether with complete interface definition
+- ModelConfig: vocab_size, hidden_dim, num_layers, num_heads, head_dim, max_seq_len, intermediate_dim
+- RuntimeState: current_position, tokens_processed, prefill/decode mode, kv_cache_handle
+- ForwardInput: tokens handle, num_tokens, start_position, use_kv_cache flag
+- ForwardOutput: logits handle, vocab_size, num_output_tokens, status code
+- Validation: config validation, input validation, sequence length check
+- Error codes: ERR_INVALID_CONFIG, ERR_INVALID_INPUT, ERR_SEQUENCE_TOO_LONG, ERR_OUT_OF_MEMORY
+- Tests: 10/10 passing (config create, state create/modify, input/output create, error output, validation, forward pass, sequence too long, invalid input)
 
 ### Task 4.4: Attention Mechanism
 - [x] Implement tensor foundations (tensor_test.aether)
