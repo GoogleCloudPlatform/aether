@@ -250,10 +250,19 @@
 ## Phase 4: Model Runtime
 
 ### Task 4.1: GGUF Parser
-- [ ] FFI bindings to GGUF library (or pure Aether)
-- [ ] Parse model metadata
+- [x] FFI bindings to GGUF library (or pure Aether)
+- [x] Parse model metadata
 - [ ] Memory-map tensor data
 - [ ] Tests: Load real GGUF files
+
+**Implementation Notes:**
+- Created gguf_parser_test.aether with pure Aether GGUF header/metadata parsing
+- Added FFI: ptr_is_null, int64_to_int, int_to_int64 for type conversion
+- GGUF header parsing: magic "GGUF", version, tensor_count, metadata_kv_count
+- GGUF metadata value types: uint8-uint64, int8-int64, float32/64, string, bool, array
+- GGUF tensor types: F32, F16, Q4_0, Q4_1, Q5_0, Q5_1, Q8_0
+- gguf_skip_string/gguf_skip_value for navigating metadata
+- Tests: 8/8 passing (constants, magic, version, tensor count, metadata count, string skip, value skip, header parsing)
 
 ### Task 4.2: Model Registry
 - [ ] Load models from local path
@@ -461,7 +470,7 @@
 | 1. Tokenizer | 5 | 5 | Complete |
 | 2. Sampler | 5 | 5 | Complete |
 | 3. KV Cache | 6 | 5 | In Progress |
-| 4. Model Runtime | 7 | 2 | In Progress |
+| 4. Model Runtime | 7 | 3 | In Progress |
 | 5. Scheduler | 5 | 0 | Not Started |
 | 6. HTTP Gateway | 6 | 0 | Not Started |
 | 7. Telemetry | 4 | 0 | Not Started |

@@ -440,6 +440,28 @@ pub unsafe extern "C" fn aether_read_i64(ptr: *const c_void, offset: c_int) -> i
     *i64_ptr
 }
 
+/// Check if pointer is null
+#[no_mangle]
+pub extern "C" fn ptr_is_null(ptr: i64) -> c_int {
+    if ptr == 0 {
+        1
+    } else {
+        0
+    }
+}
+
+/// Convert i64 to i32 (truncate)
+#[no_mangle]
+pub extern "C" fn int64_to_int(value: i64) -> c_int {
+    value as c_int
+}
+
+/// Convert i32 to i64
+#[no_mangle]
+pub extern "C" fn int_to_int64(value: c_int) -> i64 {
+    value as i64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
