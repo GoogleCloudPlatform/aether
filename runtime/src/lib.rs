@@ -148,6 +148,7 @@ pub mod concurrency;
 pub mod async_runtime;
 pub mod ffi;
 pub mod ffi_structs;
+pub mod gguf;
 
 /// Array structure with length prefix
 /// Memory layout: [length: i32][elements...]

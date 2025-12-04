@@ -1,0 +1,341 @@
+// GGUF Loader Test - Verify weight loading from GGUF files
+module gguf_loader_test;
+
+// ============================================================================
+// FFI Declarations
+// ============================================================================
+
+@extern(library="aether_runtime", symbol="aether_print")
+func print(s: String) -> Int;
+
+// GGUF loading FFI
+@extern(library="aether_runtime", symbol="gguf_load")
+func gguf_load(path: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="gguf_unload")
+func gguf_unload(model_id: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="gguf_tensor_count")
+func gguf_tensor_count(model_id: Int64) -> Int64;
+
+@extern(library="aether_runtime", symbol="gguf_tensor_numel")
+func gguf_tensor_numel(model_id: Int64, name: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="gguf_get_tensor_f32")
+func gguf_get_tensor_f32(model_id: Int64, name: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="gguf_tensor_ndim")
+func gguf_tensor_ndim(model_id: Int64, name: String) -> Int;
+
+@extern(library="aether_runtime", symbol="gguf_tensor_dim")
+func gguf_tensor_dim(model_id: Int64, name: String, index: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="gguf_has_tensor")
+func gguf_has_tensor(model_id: Int64, name: String) -> Int;
+
+// Float array FFI
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_len(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int64_to_int")
+func int64_to_int(value: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_to_int64")
+func int_to_int64(value: Int) -> Int64;
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Test 1: Load model file
+func test_load_model() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    let unload_result = gguf_unload(model_id);
+    if ({unload_result != 0}) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// Test 2: Check tensor count
+func test_tensor_count() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    let count = gguf_tensor_count(model_id);
+    // Tiny model has 21 tensors
+    if ({count != int_to_int64(21)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 3: Check embedding tensor exists
+func test_has_tensor() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    let has_embed = gguf_has_tensor(model_id, "token_embd.weight");
+    if ({has_embed != 1}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let has_output = gguf_has_tensor(model_id, "output.weight");
+    if ({has_output != 1}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    let has_fake = gguf_has_tensor(model_id, "nonexistent.weight");
+    if ({has_fake != 0}) {
+        gguf_unload(model_id);
+        return 4;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 4: Check embedding tensor dimensions
+func test_tensor_dims() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // token_embd.weight should be [hidden_dim=64, vocab_size=256]
+    let ndim = gguf_tensor_ndim(model_id, "token_embd.weight");
+    if ({ndim != 2}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let dim0 = gguf_tensor_dim(model_id, "token_embd.weight", 0);
+    if ({dim0 != int_to_int64(64)}) {  // hidden_dim
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    let dim1 = gguf_tensor_dim(model_id, "token_embd.weight", 1);
+    if ({dim1 != int_to_int64(256)}) {  // vocab_size
+        gguf_unload(model_id);
+        return 4;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 5: Check tensor numel
+func test_tensor_numel() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // token_embd.weight: 64 * 256 = 16384 elements
+    let numel = gguf_tensor_numel(model_id, "token_embd.weight");
+    if ({numel != int_to_int64(16384)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 6: Load tensor data
+func test_load_tensor_data() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // Load embedding tensor
+    let data = gguf_get_tensor_f32(model_id, "token_embd.weight");
+    if ({data <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    // Check length
+    let len = float_array_len(data);
+    if ({len != 16384}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    // Check first value is a reasonable float (should be small random value)
+    let first = float_array_get(data, 0);
+    // Value should be between -0.1 and 0.1 (small random init)
+    if ({first < {0.0 - 0.1}}) {
+        gguf_unload(model_id);
+        return 4;
+    }
+    if ({first > 0.1}) {
+        gguf_unload(model_id);
+        return 5;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 7: Load attention norm tensor
+func test_load_attention_norm() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // Check layer 0 attention norm
+    let has = gguf_has_tensor(model_id, "blk.0.attn_norm.weight");
+    if ({has != 1}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    // Load and check shape
+    let numel = gguf_tensor_numel(model_id, "blk.0.attn_norm.weight");
+    if ({numel != int_to_int64(64)}) {  // hidden_dim
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 8: Load FFN tensors
+func test_load_ffn_tensors() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // Check FFN gate tensor: [hidden_dim=64, intermediate_dim=256]
+    let has_gate = gguf_has_tensor(model_id, "blk.0.ffn_gate.weight");
+    if ({has_gate != 1}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let gate_numel = gguf_tensor_numel(model_id, "blk.0.ffn_gate.weight");
+    if ({gate_numel != int_to_int64(16384)}) {  // 64 * 256
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Main test runner
+func main() -> Int {
+    let mut passed = 0;
+    let mut failed = 0;
+
+    print("GGUF Loader Tests");
+    print("==================");
+
+    // Test 1
+    let r1 = test_load_model();
+    if ({r1 == 0}) {
+        print("PASS: test_load_model");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_load_model");
+        failed = {failed + 1};
+    }
+
+    // Test 2
+    let r2 = test_tensor_count();
+    if ({r2 == 0}) {
+        print("PASS: test_tensor_count");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_tensor_count");
+        failed = {failed + 1};
+    }
+
+    // Test 3
+    let r3 = test_has_tensor();
+    if ({r3 == 0}) {
+        print("PASS: test_has_tensor");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_has_tensor");
+        failed = {failed + 1};
+    }
+
+    // Test 4
+    let r4 = test_tensor_dims();
+    if ({r4 == 0}) {
+        print("PASS: test_tensor_dims");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_tensor_dims");
+        failed = {failed + 1};
+    }
+
+    // Test 5
+    let r5 = test_tensor_numel();
+    if ({r5 == 0}) {
+        print("PASS: test_tensor_numel");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_tensor_numel");
+        failed = {failed + 1};
+    }
+
+    // Test 6
+    let r6 = test_load_tensor_data();
+    if ({r6 == 0}) {
+        print("PASS: test_load_tensor_data");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_load_tensor_data");
+        failed = {failed + 1};
+    }
+
+    // Test 7
+    let r7 = test_load_attention_norm();
+    if ({r7 == 0}) {
+        print("PASS: test_load_attention_norm");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_load_attention_norm");
+        failed = {failed + 1};
+    }
+
+    // Test 8
+    let r8 = test_load_ffn_tensors();
+    if ({r8 == 0}) {
+        print("PASS: test_load_ffn_tensors");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_load_ffn_tensors");
+        failed = {failed + 1};
+    }
+
+    print("==================");
+    print("Tests completed");
+
+    return failed;
+}
