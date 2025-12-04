@@ -66,7 +66,12 @@ impl SemanticAnalyzer {
                     // For types not explicitly wrapped in Owned, default to Move for non-primitives
                     // and Copy for primitives.
                     // Functions are also Copy (pointers).
-                    if !param_type.is_primitive() && !matches!(param_type, Type::Function { .. }) {
+                    // Types with @derive(Copy) are also Copy.
+                    let is_copy_type = param_type.is_primitive()
+                        || matches!(param_type, Type::Function { .. })
+                        || self.is_copy_type(param_type);
+
+                    if !is_copy_type {
                         if let Err(_e) = self.symbol_table.mark_variable_moved(&name.name) {
                             // Try qualified lookup
                             let qualified_name = if let Some(module) = &self.current_module {
@@ -87,5 +92,38 @@ impl SemanticAnalyzer {
             }
         }
         Ok(())
+    }
+
+    /// Check if a type has the Copy trait (via @derive(Copy))
+    fn is_copy_type(&self, ty: &Type) -> bool {
+        match ty {
+            Type::Named { name, module } => {
+                // Look up the type definition
+                let full_name = if let Some(m) = module {
+                    format!("{}.{}", m, name)
+                } else if let Some(m) = &self.current_module {
+                    format!("{}.{}", m, name)
+                } else {
+                    name.clone()
+                };
+
+                let type_defs = self.symbol_table.get_type_definitions();
+
+                // Try to get the type definition from symbol table
+                if let Some(type_def) = type_defs.get(&full_name) {
+                    if let crate::types::TypeDefinition::Struct { is_copy, .. } = type_def {
+                        return *is_copy;
+                    }
+                }
+                // Also try without module prefix
+                if let Some(type_def) = type_defs.get(name) {
+                    if let crate::types::TypeDefinition::Struct { is_copy, .. } = type_def {
+                        return *is_copy;
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
     }
 }

@@ -453,6 +453,7 @@ impl ModuleLoader {
             where_clause: Vec::new(),
             fields,
             export_as: None,
+            is_copy: false, // TODO: Add is_copy to ABI if needed
             source_location: SourceLocation::unknown(),
         })
     }

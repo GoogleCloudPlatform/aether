@@ -506,6 +506,7 @@ impl SemanticAnalyzer {
                         let definition = match type_def {
                             crate::ast::TypeDefinition::Structured {
                                 fields,
+                                is_copy,
                                 source_location,
                                 ..
                             } => {
@@ -523,6 +524,7 @@ impl SemanticAnalyzer {
                                 }
                                 crate::types::TypeDefinition::Struct {
                                     fields: field_types,
+                                    is_copy: *is_copy,
                                     source_location: source_location.clone(),
                                 }
                             }
@@ -1121,6 +1123,7 @@ impl SemanticAnalyzer {
                 name,
                 generic_parameters,
                 fields,
+                is_copy,
                 source_location,
                 ..
             } => {
@@ -1169,6 +1172,7 @@ impl SemanticAnalyzer {
                 // Add the type definition
                 let definition = crate::types::TypeDefinition::Struct {
                     fields: field_types.clone(),
+                    is_copy: *is_copy,
                     source_location: source_location.clone(),
                 };
 

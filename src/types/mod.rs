@@ -530,6 +530,7 @@ pub enum TypeDefinition {
     /// Struct definition
     Struct {
         fields: Vec<(String, Type)>, // Changed from HashMap to preserve field order
+        is_copy: bool,               // @derive(Copy) annotation
         source_location: SourceLocation,
     },
 

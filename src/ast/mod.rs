@@ -90,6 +90,7 @@ pub enum TypeDefinition {
         where_clause: Vec<WhereClause>,
         fields: Vec<StructField>,
         export_as: Option<String>, // For FFI
+        is_copy: bool,             // @derive(Copy) annotation
         source_location: SourceLocation,
     },
     Enumeration {

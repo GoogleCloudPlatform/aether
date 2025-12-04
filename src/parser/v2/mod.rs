@@ -1001,7 +1001,20 @@ impl Parser {
                 function_definitions.push(func);
             }
         } else if self.check_keyword(Keyword::Struct) {
-            let type_def = self.parse_struct()?;
+            let mut type_def = self.parse_struct()?;
+
+            // Check for @derive(Copy) annotation
+            let has_copy = annotations.iter().any(|a| {
+                a.name == "derive" && a.arguments.iter().any(|arg| {
+                    matches!(&arg.value, AnnotationValue::Identifier(id) if id == "Copy")
+                })
+            });
+            if has_copy {
+                if let TypeDefinition::Structured { ref mut is_copy, .. } = type_def {
+                    *is_copy = true;
+                }
+            }
+
             if is_public {
                 if let TypeDefinition::Structured {
                     name,
@@ -1943,6 +1956,7 @@ impl Parser {
             where_clause,
             fields,
             export_as: None,
+            is_copy: false, // Will be set by caller if @derive(Copy) present
             source_location: start_location,
         })
     }
