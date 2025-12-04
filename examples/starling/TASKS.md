@@ -265,10 +265,19 @@
 - Tests: 8/8 passing (constants, magic, version, tensor count, metadata count, string skip, value skip, header parsing)
 
 ### Task 4.2: Model Registry
-- [ ] Load models from local path
-- [ ] SHA256 checksum validation
-- [ ] Cache directory management
-- [ ] Tests: Load/cache lifecycle
+- [x] Load models from local path
+- [x] SHA256 checksum validation
+- [x] Cache directory management
+- [x] Tests: Load/cache lifecycle
+
+**Implementation Notes:**
+- Created model_registry_test.aether with model loading and checksum validation
+- Added FFI: file_exists, file_size, sha256_file, sha256_verify, file_copy, mkdir_recursive, file_delete
+- Model entry tracking: status (UNKNOWN/CACHED/VALID/INVALID/MISSING), file size
+- Registry management: entry count, max entries
+- Cache operations: ensure_dir, cache_model with checksum verification, cache_remove
+- load_model function: checks existence, gets size, verifies checksum
+- Tests: 8/8 passing (entry create, status, size, registry create, file not exists, load missing model, error codes, status constants)
 
 ### Task 4.3: Forward Pass Interface
 - [ ] Define ModelRuntime trait

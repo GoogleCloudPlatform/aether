@@ -462,6 +462,167 @@ pub extern "C" fn int_to_int64(value: c_int) -> i64 {
     value as i64
 }
 
+/// Check if a file exists
+#[no_mangle]
+pub unsafe extern "C" fn file_exists(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return 0;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(path);
+    match c_str.to_str() {
+        Ok(path_str) => {
+            if std::path::Path::new(path_str).exists() { 1 } else { 0 }
+        }
+        Err(_) => 0,
+    }
+}
+
+/// Get file size in bytes
+#[no_mangle]
+pub unsafe extern "C" fn file_size(path: *const c_char) -> i64 {
+    if path.is_null() {
+        return -1;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(path);
+    match c_str.to_str() {
+        Ok(path_str) => {
+            match std::fs::metadata(path_str) {
+                Ok(meta) => meta.len() as i64,
+                Err(_) => -1,
+            }
+        }
+        Err(_) => -1,
+    }
+}
+
+/// Compute SHA256 hash of a file and return as hex string
+/// Returns null on error, caller must free the returned string
+#[no_mangle]
+pub unsafe extern "C" fn sha256_file(path: *const c_char) -> *mut c_char {
+    use sha2::{Sha256, Digest};
+    use std::io::Read;
+
+    if path.is_null() {
+        return ptr::null_mut();
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(path);
+    let path_str = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let mut file = match std::fs::File::open(path_str) {
+        Ok(f) => f,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 8192];
+
+    loop {
+        match file.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(n) => hasher.update(&buffer[..n]),
+            Err(_) => return ptr::null_mut(),
+        }
+    }
+
+    let result = hasher.finalize();
+    let hex_string: String = result.iter().map(|b| format!("{:02x}", b)).collect();
+
+    // Allocate and copy the hex string
+    let c_string = match std::ffi::CString::new(hex_string) {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    aether_strdup(c_string.as_ptr())
+}
+
+/// Verify a file's SHA256 hash matches expected
+/// Returns 1 if matches, 0 if mismatch, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn sha256_verify(path: *const c_char, expected: *const c_char) -> c_int {
+    if path.is_null() || expected.is_null() {
+        return -1;
+    }
+
+    let actual = sha256_file(path);
+    if actual.is_null() {
+        return -1;
+    }
+
+    let result = libc::strcmp(actual, expected);
+    aether_free(actual as *mut c_void);
+
+    if result == 0 { 1 } else { 0 }
+}
+
+/// Copy a file from source to destination
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn file_copy(src: *const c_char, dst: *const c_char) -> c_int {
+    if src.is_null() || dst.is_null() {
+        return -1;
+    }
+
+    let src_str = match std::ffi::CStr::from_ptr(src).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let dst_str = match std::ffi::CStr::from_ptr(dst).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match std::fs::copy(src_str, dst_str) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+/// Create directories recursively
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn mkdir_recursive(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return -1;
+    }
+
+    let path_str = match std::ffi::CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match std::fs::create_dir_all(path_str) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+/// Delete a file
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn file_delete(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return -1;
+    }
+
+    let path_str = match std::ffi::CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match std::fs::remove_file(path_str) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

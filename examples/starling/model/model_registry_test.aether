@@ -1,0 +1,529 @@
+// Model Registry - Task 4.2
+// Manages model loading, SHA256 checksum validation, and caching
+
+module model_registry_test;
+
+// ============================================================================
+// FFI Declarations - Print
+// ============================================================================
+
+@extern(library="aether_runtime", symbol="aether_print")
+func print(s: String) -> Int;
+
+// ============================================================================
+// FFI Declarations - File System Operations
+// ============================================================================
+
+@extern(library="aether_runtime", symbol="file_exists")
+func file_exists(path: String) -> Int;
+
+@extern(library="aether_runtime", symbol="file_size")
+func file_size(path: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="sha256_file")
+func sha256_file(path: String) -> String;
+
+@extern(library="aether_runtime", symbol="sha256_verify")
+func sha256_verify(path: String, expected: String) -> Int;
+
+@extern(library="aether_runtime", symbol="file_copy")
+func file_copy(src: String, dst: String) -> Int;
+
+@extern(library="aether_runtime", symbol="mkdir_recursive")
+func mkdir_recursive(path: String) -> Int;
+
+@extern(library="aether_runtime", symbol="file_delete")
+func file_delete(path: String) -> Int;
+
+// String comparison FFI
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Int;
+
+// String array FFI
+@extern(library="aether_runtime", symbol="string_array_create")
+func string_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="string_array_push")
+func string_array_push(arr: Int64, value: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="string_array_get")
+func string_array_get(arr: Int64, index: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_array_len")
+func string_array_len(arr: Int64) -> Int;
+
+// Int array for handles
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_len")
+func int_array_len(arr: Int64) -> Int;
+
+// Pointer utilities
+@extern(library="aether_runtime", symbol="ptr_is_null")
+func ptr_is_null(ptr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int64_to_int")
+func int64_to_int(value: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_to_int64")
+func int_to_int64(value: Int) -> Int64;
+
+// ============================================================================
+// Model Entry Status Constants (as functions for negative value support)
+// ============================================================================
+
+// Model status values
+func MODEL_STATUS_UNKNOWN() -> Int { return 0; }
+func MODEL_STATUS_CACHED() -> Int { return 1; }
+func MODEL_STATUS_VALID() -> Int { return 2; }
+func MODEL_STATUS_INVALID() -> Int { return 3; }
+func MODEL_STATUS_MISSING() -> Int { return 4; }
+
+// Error codes
+func ERR_NONE() -> Int { return 0; }
+func ERR_NOT_FOUND() -> Int { return {0 - 1}; }
+func ERR_CHECKSUM_MISMATCH() -> Int { return {0 - 2}; }
+func ERR_IO_ERROR() -> Int { return {0 - 3}; }
+func ERR_ALREADY_EXISTS() -> Int { return {0 - 4}; }
+func ERR_INVALID_PATH() -> Int { return {0 - 5}; }
+
+// ============================================================================
+// Model Entry - Stored as Int64 handle to int array
+// Layout:
+//   [0]: status (Int)
+//   [1]: file_size_low (Int) - lower 32 bits
+//   [2]: file_size_high (Int) - upper 32 bits
+// String data stored separately (path, checksum)
+// ============================================================================
+
+// Create a model entry
+func model_entry_create() -> Int64 {
+    let mut arr = int_array_create(3);
+    arr = int_array_push(arr, MODEL_STATUS_UNKNOWN());
+    arr = int_array_push(arr, 0);  // file_size_low
+    arr = int_array_push(arr, 0);  // file_size_high
+    return arr;
+}
+
+func model_entry_get_status(entry: Int64) -> Int {
+    return int_array_get(entry, 0);
+}
+
+func model_entry_set_status(entry: Int64, status: Int) -> Int {
+    return int_array_set(entry, 0, status);
+}
+
+func model_entry_get_size(entry: Int64) -> Int64 {
+    let low = int_array_get(entry, 1);
+    let high = int_array_get(entry, 2);
+    // Combine low and high into Int64
+    let high64 = int_to_int64(high);
+    let low64 = int_to_int64(low);
+    // high64 * 2^32 + low64
+    // Since we can't do bit shifts easily, use multiply
+    // 2^32 = 4294967296
+    // For now, just return low portion for files < 4GB
+    return low64;
+}
+
+func model_entry_set_size(entry: Int64, size: Int64) -> Int {
+    // Store lower 32 bits
+    let low = int64_to_int(size);
+    int_array_set(entry, 1, low);
+    // For files > 4GB, we'd need to extract high bits
+    // For now, just store 0 for high
+    int_array_set(entry, 2, 0);
+    return 0;
+}
+
+// ============================================================================
+// Model Registry - Stored as Int64 handle
+// Uses parallel arrays for entries and metadata
+// ============================================================================
+
+// Registry layout (stored in int array):
+//   [0]: entry_count
+//   [1]: max_entries
+
+// Create a new model registry with cache directory
+func registry_create(max_entries: Int) -> Int64 {
+    let mut arr = int_array_create({max_entries + 2});
+    arr = int_array_push(arr, 0);           // entry_count
+    arr = int_array_push(arr, max_entries); // max_entries
+    return arr;
+}
+
+func registry_get_count(registry: Int64) -> Int {
+    return int_array_get(registry, 0);
+}
+
+func registry_get_max(registry: Int64) -> Int {
+    return int_array_get(registry, 1);
+}
+
+// ============================================================================
+// Model Loading Functions
+// ============================================================================
+
+// Check if a model file exists
+func model_exists(path: String) -> Bool {
+    let result = file_exists(path);
+    return {result == 1};
+}
+
+// Get the size of a model file
+func model_get_size(path: String) -> Int64 {
+    return file_size(path);
+}
+
+// Compute SHA256 checksum of a model file
+func model_compute_checksum(path: String) -> String {
+    return sha256_file(path);
+}
+
+// Verify a model file matches expected checksum
+// Returns: 1 = match, 0 = mismatch, -1 = error
+func model_verify_checksum(path: String, expected: String) -> Int {
+    return sha256_verify(path, expected);
+}
+
+// ============================================================================
+// Cache Management Functions
+// ============================================================================
+
+// Ensure cache directory exists
+func cache_ensure_dir(cache_path: String) -> Int {
+    let dir_exists = file_exists(cache_path);
+    if ({dir_exists == 1}) {
+        return ERR_NONE();
+    }
+    let result = mkdir_recursive(cache_path);
+    if ({result == 0}) {
+        return ERR_NONE();
+    }
+    return ERR_IO_ERROR();
+}
+
+// Copy a model to cache with verification
+func cache_model(src_path: String, dst_path: String, expected_checksum: String) -> Int {
+    // Check source exists
+    let src_exists = file_exists(src_path);
+    if ({src_exists != 1}) {
+        return ERR_NOT_FOUND();
+    }
+
+    // Verify source checksum before copying
+    if ({string_equals(expected_checksum, "") != 1}) {
+        let verify = sha256_verify(src_path, expected_checksum);
+        if ({verify == 0}) {
+            return ERR_CHECKSUM_MISMATCH();
+        }
+        if ({verify < 0}) {
+            return ERR_IO_ERROR();
+        }
+    }
+
+    // Copy file
+    let copy_result = file_copy(src_path, dst_path);
+    if ({copy_result != 0}) {
+        return ERR_IO_ERROR();
+    }
+
+    // Verify destination matches
+    if ({string_equals(expected_checksum, "") != 1}) {
+        let dst_verify = sha256_verify(dst_path, expected_checksum);
+        if ({dst_verify != 1}) {
+            // Clean up failed copy
+            file_delete(dst_path);
+            return ERR_CHECKSUM_MISMATCH();
+        }
+    }
+
+    return ERR_NONE();
+}
+
+// Remove a model from cache
+func cache_remove(path: String) -> Int {
+    let file_present = file_exists(path);
+    if ({file_present != 1}) {
+        return ERR_NOT_FOUND();
+    }
+    let result = file_delete(path);
+    if ({result == 0}) {
+        return ERR_NONE();
+    }
+    return ERR_IO_ERROR();
+}
+
+// ============================================================================
+// Model Loading Lifecycle
+// ============================================================================
+
+// Load a model from path, optionally verifying checksum
+// Returns model entry handle
+func load_model(path: String, expected_checksum: String) -> Int64 {
+    let mut entry = model_entry_create();
+
+    // Check if file exists
+    if ({model_exists(path) != true}) {
+        model_entry_set_status(entry, MODEL_STATUS_MISSING());
+        return entry;
+    }
+
+    // Get file size
+    let size = model_get_size(path);
+    model_entry_set_size(entry, size);
+
+    // Verify checksum if provided
+    if ({string_equals(expected_checksum, "") != 1}) {
+        let verify = model_verify_checksum(path, expected_checksum);
+        if ({verify == 1}) {
+            model_entry_set_status(entry, MODEL_STATUS_VALID());
+        } else if ({verify == 0}) {
+            model_entry_set_status(entry, MODEL_STATUS_INVALID());
+        } else {
+            model_entry_set_status(entry, MODEL_STATUS_UNKNOWN());
+        }
+    } else {
+        model_entry_set_status(entry, MODEL_STATUS_CACHED());
+    }
+
+    return entry;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Test 1: Create model entry
+func test_model_entry_create() -> Int {
+    let entry = model_entry_create();
+
+    // Initial status should be unknown
+    let status = model_entry_get_status(entry);
+    if ({status != MODEL_STATUS_UNKNOWN()}) {
+        return 1;
+    }
+
+    // Initial size should be 0
+    let size = model_entry_get_size(entry);
+    if ({int64_to_int(size) != 0}) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// Test 2: Set and get model status
+func test_model_entry_status() -> Int {
+    let entry = model_entry_create();
+
+    // Set to valid
+    model_entry_set_status(entry, MODEL_STATUS_VALID());
+    let status1 = model_entry_get_status(entry);
+    if ({status1 != MODEL_STATUS_VALID()}) {
+        return 1;
+    }
+
+    // Set to invalid
+    model_entry_set_status(entry, MODEL_STATUS_INVALID());
+    let status2 = model_entry_get_status(entry);
+    if ({status2 != MODEL_STATUS_INVALID()}) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// Test 3: Set and get model size
+func test_model_entry_size() -> Int {
+    let entry = model_entry_create();
+
+    // Set a size (using a value that fits in Int32)
+    model_entry_set_size(entry, int_to_int64(12345678));
+    let size = model_entry_get_size(entry);
+
+    if ({int64_to_int(size) != 12345678}) {
+        return 1;
+    }
+
+    return 0;
+}
+
+// Test 4: Create registry
+func test_registry_create() -> Int {
+    let registry = registry_create(10);
+
+    // Count should be 0
+    let count = registry_get_count(registry);
+    if ({count != 0}) {
+        return 1;
+    }
+
+    // Max should be 10
+    let max = registry_get_max(registry);
+    if ({max != 10}) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// Test 5: Check file that doesn't exist
+func test_file_not_exists() -> Int {
+    let file_found = model_exists("/nonexistent/path/to/model.gguf");
+    if ({file_found == true}) {
+        return 1;
+    }
+    return 0;
+}
+
+// Test 6: Load model that doesn't exist
+func test_load_missing_model() -> Int {
+    let entry = load_model("/nonexistent/model.gguf", "");
+
+    let status = model_entry_get_status(entry);
+    if ({status != MODEL_STATUS_MISSING()}) {
+        return 1;
+    }
+
+    return 0;
+}
+
+// Test 7: Error codes are correct
+func test_error_codes() -> Int {
+    if ({ERR_NONE() != 0}) {
+        return 1;
+    }
+    if ({ERR_NOT_FOUND() >= 0}) {
+        return 2;
+    }
+    if ({ERR_CHECKSUM_MISMATCH() >= 0}) {
+        return 3;
+    }
+    if ({ERR_IO_ERROR() >= 0}) {
+        return 4;
+    }
+    return 0;
+}
+
+// Test 8: Status constants are distinct
+func test_status_constants() -> Int {
+    if ({MODEL_STATUS_UNKNOWN() == MODEL_STATUS_CACHED()}) {
+        return 1;
+    }
+    if ({MODEL_STATUS_CACHED() == MODEL_STATUS_VALID()}) {
+        return 2;
+    }
+    if ({MODEL_STATUS_VALID() == MODEL_STATUS_INVALID()}) {
+        return 3;
+    }
+    if ({MODEL_STATUS_INVALID() == MODEL_STATUS_MISSING()}) {
+        return 4;
+    }
+    return 0;
+}
+
+// Main test runner
+func main() -> Int {
+    let mut passed = 0;
+    let mut failed = 0;
+
+    print("Model Registry Tests");
+    print("====================");
+
+    // Test 1
+    let r1 = test_model_entry_create();
+    if ({r1 == 0}) {
+        print("PASS: test_model_entry_create");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_model_entry_create");
+        failed = {failed + 1};
+    }
+
+    // Test 2
+    let r2 = test_model_entry_status();
+    if ({r2 == 0}) {
+        print("PASS: test_model_entry_status");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_model_entry_status");
+        failed = {failed + 1};
+    }
+
+    // Test 3
+    let r3 = test_model_entry_size();
+    if ({r3 == 0}) {
+        print("PASS: test_model_entry_size");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_model_entry_size");
+        failed = {failed + 1};
+    }
+
+    // Test 4
+    let r4 = test_registry_create();
+    if ({r4 == 0}) {
+        print("PASS: test_registry_create");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_registry_create");
+        failed = {failed + 1};
+    }
+
+    // Test 5
+    let r5 = test_file_not_exists();
+    if ({r5 == 0}) {
+        print("PASS: test_file_not_exists");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_file_not_exists");
+        failed = {failed + 1};
+    }
+
+    // Test 6
+    let r6 = test_load_missing_model();
+    if ({r6 == 0}) {
+        print("PASS: test_load_missing_model");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_load_missing_model");
+        failed = {failed + 1};
+    }
+
+    // Test 7
+    let r7 = test_error_codes();
+    if ({r7 == 0}) {
+        print("PASS: test_error_codes");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_error_codes");
+        failed = {failed + 1};
+    }
+
+    // Test 8
+    let r8 = test_status_constants();
+    if ({r8 == 0}) {
+        print("PASS: test_status_constants");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_status_constants");
+        failed = {failed + 1};
+    }
+
+    print("====================");
+    print("Tests completed");
+
+    return failed;
+}
