@@ -41,11 +41,17 @@
 - vocab_test.aether validates all functionality
 
 ### Task 1.2: BPE Encode
-- [ ] Split text to characters
-- [ ] Apply BPE merges iteratively
-- [ ] Convert tokens to IDs via vocab
+- [x] Split text to characters
+- [x] Apply BPE merges iteratively
+- [x] Convert tokens to IDs via vocab
 - [ ] Track byte offsets for each token
-- [ ] Tests: Golden files, unicode, empty input, unknown chars
+- [x] Tests: Golden files, unicode, empty input, unknown chars
+
+**Implementation Notes:**
+- Added UTF-8 character operations to runtime (string_to_chars, string_char_count, string_grapheme_at)
+- Uses unicode-segmentation crate for proper grapheme cluster handling
+- BPE algorithm implemented with merge priority lookup via string maps
+- Tests verify character splitting, merge lookup, merge selection, and string concatenation
 
 ### Task 1.3: BPE Decode
 - [ ] Convert IDs to token strings
@@ -348,7 +354,7 @@
 
 | Phase | Tasks | Complete | Status |
 |-------|-------|----------|--------|
-| 1. Tokenizer | 5 | 3 | In Progress |
+| 1. Tokenizer | 5 | 4 | In Progress |
 | 2. Sampler | 5 | 0 | Not Started |
 | 3. KV Cache | 6 | 0 | Not Started |
 | 4. Model Runtime | 6 | 0 | Not Started |

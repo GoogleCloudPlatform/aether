@@ -1,0 +1,290 @@
+module BPE;
+
+// ============================================================================
+// BPE (Byte Pair Encoding) Tokenizer
+//
+// Implements the BPE encoding algorithm:
+// 1. Split text into initial tokens (UTF-8 characters)
+// 2. Iteratively merge the most frequent pairs according to merge rules
+// 3. Convert final tokens to IDs using vocabulary
+// ============================================================================
+
+// --- FFI: String operations ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_concat")
+func string_concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+@extern(library="aether_runtime", symbol="aether_strdup")
+func aether_strdup(s: String) -> String;
+
+// --- FFI: UTF-8 character operations ---
+@extern(library="aether_runtime", symbol="string_to_chars")
+func string_to_chars(s: String) -> Array<String>;
+
+@extern(library="aether_runtime", symbol="string_char_count")
+func string_char_count(s: String) -> Int;
+
+// --- FFI: Array operations ---
+@extern(library="aether_runtime", symbol="array_length")
+func array_length(arr: Array<String>) -> Int;
+
+@extern(library="aether_runtime", symbol="array_get_string")
+func array_get_string(arr: Array<String>, index: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_array_push")
+func string_array_push(arr: Array<String>, value: String) -> Array<String>;
+
+// --- FFI: Map operations (from vocab.aether) ---
+@extern(library="aether_runtime", symbol="string_int_map_new")
+func string_int_map_new() -> Int64;
+
+@extern(library="aether_runtime", symbol="string_int_map_insert")
+func string_int_map_insert(map: Int64, key: String, value: Int) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_int_map_get")
+func string_int_map_get(map: Int64, key: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_int_map_contains")
+func string_int_map_contains(map: Int64, key: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_int_map_size")
+func string_int_map_size(map: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="string_int_map_free")
+func string_int_map_free(map: Int64) -> Void;
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+// A single merge rule: merge "left" + "right" -> "merged"
+struct MergeRule {
+    left: String;
+    right: String;
+    merged: String;
+    priority: Int;  // Lower = higher priority (earlier in merge file)
+}
+
+// BPE Encoder state
+struct BPEEncoder {
+    // Vocabulary: token -> ID
+    vocab: Int64;
+    // Merge rules indexed by "left+right" pair for fast lookup
+    merge_lookup: Int64;
+    // Number of merge rules
+    merge_count: Int;
+    // Unknown token ID
+    unk_token_id: Int;
+}
+
+// Encoded result with token IDs and optional byte offsets
+struct EncodedResult {
+    token_ids: Array<Int>;
+    tokens: Array<String>;
+    token_count: Int;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// Create a pair key for merge lookup: "left|||right"
+func make_pair_key(left: String, right: String) -> String {
+    let sep = "|||";
+    let tmp = string_concat(left, sep);
+    return string_concat(tmp, right);
+}
+
+// ============================================================================
+// BPE Encoder Implementation
+// ============================================================================
+
+// Create a new BPE encoder
+func bpe_encoder_new() -> BPEEncoder {
+    return BPEEncoder {
+        vocab: string_int_map_new(),
+        merge_lookup: string_int_map_new(),
+        merge_count: 0,
+        unk_token_id: 0
+    };
+}
+
+// Free BPE encoder resources
+func bpe_encoder_free(encoder: BPEEncoder) -> Void {
+    string_int_map_free(encoder.vocab);
+    string_int_map_free(encoder.merge_lookup);
+}
+
+// Add a token to the vocabulary
+func bpe_add_token(encoder: BPEEncoder, token: String, id: Int) -> Void {
+    string_int_map_insert(encoder.vocab, token, id);
+}
+
+// Add a merge rule
+// Priority is the order in the merge file (0 = highest priority)
+func bpe_add_merge(encoder: BPEEncoder, left: String, right: String, priority: Int) -> Void {
+    let pair_key = make_pair_key(left, right);
+    let merged = string_concat(left, right);
+    // Store priority in merge_lookup (lower = merge first)
+    string_int_map_insert(encoder.merge_lookup, pair_key, priority);
+}
+
+// Check if a merge exists for the given pair
+func bpe_has_merge(encoder: BPEEncoder, left: String, right: String) -> Bool {
+    let pair_key = make_pair_key(left, right);
+    return string_int_map_contains(encoder.merge_lookup, pair_key);
+}
+
+// Get merge priority (lower = higher priority, -1 if no merge)
+func bpe_get_merge_priority(encoder: BPEEncoder, left: String, right: String) -> Int {
+    let pair_key = make_pair_key(left, right);
+    return string_int_map_get(encoder.merge_lookup, pair_key);
+}
+
+// Get token ID from vocabulary (-1 if not found)
+func bpe_get_token_id(encoder: BPEEncoder, token: String) -> Int {
+    return string_int_map_get(encoder.vocab, token);
+}
+
+// ============================================================================
+// BPE Encoding Algorithm
+// ============================================================================
+
+// Find the best merge (lowest priority number) in the token sequence
+// Returns the index of the left token to merge, or -1 if no merge found
+func find_best_merge(encoder: BPEEncoder, tokens: Array<String>, token_count: Int) -> Int {
+    let mut best_idx = -1;
+    let mut best_priority = 999999999;  // Very high number
+
+    let mut i = 0;
+    while ({i < {token_count - 1}}) {
+        let left = array_get_string(tokens, i);
+        let right = array_get_string(tokens, {i + 1});
+
+        if (bpe_has_merge(encoder, left, right)) {
+            let priority = bpe_get_merge_priority(encoder, left, right);
+            if ({priority >= 0}) {
+                if ({priority < best_priority}) {
+                    best_priority = priority;
+                    best_idx = i;
+                }
+            }
+        }
+
+        i = {i + 1};
+    }
+
+    return best_idx;
+}
+
+// Encode text to token IDs
+// This is the main BPE encoding function
+func bpe_encode(encoder: BPEEncoder, text: String) -> EncodedResult {
+    // Step 1: Split text into UTF-8 characters
+    let chars = string_to_chars(text);
+    let mut token_count = array_length(chars);
+
+    // Handle empty input
+    if ({token_count == 0}) {
+        let empty_ids: Array<Int>;
+        let empty_tokens: Array<String>;
+        return EncodedResult {
+            token_ids: empty_ids,
+            tokens: empty_tokens,
+            token_count: 0
+        };
+    }
+
+    // Copy characters to a working array of tokens
+    // We'll modify this as we merge pairs
+    let mut tokens = chars;
+
+    // Step 2: Iteratively apply BPE merges
+    let mut merge_idx = find_best_merge(encoder, tokens, token_count);
+
+    while ({merge_idx >= 0}) {
+        // Get the tokens to merge
+        let left = array_get_string(tokens, merge_idx);
+        let right = array_get_string(tokens, {merge_idx + 1});
+        let merged = string_concat(left, right);
+
+        // Create new token array with merged pair
+        let empty_arr: Array<String>;
+        let mut new_tokens = empty_arr;
+
+        let mut j = 0;
+        while ({j < token_count}) {
+            if ({j == merge_idx}) {
+                // Insert merged token
+                new_tokens = string_array_push(new_tokens, merged);
+                // Skip the next token (it was merged)
+                j = {j + 2};
+            } else {
+                // Copy token as-is
+                let tok = array_get_string(tokens, j);
+                new_tokens = string_array_push(new_tokens, tok);
+                j = {j + 1};
+            }
+        }
+
+        tokens = new_tokens;
+        token_count = {token_count - 1};
+
+        // Find next merge
+        merge_idx = find_best_merge(encoder, tokens, token_count);
+    }
+
+    // Step 3: Convert tokens to IDs
+    let empty_ids: Array<Int>;
+    let mut token_ids = empty_ids;
+
+    let mut k = 0;
+    while ({k < token_count}) {
+        let tok = array_get_string(tokens, k);
+        let id = bpe_get_token_id(encoder, tok);
+
+        if ({id >= 0}) {
+            // TODO: Need int_array_push FFI
+            // For now, we just store the tokens
+        } else {
+            // Unknown token - use unk_token_id
+            // TODO: Handle UNK token
+        }
+
+        k = {k + 1};
+    }
+
+    return EncodedResult {
+        token_ids: token_ids,
+        tokens: tokens,
+        token_count: token_count
+    };
+}
+
+// Simple encode that returns just the token strings (for testing)
+func bpe_encode_to_tokens(encoder: BPEEncoder, text: String) -> Array<String> {
+    let result = bpe_encode(encoder, text);
+    return result.tokens;
+}
+
+// Get token count after encoding
+func bpe_token_count(encoder: BPEEncoder, text: String) -> Int {
+    let result = bpe_encode(encoder, text);
+    return result.token_count;
+}
