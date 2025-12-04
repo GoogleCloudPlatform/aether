@@ -199,6 +199,44 @@ Full implementation needed for:
 - Move semantics verification
 - Reference validity tracking
 
+#### Real-World Pain Point (from Starling LLM implementation)
+
+Currently, passing a struct to a function moves it, requiring verbose workarounds:
+
+```aether
+// CURRENT: Must extract all fields before passing struct
+func tensor_zeros(shape: TensorShape) -> Tensor {
+    // Extract ALL fields BEFORE moving shape to shape_numel
+    let ndim = shape.ndim;
+    let dim0 = shape.dim0;
+    let dim1 = shape.dim1;
+    let numel = shape_numel(shape);  // shape is now moved/invalid
+    // Must reconstruct shape from extracted fields
+    return Tensor { shape: TensorShape { ndim: ndim, dim0: dim0, ... }, ... };
+}
+```
+
+**Proposed Solution - Borrowing References:**
+
+```aether
+// FUTURE: Borrow reference, struct remains valid
+func shape_numel(shape: &TensorShape) -> Int { ... }
+
+func tensor_zeros(shape: TensorShape) -> Tensor {
+    let numel = shape_numel(&shape);  // borrows, doesn't move
+    return Tensor { shape: shape, ... };  // shape still valid
+}
+```
+
+**Alternative - Copy trait for small structs:**
+
+```aether
+@derive(Copy)  // Auto-copy for structs with only primitive fields
+struct TensorShape { ndim: Int; dim0: Int; dim1: Int; ... }
+```
+
+Priority: HIGH - This significantly impacts ergonomics for any non-trivial code.
+
 ```aether
 (LIFETIME 'a)
 (LIFETIME 'b (OUTLIVES 'a))
