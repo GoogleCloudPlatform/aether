@@ -1248,6 +1248,238 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static TIMER_START: AtomicU64 = AtomicU64::new(0);
 
+// =============================================================================
+// Random Number Generator - Seeded LCG for deterministic sampling
+// =============================================================================
+
+// Simple Linear Congruential Generator state
+// Uses constants from Numerical Recipes
+static RNG_STATE: AtomicU64 = AtomicU64::new(12345);
+
+/// Seed the random number generator
+#[no_mangle]
+pub extern "C" fn rng_seed(seed: c_int) -> c_int {
+    RNG_STATE.store(seed as u64, Ordering::SeqCst);
+    0
+}
+
+/// Get next random integer (full range)
+#[no_mangle]
+pub extern "C" fn rng_next() -> c_int {
+    // LCG: state = (a * state + c) mod m
+    // Using constants from Numerical Recipes
+    let a: u64 = 1664525;
+    let c: u64 = 1013904223;
+    let state = RNG_STATE.load(Ordering::SeqCst);
+    let new_state = state.wrapping_mul(a).wrapping_add(c);
+    RNG_STATE.store(new_state, Ordering::SeqCst);
+    (new_state >> 16) as c_int  // Use upper bits for better randomness
+}
+
+/// Get random integer in range [0, max)
+#[no_mangle]
+pub extern "C" fn rng_next_range(max: c_int) -> c_int {
+    if max <= 0 {
+        return 0;
+    }
+    let r = rng_next();
+    // Use modulo (simple approach, slight bias for large ranges)
+    ((r as u32) % (max as u32)) as c_int
+}
+
+/// Get random float in range [0, 1) - returns f64 for Aether Float
+#[no_mangle]
+pub extern "C" fn rng_next_float() -> f64 {
+    let r = rng_next() as u32;
+    (r as f64) / (u32::MAX as f64)
+}
+
+// =============================================================================
+// Float Array Functions - for logits/probabilities
+// =============================================================================
+
+/// Float array structure (uses f64 to match Aether Float type)
+#[repr(C)]
+struct FloatArray {
+    length: i32,
+    capacity: i32,
+}
+
+/// Create a float array with given initial capacity
+#[no_mangle]
+pub unsafe extern "C" fn float_array_create(capacity: c_int) -> *mut c_void {
+    let cap = if capacity <= 0 { 4 } else { capacity as usize };
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<f64>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut FloatArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = 0;
+    (*array_ptr).capacity = cap as i32;
+
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
+/// Push a float onto the array (f64 for Aether Float)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_push(array_ptr: *mut c_void, value: f64) -> *mut c_void {
+    if array_ptr.is_null() {
+        let new_array = float_array_create(4);
+        if new_array.is_null() {
+            return ptr::null_mut();
+        }
+        return float_array_push(new_array, value);
+    }
+
+    let array = array_ptr as *mut FloatArray;
+    let length = (*array).length;
+    let capacity = (*array).capacity;
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+
+    if length >= capacity {
+        let new_capacity = (capacity * 2) as usize;
+        let new_size = aligned_offset + new_capacity * mem::size_of::<f64>();
+
+        let new_array_ptr = crate::memory_alloc::aether_safe_malloc(new_size) as *mut FloatArray;
+        if new_array_ptr.is_null() {
+            return array_ptr;
+        }
+
+        (*new_array_ptr).length = length;
+        (*new_array_ptr).capacity = new_capacity as i32;
+
+        let old_elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+        let new_elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+        ptr::copy_nonoverlapping(old_elements, new_elements, length as usize);
+
+        crate::memory_alloc::aether_safe_free(array_ptr);
+
+        let elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+        *elements.add(length as usize) = value;
+        (*new_array_ptr).length = length + 1;
+
+        return new_array_ptr as *mut c_void;
+    }
+
+    let elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+    *elements.add(length as usize) = value;
+    (*array).length = length + 1;
+
+    array_ptr
+}
+
+/// Get float at index (f64 for Aether Float)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_get(array_ptr: *mut c_void, index: c_int) -> f64 {
+    if array_ptr.is_null() || index < 0 {
+        return 0.0;
+    }
+
+    let array = array_ptr as *mut FloatArray;
+    if index >= (*array).length {
+        return 0.0;
+    }
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+
+    *elements.add(index as usize)
+}
+
+/// Set float at index (f64 for Aether Float)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_set(array_ptr: *mut c_void, index: c_int, value: f64) -> c_int {
+    if array_ptr.is_null() || index < 0 {
+        return -1;
+    }
+
+    let array = array_ptr as *mut FloatArray;
+    if index >= (*array).length {
+        return -1;
+    }
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+
+    *elements.add(index as usize) = value;
+    0
+}
+
+/// Get float array length
+#[no_mangle]
+pub unsafe extern "C" fn float_array_length(array_ptr: *mut c_void) -> c_int {
+    if array_ptr.is_null() {
+        return 0;
+    }
+    let array = array_ptr as *mut FloatArray;
+    (*array).length
+}
+
+/// Free float array
+#[no_mangle]
+pub unsafe extern "C" fn float_array_free(array_ptr: *mut c_void) {
+    if !array_ptr.is_null() {
+        crate::memory_alloc::aether_safe_free(array_ptr);
+    }
+}
+
+// =============================================================================
+// Math Functions - for sampling operations (f64 for Aether Float type)
+// =============================================================================
+
+/// Exponential function
+#[no_mangle]
+pub extern "C" fn math_exp(x: f64) -> f64 {
+    x.exp()
+}
+
+/// Natural logarithm
+#[no_mangle]
+pub extern "C" fn math_log(x: f64) -> f64 {
+    x.ln()
+}
+
+/// Maximum of two floats
+#[no_mangle]
+pub extern "C" fn math_max_f(a: f64, b: f64) -> f64 {
+    a.max(b)
+}
+
+/// Minimum of two floats
+#[no_mangle]
+pub extern "C" fn math_min_f(a: f64, b: f64) -> f64 {
+    a.min(b)
+}
+
+/// Float to int conversion (Aether Float is f64)
+#[no_mangle]
+pub extern "C" fn float_to_int(x: f64) -> c_int {
+    x as c_int
+}
+
+/// Int to float conversion (Aether Float is f64)
+#[no_mangle]
+pub extern "C" fn int_to_float(x: c_int) -> f64 {
+    x as f64
+}
+
 /// Start a timer for benchmarking
 /// Returns 0 on success
 #[no_mangle]

@@ -101,19 +101,33 @@
 ## Phase 2: Sampler Pipeline
 
 ### Task 2.1: Sampler Framework
-- [ ] Define Sampler trait/interface
-- [ ] Implement SamplerState (carries RNG, context)
-- [ ] Deterministic seeded RNG
-- [ ] Tests: Same seed → same output
+- [x] Define Sampler trait/interface
+- [x] Implement SamplerState (carries RNG, context)
+- [x] Deterministic seeded RNG
+- [x] Tests: Same seed → same output
+
+**Implementation Notes:**
+- Added seeded RNG to runtime (LCG algorithm with rng_seed, rng_next, rng_next_float)
+- Added float array FFI functions (float_array_create, push, get, set, length, free)
+- Added math functions (math_exp, math_log, math_max_f, math_min_f)
+- All functions use f64 to match Aether's Float type
+- Created SamplerConfig struct with temperature, top_k, top_p, seed
+- sampler_test.aether has 5 passing tests (RNG determinism, float array, softmax, temperature, sampling determinism)
 
 ### Task 2.2: Logit Processors
-- [ ] Temperature scaling
-- [ ] Top-k filtering
-- [ ] Top-p (nucleus) filtering
+- [x] Temperature scaling
+- [x] Top-k filtering
+- [x] Top-p (nucleus) filtering
 - [ ] Repetition penalty
 - [ ] Frequency penalty
 - [ ] Presence penalty
 - [ ] Tests: Each processor in isolation
+
+**Implementation Notes:**
+- apply_temperature implemented (divides logits by temperature)
+- apply_top_k implemented (sets non-top-k logits to -inf)
+- apply_top_p implemented (keeps smallest set with cumsum >= p, renormalizes)
+- Remaining penalties to be added when needed for full sampling
 
 ### Task 2.3: Stop Conditions
 - [ ] EOS token detection
@@ -122,15 +136,24 @@
 - [ ] Tests: Various stop conditions
 
 ### Task 2.4: Multinomial Sampling
-- [ ] Convert logits to probabilities (softmax)
-- [ ] Sample from distribution with RNG
+- [x] Convert logits to probabilities (softmax)
+- [x] Sample from distribution with RNG
 - [ ] Optional: logprobs capture
-- [ ] Tests: Distribution correctness, determinism
+- [x] Tests: Distribution correctness, determinism
+
+**Implementation Notes:**
+- softmax implemented with numerical stability (subtract max before exp)
+- sample_token uses cumulative distribution for multinomial sampling
+- sample_from_logits provides full pipeline: temp → top_k → softmax → top_p → sample
 
 ### Task 2.5: Sampler Integration
-- [ ] Chain processors in correct order
-- [ ] Configurable via request params
+- [x] Chain processors in correct order
+- [x] Configurable via request params
 - [ ] Tests: End-to-end sampling with fixed logits
+
+**Implementation Notes:**
+- sample_from_logits chains all processors in correct order
+- SamplerConfig struct allows configuring all parameters
 
 ---
 
@@ -379,7 +402,7 @@
 | Phase | Tasks | Complete | Status |
 |-------|-------|----------|--------|
 | 1. Tokenizer | 5 | 5 | Complete |
-| 2. Sampler | 5 | 0 | Not Started |
+| 2. Sampler | 5 | 3 | In Progress |
 | 3. KV Cache | 6 | 0 | Not Started |
 | 4. Model Runtime | 6 | 0 | Not Started |
 | 5. Scheduler | 5 | 0 | Not Started |

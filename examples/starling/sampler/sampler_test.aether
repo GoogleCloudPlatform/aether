@@ -1,0 +1,439 @@
+module SamplerTest;
+
+// ============================================================================
+// Tests for Sampler Framework
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Random Number Generator ---
+@extern(library="aether_runtime", symbol="rng_seed")
+func rng_seed(seed: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="rng_next")
+func rng_next() -> Int;
+
+@extern(library="aether_runtime", symbol="rng_next_float")
+func rng_next_float() -> Float;
+
+// --- FFI: Float Array ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Math ---
+@extern(library="aether_runtime", symbol="math_exp")
+func math_exp(x: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="math_max_f")
+func math_max_f(a: Float, b: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_to_int")
+func float_to_int(x: Float) -> Int;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+func print_float(label: String, val: Float) -> Void {
+    // Simple float printing - integer part only for now
+    aether_print(label);
+    aether_print(": ");
+    let int_part = float_to_int(val);
+    aether_print(int_to_string(int_part));
+    aether_print("\n");
+}
+
+// ============================================================================
+// Softmax Implementation (copied from sampler.aether for standalone test)
+// ============================================================================
+
+func softmax(logits: Int64) -> Int64 {
+    let n = float_array_length(logits);
+    if (n == 0) {
+        return float_array_create(0);
+    }
+
+    let mut max_val = float_array_get(logits, 0);
+    let mut i = 1;
+    while (i < n) {
+        let val = float_array_get(logits, i);
+        max_val = math_max_f(max_val, val);
+        i = i + 1;
+    }
+
+    let mut probs = float_array_create(n);
+    let mut sum = 0.0;
+    i = 0;
+    while (i < n) {
+        let val = float_array_get(logits, i);
+        let exp_val = math_exp({val - max_val});
+        probs = float_array_push(probs, exp_val);
+        sum = {sum + exp_val};
+        i = i + 1;
+    }
+
+    i = 0;
+    while (i < n) {
+        let val = float_array_get(probs, i);
+        float_array_set(probs, i, {val / sum});
+        i = i + 1;
+    }
+
+    return probs;
+}
+
+func apply_temperature(logits: Int64, temperature: Float) -> Void {
+    if ({temperature <= 0.0}) {
+        return;
+    }
+    if ({temperature == 1.0}) {
+        return;
+    }
+
+    let n = float_array_length(logits);
+    let mut i = 0;
+    while (i < n) {
+        let val = float_array_get(logits, i);
+        float_array_set(logits, i, {val / temperature});
+        i = i + 1;
+    }
+}
+
+func sample_token(probs: Int64) -> Int {
+    let n = float_array_length(probs);
+    if (n == 0) {
+        return -1;
+    }
+
+    let r = rng_next_float();
+    let mut cumsum = 0.0;
+
+    let mut i = 0;
+    while (i < n) {
+        cumsum = {cumsum + float_array_get(probs, i)};
+        if ({r < cumsum}) {
+            return i;
+        }
+        i = i + 1;
+    }
+
+    return {n - 1};
+}
+
+// ============================================================================
+// Test: RNG Determinism
+// ============================================================================
+
+func test_rng_determinism() -> Bool {
+    println("=== Test: RNG Determinism ===");
+
+    // Seed RNG
+    rng_seed(42);
+
+    // Generate sequence
+    let r1 = rng_next();
+    let r2 = rng_next();
+    let r3 = rng_next();
+
+    // Re-seed with same seed
+    rng_seed(42);
+
+    // Generate again
+    let r1b = rng_next();
+    let r2b = rng_next();
+    let r3b = rng_next();
+
+    // Should be identical
+    if ({r1 != r1b}) {
+        println("FAIL: First values don't match");
+        return false;
+    }
+    if ({r2 != r2b}) {
+        println("FAIL: Second values don't match");
+        return false;
+    }
+    if ({r3 != r3b}) {
+        println("FAIL: Third values don't match");
+        return false;
+    }
+
+    println("PASS: RNG Determinism");
+    return true;
+}
+
+// ============================================================================
+// Test: Float Array Operations
+// ============================================================================
+
+func test_float_array() -> Bool {
+    println("=== Test: Float Array ===");
+
+    let arr = float_array_create(4);
+    let mut arr2 = float_array_push(arr, 1.5);
+    arr2 = float_array_push(arr2, 2.5);
+    arr2 = float_array_push(arr2, 3.5);
+
+    let len = float_array_length(arr2);
+    if ({len != 3}) {
+        aether_print("FAIL: Expected length 3, got ");
+        println(int_to_string(len));
+        float_array_free(arr2);
+        return false;
+    }
+
+    let v0 = float_array_get(arr2, 0);
+    let v1 = float_array_get(arr2, 1);
+    let v2 = float_array_get(arr2, 2);
+
+    // Check values (integer comparison for simplicity)
+    if ({float_to_int(v0) != 1}) {
+        println("FAIL: arr[0] should be ~1.5");
+        float_array_free(arr2);
+        return false;
+    }
+    if ({float_to_int(v1) != 2}) {
+        println("FAIL: arr[1] should be ~2.5");
+        float_array_free(arr2);
+        return false;
+    }
+
+    float_array_free(arr2);
+    println("PASS: Float Array");
+    return true;
+}
+
+// ============================================================================
+// Test: Softmax
+// ============================================================================
+
+func test_softmax() -> Bool {
+    println("=== Test: Softmax ===");
+
+    // Create logits [0, 0, 0] - should give uniform [0.333, 0.333, 0.333]
+    let mut logits = float_array_create(3);
+    logits = float_array_push(logits, 0.0);
+    logits = float_array_push(logits, 0.0);
+    logits = float_array_push(logits, 0.0);
+
+    let probs = softmax(logits);
+
+    // All should be approximately 0.333
+    let p0 = float_array_get(probs, 0);
+    let p1 = float_array_get(probs, 1);
+    let p2 = float_array_get(probs, 2);
+
+    // Check sum is ~1.0
+    let sum = {p0 + p1 + p2};
+    // Allow small tolerance
+    if ({sum < 0.99}) {
+        println("FAIL: Probabilities don't sum to 1");
+        float_array_free(logits);
+        float_array_free(probs);
+        return false;
+    }
+    if ({sum > 1.01}) {
+        println("FAIL: Probabilities sum to > 1");
+        float_array_free(logits);
+        float_array_free(probs);
+        return false;
+    }
+
+    // Check all roughly equal
+    let diff = {p0 - p1};
+    if ({diff > 0.01}) {
+        println("FAIL: Uniform logits should give uniform probs");
+        float_array_free(logits);
+        float_array_free(probs);
+        return false;
+    }
+    if ({diff < -0.01}) {
+        println("FAIL: Uniform logits should give uniform probs (neg)");
+        float_array_free(logits);
+        float_array_free(probs);
+        return false;
+    }
+
+    float_array_free(logits);
+    float_array_free(probs);
+
+    println("PASS: Softmax");
+    return true;
+}
+
+// ============================================================================
+// Test: Temperature
+// ============================================================================
+
+func test_temperature() -> Bool {
+    println("=== Test: Temperature ===");
+
+    // Create logits [1, 2, 3]
+    let mut logits = float_array_create(3);
+    logits = float_array_push(logits, 1.0);
+    logits = float_array_push(logits, 2.0);
+    logits = float_array_push(logits, 3.0);
+
+    // Apply temperature 2.0 - should halve the values
+    apply_temperature(logits, 2.0);
+
+    let v0 = float_array_get(logits, 0);
+    let v1 = float_array_get(logits, 1);
+
+    // Should be 0.5 and 1.0
+    if ({v0 > 0.6}) {
+        println("FAIL: Temperature not applied correctly");
+        float_array_free(logits);
+        return false;
+    }
+    if ({v0 < 0.4}) {
+        println("FAIL: Temperature not applied correctly (too low)");
+        float_array_free(logits);
+        return false;
+    }
+
+    float_array_free(logits);
+    println("PASS: Temperature");
+    return true;
+}
+
+// ============================================================================
+// Test: Sampling Determinism
+// ============================================================================
+
+func test_sampling_determinism() -> Bool {
+    println("=== Test: Sampling Determinism ===");
+
+    // Create fixed probabilities [0.1, 0.3, 0.6]
+    let mut probs1 = float_array_create(3);
+    probs1 = float_array_push(probs1, 0.1);
+    probs1 = float_array_push(probs1, 0.3);
+    probs1 = float_array_push(probs1, 0.6);
+
+    // Sample with fixed seed
+    rng_seed(12345);
+    let s1 = sample_token(probs1);
+    let s2 = sample_token(probs1);
+    let s3 = sample_token(probs1);
+
+    // Create same probs again
+    let mut probs2 = float_array_create(3);
+    probs2 = float_array_push(probs2, 0.1);
+    probs2 = float_array_push(probs2, 0.3);
+    probs2 = float_array_push(probs2, 0.6);
+
+    // Re-seed and sample
+    rng_seed(12345);
+    let s1b = sample_token(probs2);
+    let s2b = sample_token(probs2);
+    let s3b = sample_token(probs2);
+
+    float_array_free(probs1);
+    float_array_free(probs2);
+
+    // Should be identical
+    if ({s1 != s1b}) {
+        println("FAIL: Sample 1 differs");
+        return false;
+    }
+    if ({s2 != s2b}) {
+        println("FAIL: Sample 2 differs");
+        return false;
+    }
+    if ({s3 != s3b}) {
+        println("FAIL: Sample 3 differs");
+        return false;
+    }
+
+    println("PASS: Sampling Determinism");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("Sampler Framework Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_rng_determinism()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_float_array()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_softmax()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_temperature()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_sampling_determinism()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}
