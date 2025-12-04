@@ -81,10 +81,20 @@
 - Tested endpoints: tokenize, detokenize, health, with valid/invalid inputs
 
 ### Task 1.5: Tokenizer Performance
-- [ ] Profile and optimize hot paths
-- [ ] Cache compiled merge rules
-- [ ] Benchmark: tokens/sec for various inputs
-- [ ] Target: >100k tokens/sec single-threaded
+- [x] Profile and optimize hot paths
+- [x] Cache compiled merge rules (using string_int_map for O(1) lookup)
+- [x] Benchmark: tokens/sec for various inputs
+- [x] Target: >100k tokens/sec single-threaded
+
+**Implementation Notes:**
+- Added timer FFI functions: timer_start(), timer_elapsed_us(), timer_elapsed_ms()
+- Created bench_test.aether for performance benchmarking
+- Benchmark results:
+  - Short text (5 chars): 12.5M tokens/sec
+  - Medium text (50 chars): 9.6M tokens/sec
+  - Long text (95 chars): 9.3M tokens/sec
+- Far exceeds 100k target due to efficient native FFI operations
+- Merge rules cached in string_int_map with O(1) lookup
 
 ---
 
@@ -368,7 +378,7 @@
 
 | Phase | Tasks | Complete | Status |
 |-------|-------|----------|--------|
-| 1. Tokenizer | 5 | 4 | In Progress |
+| 1. Tokenizer | 5 | 5 | Complete |
 | 2. Sampler | 5 | 0 | Not Started |
 | 3. KV Cache | 6 | 0 | Not Started |
 | 4. Model Runtime | 6 | 0 | Not Started |

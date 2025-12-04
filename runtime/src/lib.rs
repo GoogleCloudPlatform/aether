@@ -1240,6 +1240,48 @@ pub unsafe extern "C" fn aether_drop_value(value_ptr: *mut c_void, type_id: c_in
     }
 }
 
+// =============================================================================
+// Timing Functions - for benchmarking
+// =============================================================================
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TIMER_START: AtomicU64 = AtomicU64::new(0);
+
+/// Start a timer for benchmarking
+/// Returns 0 on success
+#[no_mangle]
+pub extern "C" fn timer_start() -> c_int {
+    // Store a reference point using the system
+    TIMER_START.store(std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64, Ordering::SeqCst);
+    0
+}
+
+/// Get elapsed time in microseconds since timer_start was called
+#[no_mangle]
+pub extern "C" fn timer_elapsed_us() -> c_int {
+    let start = TIMER_START.load(Ordering::SeqCst);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    ((now - start) / 1000) as c_int
+}
+
+/// Get elapsed time in milliseconds since timer_start was called
+#[no_mangle]
+pub extern "C" fn timer_elapsed_ms() -> c_int {
+    let start = TIMER_START.load(Ordering::SeqCst);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    ((now - start) / 1_000_000) as c_int
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
