@@ -618,3 +618,53 @@ See: [Architecture - Bootstrapping Roadmap](architecture.md#bootstrapping-roadma
 ### Task 28.4: Self-Hosting
 - [ ] **Build**: Compile Aether compiler with itself
 - [ ] **Verify**: Stage 2 compiler produces identical output to Stage 1
+
+---
+
+## Phase 29: Borrowing References
+
+**Priority**: HIGH - Significantly impacts ergonomics for non-trivial code.
+
+**Problem (discovered in Starling LLM implementation):**
+
+Currently, passing a struct to a function moves it, requiring verbose workarounds:
+
+```aether
+// CURRENT: Must extract all fields before passing struct
+func tensor_zeros(shape: TensorShape) -> Tensor {
+    // Extract ALL fields BEFORE moving shape to shape_numel
+    let ndim = shape.ndim;
+    let dim0 = shape.dim0;
+    let dim1 = shape.dim1;
+    let numel = shape_numel(shape);  // shape is now moved/invalid
+    // Must reconstruct shape from extracted fields
+    return Tensor { shape: TensorShape { ndim: ndim, dim0: dim0, ... }, ... };
+}
+```
+
+### Task 29.1: Implement Borrowing References (`&T`)
+- [ ] **Parser**: Add `&T` and `&mut T` reference type syntax
+- [ ] **Semantic**: Track borrowed vs owned in type system
+- [ ] **Semantic**: Implement borrow checker (no use after move, no aliased mutable borrows)
+- [ ] **LLVM**: Generate pointer-based code for references
+
+**Target syntax:**
+```aether
+func shape_numel(shape: &TensorShape) -> Int { ... }
+
+func tensor_zeros(shape: TensorShape) -> Tensor {
+    let numel = shape_numel(&shape);  // borrows, doesn't move
+    return Tensor { shape: shape, ... };  // shape still valid
+}
+```
+
+### Task 29.2: Implement Copy Trait for Small Structs (Alternative/Complement)
+- [ ] **Parser**: Add `@derive(Copy)` annotation
+- [ ] **Semantic**: Auto-copy structs with only primitive fields when passed
+- [ ] **Tests**: Verify copy semantics for annotated structs
+
+**Target syntax:**
+```aether
+@derive(Copy)  // Auto-copy for structs with only primitive fields
+struct TensorShape { ndim: Int; dim0: Int; dim1: Int; dim2: Int; dim3: Int; }
+```
