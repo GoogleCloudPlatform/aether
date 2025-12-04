@@ -3333,6 +3333,16 @@ impl Parser {
             });
         }
 
+        // Dereference: *expr
+        if self.check(&TokenType::Star) {
+            self.advance(); // consume '*'
+            let operand = self.parse_unary_expression()?;
+            return Ok(Expression::Dereference {
+                pointer: Box::new(operand),
+                source_location: start_location,
+            });
+        }
+
         self.parse_postfix_expression()
     }
 

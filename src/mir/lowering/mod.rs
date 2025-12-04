@@ -5149,6 +5149,15 @@ impl LoweringContext {
         let pointer_type = self.get_expression_type(pointer)?;
         let _target_type = match pointer_type {
             Type::Pointer { target_type, .. } => (*target_type).clone(),
+            // Borrowed and mutable borrowed references can also be dereferenced
+            Type::Owned {
+                base_type,
+                ownership: crate::types::OwnershipKind::Borrowed,
+            }
+            | Type::Owned {
+                base_type,
+                ownership: crate::types::OwnershipKind::MutableBorrow,
+            } => (*base_type).clone(),
             _ => {
                 return Err(SemanticError::TypeMismatch {
                     expected: "pointer type".to_string(),

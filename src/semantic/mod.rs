@@ -2687,9 +2687,18 @@ impl SemanticAnalyzer {
                 source_location,
             } => {
                 let pointer_type = self.analyze_expression(pointer)?;
-                // Check that it's a pointer type
+                // Check that it's a pointer type or borrowed reference type
                 match pointer_type {
                     Type::Pointer { target_type, .. } => Ok((*target_type).clone()),
+                    // Borrowed and mutable borrowed references can also be dereferenced
+                    Type::Owned {
+                        base_type,
+                        ownership: crate::types::OwnershipKind::Borrowed,
+                    }
+                    | Type::Owned {
+                        base_type,
+                        ownership: crate::types::OwnershipKind::MutableBorrow,
+                    } => Ok((*base_type).clone()),
                     _ => Err(SemanticError::TypeMismatch {
                         expected: "pointer type".to_string(),
                         found: pointer_type.to_string(),

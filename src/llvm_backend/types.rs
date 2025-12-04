@@ -178,10 +178,26 @@ impl<'ctx> TypeConverter<'ctx> {
                 location: crate::error::SourceLocation::unknown(),
             }),
 
-            Type::Owned { base_type, .. } => {
-                // Owned types have the same representation as their base type
-                // The ownership is tracked at compile time, not runtime
-                self.convert_type(base_type)
+            Type::Owned {
+                base_type, ownership, ..
+            } => {
+                use crate::types::OwnershipKind;
+                match ownership {
+                    // Owned (^T) - pass by value, same as base type
+                    OwnershipKind::Owned => self.convert_type(base_type),
+                    // Borrowed (&T) and MutableBorrow (&mut T) - pass as pointer
+                    OwnershipKind::Borrowed | OwnershipKind::MutableBorrow => {
+                        let base_llvm_type = self.convert_type(base_type)?;
+                        let ptr_type = base_llvm_type.ptr_type(AddressSpace::default());
+                        Ok(BasicTypeEnum::PointerType(ptr_type))
+                    }
+                    // Shared (~T) - reference counted, also a pointer
+                    OwnershipKind::Shared => {
+                        let base_llvm_type = self.convert_type(base_type)?;
+                        let ptr_type = base_llvm_type.ptr_type(AddressSpace::default());
+                        Ok(BasicTypeEnum::PointerType(ptr_type))
+                    }
+                }
             }
 
             Type::Module(_) => Err(SemanticError::InvalidType {
