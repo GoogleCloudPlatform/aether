@@ -22,6 +22,7 @@ use std::mem;
 use std::ptr;
 use std::panic::{self, PanicInfo};
 use backtrace::Backtrace;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Initialize the AetherScript runtime
 /// This function must be called at the beginning of every AetherScript program
@@ -988,6 +989,96 @@ pub unsafe extern "C" fn string_join(strings_array: *mut c_void, delimiter: *con
     }
     
     ptr
+}
+
+/// Split a string into an array of UTF-8 characters
+/// Each character is returned as a separate string
+#[no_mangle]
+pub unsafe extern "C" fn string_to_chars(str: *const c_char) -> *mut c_void {
+    if str.is_null() {
+        return ptr::null_mut();
+    }
+
+    let s = match CStr::from_ptr(str).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let chars: Vec<&str> = s.graphemes(true).collect();
+    let count = chars.len();
+
+    // Create array to hold string pointers with proper alignment
+    let header_size = mem::size_of::<AetherArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let array_size = aligned_offset + count * mem::size_of::<*mut c_char>();
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut AetherArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = count as i32;
+
+    // Copy each character as a string
+    let strings_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut *mut c_char;
+    for (i, ch) in chars.iter().enumerate() {
+        let char_with_null = format!("{}\0", ch);
+        let len = char_with_null.len();
+        let str_ptr = crate::memory_alloc::aether_safe_malloc(len) as *mut c_char;
+
+        if !str_ptr.is_null() {
+            ptr::copy_nonoverlapping(char_with_null.as_ptr() as *const c_char, str_ptr, len);
+            *strings_ptr.add(i) = str_ptr;
+        }
+    }
+
+    array_ptr as *mut c_void
+}
+
+/// Get the number of UTF-8 characters (grapheme clusters) in a string
+#[no_mangle]
+pub unsafe extern "C" fn string_char_count(str: *const c_char) -> c_int {
+    if str.is_null() {
+        return 0;
+    }
+
+    let s = match CStr::from_ptr(str).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+
+    s.graphemes(true).count() as c_int
+}
+
+/// Get a single UTF-8 character at the given index
+/// Returns null if index is out of bounds
+#[no_mangle]
+pub unsafe extern "C" fn string_grapheme_at(str: *const c_char, index: c_int) -> *mut c_char {
+    if str.is_null() || index < 0 {
+        return ptr::null_mut();
+    }
+
+    let s = match CStr::from_ptr(str).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let index = index as usize;
+
+    if let Some(ch) = s.graphemes(true).nth(index) {
+        let char_with_null = format!("{}\0", ch);
+        let len = char_with_null.len();
+        let ptr = crate::memory_alloc::aether_safe_malloc(len) as *mut c_char;
+
+        if !ptr.is_null() {
+            ptr::copy_nonoverlapping(char_with_null.as_ptr() as *const c_char, ptr, len);
+        }
+
+        ptr
+    } else {
+        ptr::null_mut()
+    }
 }
 
 /// Parse float from string
