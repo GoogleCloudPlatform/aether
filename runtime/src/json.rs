@@ -283,3 +283,38 @@ pub unsafe extern "C" fn json_is_number(json_value: *const c_char) -> c_int {
     }
     0
 }
+
+/// Check if JSON value is null
+#[no_mangle]
+pub unsafe extern "C" fn json_is_null(json_value: *const c_char) -> c_int {
+    if json_value.is_null() {
+        return 1;
+    }
+    let json_str = from_c_str(json_value);
+
+    // Empty string or "null" literal
+    if json_str.is_empty() || json_str == "null" {
+        return 1;
+    }
+
+    if let Ok(Value::Null) = serde_json::from_str::<Value>(&json_str) {
+        return 1;
+    }
+    0
+}
+
+/// Check if a string is valid JSON
+#[no_mangle]
+pub unsafe extern "C" fn json_is_valid(json_string: *const c_char) -> c_int {
+    if json_string.is_null() {
+        return 0;
+    }
+    let s = from_c_str(json_string);
+    if s.is_empty() {
+        return 0;
+    }
+    match serde_json::from_str::<Value>(&s) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    }
+}

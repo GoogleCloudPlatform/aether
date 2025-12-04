@@ -44,7 +44,7 @@
 - [x] Split text to characters
 - [x] Apply BPE merges iteratively
 - [x] Convert tokens to IDs via vocab
-- [ ] Track byte offsets for each token
+- [x] Track byte offsets for each token (in Task 1.4)
 - [x] Tests: Golden files, unicode, empty input, unknown chars
 
 **Implementation Notes:**
@@ -69,9 +69,16 @@
 ### Task 1.4: Tokenizer HTTP API
 - [x] `/v1/tokenize` endpoint (basic)
 - [x] `/v1/detokenize` endpoint (basic)
-- [ ] Add offset tracking to response
-- [ ] Proper error responses (400 for bad input)
-- [ ] Tests: API contract tests
+- [x] Add offset tracking to response
+- [x] Proper error responses (400 for bad input)
+- [x] Tests: API contract tests (manual curl tests)
+
+**Implementation Notes:**
+- Added HttpResult struct for consistent response handling
+- Added JSON validation functions: json_is_valid, json_is_null, json_is_string, json_is_array
+- Proper 400 errors for: invalid JSON, missing required fields, wrong field types
+- Offset tracking computes [start, end] byte positions for each token
+- Tested endpoints: tokenize, detokenize, health, with valid/invalid inputs
 
 ### Task 1.5: Tokenizer Performance
 - [ ] Profile and optimize hot paths
@@ -361,7 +368,7 @@
 
 | Phase | Tasks | Complete | Status |
 |-------|-------|----------|--------|
-| 1. Tokenizer | 5 | 4.5 | In Progress |
+| 1. Tokenizer | 5 | 4 | In Progress |
 | 2. Sampler | 5 | 0 | Not Started |
 | 3. KV Cache | 6 | 0 | Not Started |
 | 4. Model Runtime | 6 | 0 | Not Started |

@@ -88,6 +88,18 @@ func json_array_get(json_value: JsonValue, index: Int) -> JsonValue;
 @extern(library="aether_runtime", symbol="json_to_string")
 func json_to_string(json_value: JsonValue) -> String;
 
+@extern(library="aether_runtime", symbol="json_is_valid")
+func json_is_valid(json_string: String) -> Int;
+
+@extern(library="aether_runtime", symbol="json_is_null")
+func json_is_null(json_value: JsonValue) -> Int;
+
+@extern(library="aether_runtime", symbol="json_is_string")
+func json_is_string(json_value: JsonValue) -> Int;
+
+@extern(library="aether_runtime", symbol="json_is_array")
+func json_is_array(json_value: JsonValue) -> Int;
+
 // Network/HTTP FFI
 @extern(library="aether_runtime", symbol="tcp_listen")
 func tcp_listen(port: Int) -> Int;
@@ -270,11 +282,44 @@ func tokens_to_ids(tokens: Int64, vocab_json: String) -> Int64 {
 
 // =========================== Request Handlers ==============================
 
-func handle_tokenize(body: String, vocab_json: String) -> String {
-    // Parse request: {"text": "..."}
-    let json = parse_json(body);
-    let text_field = json_get_field(json, "text");
-    let text = json_to_string(text_field);
+// Result type for handlers - status_code and body
+struct HttpResult {
+    status_code: Int;
+    body: String;
+}
+
+func make_error(status_code: Int, message: String) -> HttpResult {
+    let body = string_concat("{\"error\": \"", message);
+    let body2 = string_concat(body, "\"}");
+    return HttpResult { status_code: status_code, body: body2 };
+}
+
+func make_success(body: String) -> HttpResult {
+    return HttpResult { status_code: 200, body: body };
+}
+
+func handle_tokenize(body: String, vocab_json: String) -> HttpResult {
+    // Validate JSON
+    if (json_is_valid(body) == 0) {
+        return make_error(400, "Invalid JSON");
+    }
+
+    // Parse and check for required "text" field (reparse to avoid ownership issues)
+    let json1 = parse_json(body);
+    let text_field1 = json_get_field(json1, "text");
+    if (json_is_null(text_field1) != 0) {
+        return make_error(400, "Missing required field: text");
+    }
+
+    let json2 = parse_json(body);
+    let text_field2 = json_get_field(json2, "text");
+    if (json_is_string(text_field2) == 0) {
+        return make_error(400, "Field 'text' must be a string");
+    }
+
+    let json3 = parse_json(body);
+    let text_field3 = json_get_field(json3, "text");
+    let text = json_to_string(text_field3);
 
     // Tokenize
     let tokens = bpe_encode(text, vocab_json, "");
@@ -294,35 +339,71 @@ func handle_tokenize(body: String, vocab_json: String) -> String {
     }
     tokens_json = string_concat(tokens_json, "]");
 
-    // Build token strings array
+    // Build token strings array and compute offsets
     let mut strings_json = "[";
+    let mut offsets_json = "[";
     let num_tokens = string_array_length(tokens);
+    let mut offset = 0;
     i = 0;
     while (i < num_tokens) {
+        let token = string_array_get(tokens, i);
+        let token_len = string_length(token);
+
         if (i > 0) {
             strings_json = string_concat(strings_json, ", ");
+            offsets_json = string_concat(offsets_json, ", ");
         }
+
+        // Add token string
         strings_json = string_concat(strings_json, "\"");
-        strings_json = string_concat(strings_json, string_array_get(tokens, i));
+        strings_json = string_concat(strings_json, token);
         strings_json = string_concat(strings_json, "\"");
+
+        // Add offset as [start, end]
+        offsets_json = string_concat(offsets_json, "[");
+        offsets_json = string_concat(offsets_json, int_to_string(offset));
+        offsets_json = string_concat(offsets_json, ", ");
+        offsets_json = string_concat(offsets_json, int_to_string({offset + token_len}));
+        offsets_json = string_concat(offsets_json, "]");
+
+        offset = {offset + token_len};
         i = i + 1;
     }
     strings_json = string_concat(strings_json, "]");
+    offsets_json = string_concat(offsets_json, "]");
 
     let response = string_concat("{\"tokens\": ", tokens_json);
     let response2 = string_concat(response, ", \"token_strings\": ");
     let response3 = string_concat(response2, strings_json);
-    let response4 = string_concat(response3, "}");
+    let response4 = string_concat(response3, ", \"offsets\": ");
+    let response5 = string_concat(response4, offsets_json);
+    let response6 = string_concat(response5, "}");
 
-    return response4;
+    return make_success(response6);
 }
 
-func handle_detokenize(body: String) -> String {
-    // Parse request: {"token_strings": ["he", "ll", "o"]}
-    // Get number of tokens first
+func handle_detokenize(body: String) -> HttpResult {
+    // Validate JSON
+    if (json_is_valid(body) == 0) {
+        return make_error(400, "Invalid JSON");
+    }
+
+    // Check for required "token_strings" field (reparse to avoid ownership issues)
     let json1 = parse_json(body);
     let tokens_field1 = json_get_field(json1, "token_strings");
-    let num_tokens = json_array_length(tokens_field1);
+    if (json_is_null(tokens_field1) != 0) {
+        return make_error(400, "Missing required field: token_strings");
+    }
+
+    let json2 = parse_json(body);
+    let tokens_field2 = json_get_field(json2, "token_strings");
+    if (json_is_array(tokens_field2) == 0) {
+        return make_error(400, "Field 'token_strings' must be an array");
+    }
+
+    let json3 = parse_json(body);
+    let tokens_field3 = json_get_field(json3, "token_strings");
+    let num_tokens = json_array_length(tokens_field3);
 
     // Build string array from JSON array
     // Note: Reparse body each iteration to avoid ownership issues
@@ -345,11 +426,11 @@ func handle_detokenize(body: String) -> String {
     let response = string_concat("{\"text\": \"", text);
     let response2 = string_concat(response, "\"}");
 
-    return response2;
+    return make_success(response2);
 }
 
-func handle_health() -> String {
-    return "{\"status\": \"ok\", \"service\": \"starling-tokenizer\"}";
+func handle_health() -> HttpResult {
+    return make_success("{\"status\": \"ok\", \"service\": \"starling-tokenizer\"}");
 }
 
 // =========================== HTTP Server ===================================
@@ -367,8 +448,8 @@ func handle_request(request: String, vocab_json: String) -> String {
     // Route request
     if (string_equals(path, "/v1/tokenize") != 0) {
         if (string_equals(method, "POST") != 0) {
-            let response_body = handle_tokenize(body, vocab_json);
-            return http_create_json_response(200, response_body);
+            let result = handle_tokenize(body, vocab_json);
+            return http_create_json_response(result.status_code, result.body);
         } else {
             return http_create_json_response(405, "{\"error\": \"Method not allowed\"}");
         }
@@ -376,16 +457,16 @@ func handle_request(request: String, vocab_json: String) -> String {
 
     if (string_equals(path, "/v1/detokenize") != 0) {
         if (string_equals(method, "POST") != 0) {
-            let response_body = handle_detokenize(body);
-            return http_create_json_response(200, response_body);
+            let result = handle_detokenize(body);
+            return http_create_json_response(result.status_code, result.body);
         } else {
             return http_create_json_response(405, "{\"error\": \"Method not allowed\"}");
         }
     }
 
     if (string_equals(path, "/health") != 0) {
-        let response_body = handle_health();
-        return http_create_json_response(200, response_body);
+        let result = handle_health();
+        return http_create_json_response(result.status_code, result.body);
     }
 
     // 404 Not Found
