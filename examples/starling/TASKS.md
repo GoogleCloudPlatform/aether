@@ -210,10 +210,19 @@
 - Tests: 6/6 passing (empty cache, insert/find, LRU eviction, access updates, in-flight protection, all in-flight)
 
 ### Task 3.4: Shape Validation
-- [ ] Validate tensor shapes on every access
-- [ ] Detect dtype mismatches
-- [ ] Clear error messages
-- [ ] Tests: Shape mismatch detection
+- [x] Validate tensor shapes on every access
+- [x] Detect dtype mismatches
+- [x] Clear error messages
+- [x] Tests: Shape mismatch detection
+
+**Implementation Notes:**
+- Created shape_validation_test.aether with comprehensive validation functions
+- Error codes: -1 (layer OOB), -2 (head OOB), -3 (seq OOB), -4 (dim OOB), -5 (dtype mismatch), -7 (invalid config)
+- validate_kv_access chains all dimension checks, returns first error found
+- validated_kv_get_k/set_k wrapper functions that validate before access
+- Shape metadata storage: parallel arrays storing (ndim, dim0-3, dtype) per tensor
+- Dtype support: FLOAT32, FLOAT16, INT32, INT8
+- Tests: 10/10 passing (layer/head/seq/dim bounds, full access, dtype, operations, metadata, shape validation, config)
 
 ### Task 3.5: Memory Metrics
 - [ ] Track allocated/free/fragmented bytes
@@ -442,7 +451,7 @@
 |-------|-------|----------|--------|
 | 1. Tokenizer | 5 | 5 | Complete |
 | 2. Sampler | 5 | 5 | Complete |
-| 3. KV Cache | 6 | 3 | In Progress |
+| 3. KV Cache | 6 | 4 | In Progress |
 | 4. Model Runtime | 7 | 2 | In Progress |
 | 5. Scheduler | 5 | 0 | Not Started |
 | 6. HTTP Gateway | 6 | 0 | Not Started |

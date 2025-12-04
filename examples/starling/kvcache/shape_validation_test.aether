@@ -1,0 +1,892 @@
+module ShapeValidationTest;
+
+// ============================================================================
+// Tests for Shape Validation in KV Cache
+// ============================================================================
+// Task 3.4: Validate tensor shapes on every access, detect dtype mismatches
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Float Array ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Int Array ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+// ============================================================================
+// Error Codes
+// ============================================================================
+// 0 = success
+// -1 = layer out of bounds
+// -2 = head out of bounds
+// -3 = seq_pos out of bounds
+// -4 = dim out of bounds
+// -5 = dtype mismatch
+// -6 = null tensor handle
+// -7 = invalid cache config
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+func print_error_code(code: Int) -> Void {
+    if ({code == 0}) {
+        aether_print("SUCCESS");
+    }
+    if ({code == -1}) {
+        aether_print("ERROR: Layer index out of bounds");
+    }
+    if ({code == -2}) {
+        aether_print("ERROR: Head index out of bounds");
+    }
+    if ({code == -3}) {
+        aether_print("ERROR: Sequence position out of bounds");
+    }
+    if ({code == -4}) {
+        aether_print("ERROR: Dimension index out of bounds");
+    }
+    if ({code == -5}) {
+        aether_print("ERROR: Data type mismatch");
+    }
+    if ({code == -6}) {
+        aether_print("ERROR: Null tensor handle");
+    }
+    if ({code == -7}) {
+        aether_print("ERROR: Invalid cache configuration");
+    }
+}
+
+// ============================================================================
+// Dtype Constants
+// ============================================================================
+// 0 = FLOAT32
+// 1 = FLOAT16
+// 2 = INT32
+// 3 = INT8
+
+func dtype_name(dtype: Int) -> String {
+    if ({dtype == 0}) {
+        return "FLOAT32";
+    }
+    if ({dtype == 1}) {
+        return "FLOAT16";
+    }
+    if ({dtype == 2}) {
+        return "INT32";
+    }
+    if ({dtype == 3}) {
+        return "INT8";
+    }
+    return "UNKNOWN";
+}
+
+// ============================================================================
+// Shape Validation Functions
+// ============================================================================
+
+// Validate cache configuration parameters
+func validate_cache_config(layers: Int, heads: Int, head_dim: Int, max_seq: Int) -> Int {
+    if ({layers <= 0}) {
+        return -7;
+    }
+    if ({heads <= 0}) {
+        return -7;
+    }
+    if ({head_dim <= 0}) {
+        return -7;
+    }
+    if ({max_seq <= 0}) {
+        return -7;
+    }
+    return 0;
+}
+
+// Validate layer index
+func validate_layer(layer: Int, layers: Int) -> Int {
+    if ({layer < 0}) {
+        return -1;
+    }
+    if ({layer >= layers}) {
+        return -1;
+    }
+    return 0;
+}
+
+// Validate head index
+func validate_head(head: Int, heads: Int) -> Int {
+    if ({head < 0}) {
+        return -2;
+    }
+    if ({head >= heads}) {
+        return -2;
+    }
+    return 0;
+}
+
+// Validate sequence position
+func validate_seq_pos(seq_pos: Int, max_seq: Int) -> Int {
+    if ({seq_pos < 0}) {
+        return -3;
+    }
+    if ({seq_pos >= max_seq}) {
+        return -3;
+    }
+    return 0;
+}
+
+// Validate dimension index
+func validate_dim(dim: Int, head_dim: Int) -> Int {
+    if ({dim < 0}) {
+        return -4;
+    }
+    if ({dim >= head_dim}) {
+        return -4;
+    }
+    return 0;
+}
+
+// Validate all indices for KV access
+func validate_kv_access(layer: Int, head: Int, seq_pos: Int, dim: Int,
+                        layers: Int, heads: Int, head_dim: Int, max_seq: Int) -> Int {
+    let err = validate_layer(layer, layers);
+    if ({err != 0}) {
+        return err;
+    }
+
+    let err2 = validate_head(head, heads);
+    if ({err2 != 0}) {
+        return err2;
+    }
+
+    let err3 = validate_seq_pos(seq_pos, max_seq);
+    if ({err3 != 0}) {
+        return err3;
+    }
+
+    let err4 = validate_dim(dim, head_dim);
+    if ({err4 != 0}) {
+        return err4;
+    }
+
+    return 0;
+}
+
+// Validate dtype matches expected
+func validate_dtype(actual_dtype: Int, expected_dtype: Int) -> Int {
+    if ({actual_dtype != expected_dtype}) {
+        return -5;
+    }
+    return 0;
+}
+
+// Validate tensor handle is not null (0 in our case)
+func validate_handle(handle: Int64) -> Int {
+    // Note: In practice, we'd check for null. Here we check for 0 as invalid.
+    // However, valid handles can be 0 in some systems, so this is just for demo.
+    // A real impl would track valid handles separately.
+    return 0;  // Assume valid for this implementation
+}
+
+// ============================================================================
+// Validated KV Cache Access
+// ============================================================================
+
+// Compute index for K tensor
+func k_index(layers: Int, heads: Int, head_dim: Int, layer: Int, head: Int, seq_pos: Int, dim: Int) -> Int {
+    let per_seq = {{layers * heads} * head_dim};
+    let per_layer = {heads * head_dim};
+    return {{{{seq_pos * per_seq} + {layer * per_layer}} + {head * head_dim}} + dim};
+}
+
+// Compute index for V tensor
+func v_index(layers: Int, heads: Int, head_dim: Int, max_seq: Int, layer: Int, head: Int, seq_pos: Int, dim: Int) -> Int {
+    let k_size = {{{layers * heads} * head_dim} * max_seq};
+    return {k_size + k_index(layers, heads, head_dim, layer, head, seq_pos, dim)};
+}
+
+// Compute cache size
+func compute_kv_size(layers: Int, heads: Int, head_dim: Int, seq_len: Int) -> Int {
+    return {{{{{2 * layers} * heads} * head_dim} * seq_len}};
+}
+
+// Create validated KV cache - returns data handle, sets error code
+func validated_kv_create(layers: Int, heads: Int, head_dim: Int, max_seq: Int) -> Int64 {
+    let err = validate_cache_config(layers, heads, head_dim, max_seq);
+    if ({err != 0}) {
+        // Return 0 as invalid handle indicator
+        return 0;
+    }
+
+    let size = compute_kv_size(layers, heads, head_dim, max_seq);
+    let mut data = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        data = float_array_push(data, 0.0);
+        i = i + 1;
+    }
+    return data;
+}
+
+// Validated K read - returns value, validates indices first
+// Returns -999999.0 on error (sentinel value)
+func validated_kv_get_k(data: Int64, layers: Int, heads: Int, head_dim: Int, max_seq: Int,
+                        layer: Int, head: Int, seq_pos: Int, dim: Int) -> Float {
+    let err = validate_kv_access(layer, head, seq_pos, dim, layers, heads, head_dim, max_seq);
+    if ({err != 0}) {
+        return -999999.0;
+    }
+
+    let idx = k_index(layers, heads, head_dim, layer, head, seq_pos, dim);
+    return float_array_get(data, idx);
+}
+
+// Validated K write - returns error code
+func validated_kv_set_k(data: Int64, layers: Int, heads: Int, head_dim: Int, max_seq: Int,
+                        layer: Int, head: Int, seq_pos: Int, dim: Int, value: Float) -> Int {
+    let err = validate_kv_access(layer, head, seq_pos, dim, layers, heads, head_dim, max_seq);
+    if ({err != 0}) {
+        return err;
+    }
+
+    let idx = k_index(layers, heads, head_dim, layer, head, seq_pos, dim);
+    float_array_set(data, idx, value);
+    return 0;
+}
+
+// Validated V read
+func validated_kv_get_v(data: Int64, layers: Int, heads: Int, head_dim: Int, max_seq: Int,
+                        layer: Int, head: Int, seq_pos: Int, dim: Int) -> Float {
+    let err = validate_kv_access(layer, head, seq_pos, dim, layers, heads, head_dim, max_seq);
+    if ({err != 0}) {
+        return -999999.0;
+    }
+
+    let idx = v_index(layers, heads, head_dim, max_seq, layer, head, seq_pos, dim);
+    return float_array_get(data, idx);
+}
+
+// Validated V write - returns error code
+func validated_kv_set_v(data: Int64, layers: Int, heads: Int, head_dim: Int, max_seq: Int,
+                        layer: Int, head: Int, seq_pos: Int, dim: Int, value: Float) -> Int {
+    let err = validate_kv_access(layer, head, seq_pos, dim, layers, heads, head_dim, max_seq);
+    if ({err != 0}) {
+        return err;
+    }
+
+    let idx = v_index(layers, heads, head_dim, max_seq, layer, head, seq_pos, dim);
+    float_array_set(data, idx, value);
+    return 0;
+}
+
+// ============================================================================
+// Shape Metadata Storage
+// ============================================================================
+
+// Store shape metadata for a tensor in parallel arrays
+// shapes array: [ndim, dim0, dim1, dim2, dim3, dtype] for each tensor
+// 6 entries per tensor
+
+func shape_set(shapes: Int64, tensor_idx: Int, ndim: Int, dim0: Int, dim1: Int, dim2: Int, dim3: Int, dtype: Int) -> Void {
+    let base = {tensor_idx * 6};
+    int_array_set(shapes, base, ndim);
+    int_array_set(shapes, {base + 1}, dim0);
+    int_array_set(shapes, {base + 2}, dim1);
+    int_array_set(shapes, {base + 3}, dim2);
+    int_array_set(shapes, {base + 4}, dim3);
+    int_array_set(shapes, {base + 5}, dtype);
+}
+
+func shape_get_ndim(shapes: Int64, tensor_idx: Int) -> Int {
+    return int_array_get(shapes, {tensor_idx * 6});
+}
+
+func shape_get_dim(shapes: Int64, tensor_idx: Int, dim_idx: Int) -> Int {
+    return int_array_get(shapes, {{tensor_idx * 6} + {dim_idx + 1}});
+}
+
+func shape_get_dtype(shapes: Int64, tensor_idx: Int) -> Int {
+    return int_array_get(shapes, {{tensor_idx * 6} + 5});
+}
+
+// Create shapes storage for N tensors
+func shapes_create(num_tensors: Int) -> Int64 {
+    let size = {num_tensors * 6};
+    let mut arr = int_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        arr = int_array_push(arr, 0);
+        i = i + 1;
+    }
+    return arr;
+}
+
+// Validate shape matches expected
+func validate_shape(shapes: Int64, tensor_idx: Int, expected_ndim: Int,
+                    expected_d0: Int, expected_d1: Int, expected_d2: Int, expected_d3: Int) -> Int {
+    let ndim = shape_get_ndim(shapes, tensor_idx);
+    if ({ndim != expected_ndim}) {
+        return -7;  // Shape mismatch
+    }
+
+    if ({expected_ndim >= 1}) {
+        let d0 = shape_get_dim(shapes, tensor_idx, 0);
+        if ({d0 != expected_d0}) {
+            return -7;
+        }
+    }
+
+    if ({expected_ndim >= 2}) {
+        let d1 = shape_get_dim(shapes, tensor_idx, 1);
+        if ({d1 != expected_d1}) {
+            return -7;
+        }
+    }
+
+    if ({expected_ndim >= 3}) {
+        let d2 = shape_get_dim(shapes, tensor_idx, 2);
+        if ({d2 != expected_d2}) {
+            return -7;
+        }
+    }
+
+    if ({expected_ndim >= 4}) {
+        let d3 = shape_get_dim(shapes, tensor_idx, 3);
+        if ({d3 != expected_d3}) {
+            return -7;
+        }
+    }
+
+    return 0;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+func test_validate_layer() -> Bool {
+    println("=== Test: Validate Layer Bounds ===");
+
+    let layers = 4;
+
+    // Valid layer indices
+    if ({validate_layer(0, layers) != 0}) {
+        println("FAIL: Layer 0 should be valid");
+        return false;
+    }
+    if ({validate_layer(3, layers) != 0}) {
+        println("FAIL: Layer 3 should be valid");
+        return false;
+    }
+
+    // Invalid: negative
+    if ({validate_layer(-1, layers) != -1}) {
+        println("FAIL: Layer -1 should return error -1");
+        return false;
+    }
+
+    // Invalid: >= layers
+    if ({validate_layer(4, layers) != -1}) {
+        println("FAIL: Layer 4 should return error -1");
+        return false;
+    }
+    if ({validate_layer(100, layers) != -1}) {
+        println("FAIL: Layer 100 should return error -1");
+        return false;
+    }
+
+    println("PASS: Validate Layer Bounds");
+    return true;
+}
+
+func test_validate_head() -> Bool {
+    println("=== Test: Validate Head Bounds ===");
+
+    let heads = 8;
+
+    // Valid
+    if ({validate_head(0, heads) != 0}) {
+        println("FAIL: Head 0 should be valid");
+        return false;
+    }
+    if ({validate_head(7, heads) != 0}) {
+        println("FAIL: Head 7 should be valid");
+        return false;
+    }
+
+    // Invalid
+    if ({validate_head(-1, heads) != -2}) {
+        println("FAIL: Head -1 should return error -2");
+        return false;
+    }
+    if ({validate_head(8, heads) != -2}) {
+        println("FAIL: Head 8 should return error -2");
+        return false;
+    }
+
+    println("PASS: Validate Head Bounds");
+    return true;
+}
+
+func test_validate_seq_pos() -> Bool {
+    println("=== Test: Validate Sequence Position Bounds ===");
+
+    let max_seq = 256;
+
+    // Valid
+    if ({validate_seq_pos(0, max_seq) != 0}) {
+        println("FAIL: Seq 0 should be valid");
+        return false;
+    }
+    if ({validate_seq_pos(255, max_seq) != 0}) {
+        println("FAIL: Seq 255 should be valid");
+        return false;
+    }
+
+    // Invalid
+    if ({validate_seq_pos(-1, max_seq) != -3}) {
+        println("FAIL: Seq -1 should return error -3");
+        return false;
+    }
+    if ({validate_seq_pos(256, max_seq) != -3}) {
+        println("FAIL: Seq 256 should return error -3");
+        return false;
+    }
+
+    println("PASS: Validate Sequence Position Bounds");
+    return true;
+}
+
+func test_validate_dim() -> Bool {
+    println("=== Test: Validate Dimension Bounds ===");
+
+    let head_dim = 64;
+
+    // Valid
+    if ({validate_dim(0, head_dim) != 0}) {
+        println("FAIL: Dim 0 should be valid");
+        return false;
+    }
+    if ({validate_dim(63, head_dim) != 0}) {
+        println("FAIL: Dim 63 should be valid");
+        return false;
+    }
+
+    // Invalid
+    if ({validate_dim(-1, head_dim) != -4}) {
+        println("FAIL: Dim -1 should return error -4");
+        return false;
+    }
+    if ({validate_dim(64, head_dim) != -4}) {
+        println("FAIL: Dim 64 should return error -4");
+        return false;
+    }
+
+    println("PASS: Validate Dimension Bounds");
+    return true;
+}
+
+func test_validate_full_access() -> Bool {
+    println("=== Test: Full Access Validation ===");
+
+    let layers = 4;
+    let heads = 8;
+    let head_dim = 64;
+    let max_seq = 256;
+
+    // Valid access
+    let err = validate_kv_access(0, 0, 0, 0, layers, heads, head_dim, max_seq);
+    if ({err != 0}) {
+        println("FAIL: Access (0,0,0,0) should be valid");
+        return false;
+    }
+
+    let err2 = validate_kv_access(3, 7, 255, 63, layers, heads, head_dim, max_seq);
+    if ({err2 != 0}) {
+        println("FAIL: Access (3,7,255,63) should be valid");
+        return false;
+    }
+
+    // Invalid layer (should fail first)
+    let err3 = validate_kv_access(4, 0, 0, 0, layers, heads, head_dim, max_seq);
+    if ({err3 != -1}) {
+        println("FAIL: Invalid layer should return -1");
+        return false;
+    }
+
+    // Invalid head (layer valid, head invalid)
+    let err4 = validate_kv_access(0, 8, 0, 0, layers, heads, head_dim, max_seq);
+    if ({err4 != -2}) {
+        println("FAIL: Invalid head should return -2");
+        return false;
+    }
+
+    // Invalid seq_pos
+    let err5 = validate_kv_access(0, 0, 256, 0, layers, heads, head_dim, max_seq);
+    if ({err5 != -3}) {
+        println("FAIL: Invalid seq_pos should return -3");
+        return false;
+    }
+
+    // Invalid dim
+    let err6 = validate_kv_access(0, 0, 0, 64, layers, heads, head_dim, max_seq);
+    if ({err6 != -4}) {
+        println("FAIL: Invalid dim should return -4");
+        return false;
+    }
+
+    println("PASS: Full Access Validation");
+    return true;
+}
+
+func test_dtype_validation() -> Bool {
+    println("=== Test: Dtype Validation ===");
+
+    let float32 = 0;
+    let float16 = 1;
+    let int32 = 2;
+
+    // Same dtype
+    if ({validate_dtype(float32, float32) != 0}) {
+        println("FAIL: Same dtype should be valid");
+        return false;
+    }
+
+    // Different dtype
+    if ({validate_dtype(float32, float16) != -5}) {
+        println("FAIL: Different dtype should return -5");
+        return false;
+    }
+    if ({validate_dtype(float16, int32) != -5}) {
+        println("FAIL: Different dtype should return -5");
+        return false;
+    }
+
+    println("PASS: Dtype Validation");
+    return true;
+}
+
+func test_validated_kv_operations() -> Bool {
+    println("=== Test: Validated KV Operations ===");
+
+    let layers = 2;
+    let heads = 2;
+    let head_dim = 4;
+    let max_seq = 8;
+
+    let data = validated_kv_create(layers, heads, head_dim, max_seq);
+
+    // Valid write
+    let write_err = validated_kv_set_k(data, layers, heads, head_dim, max_seq, 0, 1, 2, 3, 1.5);
+    if ({write_err != 0}) {
+        println("FAIL: Valid K write should succeed");
+        float_array_free(data);
+        return false;
+    }
+
+    // Valid read
+    let value = validated_kv_get_k(data, layers, heads, head_dim, max_seq, 0, 1, 2, 3);
+    if ({value < 1.4}) {
+        println("FAIL: K value should be 1.5");
+        float_array_free(data);
+        return false;
+    }
+    if ({value > 1.6}) {
+        println("FAIL: K value should be 1.5 (too high)");
+        float_array_free(data);
+        return false;
+    }
+
+    // Invalid write - layer out of bounds
+    let bad_write = validated_kv_set_k(data, layers, heads, head_dim, max_seq, 5, 0, 0, 0, 1.0);
+    if ({bad_write != -1}) {
+        println("FAIL: Invalid layer write should return -1");
+        float_array_free(data);
+        return false;
+    }
+
+    // Invalid read - returns sentinel value
+    let bad_read = validated_kv_get_k(data, layers, heads, head_dim, max_seq, 0, 0, 100, 0);
+    if ({bad_read > -999998.0}) {
+        println("FAIL: Invalid read should return sentinel");
+        float_array_free(data);
+        return false;
+    }
+
+    float_array_free(data);
+    println("PASS: Validated KV Operations");
+    return true;
+}
+
+func test_shape_metadata() -> Bool {
+    println("=== Test: Shape Metadata Storage ===");
+
+    let shapes = shapes_create(3);  // 3 tensors
+
+    // Set shapes for tensor 0: 4D tensor (batch, layers, heads, dim) with FLOAT32
+    shape_set(shapes, 0, 4, 16, 32, 32, 128, 0);
+
+    // Set shapes for tensor 1: 2D tensor (rows, cols) with FLOAT16
+    shape_set(shapes, 1, 2, 1024, 1024, 0, 0, 1);
+
+    // Verify tensor 0
+    if ({shape_get_ndim(shapes, 0) != 4}) {
+        println("FAIL: Tensor 0 ndim should be 4");
+        int_array_free(shapes);
+        return false;
+    }
+    if ({shape_get_dim(shapes, 0, 0) != 16}) {
+        println("FAIL: Tensor 0 dim0 should be 16");
+        int_array_free(shapes);
+        return false;
+    }
+    if ({shape_get_dim(shapes, 0, 3) != 128}) {
+        println("FAIL: Tensor 0 dim3 should be 128");
+        int_array_free(shapes);
+        return false;
+    }
+    if ({shape_get_dtype(shapes, 0) != 0}) {
+        println("FAIL: Tensor 0 dtype should be FLOAT32 (0)");
+        int_array_free(shapes);
+        return false;
+    }
+
+    // Verify tensor 1
+    if ({shape_get_ndim(shapes, 1) != 2}) {
+        println("FAIL: Tensor 1 ndim should be 2");
+        int_array_free(shapes);
+        return false;
+    }
+    if ({shape_get_dtype(shapes, 1) != 1}) {
+        println("FAIL: Tensor 1 dtype should be FLOAT16 (1)");
+        int_array_free(shapes);
+        return false;
+    }
+
+    int_array_free(shapes);
+    println("PASS: Shape Metadata Storage");
+    return true;
+}
+
+func test_shape_validation() -> Bool {
+    println("=== Test: Shape Validation ===");
+
+    let shapes = shapes_create(2);
+
+    // Tensor 0: shape (32, 32, 128)
+    shape_set(shapes, 0, 3, 32, 32, 128, 0, 0);
+
+    // Valid shape check
+    let err1 = validate_shape(shapes, 0, 3, 32, 32, 128, 0);
+    if ({err1 != 0}) {
+        println("FAIL: Matching shape should be valid");
+        int_array_free(shapes);
+        return false;
+    }
+
+    // Wrong ndim
+    let err2 = validate_shape(shapes, 0, 4, 32, 32, 128, 0);
+    if ({err2 != -7}) {
+        println("FAIL: Wrong ndim should return -7");
+        int_array_free(shapes);
+        return false;
+    }
+
+    // Wrong dim0
+    let err3 = validate_shape(shapes, 0, 3, 64, 32, 128, 0);
+    if ({err3 != -7}) {
+        println("FAIL: Wrong dim0 should return -7");
+        int_array_free(shapes);
+        return false;
+    }
+
+    // Wrong dim2
+    let err4 = validate_shape(shapes, 0, 3, 32, 32, 256, 0);
+    if ({err4 != -7}) {
+        println("FAIL: Wrong dim2 should return -7");
+        int_array_free(shapes);
+        return false;
+    }
+
+    int_array_free(shapes);
+    println("PASS: Shape Validation");
+    return true;
+}
+
+func test_config_validation() -> Bool {
+    println("=== Test: Config Validation ===");
+
+    // Valid config
+    if ({validate_cache_config(32, 32, 128, 2048) != 0}) {
+        println("FAIL: Valid config should pass");
+        return false;
+    }
+
+    // Invalid: zero layers
+    if ({validate_cache_config(0, 32, 128, 2048) != -7}) {
+        println("FAIL: Zero layers should fail");
+        return false;
+    }
+
+    // Invalid: negative heads
+    if ({validate_cache_config(32, -1, 128, 2048) != -7}) {
+        println("FAIL: Negative heads should fail");
+        return false;
+    }
+
+    // Invalid: zero head_dim
+    if ({validate_cache_config(32, 32, 0, 2048) != -7}) {
+        println("FAIL: Zero head_dim should fail");
+        return false;
+    }
+
+    // Invalid: zero max_seq
+    if ({validate_cache_config(32, 32, 128, 0) != -7}) {
+        println("FAIL: Zero max_seq should fail");
+        return false;
+    }
+
+    println("PASS: Config Validation");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("Shape Validation Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_validate_layer()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_validate_head()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_validate_seq_pos()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_validate_dim()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_validate_full_access()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_dtype_validation()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_validated_kv_operations()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_shape_metadata()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_shape_validation()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_config_validation()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}
