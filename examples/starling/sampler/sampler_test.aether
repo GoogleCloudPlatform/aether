@@ -510,6 +510,98 @@ func test_repetition_penalty() -> Bool {
 }
 
 // ============================================================================
+// Test: Stop Conditions
+// ============================================================================
+
+struct GenerationState {
+    tokens_generated: Int;
+    max_tokens: Int;
+    eos_token_id: Int;
+    stop_triggered: Bool;
+    stop_reason: Int;
+}
+
+func check_max_tokens(state: GenerationState) -> Bool {
+    if (state.max_tokens <= 0) {
+        return false;
+    }
+    return {state.tokens_generated >= state.max_tokens};
+}
+
+func check_eos_token(token_id: Int, eos_token_id: Int) -> Bool {
+    if (eos_token_id < 0) {
+        return false;
+    }
+    return {token_id == eos_token_id};
+}
+
+func test_stop_conditions() -> Bool {
+    println("=== Test: Stop Conditions ===");
+
+    // Test max tokens
+    let state1 = GenerationState {
+        tokens_generated: 10,
+        max_tokens: 10,
+        eos_token_id: -1,
+        stop_triggered: false,
+        stop_reason: 0
+    };
+
+    if (!check_max_tokens(state1)) {
+        println("FAIL: Should stop at max tokens");
+        return false;
+    }
+
+    // Test not at max tokens yet
+    let state2 = GenerationState {
+        tokens_generated: 5,
+        max_tokens: 10,
+        eos_token_id: -1,
+        stop_triggered: false,
+        stop_reason: 0
+    };
+
+    if (check_max_tokens(state2)) {
+        println("FAIL: Should not stop before max tokens");
+        return false;
+    }
+
+    // Test EOS token
+    if (!check_eos_token(2, 2)) {
+        println("FAIL: Should detect EOS token");
+        return false;
+    }
+
+    if (check_eos_token(3, 2)) {
+        println("FAIL: Should not trigger for non-EOS token");
+        return false;
+    }
+
+    // Test disabled EOS
+    if (check_eos_token(2, -1)) {
+        println("FAIL: Should not trigger when EOS disabled");
+        return false;
+    }
+
+    // Test unlimited tokens
+    let state3 = GenerationState {
+        tokens_generated: 1000,
+        max_tokens: 0,
+        eos_token_id: -1,
+        stop_triggered: false,
+        stop_reason: 0
+    };
+
+    if (check_max_tokens(state3)) {
+        println("FAIL: Should not stop when max_tokens is 0 (unlimited)");
+        return false;
+    }
+
+    println("PASS: Stop Conditions");
+    return true;
+}
+
+// ============================================================================
 // Main Test Runner
 // ============================================================================
 
@@ -558,6 +650,13 @@ func main() -> Int {
     println("");
 
     if (test_repetition_penalty()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_stop_conditions()) {
         passed = {passed + 1};
     } else {
         failed = {failed + 1};
