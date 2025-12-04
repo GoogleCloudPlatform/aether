@@ -539,6 +539,27 @@ pub unsafe extern "C" fn int_array_length(array_ptr: *mut c_void) -> c_int {
     (*array).length
 }
 
+/// Set int at index in int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_set(array_ptr: *mut c_void, index: c_int, value: c_int) -> c_int {
+    if array_ptr.is_null() || index < 0 {
+        return -1;
+    }
+
+    let array = array_ptr as *mut IntArray;
+    if index >= (*array).length {
+        return -1;
+    }
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements = (array as *mut u8).add(aligned_offset) as *mut i32;
+
+    *elements.add(index as usize) = value;
+    0
+}
+
 /// Free an int array
 #[no_mangle]
 pub unsafe extern "C" fn int_array_free(array_ptr: *mut c_void) {

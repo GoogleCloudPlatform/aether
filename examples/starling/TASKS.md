@@ -118,16 +118,20 @@
 - [x] Temperature scaling
 - [x] Top-k filtering
 - [x] Top-p (nucleus) filtering
-- [ ] Repetition penalty
-- [ ] Frequency penalty
-- [ ] Presence penalty
-- [ ] Tests: Each processor in isolation
+- [x] Repetition penalty
+- [x] Frequency penalty
+- [x] Presence penalty
+- [x] Tests: Each processor in isolation
 
 **Implementation Notes:**
 - apply_temperature implemented (divides logits by temperature)
 - apply_top_k implemented (sets non-top-k logits to -inf)
 - apply_top_p implemented (keeps smallest set with cumsum >= p, renormalizes)
-- Remaining penalties to be added when needed for full sampling
+- apply_repetition_penalty: penalizes tokens in context (divide if positive, multiply if negative)
+- apply_frequency_penalty: subtracts penalty * count for each token
+- apply_presence_penalty: flat penalty for any token that has appeared
+- build_token_counts: builds count array from context tokens
+- Added int_array_set to runtime for in-place updates
 
 ### Task 2.3: Stop Conditions
 - [ ] EOS token detection
@@ -402,7 +406,7 @@
 | Phase | Tasks | Complete | Status |
 |-------|-------|----------|--------|
 | 1. Tokenizer | 5 | 5 | Complete |
-| 2. Sampler | 5 | 3 | In Progress |
+| 2. Sampler | 5 | 4 | In Progress |
 | 3. KV Cache | 6 | 0 | Not Started |
 | 4. Model Runtime | 6 | 0 | Not Started |
 | 5. Scheduler | 5 | 0 | Not Started |

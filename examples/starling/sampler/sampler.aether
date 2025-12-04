@@ -61,6 +61,9 @@ func int_array_push(arr: Int64, value: Int) -> Int64;
 @extern(library="aether_runtime", symbol="int_array_get")
 func int_array_get(arr: Int64, index: Int) -> Int;
 
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
 @extern(library="aether_runtime", symbol="int_array_length")
 func int_array_length(arr: Int64) -> Int;
 
@@ -98,10 +101,13 @@ func println(s: String) -> Void {
 
 // Sampler parameters
 struct SamplerConfig {
-    temperature: Float;   // Temperature for scaling (1.0 = no change)
-    top_k: Int;           // Top-k filtering (0 = disabled)
-    top_p: Float;         // Top-p nucleus filtering (1.0 = disabled)
-    seed: Int;            // Random seed for determinism
+    temperature: Float;       // Temperature for scaling (1.0 = no change)
+    top_k: Int;               // Top-k filtering (0 = disabled)
+    top_p: Float;             // Top-p nucleus filtering (1.0 = disabled)
+    repetition_penalty: Float; // Repetition penalty (1.0 = disabled)
+    frequency_penalty: Float;  // Frequency penalty (0.0 = disabled)
+    presence_penalty: Float;   // Presence penalty (0.0 = disabled)
+    seed: Int;                 // Random seed for determinism
 }
 
 // Create default sampler config
@@ -110,6 +116,9 @@ func default_config() -> SamplerConfig {
         temperature: 1.0,
         top_k: 0,
         top_p: 1.0,
+        repetition_penalty: 1.0,
+        frequency_penalty: 0.0,
+        presence_penalty: 0.0,
         seed: 12345
     };
 }
@@ -357,6 +366,123 @@ func apply_top_p(probs: Int64, p: Float) -> Void {
 
     int_array_free(sorted_indices);
     int_array_free(used);
+}
+
+// ============================================================================
+// Penalty Functions
+// ============================================================================
+
+// Apply repetition penalty to logits based on context tokens
+// Tokens that appear in context have their logits divided/multiplied by penalty
+// penalty > 1.0 reduces probability of repeated tokens
+func apply_repetition_penalty(logits: Int64, context: Int64, penalty: Float) -> Void {
+    if ({penalty == 1.0}) {
+        return;  // No penalty
+    }
+    if ({penalty <= 0.0}) {
+        return;  // Invalid penalty
+    }
+
+    let n_logits = float_array_length(logits);
+    let n_context = int_array_length(context);
+
+    // For each token in context, apply penalty to its logit
+    let mut i = 0;
+    while (i < n_context) {
+        let token_id = int_array_get(context, i);
+        if ({token_id >= 0}) {
+            if ({token_id < n_logits}) {
+                let logit = float_array_get(logits, token_id);
+                // If logit > 0, divide by penalty; if logit < 0, multiply by penalty
+                if ({logit > 0.0}) {
+                    float_array_set(logits, token_id, {logit / penalty});
+                } else {
+                    float_array_set(logits, token_id, {logit * penalty});
+                }
+            }
+        }
+        i = i + 1;
+    }
+}
+
+// Apply frequency penalty to logits
+// Penalty is proportional to token count in context
+// frequency_penalty > 0 penalizes frequent tokens
+func apply_frequency_penalty(logits: Int64, token_counts: Int64, penalty: Float) -> Void {
+    if ({penalty == 0.0}) {
+        return;  // No penalty
+    }
+
+    let n = float_array_length(logits);
+    let n_counts = int_array_length(token_counts);
+
+    // Subtract penalty * count from each logit
+    let mut i = 0;
+    while (i < n) {
+        if (i < n_counts) {
+            let count = int_array_get(token_counts, i);
+            if (count > 0) {
+                let logit = float_array_get(logits, i);
+                let count_f = int_to_float(count);
+                float_array_set(logits, i, {logit - {penalty * count_f}});
+            }
+        }
+        i = i + 1;
+    }
+}
+
+// Apply presence penalty to logits
+// Flat penalty for any token that has appeared at least once
+// presence_penalty > 0 penalizes tokens that have appeared
+func apply_presence_penalty(logits: Int64, token_counts: Int64, penalty: Float) -> Void {
+    if ({penalty == 0.0}) {
+        return;  // No penalty
+    }
+
+    let n = float_array_length(logits);
+    let n_counts = int_array_length(token_counts);
+
+    // Subtract flat penalty from logit if token has appeared
+    let mut i = 0;
+    while (i < n) {
+        if (i < n_counts) {
+            let count = int_array_get(token_counts, i);
+            if (count > 0) {
+                let logit = float_array_get(logits, i);
+                float_array_set(logits, i, {logit - penalty});
+            }
+        }
+        i = i + 1;
+    }
+}
+
+// Build token count array from context
+// Returns array where index is token_id and value is count
+func build_token_counts(context: Int64, vocab_size: Int) -> Int64 {
+    let mut counts = int_array_create(vocab_size);
+
+    // Initialize all counts to 0
+    let mut i = 0;
+    while (i < vocab_size) {
+        counts = int_array_push(counts, 0);
+        i = i + 1;
+    }
+
+    // Count occurrences
+    let n = int_array_length(context);
+    i = 0;
+    while (i < n) {
+        let token_id = int_array_get(context, i);
+        if ({token_id >= 0}) {
+            if ({token_id < vocab_size}) {
+                let current = int_array_get(counts, token_id);
+                int_array_set(counts, token_id, {current + 1});
+            }
+        }
+        i = i + 1;
+    }
+
+    return counts;
 }
 
 // ============================================================================
