@@ -198,10 +198,16 @@
 - Tests: 6/6 passing (size, create, read/write, K/V independence, slots, lifecycle)
 
 ### Task 3.3: LRU Eviction
-- [ ] Track access times per session
-- [ ] Evict least-recently-used when at capacity
-- [ ] Protect in-flight sessions
-- [ ] Tests: Eviction under pressure
+- [x] Track access times per session
+- [x] Evict least-recently-used when at capacity
+- [x] Protect in-flight sessions
+- [x] Tests: Eviction under pressure
+
+**Implementation Notes:**
+- Created lru_test.aether with LRU eviction policy
+- Parallel arrays for session_ids, access_times, in_flight status
+- find_lru_slot respects in-flight protection
+- Tests: 6/6 passing (empty cache, insert/find, LRU eviction, access updates, in-flight protection, all in-flight)
 
 ### Task 3.4: Shape Validation
 - [ ] Validate tensor shapes on every access
@@ -436,7 +442,7 @@
 |-------|-------|----------|--------|
 | 1. Tokenizer | 5 | 5 | Complete |
 | 2. Sampler | 5 | 5 | Complete |
-| 3. KV Cache | 6 | 2 | In Progress |
+| 3. KV Cache | 6 | 3 | In Progress |
 | 4. Model Runtime | 7 | 2 | In Progress |
 | 5. Scheduler | 5 | 0 | Not Started |
 | 6. HTTP Gateway | 6 | 0 | Not Started |
