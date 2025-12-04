@@ -297,16 +297,26 @@
 
 ### Task 4.4: Attention Mechanism
 - [x] Implement tensor foundations (tensor_test.aether)
-- [ ] Implement multi-head attention in pure Aether
-- [ ] Query/Key/Value projections
+- [x] Implement multi-head attention in pure Aether
+- [x] Query/Key/Value projections
 - [x] Softmax and attention scores
-- [ ] Tests: Numerical correctness vs reference
+- [x] Tests: Numerical correctness vs reference
 
 **Implementation Notes (Tensor Foundations):**
 - Created tensor_test.aether with ownership-safe tensor operations
 - Uses Int64 handles for data arrays to avoid ownership issues
 - Implemented: zeros, ones, add, matmul, relu, softmax, silu
 - Tests: 7/7 passing (numel, zeros/ones, add, matmul, relu, softmax, silu)
+
+**Implementation Notes (Attention):**
+- Created attention_test.aether with multi-head attention implementation
+- Linear layer: forward projection with weight @ input + bias
+- Batched linear for sequence processing
+- Softmax with numerical stability (max subtraction)
+- Matrix transpose for attention computation
+- Scaled dot-product attention: softmax(Q @ K^T / sqrt(d_k)) @ V
+- Multi-head attention config: hidden_dim, num_heads, head_dim
+- Tests: 8/8 passing (linear forward, softmax, transpose, matmul, config, scaled attention, compute scale, linear batched)
 
 ### Task 4.5: Feed-Forward Network
 - [ ] Implement FFN layers (MLP)
