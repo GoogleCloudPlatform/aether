@@ -225,9 +225,18 @@
 - Tests: 10/10 passing (layer/head/seq/dim bounds, full access, dtype, operations, metadata, shape validation, config)
 
 ### Task 3.5: Memory Metrics
-- [ ] Track allocated/free/fragmented bytes
-- [ ] Expose via metrics endpoint
-- [ ] Tests: Metric accuracy
+- [x] Track allocated/free/fragmented bytes
+- [x] Expose via metrics endpoint
+- [x] Tests: Metric accuracy
+
+**Implementation Notes:**
+- Created memory_metrics_test.aether with comprehensive memory tracking
+- Metrics tracked: total_capacity, allocated_bytes, free_bytes, num_allocations, num_frees, peak_allocated, fragmentation_count, largest_free_block
+- metrics_on_alloc/metrics_on_free update metrics with each operation
+- update_fragmentation_metrics scans blocks to compute free block count and largest free block
+- calculate_fragmentation_ratio: 0% if all free space contiguous, higher if fragmented
+- print_metrics outputs Prometheus-compatible format for HTTP endpoint
+- Tests: 8/8 passing (create, alloc, free, fragmentation, ratio, arena alloc, arena free, print)
 
 ### Task 3.6: mmap Spill (Advanced)
 - [ ] Spill cold sessions to disk
@@ -451,7 +460,7 @@
 |-------|-------|----------|--------|
 | 1. Tokenizer | 5 | 5 | Complete |
 | 2. Sampler | 5 | 5 | Complete |
-| 3. KV Cache | 6 | 4 | In Progress |
+| 3. KV Cache | 6 | 5 | In Progress |
 | 4. Model Runtime | 7 | 2 | In Progress |
 | 5. Scheduler | 5 | 0 | Not Started |
 | 6. HTTP Gateway | 6 | 0 | Not Started |
