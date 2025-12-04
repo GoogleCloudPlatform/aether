@@ -378,7 +378,9 @@ impl SemanticAnalyzer {
             true,
             location.clone(),
         );
-        self.symbol_table.add_symbol(module_symbol.clone())?;
+        eprintln!("DEBUG: Adding module symbol '{}' with Type::Module('{}') to global scope", module_symbol_name, module_name);
+        // Add to global scope so it's accessible during MIR lowering
+        self.symbol_table.add_symbol_to_global(module_symbol.clone())?;
 
 
 
@@ -393,8 +395,8 @@ impl SemanticAnalyzer {
                         format!("{}.{}", module_name, name.name)
                     };
 
-                    // Resolve function signature from AST
-                    let (parameter_types, return_type, is_variadic) = {
+                    // Resolve function signature from AST, including FFI symbol for externals
+                    let (parameter_types, return_type, is_variadic, ffi_symbol) = {
                         if let Some(func) = loaded_module
                             .module
                             .function_definitions
@@ -415,7 +417,7 @@ impl SemanticAnalyzer {
                                 .borrow()
                                 .ast_type_to_type(&func.return_type)
                                 .unwrap_or(Type::Error);
-                            (params, Box::new(ret_type), false)
+                            (params, Box::new(ret_type), false, None)
                         } else if let Some(func) = loaded_module
                             .module
                             .external_functions
@@ -436,17 +438,19 @@ impl SemanticAnalyzer {
                                 .borrow()
                                 .ast_type_to_type(&func.return_type)
                                 .unwrap_or(Type::Error);
-                            (params, Box::new(ret_type), func.variadic)
+                            // Capture the FFI symbol from the extern annotation
+                            (params, Box::new(ret_type), func.variadic, func.symbol.clone())
                         } else {
                             (
                                 vec![],
                                 Box::new(Type::Primitive(PrimitiveType::Void)),
                                 false,
+                                None,
                             )
                         }
                     };
 
-                    let symbol = Symbol::new(
+                    let symbol = Symbol::new_with_ffi_symbol(
                         qualified_name.clone(),
                         Type::Function {
                             parameter_types,
@@ -457,9 +461,13 @@ impl SemanticAnalyzer {
                         false,
                         true,
                         location.clone(),
+                        ffi_symbol,
                     );
-                    self.symbol_table.add_symbol(symbol.clone())?;
-                    exported_symbols.insert(qualified_name.clone(), symbol.clone());
+                    // Add to global scope so it's accessible during MIR lowering
+                    self.symbol_table.add_symbol_to_global(symbol.clone())?;
+                    // Insert with just the function name as key, not qualified name
+                    // because lookup_symbol extracts just the method name after the dot
+                    exported_symbols.insert(name.name.clone(), symbol.clone());
                 }
                 ExportStatement::Type { name, .. } => {
                     // Add exported type to type system
@@ -592,8 +600,10 @@ impl SemanticAnalyzer {
                         true,
                         location.clone(),
                     );
-                    self.symbol_table.add_symbol(symbol.clone())?;
-                    exported_symbols.insert(qualified_name.clone(), symbol.clone());
+                    // Add to global scope so it's accessible during MIR lowering
+                    self.symbol_table.add_symbol_to_global(symbol.clone())?;
+                    // Insert with just the type name as key
+                    exported_symbols.insert(name.name.clone(), symbol.clone());
                 }
                 ExportStatement::Constant { name, .. } => {
                     // Add exported constant to symbol table
@@ -614,8 +624,9 @@ impl SemanticAnalyzer {
                         location.clone(),
                     );
 
-                    self.symbol_table.add_symbol(symbol.clone())?;
-                    exported_symbols.insert(qualified_name, symbol);
+                    self.symbol_table.add_symbol_to_global(symbol.clone())?;
+                    // Insert with just the constant name as key
+                    exported_symbols.insert(name.name.clone(), symbol);
                 }
             }
         }
@@ -954,6 +965,7 @@ impl SemanticAnalyzer {
                     declaration_location: method.source_location.clone(),
                     is_moved: false,
                     borrow_state: BorrowState::None,
+                    ffi_symbol: None,
                 };
                 // Signature-only registration; errors about duplicates bubble up
                 self.symbol_table.add_symbol(func_symbol)?;
@@ -1294,6 +1306,7 @@ impl SemanticAnalyzer {
             declaration_location: const_decl.source_location.clone(),
             is_moved: false,
             borrow_state: BorrowState::None,
+            ffi_symbol: None,
         };
 
         self.symbol_table.add_symbol(symbol)?;
@@ -1345,6 +1358,7 @@ impl SemanticAnalyzer {
             declaration_location: func_def.source_location.clone(),
             is_moved: false,
             borrow_state: BorrowState::None,
+            ffi_symbol: None,
         };
 
         self.symbol_table.add_symbol(func_symbol)?;
@@ -1422,6 +1436,7 @@ impl SemanticAnalyzer {
                 declaration_location: param.source_location.clone(),
                 is_moved: false,
                 borrow_state: BorrowState::None,
+                ffi_symbol: None,
             };
 
             self.symbol_table.add_symbol(param_symbol)?;
@@ -3150,6 +3165,7 @@ impl SemanticAnalyzer {
                         declaration_location: symbol.declaration_location.clone(),
                         is_moved: false,
                         borrow_state: BorrowState::None,
+                        ffi_symbol: None,
                     };
                     self.symbol_table.add_symbol(capture_symbol)?;
                 }
@@ -3172,6 +3188,7 @@ impl SemanticAnalyzer {
                         declaration_location: param.source_location.clone(),
                         is_moved: false,
                         borrow_state: BorrowState::None,
+                        ffi_symbol: None,
                     };
                     self.symbol_table.add_symbol(param_symbol)?;
                 }
@@ -3931,6 +3948,7 @@ impl SemanticAnalyzer {
             declaration_location: element_binding.source_location.clone(),
             is_moved: false,
             borrow_state: BorrowState::None,
+            ffi_symbol: None,
         };
         self.symbol_table.add_symbol(element_symbol)?;
 
@@ -3996,6 +4014,7 @@ impl SemanticAnalyzer {
             declaration_location: counter.source_location.clone(),
             is_moved: false,
             borrow_state: BorrowState::None,
+            ffi_symbol: None,
         };
         self.symbol_table.add_symbol(counter_symbol)?;
 
@@ -4091,6 +4110,7 @@ impl SemanticAnalyzer {
                     declaration_location: binding.source_location.clone(),
                     is_moved: false,
                     borrow_state: BorrowState::None,
+                    ffi_symbol: None,
                 };
                 self.symbol_table.add_symbol(exception_symbol)?;
             }
@@ -4230,6 +4250,7 @@ impl SemanticAnalyzer {
                 declaration_location: resource.binding.source_location.clone(),
                 is_moved: false,
                 borrow_state: crate::symbols::BorrowState::None,
+                ffi_symbol: None,
             };
             self.symbol_table.add_symbol(symbol)?;
         }
@@ -4356,6 +4377,7 @@ impl SemanticAnalyzer {
             declaration_location: ext_func.source_location.clone(),
             is_moved: false,
             borrow_state: BorrowState::None,
+            ffi_symbol: ext_func.symbol.clone(),
         };
 
         self.symbol_table.add_symbol(func_symbol)?;
@@ -4480,6 +4502,7 @@ impl SemanticAnalyzer {
                                     declaration_location: binding_id.source_location.clone(),
                                     is_moved: false,
                                     borrow_state: BorrowState::None,
+                                    ffi_symbol: None,
                                 })?;
                             }
                         }
@@ -4511,6 +4534,7 @@ impl SemanticAnalyzer {
                         declaration_location: binding_id.source_location.clone(),
                         is_moved: false,
                         borrow_state: BorrowState::None,
+                        ffi_symbol: None,
                     })?;
                 }
             }

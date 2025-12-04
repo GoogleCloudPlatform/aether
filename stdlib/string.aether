@@ -1,0 +1,92 @@
+module Strings;
+
+// ============================================================================
+// Core String Operations
+// ============================================================================
+
+// Returns the length of the string
+@extern(library="aether_runtime", symbol="string_length")
+@export
+func length(s: String) -> Int;
+
+// Returns the character code at the specified index
+// Returns 0 if index is out of bounds
+@extern(library="aether_runtime", symbol="string_char_at")
+@export
+func char_at(s: String, index: Int) -> Int;
+
+// Returns a substring starting at 'start' with 'length' characters
+@extern(library="aether_runtime", symbol="string_substring")
+@export
+func substring(s: String, start: Int, len: Int) -> String;
+
+// Concatenates two strings
+@extern(library="aether_runtime", symbol="string_concat")
+@export
+func concat(a: String, b: String) -> String;
+
+// ============================================================================
+// String Comparison
+// ============================================================================
+
+// Checks if two strings are equal (returns 1 if equal, 0 otherwise)
+@extern(library="aether_runtime", symbol="string_equals")
+@export
+func equals(a: String, b: String) -> Int;
+
+// Checks if 'haystack' contains 'needle' (returns 1 if true, 0 otherwise)
+@extern(library="aether_runtime", symbol="string_contains")
+@export
+func contains(haystack: String, needle: String) -> Int;
+
+// ============================================================================
+// String Transformation
+// ============================================================================
+
+// Converts string to uppercase
+@extern(library="aether_runtime", symbol="string_to_upper")
+@export
+func to_upper(s: String) -> String;
+
+// Converts string to lowercase
+@extern(library="aether_runtime", symbol="string_to_lower")
+@export
+func to_lower(s: String) -> String;
+
+// Trims whitespace from the beginning and end of the string
+@extern(library="aether_runtime", symbol="string_trim")
+@export
+func trim(s: String) -> String;
+
+// ============================================================================
+// String Parsing and Conversion
+// ============================================================================
+
+// Parses an integer from a string
+@extern(library="aether_runtime", symbol="string_to_int")
+@export
+func parse_int(s: String) -> Int;
+
+// Converts an integer to a string
+@extern(library="aether_runtime", symbol="int_to_string")
+@export
+func from_int(i: Int) -> String;
+
+// ============================================================================
+// String Splitting
+// ============================================================================
+
+// Splits the string by the given delimiter
+// Returns an opaque pointer to a string array - use string_array_* functions
+@extern(library="aether_runtime", symbol="string_split")
+@export
+func split(s: String, delimiter: String) -> Int64;
+
+// String array operations for working with split results
+@extern(library="aether_runtime", symbol="string_array_length")
+@export
+func array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="string_array_get")
+@export
+func array_get(arr: Int64, index: Int) -> String;

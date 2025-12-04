@@ -33,6 +33,8 @@ pub struct Symbol {
     pub is_moved: bool,
     /// Tracks current borrow state
     pub borrow_state: BorrowState,
+    /// FFI symbol name for external functions (e.g., "aether_print" for @extern(symbol="aether_print"))
+    pub ffi_symbol: Option<String>,
 }
 
 /// Borrow state of a symbol
@@ -65,6 +67,30 @@ impl Symbol {
             declaration_location,
             is_moved: false,
             borrow_state: BorrowState::None,
+            ffi_symbol: None,
+        }
+    }
+
+    /// Create a new symbol with an FFI symbol name
+    pub fn new_with_ffi_symbol(
+        name: String,
+        symbol_type: Type,
+        kind: SymbolKind,
+        is_mutable: bool,
+        is_initialized: bool,
+        declaration_location: SourceLocation,
+        ffi_symbol: Option<String>,
+    ) -> Self {
+        Self {
+            name,
+            symbol_type,
+            kind,
+            is_mutable,
+            is_initialized,
+            declaration_location,
+            is_moved: false,
+            borrow_state: BorrowState::None,
+            ffi_symbol,
         }
     }
 }
@@ -217,9 +243,14 @@ impl SymbolTable {
         self.current_scope_mut().add_symbol(symbol)
     }
 
+    /// Add a symbol to the global scope (scope 0) - used for imports
+    pub fn add_symbol_to_global(&mut self, symbol: Symbol) -> Result<(), SemanticError> {
+        self.scopes[0].add_symbol(symbol)
+    }
+
     /// Look up a symbol, searching from current scope up to global
     pub fn lookup_symbol(&self, name: &str) -> Option<&Symbol> {
-        eprintln!("SymbolTable: lookup_symbol: Looking for '{}'", name);
+        eprintln!("SymbolTable: lookup_symbol: Looking for '{}' in scope {}", name, self.current_scope);
         let mut current = self.current_scope;
 
         loop {

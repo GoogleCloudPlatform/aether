@@ -1,44 +1,132 @@
 module Math;
 
+// ============================================================================
+// Integer Operations
+// ============================================================================
+
 // @pre({true}, message="Addition is always safe for Int within bounds.")
 // @post({result.0 == a + b}, message="Result.0 is the sum of a and b.")
-// @post({result.1 == false}, message="Result.1 (overflow flag) is false as Int is arbitrary precision.")
-@extern("C")
+@extern(library="aether_runtime", symbol="safe_add")
+@export
 func safe_add(a: Int, b: Int) -> Int;
 
 // @pre({true}, message="Multiplication is always safe for Int within bounds.")
 // @post({result.0 == a * b}, message="Result.0 is the product of a and b.")
-// @post({result.1 == false}, message="Result.1 (overflow flag) is false as Int is arbitrary precision.")
-@extern("C")
+@extern(library="aether_runtime", symbol="safe_multiply")
+@export
 func safe_multiply(a: Int, b: Int) -> Int;
 
-// @pre({exp >= 0}, message="Exponent must be non-negative.", verify=instantiation)
+// @pre({exp >= 0}, message="Exponent must be non-negative.")
 // @post({result == base ^ exp}, message="Result is base raised to the power of exp.")
-@extern("C")
-func pow_verified(base: Int, exp: Int) -> Int;
+@extern(library="aether_runtime", symbol="pow_verified")
+@export
+func pow_int(base: Int, exp: Int) -> Int;
 
-// @pre({n >= 0}, message="Input for integer square root must be non-negative.", verify=instantiation)
+// @pre({n >= 0}, message="Input for integer square root must be non-negative.")
 // @post({result * result <= n && (result + 1) * (result + 1) > n}, message="Result is the integer square root.")
-@extern("C")
+@extern(library="aether_runtime", symbol="sqrt_int")
+@export
 func sqrt_int(n: Int) -> Int;
 
-// @pre({a >= 0 && b >= 0}, message="Inputs for GCD must be non-negative.", verify=abstract)
+// @pre({a >= 0 && b >= 0}, message="Inputs for GCD must be non-negative.")
 // @post({result >= 0}, message="GCD is non-negative.")
-// @post({a % result == 0 && b % result == 0}, message="Result divides both a and b.")
-// @post({forall k: Int. (k > result && a % k == 0 && b % k == 0) => false}, message="Result is the greatest common divisor.", verify=abstract)
-@extern("C")
+@extern(library="aether_runtime", symbol="gcd")
+@export
 func gcd(a: Int, b: Int) -> Int;
 
 // @post({result == (a < b ? a : b)}, message="Result is the minimum of a and b.")
-@extern("C")
-func min(a: Int, b: Int) -> Int;
+@extern(library="aether_runtime", symbol="min")
+@export
+func min_int(a: Int, b: Int) -> Int;
 
 // @post({result == (a > b ? a : b)}, message="Result is the maximum of a and b.")
-@extern("C")
-func max(a: Int, b: Int) -> Int;
+@extern(library="aether_runtime", symbol="max")
+@export
+func max_int(a: Int, b: Int) -> Int;
 
-// @pre({array.length > 0}, message="Array must not be empty.")
-// @post({forall i: Int. (i >= 0 && i < array.length) => array[i] >= 0}, message="All elements in the array must be non-negative.", verify=abstract)
-// @post({result >= 0}, message="Sum of non-negative elements is non-negative.")
-@extern("C")
-func sum_array(array: Array<Int>) -> Int;
+// Absolute value of an integer
+@extern(library="aether_runtime", symbol="aether_abs")
+@export
+func abs(x: Int) -> Int;
+
+// ============================================================================
+// Floating-Point Operations
+// ============================================================================
+
+// Square root of a floating-point number
+@extern(library="aether_runtime", symbol="aether_sqrt")
+@export
+func sqrt(x: Float) -> Float;
+
+// Exponential function (e^x)
+@extern(library="aether_runtime", symbol="aether_exp")
+@export
+func exp(x: Float) -> Float;
+
+// Natural logarithm
+@extern(library="aether_runtime", symbol="aether_log")
+@export
+func log(x: Float) -> Float;
+
+// Base-10 logarithm
+@extern(library="aether_runtime", symbol="aether_log10")
+@export
+func log10(x: Float) -> Float;
+
+// Power function (base^exponent)
+@extern(library="aether_runtime", symbol="aether_pow")
+@export
+func pow(base: Float, exp: Float) -> Float;
+
+// ============================================================================
+// Trigonometric Functions
+// ============================================================================
+
+// Sine
+@extern(library="aether_runtime", symbol="aether_sin")
+@export
+func sin(x: Float) -> Float;
+
+// Cosine
+@extern(library="aether_runtime", symbol="aether_cos")
+@export
+func cos(x: Float) -> Float;
+
+// Tangent
+@extern(library="aether_runtime", symbol="aether_tan")
+@export
+func tan(x: Float) -> Float;
+
+// Hyperbolic sine
+@extern(library="aether_runtime", symbol="aether_sinh")
+@export
+func sinh(x: Float) -> Float;
+
+// Hyperbolic cosine
+@extern(library="aether_runtime", symbol="aether_cosh")
+@export
+func cosh(x: Float) -> Float;
+
+// Hyperbolic tangent
+@extern(library="aether_runtime", symbol="aether_tanh")
+@export
+func tanh(x: Float) -> Float;
+
+// ============================================================================
+// Rounding and Truncation
+// ============================================================================
+
+// Floor - round down to nearest integer
+@extern(library="aether_runtime", symbol="aether_floor")
+@export
+func floor(x: Float) -> Float;
+
+// Ceiling - round up to nearest integer
+@extern(library="aether_runtime", symbol="aether_ceil")
+@export
+func ceil(x: Float) -> Float;
+
+// Round to nearest integer
+@extern(library="aether_runtime", symbol="aether_round")
+@export
+func round(x: Float) -> Float;

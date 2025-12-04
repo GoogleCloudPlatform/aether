@@ -257,6 +257,12 @@ impl ModuleLoader {
             "string".to_string(),
             std::fs::read_to_string("stdlib/string.aether").unwrap_or_else(|_| String::new()),
         );
+
+        // StringView - zero-copy string operations
+        self.stdlib_modules.insert(
+            "stringview".to_string(),
+            std::fs::read_to_string("stdlib/stringview.aether").unwrap_or_else(|_| String::new()),
+        );
     }
 
     /// Get all loaded modules

@@ -2045,9 +2045,10 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Check for module function call (e.g. io.println)
         if let ast::Expression::Variable { name, .. } = receiver {
-            if let Some(module_name) = self.imported_modules.get(&name.name) {
-                // It's a module function call
-                let qualified_name = format!("{}.{}", module_name, method_name.name);
+            if let Some(_module_name) = self.imported_modules.get(&name.name) {
+                // It's a module function call - use the alias (name.name) not actual module name
+                // because symbols are registered with the alias in add_imported_module_to_scope
+                let qualified_name = format!("{}.{}", name.name, method_name.name);
 
                 // Look up return type from symbol table if available, otherwise void
                 let return_type = if let Some(st) = &self.symbol_table {
@@ -2067,7 +2068,8 @@ impl LoweringContext {
                             {
                                 let ext_func = crate::mir::ExternalFunction {
                                     name: qualified_name.clone(),
-                                    symbol: None, // Or lookup from somewhere? But for now None.
+                                    // Use FFI symbol from the symbol table (captured during import)
+                                    symbol: func_sym.ffi_symbol.clone(),
                                     parameters: parameter_types.clone(),
                                     return_type: *return_type.clone(),
                                     calling_convention: crate::mir::CallingConvention::C,

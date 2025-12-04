@@ -9,12 +9,19 @@
 
 module integration_test;
 
-// ============================================================================
-// FFI Declarations
-// ============================================================================
+// Import stdlib modules instead of using raw FFI
+import std.io as io;
+import std.math as math;
 
-@extern(library="aether_runtime", symbol="aether_print")
-func print(s: String) -> Int;
+// Helper to call io.print (returns void, but we need Int compatibility)
+func print(s: String) -> Int {
+    io.print(s);
+    return 0;
+}
+
+// ============================================================================
+// FFI Declarations (LLM-specific, not in stdlib)
+// ============================================================================
 
 // Tokenizer FFI
 @extern(library="aether_runtime", symbol="tokenizer_create")
@@ -70,12 +77,7 @@ func int64_to_int(value: Int64) -> Int;
 @extern(library="aether_runtime", symbol="int_to_int64")
 func int_to_int64(value: Int) -> Int64;
 
-// Math FFI
-@extern(library="aether_runtime", symbol="aether_sqrt")
-func sqrt(x: Float) -> Float;
-
-@extern(library="aether_runtime", symbol="aether_exp")
-func exp(x: Float) -> Float;
+// Note: sqrt and exp are now from std.math import
 
 // ============================================================================
 // Model Configuration (tiny synthetic model)
@@ -113,7 +115,7 @@ func rms_norm(x: Int64, weight: Int64, dim: Int) -> Int64 {
         i = {i + 1};
     }
     let mean_sq = {sum_sq / 64.0};
-    let rms = sqrt({mean_sq + eps});
+    let rms = math.sqrt({mean_sq + eps});
 
     let result = float_array_zeros(dim);
     i = 0;
@@ -153,7 +155,7 @@ func silu(x: Int64, dim: Int) -> Int64 {
     while ({i < dim}) {
         let val = float_array_get(x, i);
         let neg_val = {0.0 - val};
-        let sigmoid = {1.0 / {1.0 + exp(neg_val)}};
+        let sigmoid = {1.0 / {1.0 + math.exp(neg_val)}};
         float_array_set(result, i, {val * sigmoid});
         i = {i + 1};
     }
