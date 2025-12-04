@@ -248,6 +248,17 @@
         - Use `Int64` instead of `Pointer<Void>` for array handles to avoid 64-bit pointer truncation on arm64.
         - Use `Int` return type for boolean-returning FFI functions and compare with `== 0` instead of using Bool directly (to avoid `!` operator issues with Bool type).
 
+- [x] **Task 19.3: Tokenizer API**: Completed. Implemented HTTP service with tokenize/detokenize endpoints.
+    - **Runtime Additions**:
+        - Added `http_parse_method`, `http_parse_path`, `http_parse_body` FFI functions for HTTP request parsing.
+        - Added `http_create_json_response` FFI function for creating JSON HTTP responses.
+    - **LLVM Backend Fix**: External function declarations now check if symbol already exists in LLVM module before adding (prevents duplicate `.1` suffixed symbols).
+    - **Service File**: `tests/starling/tokenizer_service.aether` implements full HTTP tokenizer service:
+        - `POST /v1/tokenize` - Tokenizes text using BPE, returns tokens and IDs
+        - `POST /v1/detokenize` - Decodes token strings back to text
+        - `GET /health` - Health check endpoint
+    - **Verified**: All endpoints working with correct token IDs (e.g., "hello" → ["he", "ll", "o"] → [5, 4, 3]).
+
 ## Phase 16: Generic Contract Verification (Completed)
 
 ## Phase 18: Standard Library in Aether (Completed)

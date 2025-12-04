@@ -535,9 +535,9 @@ See: [Architecture - Verification Strategy](architecture.md#verification-strateg
 
 ## Phase 19: Starling Tokenizer Service
 
-- [ ] **Task 19.1: Implement Tokenizer Loader**: Implement BPE/WordPiece tokenizer loader (from vocab/merges).
-- [ ] **Task 19.2: Tokenizer Logic**: Encode/decode with canonical round-trip; offsets.
-- [ ] **Task 19.3: Tokenizer API**: HTTP endpoints: `/v1/tokenize` and `/v1/detokenize`.
+- [x] **Task 19.1: Implement Tokenizer Loader**: Implement BPE/WordPiece tokenizer loader (from vocab/merges).
+- [x] **Task 19.2: Tokenizer Logic**: Encode/decode with canonical round-trip; offsets.
+- [x] **Task 19.3: Tokenizer API**: HTTP endpoints: `/v1/tokenize` and `/v1/detokenize`.
 - [ ] **Task 19.4: Tokenizer Tests**: Golden fixtures, unicode edge cases, round-trip property, bad-token errors.
 
 ## Phase 20: Starling Sampler Pipeline
