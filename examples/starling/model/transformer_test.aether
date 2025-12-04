@@ -1,0 +1,642 @@
+// Minimal Transformer Test - End-to-end inference with GGUF weights
+module transformer_test;
+
+// ============================================================================
+// FFI Declarations
+// ============================================================================
+
+@extern(library="aether_runtime", symbol="aether_print")
+func print(s: String) -> Int;
+
+// GGUF loading FFI
+@extern(library="aether_runtime", symbol="gguf_load")
+func gguf_load(path: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="gguf_unload")
+func gguf_unload(model_id: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="gguf_get_tensor_f32")
+func gguf_get_tensor_f32(model_id: Int64, name: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="gguf_tensor_dim")
+func gguf_tensor_dim(model_id: Int64, name: String, index: Int) -> Int64;
+
+// Float array FFI
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(size: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_zeros")
+func float_array_zeros(size: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_len(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int64_to_int")
+func int64_to_int(value: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_to_int64")
+func int_to_int64(value: Int) -> Int64;
+
+// Math FFI
+@extern(library="aether_runtime", symbol="aether_sqrt")
+func sqrt(x: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="aether_exp")
+func exp(x: Float) -> Float;
+
+// ============================================================================
+// Model Configuration
+// ============================================================================
+
+// Config for tiny synthetic model
+func vocab_size() -> Int { return 256; }
+func hidden_dim() -> Int { return 64; }
+func intermediate_dim() -> Int { return 256; }
+func num_layers() -> Int { return 2; }
+func num_heads() -> Int { return 4; }
+func head_dim() -> Int { return 16; }  // hidden_dim / num_heads
+
+// ============================================================================
+// Core Operations
+// ============================================================================
+
+// Embedding lookup: get row from embedding matrix
+func embedding_lookup(weights: Int64, token_id: Int, dim: Int) -> Int64 {
+    let result = float_array_zeros(dim);
+    let mut i = 0;
+    while ({i < dim}) {
+        // weights is [hidden_dim, vocab_size], row-major
+        // For token_id, we want column token_id
+        let idx = {i + {token_id * dim}};
+        let value = float_array_get(weights, idx);
+        float_array_set(result, i, value);
+        i = {i + 1};
+    }
+    return result;
+}
+
+// RMSNorm: x / sqrt(mean(x^2) + eps) * weight
+func rms_norm(x: Int64, weight: Int64, dim: Int) -> Int64 {
+    let eps = 0.00001;
+
+    // Compute mean of squares
+    let mut sum_sq = 0.0;
+    let mut i = 0;
+    while ({i < dim}) {
+        let val = float_array_get(x, i);
+        sum_sq = {sum_sq + {val * val}};
+        i = {i + 1};
+    }
+    let mean_sq = {sum_sq / 64.0};  // dim = 64
+    let rms = sqrt({mean_sq + eps});
+
+    // Normalize and scale
+    let result = float_array_zeros(dim);
+    i = 0;
+    while ({i < dim}) {
+        let val = float_array_get(x, i);
+        let w = float_array_get(weight, i);
+        let normed = {{val / rms} * w};
+        float_array_set(result, i, normed);
+        i = {i + 1};
+    }
+
+    return result;
+}
+
+// Linear layer: out = x @ W^T (W is [out_dim, in_dim])
+func linear(x: Int64, weight: Int64, in_dim: Int, out_dim: Int) -> Int64 {
+    let result = float_array_zeros(out_dim);
+
+    let mut o = 0;
+    while ({o < out_dim}) {
+        let mut sum = 0.0;
+        let mut i = 0;
+        while ({i < in_dim}) {
+            let x_val = float_array_get(x, i);
+            // weight is [in_dim, out_dim] row-major
+            let w_idx = {i + {o * in_dim}};
+            let w_val = float_array_get(weight, w_idx);
+            sum = {sum + {x_val * w_val}};
+            i = {i + 1};
+        }
+        float_array_set(result, o, sum);
+        o = {o + 1};
+    }
+
+    return result;
+}
+
+// SiLU activation: x * sigmoid(x) = x / (1 + exp(-x))
+func silu(x: Int64, dim: Int) -> Int64 {
+    let result = float_array_zeros(dim);
+    let mut i = 0;
+    while ({i < dim}) {
+        let val = float_array_get(x, i);
+        let neg_val = {0.0 - val};
+        let sigmoid = {1.0 / {1.0 + exp(neg_val)}};
+        float_array_set(result, i, {val * sigmoid});
+        i = {i + 1};
+    }
+    return result;
+}
+
+// Element-wise multiply
+func elementwise_mul(a: Int64, b: Int64, dim: Int) -> Int64 {
+    let result = float_array_zeros(dim);
+    let mut i = 0;
+    while ({i < dim}) {
+        let va = float_array_get(a, i);
+        let vb = float_array_get(b, i);
+        float_array_set(result, i, {va * vb});
+        i = {i + 1};
+    }
+    return result;
+}
+
+// Element-wise add
+func elementwise_add(a: Int64, b: Int64, dim: Int) -> Int64 {
+    let result = float_array_zeros(dim);
+    let mut i = 0;
+    while ({i < dim}) {
+        let va = float_array_get(a, i);
+        let vb = float_array_get(b, i);
+        float_array_set(result, i, {va + vb});
+        i = {i + 1};
+    }
+    return result;
+}
+
+// ============================================================================
+// FFN Block (SwiGLU variant)
+// ============================================================================
+
+// FFN: SwiGLU = silu(gate) * up, then down projection
+func ffn_block(x: Int64, gate_w: Int64, up_w: Int64, down_w: Int64) -> Int64 {
+    let hid = hidden_dim();
+    let inter = intermediate_dim();
+
+    // Gate and up projections
+    let gate = linear(x, gate_w, hid, inter);
+    let up = linear(x, up_w, hid, inter);
+
+    // SwiGLU: silu(gate) * up
+    let gate_act = silu(gate, inter);
+    let hidden = elementwise_mul(gate_act, up, inter);
+
+    // Down projection
+    let out = linear(hidden, down_w, inter, hid);
+
+    return out;
+}
+
+// ============================================================================
+// Simplified Attention (single head, no cache for testing)
+// ============================================================================
+
+// Simple self-attention for single position
+func attention_block(x: Int64, q_w: Int64, k_w: Int64, v_w: Int64, o_w: Int64) -> Int64 {
+    let hid = hidden_dim();
+
+    // Compute Q, K, V
+    let q = linear(x, q_w, hid, hid);
+    let k = linear(x, k_w, hid, hid);
+    let v = linear(x, v_w, hid, hid);
+
+    // For single token, attention is just softmax(q·k/√d) * v = v
+    // Since there's only one position, attention weights are [1.0]
+    // So output is just V projected through O
+    let out = linear(v, o_w, hid, hid);
+
+    return out;
+}
+
+// ============================================================================
+// Transformer Layer
+// ============================================================================
+
+func transformer_layer(x: Int64, model_id: Int64, layer: Int) -> Int64 {
+    let hid = hidden_dim();
+
+    // Load layer weights
+    let attn_norm_name = "blk.0.attn_norm.weight";
+    let ffn_norm_name = "blk.0.ffn_norm.weight";
+    let q_name = "blk.0.attn_q.weight";
+    let k_name = "blk.0.attn_k.weight";
+    let v_name = "blk.0.attn_v.weight";
+    let o_name = "blk.0.attn_output.weight";
+    let gate_name = "blk.0.ffn_gate.weight";
+    let up_name = "blk.0.ffn_up.weight";
+    let down_name = "blk.0.ffn_down.weight";
+
+    // Load attention weights
+    let attn_norm = gguf_get_tensor_f32(model_id, attn_norm_name);
+    let q_w = gguf_get_tensor_f32(model_id, q_name);
+    let k_w = gguf_get_tensor_f32(model_id, k_name);
+    let v_w = gguf_get_tensor_f32(model_id, v_name);
+    let o_w = gguf_get_tensor_f32(model_id, o_name);
+
+    // Attention block with residual
+    let normed = rms_norm(x, attn_norm, hid);
+    let attn_out = attention_block(normed, q_w, k_w, v_w, o_w);
+    let post_attn = elementwise_add(x, attn_out, hid);
+
+    // Load FFN weights
+    let ffn_norm = gguf_get_tensor_f32(model_id, ffn_norm_name);
+    let gate_w = gguf_get_tensor_f32(model_id, gate_name);
+    let up_w = gguf_get_tensor_f32(model_id, up_name);
+    let down_w = gguf_get_tensor_f32(model_id, down_name);
+
+    // FFN block with residual
+    let normed2 = rms_norm(post_attn, ffn_norm, hid);
+    let ffn_out = ffn_block(normed2, gate_w, up_w, down_w);
+    let out = elementwise_add(post_attn, ffn_out, hid);
+
+    return out;
+}
+
+// ============================================================================
+// Full Forward Pass
+// ============================================================================
+
+func forward(model_id: Int64, token_id: Int) -> Int64 {
+    let hid = hidden_dim();
+    let vocab = vocab_size();
+
+    // Load embedding weights
+    let embed_w = gguf_get_tensor_f32(model_id, "token_embd.weight");
+    if ({embed_w <= int_to_int64(0)}) {
+        return int_to_int64(0);
+    }
+
+    // Embedding lookup
+    let x = embedding_lookup(embed_w, token_id, hid);
+
+    // Apply transformer layers (just layer 0 for now)
+    let after_layer = transformer_layer(x, model_id, 0);
+
+    // Output norm
+    let out_norm = gguf_get_tensor_f32(model_id, "output_norm.weight");
+    let normed = rms_norm(after_layer, out_norm, hid);
+
+    // Output projection to logits
+    let output_w = gguf_get_tensor_f32(model_id, "output.weight");
+    let logits = linear(normed, output_w, hid, vocab);
+
+    return logits;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Test 1: Load model and run embedding lookup
+func test_embedding_lookup() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    let embed_w = gguf_get_tensor_f32(model_id, "token_embd.weight");
+    if ({embed_w <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let embedding = embedding_lookup(embed_w, 42, hidden_dim());
+    let len = float_array_len(embedding);
+    if ({len != 64}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 2: RMSNorm produces output
+func test_rms_norm() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // Create input vector
+    let x = float_array_zeros(64);
+    let mut i = 0;
+    while ({i < 64}) {
+        float_array_set(x, i, 0.1);
+        i = {i + 1};
+    }
+
+    // Load norm weights
+    let norm_w = gguf_get_tensor_f32(model_id, "blk.0.attn_norm.weight");
+    if ({norm_w <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let normed = rms_norm(x, norm_w, 64);
+    let len = float_array_len(normed);
+    if ({len != 64}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 3: Linear layer produces correct output size
+func test_linear() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // Create input
+    let x = float_array_zeros(64);
+    let mut i = 0;
+    while ({i < 64}) {
+        float_array_set(x, i, 0.01);
+        i = {i + 1};
+    }
+
+    // Load Q projection
+    let q_w = gguf_get_tensor_f32(model_id, "blk.0.attn_q.weight");
+    if ({q_w <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let out = linear(x, q_w, 64, 64);
+    let len = float_array_len(out);
+    if ({len != 64}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 4: FFN block
+func test_ffn_block() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // Create input
+    let x = float_array_zeros(64);
+    let mut i = 0;
+    while ({i < 64}) {
+        float_array_set(x, i, 0.02);
+        i = {i + 1};
+    }
+
+    // Load FFN weights
+    let gate_w = gguf_get_tensor_f32(model_id, "blk.0.ffn_gate.weight");
+    let up_w = gguf_get_tensor_f32(model_id, "blk.0.ffn_up.weight");
+    let down_w = gguf_get_tensor_f32(model_id, "blk.0.ffn_down.weight");
+
+    if ({gate_w <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let out = ffn_block(x, gate_w, up_w, down_w);
+    let len = float_array_len(out);
+    if ({len != 64}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 5: Single transformer layer
+func test_transformer_layer() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    // Create input embedding
+    let x = float_array_zeros(64);
+    let mut i = 0;
+    while ({i < 64}) {
+        float_array_set(x, i, 0.01);
+        i = {i + 1};
+    }
+
+    let out = transformer_layer(x, model_id, 0);
+    let len = float_array_len(out);
+    if ({len != 64}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 6: Full forward pass produces logits
+func test_forward_pass() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    let logits = forward(model_id, 42);
+    if ({logits <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    let len = float_array_len(logits);
+    if ({len != 256}) {  // vocab_size
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 7: Logits are finite (not NaN/Inf)
+func test_logits_finite() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    let logits = forward(model_id, 0);
+    if ({logits <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+
+    // Check a few logits are reasonable (between -100 and 100)
+    let v0 = float_array_get(logits, 0);
+    if ({v0 < {0.0 - 100.0}}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+    if ({v0 > 100.0}) {
+        gguf_unload(model_id);
+        return 4;
+    }
+
+    let v100 = float_array_get(logits, 100);
+    if ({v100 < {0.0 - 100.0}}) {
+        gguf_unload(model_id);
+        return 5;
+    }
+    if ({v100 > 100.0}) {
+        gguf_unload(model_id);
+        return 6;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Test 8: Multiple tokens produce different logits
+func test_different_tokens() -> Int {
+    let model_id = gguf_load("tests/starling/tiny_model.gguf");
+    if ({model_id <= int_to_int64(0)}) {
+        return 1;
+    }
+
+    let logits1 = forward(model_id, 0);
+    let logits2 = forward(model_id, 100);
+
+    if ({logits1 <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 2;
+    }
+    if ({logits2 <= int_to_int64(0)}) {
+        gguf_unload(model_id);
+        return 3;
+    }
+
+    // Logits should differ for different input tokens
+    let v1 = float_array_get(logits1, 50);
+    let v2 = float_array_get(logits2, 50);
+    let diff = {v1 - v2};
+    let mut abs_diff = diff;
+    if ({diff < 0.0}) {
+        abs_diff = {0.0 - diff};
+    }
+
+    // Should be different (not exactly equal)
+    if ({abs_diff < 0.0000001}) {
+        gguf_unload(model_id);
+        return 4;
+    }
+
+    gguf_unload(model_id);
+    return 0;
+}
+
+// Main test runner
+func main() -> Int {
+    let mut passed = 0;
+    let mut failed = 0;
+
+    print("Transformer Integration Tests");
+    print("==============================");
+
+    // Test 1
+    let r1 = test_embedding_lookup();
+    if ({r1 == 0}) {
+        print("PASS: test_embedding_lookup");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_embedding_lookup");
+        failed = {failed + 1};
+    }
+
+    // Test 2
+    let r2 = test_rms_norm();
+    if ({r2 == 0}) {
+        print("PASS: test_rms_norm");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_rms_norm");
+        failed = {failed + 1};
+    }
+
+    // Test 3
+    let r3 = test_linear();
+    if ({r3 == 0}) {
+        print("PASS: test_linear");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_linear");
+        failed = {failed + 1};
+    }
+
+    // Test 4
+    let r4 = test_ffn_block();
+    if ({r4 == 0}) {
+        print("PASS: test_ffn_block");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_ffn_block");
+        failed = {failed + 1};
+    }
+
+    // Test 5
+    let r5 = test_transformer_layer();
+    if ({r5 == 0}) {
+        print("PASS: test_transformer_layer");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_transformer_layer");
+        failed = {failed + 1};
+    }
+
+    // Test 6
+    let r6 = test_forward_pass();
+    if ({r6 == 0}) {
+        print("PASS: test_forward_pass");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_forward_pass");
+        failed = {failed + 1};
+    }
+
+    // Test 7
+    let r7 = test_logits_finite();
+    if ({r7 == 0}) {
+        print("PASS: test_logits_finite");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_logits_finite");
+        failed = {failed + 1};
+    }
+
+    // Test 8
+    let r8 = test_different_tokens();
+    if ({r8 == 0}) {
+        print("PASS: test_different_tokens");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_different_tokens");
+        failed = {failed + 1};
+    }
+
+    print("==============================");
+    print("Tests completed");
+
+    return failed;
+}

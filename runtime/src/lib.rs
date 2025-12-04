@@ -1352,6 +1352,31 @@ pub unsafe extern "C" fn float_array_create(capacity: c_int) -> *mut c_void {
     array_ptr as *mut c_void
 }
 
+/// Create a float array with given size, pre-filled with zeros (length = size)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_zeros(size: c_int) -> *mut c_void {
+    let cap = if size <= 0 { 4 } else { size as usize };
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<f64>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut FloatArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = cap as i32; // Set length = capacity
+    (*array_ptr).capacity = cap as i32;
+
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
 /// Push a float onto the array (f64 for Aether Float)
 #[no_mangle]
 pub unsafe extern "C" fn float_array_push(array_ptr: *mut c_void, value: f64) -> *mut c_void {
