@@ -148,6 +148,14 @@ pub enum Keyword {
     Pointer,
     MutPointer,
     SizeT,
+    // New fixed-width types
+    UInt8,
+    Int8,
+    UInt16,
+    Int16,
+    UInt32,
+    Int32, // Already exists above
+    UInt64,
 
     // Literals
     True,
@@ -287,6 +295,14 @@ impl Lexer {
         self.keywords
             .insert("MutPointer".to_string(), Keyword::MutPointer);
         self.keywords.insert("SizeT".to_string(), Keyword::SizeT);
+        
+        // New fixed-width types
+        self.keywords.insert("UInt8".to_string(), Keyword::UInt8);
+        self.keywords.insert("Int8".to_string(), Keyword::Int8);
+        self.keywords.insert("UInt16".to_string(), Keyword::UInt16);
+        self.keywords.insert("Int16".to_string(), Keyword::Int16);
+        self.keywords.insert("UInt32".to_string(), Keyword::UInt32);
+        self.keywords.insert("UInt64".to_string(), Keyword::UInt64);
 
         // Literal keywords
         self.keywords.insert("true".to_string(), Keyword::True);

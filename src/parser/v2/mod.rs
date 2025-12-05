@@ -1418,6 +1418,55 @@ impl Parser {
                         source_location: start_location,
                     });
                 }
+                Keyword::UInt8 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::UInt8,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Int8 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Int8,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::UInt16 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::UInt16,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Int16 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Int16,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::UInt32 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::UInt32,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::Int32 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::Int32,
+                        source_location: start_location,
+                    });
+                }
+                Keyword::UInt64 => {
+                    self.advance();
+                    return Ok(TypeSpecifier::Primitive {
+                        type_name: PrimitiveType::UInt64,
+                        source_location: start_location,
+                    });
+                }
 
                 // Built-in generic types
                 Keyword::Array => {

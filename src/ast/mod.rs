@@ -300,6 +300,14 @@ pub enum PrimitiveType {
     Void,
     SizeT,
     UIntPtrT,
+    // New fixed-width types
+    UInt8,
+    Int8,
+    UInt16,
+    Int16,
+    UInt32,
+    Int32,
+    UInt64,
 }
 
 impl PrimitiveType {
@@ -315,6 +323,13 @@ impl PrimitiveType {
                 | PrimitiveType::Float64
                 | PrimitiveType::SizeT
                 | PrimitiveType::UIntPtrT
+                | PrimitiveType::UInt8
+                | PrimitiveType::Int8
+                | PrimitiveType::UInt16
+                | PrimitiveType::Int16
+                | PrimitiveType::UInt32
+                | PrimitiveType::Int32
+                | PrimitiveType::UInt64
         )
     }
 }
@@ -334,6 +349,13 @@ impl std::fmt::Display for PrimitiveType {
             PrimitiveType::Void => write!(f, "VOID"),
             PrimitiveType::SizeT => write!(f, "SIZE_T"),
             PrimitiveType::UIntPtrT => write!(f, "UINTPTR_T"),
+            PrimitiveType::UInt8 => write!(f, "UINT8"),
+            PrimitiveType::Int8 => write!(f, "INT8"),
+            PrimitiveType::UInt16 => write!(f, "UINT16"),
+            PrimitiveType::Int16 => write!(f, "INT16"),
+            PrimitiveType::UInt32 => write!(f, "UINT32"),
+            PrimitiveType::Int32 => write!(f, "INT32"),
+            PrimitiveType::UInt64 => write!(f, "UINT64"),
         }
     }
 }
