@@ -378,6 +378,347 @@ func test_round_trip() -> Bool {
 }
 
 // ============================================================================
+// Test: Golden fixtures - deterministic expected outputs
+// ============================================================================
+func test_golden_fixtures() -> Bool {
+    println("=== Test: Golden fixtures ===");
+
+    // Test 1: Single character - should remain unchanged
+    let chars1 = split_to_chars("a");
+    if (string_array_length(chars1) != 1) {
+        println("FAIL: 'a' should split into 1 char");
+        return false;
+    }
+    if (string_equals(string_array_get(chars1, 0), "a") == 0) {
+        println("FAIL: 'a' should be 'a'");
+        return false;
+    }
+
+    // Test 2: Empty string
+    let chars2 = split_to_chars("");
+    if (string_array_length(chars2) != 0) {
+        print("FAIL: Empty string should have 0 chars, got ");
+        println(int_to_string(string_array_length(chars2)));
+        return false;
+    }
+
+    // Test 3: Known merge sequence for "aab"
+    // Starting: ['a', 'a', 'b']
+    // After merging a+a: ['aa', 'b']
+    let tokens3 = split_to_chars("aab");
+    if (string_array_length(tokens3) != 3) {
+        println("FAIL: 'aab' should have 3 chars initially");
+        return false;
+    }
+    let idx3 = find_merge_index(tokens3, "a", "a");
+    if (idx3 != 0) {
+        print("FAIL: Expected merge index 0, got ");
+        println(int_to_string(idx3));
+        return false;
+    }
+    let merged3 = apply_merge(tokens3, idx3);
+    if (string_array_length(merged3) != 2) {
+        println("FAIL: After merge should have 2 tokens");
+        return false;
+    }
+    if (string_equals(string_array_get(merged3, 0), "aa") == 0) {
+        println("FAIL: First token should be 'aa'");
+        return false;
+    }
+    if (string_equals(string_array_get(merged3, 1), "b") == 0) {
+        println("FAIL: Second token should be 'b'");
+        return false;
+    }
+
+    // Test 4: No merge available
+    let tokens4 = split_to_chars("abc");
+    let idx4 = find_merge_index(tokens4, "x", "y");
+    if (idx4 != -1) {
+        println("FAIL: Should not find 'x'+'y' in 'abc'");
+        return false;
+    }
+
+    // Test 5: Multiple same-char pairs - "aaa" -> first merge at index 0
+    let tokens5 = split_to_chars("aaa");
+    let idx5 = find_merge_index(tokens5, "a", "a");
+    if (idx5 != 0) {
+        print("FAIL: First 'a'+'a' merge should be at index 0, got ");
+        println(int_to_string(idx5));
+        return false;
+    }
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Test: Unicode and multi-byte characters
+// ============================================================================
+func test_unicode_chars() -> Bool {
+    println("=== Test: Unicode characters ===");
+
+    // Test 1: Simple ASCII with spaces
+    let text1 = "a b";
+    let chars1 = split_to_chars(text1);
+    print_tokens("'a b' splits to", chars1);
+    if (string_array_length(chars1) != 3) {
+        print("FAIL: 'a b' should have 3 chars, got ");
+        println(int_to_string(string_array_length(chars1)));
+        return false;
+    }
+    if (string_equals(string_array_get(chars1, 1), " ") == 0) {
+        println("FAIL: Middle char should be space");
+        return false;
+    }
+
+    // Test 2: Newline and tab characters
+    let text2 = "a\nb";
+    let chars2 = split_to_chars(text2);
+    print_tokens("'a\\nb' splits to", chars2);
+    if (string_array_length(chars2) != 3) {
+        println("FAIL: 'a\\nb' should have 3 chars");
+        return false;
+    }
+
+    // Test 3: Numbers and special characters
+    let text3 = "123!@#";
+    let chars3 = split_to_chars(text3);
+    print_tokens("'123!@#' splits to", chars3);
+    if (string_array_length(chars3) != 6) {
+        println("FAIL: '123!@#' should have 6 chars");
+        return false;
+    }
+
+    // Test 4: Mixed case
+    let text4 = "AaBb";
+    let chars4 = split_to_chars(text4);
+    if (string_array_length(chars4) != 4) {
+        println("FAIL: 'AaBb' should have 4 chars");
+        return false;
+    }
+    if (string_equals(string_array_get(chars4, 0), "A") == 0) {
+        println("FAIL: First char should be 'A'");
+        return false;
+    }
+    if (string_equals(string_array_get(chars4, 1), "a") == 0) {
+        println("FAIL: Second char should be 'a'");
+        return false;
+    }
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Test: Comprehensive round-trip tests
+// ============================================================================
+func join_tokens(tokens: Int64) -> String {
+    let mut result = "";
+    let num = string_array_length(tokens);
+    let mut i = 0;
+    while (i < num) {
+        let t = string_array_get(tokens, i);
+        result = string_concat(result, t);
+        i = i + 1;
+    }
+    return result;
+}
+
+func test_round_trip_comprehensive() -> Bool {
+    println("=== Test: Comprehensive round-trip ===");
+
+    // Test 1: Simple word
+    let text1 = "test";
+    let tokens1 = split_to_chars(text1);
+    let result1 = join_tokens(tokens1);
+    if (string_equals(text1, result1) == 0) {
+        print("FAIL: Round-trip failed for '");
+        print(text1);
+        print("' -> got '");
+        print(result1);
+        println("'");
+        return false;
+    }
+    println("  'test' round-trip OK");
+
+    // Test 2: With spaces
+    let text2 = "hello world";
+    let tokens2 = split_to_chars(text2);
+    let result2 = join_tokens(tokens2);
+    if (string_equals(text2, result2) == 0) {
+        println("FAIL: Round-trip failed for 'hello world'");
+        return false;
+    }
+    println("  'hello world' round-trip OK");
+
+    // Test 3: Numbers
+    let text3 = "12345";
+    let tokens3 = split_to_chars(text3);
+    let result3 = join_tokens(tokens3);
+    if (string_equals(text3, result3) == 0) {
+        println("FAIL: Round-trip failed for '12345'");
+        return false;
+    }
+    println("  '12345' round-trip OK");
+
+    // Test 4: Mixed content
+    let text4 = "abc123xyz";
+    let tokens4 = split_to_chars(text4);
+    let result4 = join_tokens(tokens4);
+    if (string_equals(text4, result4) == 0) {
+        println("FAIL: Round-trip failed for 'abc123xyz'");
+        return false;
+    }
+    println("  'abc123xyz' round-trip OK");
+
+    // Test 5: After merges - ensure content preserved
+    let text5 = "aabb";
+    let mut tokens5 = split_to_chars(text5);
+    // Apply merge a+a
+    let idx5a = find_merge_index(tokens5, "a", "a");
+    if (idx5a >= 0) {
+        tokens5 = apply_merge(tokens5, idx5a);
+    }
+    // Apply merge b+b
+    let idx5b = find_merge_index(tokens5, "b", "b");
+    if (idx5b >= 0) {
+        tokens5 = apply_merge(tokens5, idx5b);
+    }
+    let result5 = join_tokens(tokens5);
+    if (string_equals(text5, result5) == 0) {
+        print("FAIL: Round-trip after merges failed for '");
+        print(text5);
+        print("' -> got '");
+        print(result5);
+        println("'");
+        return false;
+    }
+    print_tokens("  'aabb' after merges", tokens5);
+    println("  'aabb' round-trip after merges OK");
+
+    // Test 6: Longer text
+    let text6 = "The quick brown fox";
+    let tokens6 = split_to_chars(text6);
+    let result6 = join_tokens(tokens6);
+    if (string_equals(text6, result6) == 0) {
+        println("FAIL: Round-trip failed for longer text");
+        return false;
+    }
+    print("  '");
+    print(text6);
+    println("' round-trip OK");
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
+// Test: Edge cases and boundary conditions
+// ============================================================================
+func test_edge_cases() -> Bool {
+    println("=== Test: Edge cases ===");
+
+    // Test 1: Single character string
+    let tokens1 = split_to_chars("x");
+    if (string_array_length(tokens1) != 1) {
+        println("FAIL: Single char should produce 1 token");
+        return false;
+    }
+    println("  Single char OK");
+
+    // Test 2: Two character string
+    let tokens2 = split_to_chars("xy");
+    if (string_array_length(tokens2) != 2) {
+        println("FAIL: Two char string should produce 2 tokens");
+        return false;
+    }
+    println("  Two chars OK");
+
+    // Test 3: Merge at end of token list
+    let tokens3 = split_to_chars("xyaa");
+    let idx3 = find_merge_index(tokens3, "a", "a");
+    if (idx3 != 2) {
+        print("FAIL: 'a'+'a' should be at index 2, got ");
+        println(int_to_string(idx3));
+        return false;
+    }
+    let merged3 = apply_merge(tokens3, idx3);
+    if (string_array_length(merged3) != 3) {
+        println("FAIL: After merge should have 3 tokens");
+        return false;
+    }
+    if (string_equals(string_array_get(merged3, 2), "aa") == 0) {
+        println("FAIL: Last token should be 'aa'");
+        return false;
+    }
+    println("  Merge at end OK");
+
+    // Test 4: Merge at beginning of token list
+    let tokens4 = split_to_chars("aabb");
+    let idx4 = find_merge_index(tokens4, "a", "a");
+    if (idx4 != 0) {
+        println("FAIL: 'a'+'a' should be at index 0");
+        return false;
+    }
+    let merged4 = apply_merge(tokens4, idx4);
+    if (string_equals(string_array_get(merged4, 0), "aa") == 0) {
+        println("FAIL: First token should be 'aa'");
+        return false;
+    }
+    println("  Merge at beginning OK");
+
+    // Test 5: Multiple consecutive merges
+    let mut tokens5 = split_to_chars("aaaa");
+    // First merge: ['a','a','a','a'] -> ['aa','a','a']
+    let idx5a = find_merge_index(tokens5, "a", "a");
+    tokens5 = apply_merge(tokens5, idx5a);
+    if (string_array_length(tokens5) != 3) {
+        println("FAIL: First merge of 'aaaa' should give 3 tokens");
+        return false;
+    }
+    // Second merge: ['aa','a','a'] -> ['aa','aa']
+    let idx5b = find_merge_index(tokens5, "a", "a");
+    if (idx5b >= 0) {
+        tokens5 = apply_merge(tokens5, idx5b);
+    }
+    if (string_array_length(tokens5) != 2) {
+        println("FAIL: Second merge should give 2 tokens");
+        return false;
+    }
+    println("  Multiple consecutive merges OK");
+
+    // Test 6: Non-existent merge pair
+    let tokens6 = split_to_chars("abc");
+    let idx6 = find_merge_index(tokens6, "z", "z");
+    if (idx6 != -1) {
+        println("FAIL: Should not find 'z'+'z' in 'abc'");
+        return false;
+    }
+    println("  Non-existent merge pair OK");
+
+    // Test 7: Repeated character string
+    let tokens7 = split_to_chars("zzzzz");
+    let len7 = string_array_length(tokens7);
+    if (len7 != 5) {
+        println("FAIL: 'zzzzz' should have 5 chars");
+        return false;
+    }
+    // All characters should be 'z'
+    let mut i = 0;
+    while (i < len7) {
+        if (string_equals(string_array_get(tokens7, i), "z") == 0) {
+            println("FAIL: All chars should be 'z'");
+            return false;
+        }
+        i = i + 1;
+    }
+    println("  Repeated character string OK");
+
+    println("PASS");
+    return true;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 func main() -> Int {
@@ -408,6 +749,26 @@ func main() -> Int {
     println("");
 
     if (test_round_trip() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_golden_fixtures() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_unicode_chars() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_round_trip_comprehensive() == false) {
+        failures = failures + 1;
+    }
+    println("");
+
+    if (test_edge_cases() == false) {
         failures = failures + 1;
     }
     println("");

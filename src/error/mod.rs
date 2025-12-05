@@ -112,6 +112,9 @@ pub enum LexerError {
     #[error("Maximum nesting depth exceeded at {location}")]
     MaxNestingDepthExceeded { location: SourceLocation },
 
+    #[error("Unterminated block comment at {location}")]
+    UnterminatedBlockComment { location: SourceLocation },
+
     #[error("Unexpected end of file")]
     UnexpectedEof,
 }

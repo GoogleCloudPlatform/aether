@@ -2045,14 +2045,16 @@ impl LoweringContext {
     ) -> Result<Operand, SemanticError> {
         // Check for module function call (e.g. io.println)
         if let ast::Expression::Variable { name, .. } = receiver {
-            if let Some(_module_name) = self.imported_modules.get(&name.name) {
-                // It's a module function call - use the alias (name.name) not actual module name
-                // because symbols are registered with the alias in add_imported_module_to_scope
-                let qualified_name = format!("{}.{}", name.name, method_name.name);
+            if let Some(module_name) = self.imported_modules.get(&name.name) {
+                // It's a module function call
+                // Use the alias for symbol lookup (since that's how it's in the scope)
+                let alias_qualified_name = format!("{}.{}", name.name, method_name.name);
+                // Use the canonical name for code generation (to match the definition)
+                let canonical_qualified_name = format!("{}.{}", module_name, method_name.name);
 
                 // Look up return type from symbol table if available, otherwise void
                 let return_type = if let Some(st) = &self.symbol_table {
-                    if let Some(func_sym) = st.lookup_symbol(&qualified_name) {
+                    if let Some(func_sym) = st.lookup_symbol(&alias_qualified_name) {
                         if let crate::types::Type::Function {
                             parameter_types,
                             return_type,
@@ -2060,16 +2062,18 @@ impl LoweringContext {
                         } = &func_sym.symbol_type
                         {
                             // Register as external function if not already known
-                            if !self.program.functions.contains_key(&qualified_name)
+                            // Use canonical name for registration
+                            if !self.program.functions.contains_key(&canonical_qualified_name)
                                 && !self
                                     .program
                                     .external_functions
-                                    .contains_key(&qualified_name)
+                                    .contains_key(&canonical_qualified_name)
                             {
                                 let ext_func = crate::mir::ExternalFunction {
-                                    name: qualified_name.clone(),
+                                    name: canonical_qualified_name.clone(),
                                     // Use FFI symbol from the symbol table (captured during import)
-                                    symbol: func_sym.ffi_symbol.clone(),
+                                    // If not present, default to canonical name
+                                    symbol: func_sym.ffi_symbol.clone().or(Some(canonical_qualified_name.clone())),
                                     parameters: parameter_types.clone(),
                                     return_type: *return_type.clone(),
                                     calling_convention: crate::mir::CallingConvention::C,
@@ -2077,7 +2081,7 @@ impl LoweringContext {
                                 };
                                 self.program
                                     .external_functions
-                                    .insert(qualified_name.clone(), ext_func);
+                                    .insert(canonical_qualified_name.clone(), ext_func);
                             }
                             *return_type.clone()
                         } else {
@@ -2105,7 +2109,8 @@ impl LoweringContext {
                     rvalue: Rvalue::Call {
                         func: Operand::Constant(Constant {
                             ty: crate::types::Type::primitive(ast::PrimitiveType::String),
-                            value: ConstantValue::String(qualified_name),
+                            // Use canonical name for the call
+                            value: ConstantValue::String(canonical_qualified_name),
                         }),
                         explicit_type_arguments: vec![],
                         args: lowered_args,

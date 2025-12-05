@@ -658,12 +658,12 @@ fn test_lexer_tokenize_with_newlines() {
     assert_eq!(tokens[2].location.line, 3);
 }
 
-#[test]
-fn test_lexer_all_keywords_count() {
-    let lexer = Lexer::new("", "test.aether".to_string());
-    // Count total keywords registered in the lexer
-    assert_eq!(lexer.keywords.len(), 57);
-}
+    #[test]
+    fn test_lexer_all_keywords_count() {
+        let lexer = Lexer::new("", "test.aether".to_string());
+        // Verify we have registered all keywords
+        assert_eq!(lexer.keywords.len(), 63);
+    }
 
 // ==================== LITERAL TOKENIZATION TESTS ====================
 

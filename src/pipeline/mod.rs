@@ -772,7 +772,23 @@ impl CompilationPipeline {
         backend: &LLVMBackend,
         base_name: &str,
     ) -> Result<PathBuf, CompilerError> {
-        let object_path = PathBuf::from(format!("{}.o", base_name));
+        // If output path is specified, use its directory + base_name.o
+        // If output path is an object file (ends in .o), use it directly.
+        let object_path = if let Some(ref output) = self.options.output {
+            if output.extension().map_or(false, |ext| ext == "o") {
+                output.clone()
+            } else {
+                // Output is likely an executable path (e.g., /tmp/test_dir/main)
+                // We want /tmp/test_dir/main.o or /tmp/test_dir/module.o
+                if let Some(parent) = output.parent() {
+                    parent.join(format!("{}.o", base_name))
+                } else {
+                    PathBuf::from(format!("{}.o", base_name))
+                }
+            }
+        } else {
+            PathBuf::from(format!("{}.o", base_name))
+        };
 
         // Write object file
         backend.write_object_file(&object_path)?;

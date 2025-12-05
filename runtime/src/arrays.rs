@@ -214,3 +214,41 @@ pub unsafe extern "C" fn array_f32_get_unchecked(array_ptr: *mut c_void, index: 
     let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut f32;
     *elements_ptr.add(index as usize)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_array_u8() {
+        unsafe {
+            // Initialize memory allocator
+            crate::memory_alloc::aether_memory_init();
+
+            let ptr = array_u8_create(10);
+            assert!(!ptr.is_null());
+
+            assert_eq!(array_u8_length(ptr), 0);
+
+            // Push values
+            let ptr = array_u8_push(ptr, 10);
+            let ptr = array_u8_push(ptr, 20);
+            let ptr = array_u8_push(ptr, 30);
+
+            assert_eq!(array_u8_length(ptr), 3);
+            assert_eq!(array_u8_get(ptr, 0), 10);
+            assert_eq!(array_u8_get(ptr, 1), 20);
+            assert_eq!(array_u8_get(ptr, 2), 30);
+            assert_eq!(array_u8_get(ptr, 3), 0); // Out of bounds safe return
+
+            // Unchecked access
+            assert_eq!(array_u8_get_unchecked(ptr, 1), 20);
+
+            // Set value
+            array_u8_set(ptr, 1, 99);
+            assert_eq!(array_u8_get(ptr, 1), 99);
+
+            array_u8_free(ptr);
+        }
+    }
+}

@@ -1453,13 +1453,6 @@ impl Parser {
                         source_location: start_location,
                     });
                 }
-                Keyword::Int32 => {
-                    self.advance();
-                    return Ok(TypeSpecifier::Primitive {
-                        type_name: PrimitiveType::Int32,
-                        source_location: start_location,
-                    });
-                }
                 Keyword::UInt64 => {
                     self.advance();
                     return Ok(TypeSpecifier::Primitive {

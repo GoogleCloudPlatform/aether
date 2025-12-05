@@ -154,7 +154,6 @@ pub enum Keyword {
     UInt16,
     Int16,
     UInt32,
-    Int32, // Already exists above
     UInt64,
 
     // Literals
@@ -375,6 +374,46 @@ impl Lexer {
             }
             self.advance();
         }
+    }
+
+    /// Skip a block comment (/* ... */)
+    fn skip_block_comment(&mut self) -> Result<(), LexerError> {
+        // We're positioned after the first '/', consume the second '*'
+        self.advance();
+
+        let start_location = self.current_location();
+        let mut depth = 1;
+
+        // We need to consume the '*' that started the comment
+        self.advance();
+
+        while depth > 0 {
+            match self.current_char {
+                Some('/') => {
+                    self.advance();
+                    if self.current_char == Some('*') {
+                        depth += 1;
+                        self.advance();
+                    }
+                }
+                Some('*') => {
+                    self.advance();
+                    if self.current_char == Some('/') {
+                        depth -= 1;
+                        self.advance();
+                    }
+                }
+                Some(_) => {
+                    self.advance();
+                }
+                None => {
+                    return Err(LexerError::UnterminatedBlockComment {
+                        location: start_location,
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Read a number (integer or float)
@@ -737,6 +776,11 @@ impl Lexer {
                 if self.current_char == Some('/') {
                     // Line comment (// or ///)
                     self.skip_line_comment();
+                    // Continue to get the next token after the comment
+                    self.next_token()
+                } else if self.current_char == Some('*') {
+                    // Block comment (/* ... */)
+                    self.skip_block_comment()?;
                     // Continue to get the next token after the comment
                     self.next_token()
                 } else {

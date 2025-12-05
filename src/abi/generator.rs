@@ -587,6 +587,13 @@ fn primitive_to_string(prim: &ast::PrimitiveType) -> String {
         ast::PrimitiveType::Void => "Void".to_string(),
         ast::PrimitiveType::SizeT => "SizeT".to_string(),
         ast::PrimitiveType::UIntPtrT => "UIntPtrT".to_string(),
+        ast::PrimitiveType::UInt8 => "UInt8".to_string(),
+        ast::PrimitiveType::Int8 => "Int8".to_string(),
+        ast::PrimitiveType::UInt16 => "UInt16".to_string(),
+        ast::PrimitiveType::Int16 => "Int16".to_string(),
+        ast::PrimitiveType::UInt32 => "UInt32".to_string(),
+        ast::PrimitiveType::Int32 => "Int32".to_string(),
+        ast::PrimitiveType::UInt64 => "UInt64".to_string(),
     }
 }
 

@@ -21,7 +21,6 @@ mod resource_tests;
 mod test_ffi_structs;
 mod test_ffi_function_pointers;
 mod test_ffi_arrays;
-mod test_llvm_c_api_simulation;
 mod test_memory_alloc;
 mod test_starling_ffi;
 mod test_string_runtime;

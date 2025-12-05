@@ -237,9 +237,15 @@ impl Type {
             | Type::Primitive(PrimitiveType::Integer64)
             | Type::Primitive(PrimitiveType::Float)
             | Type::Primitive(PrimitiveType::Float32)
-            | Type::Primitive(PrimitiveType::Float64)
             | Type::Primitive(PrimitiveType::SizeT)
-            | Type::Primitive(PrimitiveType::UIntPtrT) => true,
+            | Type::Primitive(PrimitiveType::UIntPtrT)
+            | Type::Primitive(PrimitiveType::UInt8)
+            | Type::Primitive(PrimitiveType::Int8)
+            | Type::Primitive(PrimitiveType::UInt16)
+            | Type::Primitive(PrimitiveType::Int16)
+            | Type::Primitive(PrimitiveType::UInt32)
+            | Type::Primitive(PrimitiveType::Int32)
+            | Type::Primitive(PrimitiveType::UInt64) => true,
             _ => false,
         }
     }
@@ -251,7 +257,14 @@ impl Type {
             | Type::Primitive(PrimitiveType::Integer32)
             | Type::Primitive(PrimitiveType::Integer64)
             | Type::Primitive(PrimitiveType::SizeT)
-            | Type::Primitive(PrimitiveType::UIntPtrT) => true,
+            | Type::Primitive(PrimitiveType::UIntPtrT)
+            | Type::Primitive(PrimitiveType::UInt8)
+            | Type::Primitive(PrimitiveType::Int8)
+            | Type::Primitive(PrimitiveType::UInt16)
+            | Type::Primitive(PrimitiveType::Int16)
+            | Type::Primitive(PrimitiveType::UInt32)
+            | Type::Primitive(PrimitiveType::Int32)
+            | Type::Primitive(PrimitiveType::UInt64) => true,
             _ => false,
         }
     }
@@ -335,6 +348,10 @@ impl Type {
             Type::Primitive(PrimitiveType::Float64) => Some(8),
             Type::Primitive(PrimitiveType::SizeT) => Some(8), // Assuming 64-bit target
             Type::Primitive(PrimitiveType::UIntPtrT) => Some(8), // Assuming 64-bit target
+            Type::Primitive(PrimitiveType::UInt8) | Type::Primitive(PrimitiveType::Int8) => Some(1),
+            Type::Primitive(PrimitiveType::UInt16) | Type::Primitive(PrimitiveType::Int16) => Some(2),
+            Type::Primitive(PrimitiveType::UInt32) | Type::Primitive(PrimitiveType::Int32) => Some(4),
+            Type::Primitive(PrimitiveType::UInt64) => Some(8),
             Type::Pointer { .. } => Some(8),                  // Assuming 64-bit target
             Type::Array {
                 element_type,
@@ -365,7 +382,14 @@ impl Type {
             | Type::Primitive(PrimitiveType::Float32)
             | Type::Primitive(PrimitiveType::Float64)
             | Type::Primitive(PrimitiveType::SizeT)
-            | Type::Primitive(PrimitiveType::UIntPtrT) => false,
+            | Type::Primitive(PrimitiveType::UIntPtrT)
+            | Type::Primitive(PrimitiveType::UInt8)
+            | Type::Primitive(PrimitiveType::Int8)
+            | Type::Primitive(PrimitiveType::UInt16)
+            | Type::Primitive(PrimitiveType::Int16)
+            | Type::Primitive(PrimitiveType::UInt32)
+            | Type::Primitive(PrimitiveType::Int32)
+            | Type::Primitive(PrimitiveType::UInt64) => false,
             Type::Primitive(PrimitiveType::String)
             | Type::Array { .. }
             | Type::Map { .. }

@@ -83,6 +83,13 @@ fn format_type(type_spec: &aether::ast::TypeSpecifier) -> String {
             PrimitiveType::Void => "Void".to_string(),
             PrimitiveType::SizeT => "SizeT".to_string(),
             PrimitiveType::UIntPtrT => "UIntPtrT".to_string(),
+            PrimitiveType::UInt8 => "UInt8".to_string(),
+            PrimitiveType::Int8 => "Int8".to_string(),
+            PrimitiveType::UInt16 => "UInt16".to_string(),
+            PrimitiveType::Int16 => "Int16".to_string(),
+            PrimitiveType::UInt32 => "UInt32".to_string(),
+            PrimitiveType::Int32 => "Int32".to_string(),
+            PrimitiveType::UInt64 => "UInt64".to_string(),
         },
         aether::ast::TypeSpecifier::Named { name, .. } => name.name.clone(),
         aether::ast::TypeSpecifier::Array { element_type, .. } => {

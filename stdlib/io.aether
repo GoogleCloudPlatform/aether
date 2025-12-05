@@ -25,3 +25,15 @@ func println(message: String) -> Void;
 @extern(library="aether_runtime", symbol="aether_read_line")
 @export
 func read_line() -> String;
+
+@extern(library="aether_runtime", symbol="calculate_file_sha256")
+@export
+func calculate_file_sha256(path: String) -> String;
+
+@extern(library="aether_runtime", symbol="file_exists")
+@export
+func file_exists(path: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="create_directory")
+@export
+func create_directory(path: String) -> Bool;

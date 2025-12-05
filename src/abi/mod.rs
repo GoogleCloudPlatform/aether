@@ -766,6 +766,13 @@ impl AbiType {
                     PT::Void => "Void".to_string(),
                     PT::SizeT => "SizeT".to_string(),
                     PT::UIntPtrT => "UIntPtrT".to_string(),
+                    PT::UInt8 => "UInt8".to_string(),
+                    PT::Int8 => "Int8".to_string(),
+                    PT::UInt16 => "UInt16".to_string(),
+                    PT::Int16 => "Int16".to_string(),
+                    PT::UInt32 => "UInt32".to_string(),
+                    PT::Int32 => "Int32".to_string(),
+                    PT::UInt64 => "UInt64".to_string(),
                 },
             },
 
@@ -845,6 +852,12 @@ impl AbiType {
                     "Void" => PT::Void,
                     "SizeT" => PT::SizeT,
                     "UIntPtrT" => PT::UIntPtrT,
+                    "UInt8" => PT::UInt8,
+                    "Int8" => PT::Int8,
+                    "UInt16" => PT::UInt16,
+                    "Int16" => PT::Int16,
+                    "UInt32" => PT::UInt32,
+                    "UInt64" => PT::UInt64,
                     _ => PT::Void, // Fallback
                 };
                 Type::Primitive(prim)

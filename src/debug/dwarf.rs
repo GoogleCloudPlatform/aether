@@ -379,6 +379,14 @@ impl DwarfGenerator {
                     crate::ast::PrimitiveType::Void => 5,
                     crate::ast::PrimitiveType::SizeT => 1, // Treat as integer
                     crate::ast::PrimitiveType::UIntPtrT => 1, // Treat as integer
+                    // New types - mapping to DWARF encoding implicitly via size
+                    crate::ast::PrimitiveType::UInt8 => 1,
+                    crate::ast::PrimitiveType::Int8 => 1,
+                    crate::ast::PrimitiveType::UInt16 => 1,
+                    crate::ast::PrimitiveType::Int16 => 1,
+                    crate::ast::PrimitiveType::UInt32 => 1,
+                    crate::ast::PrimitiveType::Int32 => 1,
+                    crate::ast::PrimitiveType::UInt64 => 1,
                 }
             }
             _ => 0, // Unknown type

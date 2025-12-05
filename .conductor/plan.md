@@ -317,7 +317,7 @@ cargo fmt && cargo clippy && cargo test
 17. [x] Phase 17: Contract Examples (Real-World) | ✅ Done |
 18. [x] Phase 18: Standard Library in Aether | ✅ Done |
 19. [TODO] Phase 19: Bootstrapping Preparation | ⏳ Pending |
-| 29 | 29.1 - 29.2 | Borrowing References | ⏳ Pending |
+| 29 | 29.1 - 29.2 | Borrowing References | ✅ Done (2024-12-04) |
 | 30 | 30.1 - 30.7 | Separate Compilation | ✅ Done (2024-12-04) |
 
 **Total Tasks:** 80+
@@ -551,24 +551,24 @@ See: [Architecture - Verification Strategy](architecture.md#verification-strateg
 - [x] **Task 19.1: Implement Tokenizer Loader**: Implement BPE/WordPiece tokenizer loader (from vocab/merges).
 - [x] **Task 19.2: Tokenizer Logic**: Encode/decode with canonical round-trip; offsets.
 - [x] **Task 19.3: Tokenizer API**: HTTP endpoints: `/v1/tokenize` and `/v1/detokenize`.
-- [ ] **Task 19.4: Tokenizer Tests**: Golden fixtures, unicode edge cases, round-trip property, bad-token errors.
+- [x] **Task 19.4: Tokenizer Tests**: Golden fixtures, unicode edge cases, round-trip property, bad-token errors. (completed: 2024-12-04)
 
 ## Phase 20: Starling Sampler Pipeline
 
-- [ ] **Task 20.1: Sampler Steps**: Implement masking (stop/eos), repetition penalty, temperature, top-k, top-p, freq/presence penalties, multinomial draw.
-- [ ] **Task 20.2: Deterministic RNG**: Seeded per request.
-- [ ] **Task 20.3: Sampler Tests**: Fixed logits + seeds → expected tokens; probability mass invariants; stop conditions.
+- [x] **Task 20.1: Sampler Steps**: Implement masking (stop/eos), repetition penalty, temperature, top-k, top-p, freq/presence penalties, multinomial draw.
+- [x] **Task 20.2: Deterministic RNG**: Seeded per request.
+- [x] **Task 20.3: Sampler Tests**: Fixed logits + seeds → expected tokens; probability mass invariants; stop conditions. (completed: 2024-12-04)
 
 ## Phase 21: Starling KV Cache Manager
 
-- [ ] **Task 21.1: Allocator**: RAM arena allocator with shape/dtype metadata per block.
-- [ ] **Task 21.2: Lifecycle**: Session lifecycle (allocate, resize, free); LRU eviction (session-level) with protected in-flight sessions.
-- [ ] **Task 21.3: Integrity & Metrics**: Checks on every borrow; metrics for alloc/free/evict; optional spill API stub (future).
-- [ ] **Task 21.4: Cache Tests**: Allocate/resize/evict under load; shape mismatch detection; TTL eviction.
+- [x] **Task 21.1: Allocator**: RAM arena allocator with shape/dtype metadata per block. (completed: 2024-12-04)
+- [x] **Task 21.2: Lifecycle**: Session lifecycle (allocate, resize, free); LRU eviction (session-level) with protected in-flight sessions. (completed: 2024-12-04)
+- [x] **Task 21.3: Integrity & Metrics**: Checks on every borrow; metrics for alloc/free/evict; optional spill API stub (future). (completed: 2024-12-04)
+- [x] **Task 21.4: Cache Tests**: Allocate/resize/evict under load; shape mismatch detection; TTL eviction. (completed: 2024-12-04)
 
 ## Phase 22: Starling Model Manager & Registry
 
-- [ ] **Task 22.1: Registry**: Load GGUF from local path/URL; checksum/etag validation; cache directory management.
+- [~] **Task 22.1: Registry**: Load GGUF from local path; checksum/etag validation; cache directory management. (started: 2025-12-04 09:35)
 - [ ] **Task 22.2: Loader**: Mmap weights, validate tensor shapes, expose ModelRuntime stub (CPU mock).
 - [ ] **Task 22.3: Admin Controls**: List/load/unload models; enforce max_sessions/max_batch per model.
 - [ ] **Task 22.4: Registry Tests**: Cache hit/miss, checksum failure, load/unload lifecycle.
@@ -655,11 +655,14 @@ func tensor_zeros(shape: TensorShape) -> Tensor {
 }
 ```
 
-### Task 29.1: Implement Borrowing References (`&T`)
-- [ ] **Parser**: Add `&T` and `&mut T` reference type syntax
-- [ ] **Semantic**: Track borrowed vs owned in type system
-- [ ] **Semantic**: Implement borrow checker (no use after move, no aliased mutable borrows)
-- [ ] **LLVM**: Generate pointer-based code for references
+### Task 29.1: Implement Borrowing References (`&T`) (completed: 2024-12-04)
+- [x] **Parser**: `&T` and `&mut T` reference type syntax (already existed)
+- [x] **Parser**: Added `*expr` dereference syntax
+- [x] **Semantic**: Allow dereferencing borrowed types
+- [x] **MIR**: Support borrowed type dereferencing in MIR lowering
+- [x] **LLVM**: Generate pointer types for `&T` and `&mut T` parameters
+- [x] **Semantic**: Borrow checker - use after move detection (already existed)
+- [x] **Semantic**: Borrow checker - aliased mutable borrow prevention (added)
 
 **Target syntax:**
 ```aether
@@ -671,10 +674,11 @@ func tensor_zeros(shape: TensorShape) -> Tensor {
 }
 ```
 
-### Task 29.2: Implement Copy Trait for Small Structs (Alternative/Complement)
-- [ ] **Parser**: Add `@derive(Copy)` annotation
-- [ ] **Semantic**: Auto-copy structs with only primitive fields when passed
-- [ ] **Tests**: Verify copy semantics for annotated structs
+### Task 29.2: Implement Copy Trait for Small Structs (completed: 2024-12-04)
+- [x] **Parser**: Add `@derive(Copy)` annotation recognition
+- [x] **AST/Types**: Added `is_copy` field to struct type definitions
+- [x] **Ownership**: Skip move semantics for Copy types
+- [x] **Tests**: Verified copy semantics - struct used twice without error
 
 **Target syntax:**
 ```aether
@@ -752,3 +756,55 @@ module.aether ──▶ Compiler ──▶ module.o + module.abi
 - [x] **End-to-End**: Verified import from pre-compiled module (MathUtils.add/multiply)
 - [x] **Contracts**: Verification using ABI contracts
 - [x] **Errors**: Good error messages with source locations from ABI
+
+---
+
+## Phase 31: Typed Arrays (New)
+
+**Goal**: Implement memory-efficient arrays for primitive types (`UInt8`, `Float32`, etc.) to support high-performance binary I/O and tensor operations.
+
+### Task 31.1: Type System & Syntax
+- [x] **AST**: Add `UInt8`, `Int8`, `UInt16`, `Int16`, `UInt32`, `Int32`, `Float32`, `UInt64` primitive types.
+- [x] **Parser**: Update `parse_type` to recognize new primitive types.
+- [x] **Semantics**: Update type checker to allow these new types. (Implicitly done as they are PrimitiveTypes, but verification needed later)
+
+### Task 31.2: Array Implementation
+- [x] **Runtime**: Implement specialized array backends in `runtime/src/arrays.rs` (e.g., `AetherArrayU8` wrapping `Vec<u8>`).
+- [x] **FFI**: Update array creation/access FFI to handle typed arrays.
+- [x] **Optimization**: Implement `array_get_unchecked` intrinsic.
+- [x] **Contracts**: Add `@pre` bounds checks to stdlib array accessors to enable verification-driven removal of runtime checks.
+
+### Task 31.3: Integration & Testing
+- [x] **Compiler**: Update MIR and LLVM backend to handle new primitive types and array access.
+- [x] **Tests**: Unit tests for creation, access, and modification of typed arrays (`runtime/src/arrays.rs` test added and passed).
+- [x] **Integration**: Fixed compiler aliasing bugs exposed by multi-module tests.
+
+---
+
+## Phase 32: Advanced Binary I/O & Memory Mapping
+
+**Goal**: Implement low-level features required for high-performance GGUF loading and binary parsing in pure Aether.
+
+### Task 32.1: Binary Primitives & Bitwise Operations
+- [~] **Runtime**: Expose `read_file_bytes(path: String) -> Pointer<Void>` (returning typed array raw pointer for now, eventually `Array<UInt8>`). (started: 2025-12-04 10:15)
+- [ ] **Semantics**: Verify and test bitwise operators `<<`, `>>`, `&`, `|`, `^` on new integer types.
+- [ ] **Stdlib**: Add `stdlib/binary.aether` with helper functions for endianness conversion.
+
+### Task 32.2: Memory Mapping (Mmap)
+- [ ] **Runtime**: Implement `mmap_file(path: String) -> Int64` (returns handle).
+- [ ] **Runtime**: Implement `mmap_read_byte(handle: Int64, offset: Int) -> UInt8`.
+- [ ] **Runtime**: Implement `mmap_read_bytes(handle: Int64, offset: Int, length: Int) -> Array<UInt8>`.
+- [ ] **Runtime**: Implement `mmap_close(handle: Int64) -> Void`.
+- [ ] **Stdlib**: Wrap in `stdlib/mmap.aether` module with RAII-like safety if possible (or just explicit close).
+- [ ] **Contracts**: Add `@pre` bounds checks for mmap access to enable zero-overhead reads.
+
+### Task 32.3: Struct Packing/Unpacking
+- [ ] **Runtime**: Implement `unsafe_cast<T>(data: Array<UInt8>) -> T` or similar intrinsic for reinterpreting bytes as structs.
+- [ ] **Design**: Define how to represent packed structs in Aether (e.g., `@packed` annotation).
+- [ ] **Verification**: Add `@aligned(N)` contract assertions to ensure zero-copy casts are safe.
+- [ ] **Implementation**: Allow reading directly from Mmap into a struct if layout matches.
+
+### Task 32.4: Pure Aether GGUF Parser
+- [ ] **Implementation**: Port `runtime/src/gguf.rs` logic to `modules/starling/gguf.aether` using the new primitives.
+- [ ] **Verification**: Benchmark against Rust implementation.
+

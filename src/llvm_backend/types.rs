@@ -250,6 +250,10 @@ impl<'ctx> TypeConverter<'ctx> {
                 #[cfg(target_pointer_width = "32")]
                 return Ok(BasicTypeEnum::IntType(self.context.i32_type()));
             }
+            PrimitiveType::UInt8 | PrimitiveType::Int8 => BasicTypeEnum::IntType(self.context.i8_type()),
+            PrimitiveType::UInt16 | PrimitiveType::Int16 => BasicTypeEnum::IntType(self.context.i16_type()),
+            PrimitiveType::UInt32 | PrimitiveType::Int32 => BasicTypeEnum::IntType(self.context.i32_type()),
+            PrimitiveType::UInt64 => BasicTypeEnum::IntType(self.context.i64_type()),
         };
 
         Ok(llvm_type)

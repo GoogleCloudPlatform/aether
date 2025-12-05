@@ -166,9 +166,17 @@ impl<'ctx> LLVMBackend<'ctx> {
             crate::types::Type::Primitive(primitive) => match primitive {
                 crate::ast::PrimitiveType::Integer
                 | crate::ast::PrimitiveType::Integer32
-                | crate::ast::PrimitiveType::SizeT => self.context.i32_type().into(),
-                crate::ast::PrimitiveType::Integer64 | crate::ast::PrimitiveType::UIntPtrT => {
-                    self.context.i64_type().into()
+                | crate::ast::PrimitiveType::SizeT
+                | crate::ast::PrimitiveType::UInt32
+                | crate::ast::PrimitiveType::Int32 => self.context.i32_type().into(),
+                crate::ast::PrimitiveType::Integer64
+                | crate::ast::PrimitiveType::UIntPtrT
+                | crate::ast::PrimitiveType::UInt64 => self.context.i64_type().into(),
+                crate::ast::PrimitiveType::UInt16 | crate::ast::PrimitiveType::Int16 => {
+                    self.context.i16_type().into()
+                }
+                crate::ast::PrimitiveType::UInt8 | crate::ast::PrimitiveType::Int8 => {
+                    self.context.i8_type().into()
                 }
                 crate::ast::PrimitiveType::Float | crate::ast::PrimitiveType::Float64 => {
                     self.context.f64_type().into()
@@ -297,6 +305,10 @@ impl<'ctx> LLVMBackend<'ctx> {
                 crate::ast::PrimitiveType::Boolean => 4, // i32
                 crate::ast::PrimitiveType::Char => 1,    // i8
                 crate::ast::PrimitiveType::String => 8,  // pointer
+                crate::ast::PrimitiveType::UInt8 | crate::ast::PrimitiveType::Int8 => 1,
+                crate::ast::PrimitiveType::UInt16 | crate::ast::PrimitiveType::Int16 => 2,
+                crate::ast::PrimitiveType::UInt32 | crate::ast::PrimitiveType::Int32 => 4,
+                crate::ast::PrimitiveType::UInt64 => 8,
                 _ => 8,                                  // Default to pointer size
             },
             crate::types::Type::Array { .. } => 8,   // pointer

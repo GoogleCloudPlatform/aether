@@ -54,6 +54,7 @@ fn create_test_module_with_struct() -> Module {
                 },
             ],
             export_as: Some("struct Point2D".to_string()),
+            is_copy: false,
             source_location: SourceLocation::unknown(),
         }],
         trait_definitions: vec![],
@@ -354,6 +355,7 @@ fn test_nested_struct_generation() {
                     },
                 ],
                 export_as: None,
+                is_copy: false,
                 source_location: SourceLocation::unknown(),
             },
             TypeDefinition::Structured {
@@ -389,6 +391,7 @@ fn test_nested_struct_generation() {
                     },
                 ],
                 export_as: None,
+                is_copy: false,
                 source_location: SourceLocation::unknown(),
             },
         ],
