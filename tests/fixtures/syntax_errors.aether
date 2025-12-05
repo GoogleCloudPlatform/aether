@@ -1,17 +1,4 @@
-(DEFINE_MODULE
-  (NAME 'syntax_errors')
-  (INTENT "Module with syntax errors for testing parser error recovery")
-  (CONTENT
-    (DECLARE_CONSTANT
-      (NAME 'MISSING_PAREN')
-      (TYPE STRING
-      (VALUE "missing closing paren in type spec")
-    )
-    (DECLARE_CONSTANT
-      (NAME 'EXTRA_PAREN')
-      (TYPE INTEGER))
-      (VALUE 42)
-    )
-    INVALID_TOP_LEVEL_EXPRESSION
-  )
-)
+module syntax_errors {
+  const MISSING_SEMICOLON: String = "oops"
+  const INVALID_SYNTAX = ;
+}

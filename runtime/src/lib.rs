@@ -22,12 +22,14 @@ use std::mem;
 use std::ptr;
 use std::panic::{self, PanicInfo};
 use backtrace::Backtrace;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Initialize the AetherScript runtime
 /// This function must be called at the beginning of every AetherScript program
 #[no_mangle]
 pub extern "C" fn aether_runtime_init() {
     panic::set_hook(Box::new(aether_panic_handler));
+    crate::async_runtime::aether_async_init();
 }
 
 /// Custom panic handler for AetherScript runtime
@@ -136,6 +138,7 @@ pub extern "C" fn aether_panic(message: *const c_char) {
 pub mod network;
 pub mod memory;
 pub mod memory_alloc;
+pub mod arrays;
 pub mod http;
 pub mod json;
 pub mod collections;
@@ -143,8 +146,11 @@ pub mod io;
 pub mod math;
 pub mod time;
 pub mod concurrency;
+pub mod async_runtime;
 pub mod ffi;
 pub mod ffi_structs;
+pub mod gguf;
+pub mod stringview;
 
 /// Array structure with length prefix
 /// Memory layout: [length: i32][elements...]
@@ -247,6 +253,319 @@ pub unsafe extern "C" fn array_length(array_ptr: *mut c_void) -> c_int {
 /// Free an array
 #[no_mangle]
 pub unsafe extern "C" fn array_free(array_ptr: *mut c_void) {
+    crate::memory_alloc::aether_safe_free(array_ptr);
+}
+
+// =============================================================================
+// String Array Functions - for dynamic arrays of strings (pointers)
+// =============================================================================
+
+/// String array structure
+/// Memory layout: [length: i32][capacity: i32][pointers: *mut c_char...]
+#[repr(C)]
+struct StringArray {
+    length: i32,
+    capacity: i32,
+    // String pointers follow immediately after in memory
+}
+
+/// Create a string array with given initial capacity
+/// If capacity is 0, creates an empty array with capacity 4
+#[no_mangle]
+pub unsafe extern "C" fn string_array_create(capacity: c_int) -> *mut c_void {
+    let cap = if capacity <= 0 { 4 } else { capacity as usize };
+
+    // Calculate size needed
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<*mut c_char>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut StringArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = 0;
+    (*array_ptr).capacity = cap as i32;
+
+    // Initialize pointers to null
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut *mut c_char;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
+/// Push a string onto the string array (returns new array pointer, may reallocate)
+#[no_mangle]
+pub unsafe extern "C" fn string_array_push(array_ptr: *mut c_void, value: *const c_char) -> *mut c_void {
+    if array_ptr.is_null() {
+        // Create new array and push
+        let new_array = string_array_create(4);
+        if new_array.is_null() {
+            return ptr::null_mut();
+        }
+        return string_array_push(new_array, value);
+    }
+
+    let array = array_ptr as *mut StringArray;
+    let length = (*array).length;
+    let capacity = (*array).capacity;
+
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+
+    // Check if we need to grow
+    if length >= capacity {
+        let new_capacity = (capacity * 2) as usize;
+        let new_size = aligned_offset + new_capacity * mem::size_of::<*mut c_char>();
+
+        let new_array_ptr = crate::memory_alloc::aether_safe_malloc(new_size) as *mut StringArray;
+        if new_array_ptr.is_null() {
+            return array_ptr; // Return original on failure
+        }
+
+        (*new_array_ptr).length = length;
+        (*new_array_ptr).capacity = new_capacity as i32;
+
+        // Copy existing pointers
+        let old_elements = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+        let new_elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut *mut c_char;
+        ptr::copy_nonoverlapping(old_elements, new_elements, length as usize);
+
+        // Initialize remaining to null
+        for i in length as usize..new_capacity {
+            *new_elements.add(i) = ptr::null_mut();
+        }
+
+        // Free old array (but not the strings it contained - they're now in new array)
+        crate::memory_alloc::aether_safe_free(array_ptr);
+
+        // Continue with new array
+        return string_array_push(new_array_ptr as *mut c_void, value);
+    }
+
+    // Duplicate the string and add to array
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+
+    // Duplicate the string
+    let dup = if value.is_null() {
+        ptr::null_mut()
+    } else {
+        crate::memory::aether_strdup(value)
+    };
+
+    *elements_ptr.add(length as usize) = dup;
+    (*array).length = length + 1;
+
+    array_ptr
+}
+
+/// Get string at index from string array
+#[no_mangle]
+pub unsafe extern "C" fn string_array_get(array_ptr: *mut c_void, index: c_int) -> *mut c_char {
+    if array_ptr.is_null() || index < 0 {
+        return ptr::null_mut();
+    }
+
+    let array = array_ptr as *mut StringArray;
+
+    if index >= (*array).length {
+        return ptr::null_mut();
+    }
+
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+
+    *elements_ptr.add(index as usize)
+}
+
+/// Get length of string array
+#[no_mangle]
+pub unsafe extern "C" fn string_array_length(array_ptr: *mut c_void) -> c_int {
+    if array_ptr.is_null() {
+        return 0;
+    }
+
+    let array = array_ptr as *mut StringArray;
+    (*array).length
+}
+
+/// Free a string array and all its contained strings
+#[no_mangle]
+pub unsafe extern "C" fn string_array_free(array_ptr: *mut c_void) {
+    if array_ptr.is_null() {
+        return;
+    }
+
+    let array = array_ptr as *mut StringArray;
+    let length = (*array).length;
+
+    let header_size = mem::size_of::<StringArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut *mut c_char;
+
+    // Free each string
+    for i in 0..length as usize {
+        let s = *elements_ptr.add(i);
+        if !s.is_null() {
+            crate::memory_alloc::aether_safe_free(s as *mut c_void);
+        }
+    }
+
+    // Free the array itself
+    crate::memory_alloc::aether_safe_free(array_ptr);
+}
+
+// =============================================================================
+// Int Array Functions - for dynamic arrays of integers
+// =============================================================================
+
+/// Int array structure
+/// Memory layout: [length: i32][capacity: i32][elements: i32...]
+#[repr(C)]
+struct IntArray {
+    length: i32,
+    capacity: i32,
+}
+
+/// Create an int array with given initial capacity
+#[no_mangle]
+pub unsafe extern "C" fn int_array_create(capacity: c_int) -> *mut c_void {
+    let cap = if capacity <= 0 { 4 } else { capacity as usize };
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<i32>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut IntArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = 0;
+    (*array_ptr).capacity = cap as i32;
+
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut i32;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
+/// Push an int onto the int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_push(array_ptr: *mut c_void, value: c_int) -> *mut c_void {
+    if array_ptr.is_null() {
+        let new_array = int_array_create(4);
+        if new_array.is_null() {
+            return ptr::null_mut();
+        }
+        return int_array_push(new_array, value);
+    }
+
+    let array = array_ptr as *mut IntArray;
+    let length = (*array).length;
+    let capacity = (*array).capacity;
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+
+    if length >= capacity {
+        let new_capacity = (capacity * 2) as usize;
+        let new_size = aligned_offset + new_capacity * mem::size_of::<i32>();
+
+        let new_array_ptr = crate::memory_alloc::aether_safe_malloc(new_size) as *mut IntArray;
+        if new_array_ptr.is_null() {
+            return array_ptr;
+        }
+
+        (*new_array_ptr).length = length;
+        (*new_array_ptr).capacity = new_capacity as i32;
+
+        let old_elements = (array as *mut u8).add(aligned_offset) as *mut i32;
+        let new_elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut i32;
+        ptr::copy_nonoverlapping(old_elements, new_elements, length as usize);
+
+        for i in length as usize..new_capacity {
+            *new_elements.add(i) = 0;
+        }
+
+        crate::memory_alloc::aether_safe_free(array_ptr);
+
+        return int_array_push(new_array_ptr as *mut c_void, value);
+    }
+
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut i32;
+    *elements_ptr.add(length as usize) = value;
+    (*array).length = length + 1;
+
+    array_ptr
+}
+
+/// Get int at index from int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_get(array_ptr: *mut c_void, index: c_int) -> c_int {
+    if array_ptr.is_null() || index < 0 {
+        return 0;
+    }
+
+    let array = array_ptr as *mut IntArray;
+
+    if index >= (*array).length {
+        return 0;
+    }
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements_ptr = (array as *mut u8).add(aligned_offset) as *mut i32;
+
+    *elements_ptr.add(index as usize)
+}
+
+/// Get length of int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_length(array_ptr: *mut c_void) -> c_int {
+    if array_ptr.is_null() {
+        return 0;
+    }
+
+    let array = array_ptr as *mut IntArray;
+    (*array).length
+}
+
+/// Set int at index in int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_set(array_ptr: *mut c_void, index: c_int, value: c_int) -> c_int {
+    if array_ptr.is_null() || index < 0 {
+        return -1;
+    }
+
+    let array = array_ptr as *mut IntArray;
+    if index >= (*array).length {
+        return -1;
+    }
+
+    let header_size = mem::size_of::<IntArray>();
+    let elem_align = mem::align_of::<i32>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements = (array as *mut u8).add(aligned_offset) as *mut i32;
+
+    *elements.add(index as usize) = value;
+    0
+}
+
+/// Free an int array
+#[no_mangle]
+pub unsafe extern "C" fn int_array_free(array_ptr: *mut c_void) {
     crate::memory_alloc::aether_safe_free(array_ptr);
 }
 
@@ -696,6 +1015,96 @@ pub unsafe extern "C" fn string_join(strings_array: *mut c_void, delimiter: *con
     ptr
 }
 
+/// Split a string into an array of UTF-8 characters
+/// Each character is returned as a separate string
+#[no_mangle]
+pub unsafe extern "C" fn string_to_chars(str: *const c_char) -> *mut c_void {
+    if str.is_null() {
+        return ptr::null_mut();
+    }
+
+    let s = match CStr::from_ptr(str).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let chars: Vec<&str> = s.graphemes(true).collect();
+    let count = chars.len();
+
+    // Create array to hold string pointers with proper alignment
+    let header_size = mem::size_of::<AetherArray>();
+    let ptr_align = mem::align_of::<*mut c_char>();
+    let aligned_offset = (header_size + ptr_align - 1) & !(ptr_align - 1);
+    let array_size = aligned_offset + count * mem::size_of::<*mut c_char>();
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut AetherArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = count as i32;
+
+    // Copy each character as a string
+    let strings_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut *mut c_char;
+    for (i, ch) in chars.iter().enumerate() {
+        let char_with_null = format!("{}\0", ch);
+        let len = char_with_null.len();
+        let str_ptr = crate::memory_alloc::aether_safe_malloc(len) as *mut c_char;
+
+        if !str_ptr.is_null() {
+            ptr::copy_nonoverlapping(char_with_null.as_ptr() as *const c_char, str_ptr, len);
+            *strings_ptr.add(i) = str_ptr;
+        }
+    }
+
+    array_ptr as *mut c_void
+}
+
+/// Get the number of UTF-8 characters (grapheme clusters) in a string
+#[no_mangle]
+pub unsafe extern "C" fn string_char_count(str: *const c_char) -> c_int {
+    if str.is_null() {
+        return 0;
+    }
+
+    let s = match CStr::from_ptr(str).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+
+    s.graphemes(true).count() as c_int
+}
+
+/// Get a single UTF-8 character at the given index
+/// Returns null if index is out of bounds
+#[no_mangle]
+pub unsafe extern "C" fn string_grapheme_at(str: *const c_char, index: c_int) -> *mut c_char {
+    if str.is_null() || index < 0 {
+        return ptr::null_mut();
+    }
+
+    let s = match CStr::from_ptr(str).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let index = index as usize;
+
+    if let Some(ch) = s.graphemes(true).nth(index) {
+        let char_with_null = format!("{}\0", ch);
+        let len = char_with_null.len();
+        let ptr = crate::memory_alloc::aether_safe_malloc(len) as *mut c_char;
+
+        if !ptr.is_null() {
+            ptr::copy_nonoverlapping(char_with_null.as_ptr() as *const c_char, ptr, len);
+        }
+
+        ptr
+    } else {
+        ptr::null_mut()
+    }
+}
+
 /// Parse float from string
 #[no_mangle]
 pub unsafe extern "C" fn parse_float(str: *const c_char) -> f64 {
@@ -853,6 +1262,305 @@ pub unsafe extern "C" fn aether_drop_value(value_ptr: *mut c_void, type_id: c_in
         3 => aether_drop_map(value_ptr),                   // Map type
         _ => {} // Primitive types don't need cleanup
     }
+}
+
+// =============================================================================
+// Timing Functions - for benchmarking
+// =============================================================================
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TIMER_START: AtomicU64 = AtomicU64::new(0);
+
+// =============================================================================
+// Random Number Generator - Seeded LCG for deterministic sampling
+// =============================================================================
+
+// Simple Linear Congruential Generator state
+// Uses constants from Numerical Recipes
+static RNG_STATE: AtomicU64 = AtomicU64::new(12345);
+
+/// Seed the random number generator
+#[no_mangle]
+pub extern "C" fn rng_seed(seed: c_int) -> c_int {
+    RNG_STATE.store(seed as u64, Ordering::SeqCst);
+    0
+}
+
+/// Get next random integer (full range)
+#[no_mangle]
+pub extern "C" fn rng_next() -> c_int {
+    // LCG: state = (a * state + c) mod m
+    // Using constants from Numerical Recipes
+    let a: u64 = 1664525;
+    let c: u64 = 1013904223;
+    let state = RNG_STATE.load(Ordering::SeqCst);
+    let new_state = state.wrapping_mul(a).wrapping_add(c);
+    RNG_STATE.store(new_state, Ordering::SeqCst);
+    (new_state >> 16) as c_int  // Use upper bits for better randomness
+}
+
+/// Get random integer in range [0, max)
+#[no_mangle]
+pub extern "C" fn rng_next_range(max: c_int) -> c_int {
+    if max <= 0 {
+        return 0;
+    }
+    let r = rng_next();
+    // Use modulo (simple approach, slight bias for large ranges)
+    ((r as u32) % (max as u32)) as c_int
+}
+
+/// Get random float in range [0, 1) - returns f64 for Aether Float
+#[no_mangle]
+pub extern "C" fn rng_next_float() -> f64 {
+    let r = rng_next() as u32;
+    (r as f64) / (u32::MAX as f64)
+}
+
+// =============================================================================
+// Float Array Functions - for logits/probabilities
+// =============================================================================
+
+/// Float array structure (uses f64 to match Aether Float type)
+#[repr(C)]
+struct FloatArray {
+    length: i32,
+    capacity: i32,
+}
+
+/// Create a float array with given initial capacity
+#[no_mangle]
+pub unsafe extern "C" fn float_array_create(capacity: c_int) -> *mut c_void {
+    let cap = if capacity <= 0 { 4 } else { capacity as usize };
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<f64>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut FloatArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = 0;
+    (*array_ptr).capacity = cap as i32;
+
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
+/// Create a float array with given size, pre-filled with zeros (length = size)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_zeros(size: c_int) -> *mut c_void {
+    let cap = if size <= 0 { 4 } else { size as usize };
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let array_size = aligned_offset + cap * mem::size_of::<f64>();
+
+    let array_ptr = crate::memory_alloc::aether_safe_malloc(array_size) as *mut FloatArray;
+
+    if array_ptr.is_null() {
+        return ptr::null_mut();
+    }
+
+    (*array_ptr).length = cap as i32; // Set length = capacity
+    (*array_ptr).capacity = cap as i32;
+
+    let elements_ptr = (array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+    ptr::write_bytes(elements_ptr, 0, cap);
+
+    array_ptr as *mut c_void
+}
+
+/// Push a float onto the array (f64 for Aether Float)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_push(array_ptr: *mut c_void, value: f64) -> *mut c_void {
+    if array_ptr.is_null() {
+        let new_array = float_array_create(4);
+        if new_array.is_null() {
+            return ptr::null_mut();
+        }
+        return float_array_push(new_array, value);
+    }
+
+    let array = array_ptr as *mut FloatArray;
+    let length = (*array).length;
+    let capacity = (*array).capacity;
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+
+    if length >= capacity {
+        let new_capacity = (capacity * 2) as usize;
+        let new_size = aligned_offset + new_capacity * mem::size_of::<f64>();
+
+        let new_array_ptr = crate::memory_alloc::aether_safe_malloc(new_size) as *mut FloatArray;
+        if new_array_ptr.is_null() {
+            return array_ptr;
+        }
+
+        (*new_array_ptr).length = length;
+        (*new_array_ptr).capacity = new_capacity as i32;
+
+        let old_elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+        let new_elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+        ptr::copy_nonoverlapping(old_elements, new_elements, length as usize);
+
+        crate::memory_alloc::aether_safe_free(array_ptr);
+
+        let elements = (new_array_ptr as *mut u8).add(aligned_offset) as *mut f64;
+        *elements.add(length as usize) = value;
+        (*new_array_ptr).length = length + 1;
+
+        return new_array_ptr as *mut c_void;
+    }
+
+    let elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+    *elements.add(length as usize) = value;
+    (*array).length = length + 1;
+
+    array_ptr
+}
+
+/// Get float at index (f64 for Aether Float)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_get(array_ptr: *mut c_void, index: c_int) -> f64 {
+    if array_ptr.is_null() || index < 0 {
+        return 0.0;
+    }
+
+    let array = array_ptr as *mut FloatArray;
+    if index >= (*array).length {
+        return 0.0;
+    }
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+
+    *elements.add(index as usize)
+}
+
+/// Set float at index (f64 for Aether Float)
+#[no_mangle]
+pub unsafe extern "C" fn float_array_set(array_ptr: *mut c_void, index: c_int, value: f64) -> c_int {
+    if array_ptr.is_null() || index < 0 {
+        return -1;
+    }
+
+    let array = array_ptr as *mut FloatArray;
+    if index >= (*array).length {
+        return -1;
+    }
+
+    let header_size = mem::size_of::<FloatArray>();
+    let elem_align = mem::align_of::<f64>();
+    let aligned_offset = (header_size + elem_align - 1) & !(elem_align - 1);
+    let elements = (array as *mut u8).add(aligned_offset) as *mut f64;
+
+    *elements.add(index as usize) = value;
+    0
+}
+
+/// Get float array length
+#[no_mangle]
+pub unsafe extern "C" fn float_array_length(array_ptr: *mut c_void) -> c_int {
+    if array_ptr.is_null() {
+        return 0;
+    }
+    let array = array_ptr as *mut FloatArray;
+    (*array).length
+}
+
+/// Free float array
+#[no_mangle]
+pub unsafe extern "C" fn float_array_free(array_ptr: *mut c_void) {
+    if !array_ptr.is_null() {
+        crate::memory_alloc::aether_safe_free(array_ptr);
+    }
+}
+
+// =============================================================================
+// Math Functions - for sampling operations (f64 for Aether Float type)
+// =============================================================================
+
+/// Exponential function
+#[no_mangle]
+pub extern "C" fn math_exp(x: f64) -> f64 {
+    x.exp()
+}
+
+/// Natural logarithm
+#[no_mangle]
+pub extern "C" fn math_log(x: f64) -> f64 {
+    x.ln()
+}
+
+/// Maximum of two floats
+#[no_mangle]
+pub extern "C" fn math_max_f(a: f64, b: f64) -> f64 {
+    a.max(b)
+}
+
+/// Minimum of two floats
+#[no_mangle]
+pub extern "C" fn math_min_f(a: f64, b: f64) -> f64 {
+    a.min(b)
+}
+
+/// Float to int conversion (Aether Float is f64)
+#[no_mangle]
+pub extern "C" fn float_to_int(x: f64) -> c_int {
+    x as c_int
+}
+
+/// Int to float conversion (Aether Float is f64)
+#[no_mangle]
+pub extern "C" fn int_to_float(x: c_int) -> f64 {
+    x as f64
+}
+
+/// Start a timer for benchmarking
+/// Returns 0 on success
+#[no_mangle]
+pub extern "C" fn timer_start() -> c_int {
+    // Store a reference point using the system
+    TIMER_START.store(std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64, Ordering::SeqCst);
+    0
+}
+
+/// Get elapsed time in microseconds since timer_start was called
+#[no_mangle]
+pub extern "C" fn timer_elapsed_us() -> c_int {
+    let start = TIMER_START.load(Ordering::SeqCst);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    ((now - start) / 1000) as c_int
+}
+
+/// Get elapsed time in milliseconds since timer_start was called
+#[no_mangle]
+pub extern "C" fn timer_elapsed_ms() -> c_int {
+    let start = TIMER_START.load(Ordering::SeqCst);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    ((now - start) / 1_000_000) as c_int
 }
 
 #[cfg(test)]
@@ -1110,6 +1818,61 @@ mod tests {
             let str = CStr::from_ptr(result).to_str().unwrap();
             assert_eq!(str, "123");
             string_free(result);
+        }
+    }
+    
+    #[test]
+    fn test_async_runtime_ffi() {
+        use std::ffi::c_void;
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+        
+        // Initialize runtime
+        crate::async_runtime::aether_async_init();
+        
+        // Define a task function that mocks an Aether function
+        extern "C" fn mock_task(ctx: *mut c_void) -> *mut c_void {
+            unsafe {
+                // Context is a pointer to an integer
+                let val_ptr = ctx as *mut i32;
+                let val = *val_ptr;
+                
+                // Sleep to simulate work
+                std::thread::sleep(Duration::from_millis(10));
+                
+                // Return result (val * 2)
+                let result = Box::new(val * 2);
+                Box::into_raw(result) as *mut c_void
+            }
+        }
+        
+        // Define cleanup function
+        extern "C" fn mock_cleanup(ctx: *mut c_void) {
+            unsafe {
+                let _ = Box::from_raw(ctx as *mut i32);
+            }
+        }
+        
+        unsafe {
+            // Create context
+            let context = Box::new(21);
+            let ctx_ptr = Box::into_raw(context) as *mut c_void;
+            
+            // Spawn task
+            let future = crate::async_runtime::aether_spawn(mock_task, ctx_ptr, Some(mock_cleanup));
+            
+            // Wait for result
+            let result_ptr = crate::async_runtime::aether_await(future);
+            
+            // Verify result
+            let result = *(result_ptr as *mut i32);
+            assert_eq!(result, 42);
+            
+            // Cleanup result
+            let _ = Box::from_raw(result_ptr as *mut i32);
+            
+            // Release future
+            crate::async_runtime::aether_future_release(future);
         }
     }
 }

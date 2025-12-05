@@ -1,0 +1,740 @@
+// Forward Pass Interface - Task 4.3
+// Defines ModelRuntime interface for forward pass execution
+
+module forward_pass_test;
+
+// ============================================================================
+// FFI Declarations
+// ============================================================================
+
+@extern(library="aether_runtime", symbol="aether_print")
+func print(s: String) -> Int;
+
+// Float array FFI
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_len")
+func float_array_len(arr: Int64) -> Int;
+
+// Int array FFI
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_len")
+func int_array_len(arr: Int64) -> Int;
+
+// Pointer utilities
+@extern(library="aether_runtime", symbol="ptr_is_null")
+func ptr_is_null(ptr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int64_to_int")
+func int64_to_int(value: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_to_int64")
+func int_to_int64(value: Int) -> Int64;
+
+// ============================================================================
+// Model Configuration
+// ============================================================================
+
+// ModelConfig layout (stored as int array handle):
+//   [0]: vocab_size
+//   [1]: hidden_dim
+//   [2]: num_layers
+//   [3]: num_heads
+//   [4]: head_dim
+//   [5]: max_seq_len
+//   [6]: intermediate_dim (for FFN)
+
+func config_create(vocab_size: Int, hidden_dim: Int, num_layers: Int,
+                   num_heads: Int, max_seq_len: Int) -> Int64 {
+    let mut arr = int_array_create(7);
+    arr = int_array_push(arr, vocab_size);
+    arr = int_array_push(arr, hidden_dim);
+    arr = int_array_push(arr, num_layers);
+    arr = int_array_push(arr, num_heads);
+    let head_dim = {hidden_dim / num_heads};
+    arr = int_array_push(arr, head_dim);
+    arr = int_array_push(arr, max_seq_len);
+    let intermediate_dim = {hidden_dim * 4}; // Typical FFN expansion
+    arr = int_array_push(arr, intermediate_dim);
+    return arr;
+}
+
+func config_get_vocab_size(config: Int64) -> Int {
+    return int_array_get(config, 0);
+}
+
+func config_get_hidden_dim(config: Int64) -> Int {
+    return int_array_get(config, 1);
+}
+
+func config_get_num_layers(config: Int64) -> Int {
+    return int_array_get(config, 2);
+}
+
+func config_get_num_heads(config: Int64) -> Int {
+    return int_array_get(config, 3);
+}
+
+func config_get_head_dim(config: Int64) -> Int {
+    return int_array_get(config, 4);
+}
+
+func config_get_max_seq_len(config: Int64) -> Int {
+    return int_array_get(config, 5);
+}
+
+func config_get_intermediate_dim(config: Int64) -> Int {
+    return int_array_get(config, 6);
+}
+
+// ============================================================================
+// Runtime State
+// ============================================================================
+
+// RuntimeState layout (stored as int array handle):
+//   [0]: current_position (sequence position)
+//   [1]: num_tokens_processed
+//   [2]: is_prefill (1 = prefill phase, 0 = decode phase)
+//   [3]: kv_cache_handle (Int64 as two ints: low, high)
+
+func state_create() -> Int64 {
+    let mut arr = int_array_create(5);
+    arr = int_array_push(arr, 0);  // current_position
+    arr = int_array_push(arr, 0);  // num_tokens_processed
+    arr = int_array_push(arr, 1);  // is_prefill (start in prefill)
+    arr = int_array_push(arr, 0);  // kv_cache_handle low
+    arr = int_array_push(arr, 0);  // kv_cache_handle high
+    return arr;
+}
+
+func state_get_position(state: Int64) -> Int {
+    return int_array_get(state, 0);
+}
+
+func state_set_position(state: Int64, pos: Int) -> Int {
+    return int_array_set(state, 0, pos);
+}
+
+func state_get_tokens_processed(state: Int64) -> Int {
+    return int_array_get(state, 1);
+}
+
+func state_set_tokens_processed(state: Int64, count: Int) -> Int {
+    return int_array_set(state, 1, count);
+}
+
+func state_is_prefill(state: Int64) -> Bool {
+    let val = int_array_get(state, 2);
+    return {val == 1};
+}
+
+func state_set_prefill(state: Int64, is_prefill: Bool) -> Int {
+    if (is_prefill) {
+        return int_array_set(state, 2, 1);
+    } else {
+        return int_array_set(state, 2, 0);
+    }
+}
+
+// ============================================================================
+// Forward Pass Input/Output
+// ============================================================================
+
+// ForwardInput layout (stored as int array handle):
+//   [0]: input_tokens_handle (low)
+//   [1]: input_tokens_handle (high)
+//   [2]: num_tokens
+//   [3]: start_position
+//   [4]: use_kv_cache (1 = yes, 0 = no)
+
+func forward_input_create(tokens: Int64, num_tokens: Int, start_pos: Int, use_cache: Bool) -> Int64 {
+    let mut arr = int_array_create(5);
+    let tokens_low = int64_to_int(tokens);
+    arr = int_array_push(arr, tokens_low);
+    arr = int_array_push(arr, 0);  // high (assume fits in 32 bits for now)
+    arr = int_array_push(arr, num_tokens);
+    arr = int_array_push(arr, start_pos);
+    if (use_cache) {
+        arr = int_array_push(arr, 1);
+    } else {
+        arr = int_array_push(arr, 0);
+    }
+    return arr;
+}
+
+func input_get_num_tokens(input: Int64) -> Int {
+    return int_array_get(input, 2);
+}
+
+func input_get_start_pos(input: Int64) -> Int {
+    return int_array_get(input, 3);
+}
+
+func input_uses_kv_cache(input: Int64) -> Bool {
+    let val = int_array_get(input, 4);
+    return {val == 1};
+}
+
+// ForwardOutput layout (stored as int array handle):
+//   [0]: logits_handle (low)
+//   [1]: logits_handle (high)
+//   [2]: vocab_size
+//   [3]: num_output_tokens
+//   [4]: status (0 = success, <0 = error)
+
+func forward_output_create(logits: Int64, vocab_size: Int, num_tokens: Int) -> Int64 {
+    let mut arr = int_array_create(5);
+    let logits_low = int64_to_int(logits);
+    arr = int_array_push(arr, logits_low);
+    arr = int_array_push(arr, 0);
+    arr = int_array_push(arr, vocab_size);
+    arr = int_array_push(arr, num_tokens);
+    arr = int_array_push(arr, 0);  // success
+    return arr;
+}
+
+func output_create_error(error_code: Int) -> Int64 {
+    let mut arr = int_array_create(5);
+    arr = int_array_push(arr, 0);
+    arr = int_array_push(arr, 0);
+    arr = int_array_push(arr, 0);
+    arr = int_array_push(arr, 0);
+    arr = int_array_push(arr, error_code);
+    return arr;
+}
+
+func output_get_vocab_size(output: Int64) -> Int {
+    return int_array_get(output, 2);
+}
+
+func output_get_num_tokens(output: Int64) -> Int {
+    return int_array_get(output, 3);
+}
+
+func output_get_status(output: Int64) -> Int {
+    return int_array_get(output, 4);
+}
+
+func output_is_success(output: Int64) -> Bool {
+    let status = int_array_get(output, 4);
+    return {status == 0};
+}
+
+// ============================================================================
+// ModelRuntime Interface (Function-based "trait")
+// ============================================================================
+
+// Error codes for forward pass
+func ERR_INVALID_CONFIG() -> Int { return {0 - 1}; }
+func ERR_INVALID_INPUT() -> Int { return {0 - 2}; }
+func ERR_SEQUENCE_TOO_LONG() -> Int { return {0 - 3}; }
+func ERR_OUT_OF_MEMORY() -> Int { return {0 - 4}; }
+
+// Validate model configuration
+func validate_config(config: Int64) -> Int {
+    if ({ptr_is_null(config) == 1}) {
+        return ERR_INVALID_CONFIG();
+    }
+
+    let vocab_size = config_get_vocab_size(config);
+    if ({vocab_size <= 0}) {
+        return ERR_INVALID_CONFIG();
+    }
+
+    let hidden_dim = config_get_hidden_dim(config);
+    if ({hidden_dim <= 0}) {
+        return ERR_INVALID_CONFIG();
+    }
+
+    let num_layers = config_get_num_layers(config);
+    if ({num_layers <= 0}) {
+        return ERR_INVALID_CONFIG();
+    }
+
+    let num_heads = config_get_num_heads(config);
+    if ({num_heads <= 0}) {
+        return ERR_INVALID_CONFIG();
+    }
+
+    // Check hidden_dim divisible by num_heads
+    let remainder = {hidden_dim - {{hidden_dim / num_heads} * num_heads}};
+    if ({remainder != 0}) {
+        return ERR_INVALID_CONFIG();
+    }
+
+    return 0;
+}
+
+// Validate forward pass input
+func validate_input(input: Int64, config: Int64, state: Int64) -> Int {
+    if ({ptr_is_null(input) == 1}) {
+        return ERR_INVALID_INPUT();
+    }
+
+    let num_tokens = input_get_num_tokens(input);
+    if ({num_tokens <= 0}) {
+        return ERR_INVALID_INPUT();
+    }
+
+    let start_pos = input_get_start_pos(input);
+    if ({start_pos < 0}) {
+        return ERR_INVALID_INPUT();
+    }
+
+    let max_seq = config_get_max_seq_len(config);
+    let end_pos = {start_pos + num_tokens};
+    if ({end_pos > max_seq}) {
+        return ERR_SEQUENCE_TOO_LONG();
+    }
+
+    return 0;
+}
+
+// Placeholder forward pass (returns dummy logits)
+// Real implementation would call attention, FFN layers
+func forward_pass(config: Int64, state: Int64, input: Int64) -> Int64 {
+    // Validate config
+    let config_err = validate_config(config);
+    if ({config_err != 0}) {
+        return output_create_error(config_err);
+    }
+
+    // Validate input
+    let input_err = validate_input(input, config, state);
+    if ({input_err != 0}) {
+        return output_create_error(input_err);
+    }
+
+    // Get dimensions
+    let vocab_size = config_get_vocab_size(config);
+    let num_tokens = input_get_num_tokens(input);
+    let start_pos = input_get_start_pos(input);
+
+    // Create logits array (num_tokens * vocab_size floats)
+    let logits_size = {num_tokens * vocab_size};
+    let mut logits = float_array_create(logits_size);
+
+    // Fill with dummy logits (uniform distribution)
+    // Use fixed small value since we can't easily convert int to float
+    let uniform_logit = 0.01;
+    let mut i = 0;
+    while ({i < logits_size}) {
+        logits = float_array_push(logits, uniform_logit);
+        i = {i + 1};
+    }
+
+    // Update state
+    let new_pos = {start_pos + num_tokens};
+    state_set_position(state, new_pos);
+
+    let processed = state_get_tokens_processed(state);
+    state_set_tokens_processed(state, {processed + num_tokens});
+
+    // After first pass, switch to decode mode
+    if ({state_is_prefill(state) == true}) {
+        state_set_prefill(state, false);
+    }
+
+    // Create and return output
+    return forward_output_create(logits, vocab_size, num_tokens);
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+// Test 1: Create config
+func test_config_create() -> Int {
+    let config = config_create(32000, 4096, 32, 32, 2048);
+
+    let vocab = config_get_vocab_size(config);
+    if ({vocab != 32000}) {
+        return 1;
+    }
+
+    let hidden = config_get_hidden_dim(config);
+    if ({hidden != 4096}) {
+        return 2;
+    }
+
+    let layers = config_get_num_layers(config);
+    if ({layers != 32}) {
+        return 3;
+    }
+
+    let heads = config_get_num_heads(config);
+    if ({heads != 32}) {
+        return 4;
+    }
+
+    let head_dim = config_get_head_dim(config);
+    if ({head_dim != 128}) {  // 4096 / 32 = 128
+        return 5;
+    }
+
+    let max_seq = config_get_max_seq_len(config);
+    if ({max_seq != 2048}) {
+        return 6;
+    }
+
+    let inter_dim = config_get_intermediate_dim(config);
+    if ({inter_dim != 16384}) {  // 4096 * 4 = 16384
+        return 7;
+    }
+
+    return 0;
+}
+
+// Test 2: Create state
+func test_state_create() -> Int {
+    let state = state_create();
+
+    let pos = state_get_position(state);
+    if ({pos != 0}) {
+        return 1;
+    }
+
+    let processed = state_get_tokens_processed(state);
+    if ({processed != 0}) {
+        return 2;
+    }
+
+    let prefill = state_is_prefill(state);
+    if ({prefill != true}) {
+        return 3;
+    }
+
+    return 0;
+}
+
+// Test 3: State modifications
+func test_state_modifications() -> Int {
+    let state = state_create();
+
+    // Set position
+    state_set_position(state, 42);
+    let pos = state_get_position(state);
+    if ({pos != 42}) {
+        return 1;
+    }
+
+    // Set tokens processed
+    state_set_tokens_processed(state, 100);
+    let processed = state_get_tokens_processed(state);
+    if ({processed != 100}) {
+        return 2;
+    }
+
+    // Set prefill to false
+    state_set_prefill(state, false);
+    let prefill = state_is_prefill(state);
+    if ({prefill != false}) {
+        return 3;
+    }
+
+    return 0;
+}
+
+// Test 4: Create forward input
+func test_forward_input_create() -> Int {
+    let tokens = int_array_create(10);
+    let input = forward_input_create(tokens, 5, 0, true);
+
+    let num = input_get_num_tokens(input);
+    if ({num != 5}) {
+        return 1;
+    }
+
+    let start = input_get_start_pos(input);
+    if ({start != 0}) {
+        return 2;
+    }
+
+    let uses_cache = input_uses_kv_cache(input);
+    if ({uses_cache != true}) {
+        return 3;
+    }
+
+    return 0;
+}
+
+// Test 5: Create forward output
+func test_forward_output_create() -> Int {
+    let logits = float_array_create(100);
+    let output = forward_output_create(logits, 32000, 1);
+
+    let vocab = output_get_vocab_size(output);
+    if ({vocab != 32000}) {
+        return 1;
+    }
+
+    let num = output_get_num_tokens(output);
+    if ({num != 1}) {
+        return 2;
+    }
+
+    let success = output_is_success(output);
+    if ({success != true}) {
+        return 3;
+    }
+
+    return 0;
+}
+
+// Test 6: Error output
+func test_error_output() -> Int {
+    let output = output_create_error(ERR_INVALID_CONFIG());
+
+    let success = output_is_success(output);
+    if ({success != false}) {
+        return 1;
+    }
+
+    let status = output_get_status(output);
+    if ({status >= 0}) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// Test 7: Validate valid config
+func test_validate_config() -> Int {
+    let config = config_create(32000, 4096, 32, 32, 2048);
+    let result = validate_config(config);
+    if ({result != 0}) {
+        return 1;
+    }
+    return 0;
+}
+
+// Test 8: Forward pass execution
+func test_forward_pass() -> Int {
+    // Create config (small model for testing)
+    let config = config_create(100, 64, 2, 4, 128);
+    let state = state_create();
+
+    // Create input tokens
+    let mut tokens = int_array_create(3);
+    tokens = int_array_push(tokens, 1);
+    tokens = int_array_push(tokens, 2);
+    tokens = int_array_push(tokens, 3);
+
+    let input = forward_input_create(tokens, 3, 0, true);
+
+    // Run forward pass
+    let output = forward_pass(config, state, input);
+
+    // Check success
+    if ({output_is_success(output) != true}) {
+        return 1;
+    }
+
+    // Check output dimensions
+    let vocab_size = output_get_vocab_size(output);
+    if ({vocab_size != 100}) {
+        return 2;
+    }
+
+    let num_tokens = output_get_num_tokens(output);
+    if ({num_tokens != 3}) {
+        return 3;
+    }
+
+    // Check state was updated
+    let pos = state_get_position(state);
+    if ({pos != 3}) {
+        return 4;
+    }
+
+    let processed = state_get_tokens_processed(state);
+    if ({processed != 3}) {
+        return 5;
+    }
+
+    // Check prefill switched to decode
+    let prefill = state_is_prefill(state);
+    if ({prefill != false}) {
+        return 6;
+    }
+
+    return 0;
+}
+
+// Test 9: Sequence too long
+func test_sequence_too_long() -> Int {
+    let config = config_create(100, 64, 2, 4, 10);  // max_seq = 10
+    let state = state_create();
+
+    let tokens = int_array_create(15);  // 15 tokens > max_seq
+    let input = forward_input_create(tokens, 15, 0, true);
+
+    let output = forward_pass(config, state, input);
+
+    let success = output_is_success(output);
+    if ({success != false}) {
+        return 1;
+    }
+
+    let status = output_get_status(output);
+    if ({status != ERR_SEQUENCE_TOO_LONG()}) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// Test 10: Invalid input (zero tokens)
+func test_invalid_input() -> Int {
+    let config = config_create(100, 64, 2, 4, 128);
+    let state = state_create();
+
+    let tokens = int_array_create(0);
+    let input = forward_input_create(tokens, 0, 0, true);  // 0 tokens
+
+    let output = forward_pass(config, state, input);
+
+    let success = output_is_success(output);
+    if ({success != false}) {
+        return 1;
+    }
+
+    let status = output_get_status(output);
+    if ({status != ERR_INVALID_INPUT()}) {
+        return 2;
+    }
+
+    return 0;
+}
+
+// Main test runner
+func main() -> Int {
+    let mut passed = 0;
+    let mut failed = 0;
+
+    print("Forward Pass Interface Tests");
+    print("=============================");
+
+    // Test 1
+    let r1 = test_config_create();
+    if ({r1 == 0}) {
+        print("PASS: test_config_create");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_config_create");
+        failed = {failed + 1};
+    }
+
+    // Test 2
+    let r2 = test_state_create();
+    if ({r2 == 0}) {
+        print("PASS: test_state_create");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_state_create");
+        failed = {failed + 1};
+    }
+
+    // Test 3
+    let r3 = test_state_modifications();
+    if ({r3 == 0}) {
+        print("PASS: test_state_modifications");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_state_modifications");
+        failed = {failed + 1};
+    }
+
+    // Test 4
+    let r4 = test_forward_input_create();
+    if ({r4 == 0}) {
+        print("PASS: test_forward_input_create");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_forward_input_create");
+        failed = {failed + 1};
+    }
+
+    // Test 5
+    let r5 = test_forward_output_create();
+    if ({r5 == 0}) {
+        print("PASS: test_forward_output_create");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_forward_output_create");
+        failed = {failed + 1};
+    }
+
+    // Test 6
+    let r6 = test_error_output();
+    if ({r6 == 0}) {
+        print("PASS: test_error_output");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_error_output");
+        failed = {failed + 1};
+    }
+
+    // Test 7
+    let r7 = test_validate_config();
+    if ({r7 == 0}) {
+        print("PASS: test_validate_config");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_validate_config");
+        failed = {failed + 1};
+    }
+
+    // Test 8
+    let r8 = test_forward_pass();
+    if ({r8 == 0}) {
+        print("PASS: test_forward_pass");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_forward_pass");
+        failed = {failed + 1};
+    }
+
+    // Test 9
+    let r9 = test_sequence_too_long();
+    if ({r9 == 0}) {
+        print("PASS: test_sequence_too_long");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_sequence_too_long");
+        failed = {failed + 1};
+    }
+
+    // Test 10
+    let r10 = test_invalid_input();
+    if ({r10 == 0}) {
+        print("PASS: test_invalid_input");
+        passed = {passed + 1};
+    } else {
+        print("FAIL: test_invalid_input");
+        failed = {failed + 1};
+    }
+
+    print("=============================");
+    print("Tests completed");
+
+    return failed;
+}

@@ -1,0 +1,1 @@
+func LLVMModuleCreateWithName(ModuleID: Pointer<Char>) -> Pointer<LLVMModule>;

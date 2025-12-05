@@ -1,0 +1,94 @@
+module concurrency;
+
+// Threading types
+pub struct Thread {
+  handle: Int,
+  is_alive: Bool,
+}
+
+pub struct Mutex {
+  handle: Int,
+  is_locked: Bool,
+  owner_thread: Int,
+}
+
+pub struct Semaphore {
+  handle: Int,
+  count: Int,
+  max_count: Int,
+}
+
+pub struct Channel {
+  handle: Int,
+  capacity: Int,
+  is_closed: Bool,
+}
+
+pub struct AtomicInt {
+  value: Int,
+}
+
+// Future type for async/await
+pub struct Future<T> {
+  handle: Int,
+}
+
+// Extern declarations
+@extern(library: "aether_runtime", symbol: "aether_thread_create")
+func aether_thread_create(function: Int, stack_size: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_thread_join")
+func aether_thread_join(handle: Int, timeout_ms: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_thread_current_id")
+func aether_thread_current_id() -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_thread_yield")
+func aether_thread_yield() -> Void;
+
+@extern(library: "aether_runtime", symbol: "aether_mutex_create")
+func aether_mutex_create() -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_mutex_lock")
+func aether_mutex_lock(handle: Int, timeout_ms: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_mutex_unlock")
+func aether_mutex_unlock(handle: Int) -> Void;
+
+@extern(library: "aether_runtime", symbol: "aether_channel_create")
+func aether_channel_create(capacity: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_channel_send")
+func aether_channel_send(handle: Int, value: Int, timeout_ms: Int) -> Int;
+
+// Note: channel_receive expects a pointer to value, which we can't easily represent in V2 yet without pointers
+// We'll use a wrapper or simplified version if needed.
+// For now, let's skip complex channel ops if they require pointers not yet fully exposed in V2 syntax.
+
+// Wrappers
+
+pub func thread_yield() -> Void {
+  aether_thread_yield();
+}
+
+pub func thread_current_id() -> Int {
+  return aether_thread_current_id();
+}
+
+pub func mutex_create() -> Mutex {
+  let handle = aether_mutex_create();
+  return Mutex {
+    handle: handle,
+    is_locked: false,
+    owner_thread: -1
+  };
+}
+
+pub func mutex_lock(mutex: Mutex, timeout_ms: Int) -> Bool {
+  let res = aether_mutex_lock(mutex.handle, timeout_ms);
+  return { res > 0 };
+}
+
+pub func mutex_unlock(mutex: Mutex) -> Void {
+  aether_mutex_unlock(mutex.handle);
+}

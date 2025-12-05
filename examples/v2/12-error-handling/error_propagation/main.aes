@@ -1,0 +1,47 @@
+// Error Propagation Example
+// Demonstrates chaining error-prone operations
+
+module error_propagation;
+
+enum Result {
+    Ok(Int),
+    Err(Int),
+}
+
+func step1(input: Int) -> Result {
+    if {input < 0} {
+        return Result::Err(1);
+    } else {
+        return Result::Ok({input * 2});
+    }
+}
+
+func step2(input: Int) -> Result {
+    if {input > 100} {
+        return Result::Err(2);
+    } else {
+        return Result::Ok({input + 10});
+    }
+}
+
+func pipeline(input: Int) -> Result {
+    // Step 1
+    let r1: Result = step1(input);
+    match r1 {
+        Result::Err(e) => { return Result::Err(e); }
+        Result::Ok(v1) => {
+            // Step 2
+            let r2: Result = step2(v1);
+            return r2;
+        }
+    }
+}
+
+func main() -> Int {
+    let result: Result = pipeline(5);
+
+    match result {
+        Result::Ok(value) => { return value; }
+        Result::Err(_) => { return -1; }
+    }
+}

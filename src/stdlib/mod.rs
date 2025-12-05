@@ -13,20 +13,20 @@
 // limitations under the License.
 
 //! AetherScript Standard Library
-//! 
+//!
 //! Core modules providing essential functionality for AetherScript programs
 
-pub mod io;
 pub mod collections;
-pub mod math;
-pub mod string;
 pub mod console;
-pub mod network;
-pub mod memory;
 pub mod http;
+pub mod io;
 pub mod json;
+pub mod math;
+pub mod memory;
+pub mod network;
+pub mod string;
 
-use crate::ast::{Module, Function, TypeSpecifier, Parameter, ExternalFunction, Identifier};
+use crate::ast::{ExternalFunction, Function, Identifier, Module, Parameter, TypeSpecifier};
 use crate::error::SourceLocation;
 use std::collections::HashMap;
 
@@ -41,11 +41,11 @@ impl StandardLibrary {
         let mut stdlib = Self {
             modules: HashMap::new(),
         };
-        
+
         stdlib.register_core_modules();
         stdlib
     }
-    
+
     /// Register all core standard library modules
     fn register_core_modules(&mut self) {
         self.register_module("std.io", io::create_io_module());
@@ -58,27 +58,27 @@ impl StandardLibrary {
         self.register_module("std.http", http::create_http_module());
         self.register_module("std.json", json::create_json_module());
     }
-    
+
     /// Register a standard library module
     fn register_module(&mut self, name: &str, module: Module) {
         self.modules.insert(name.to_string(), module);
     }
-    
+
     /// Get a standard library module by name
     pub fn get_module(&self, name: &str) -> Option<&Module> {
         self.modules.get(name)
     }
-    
+
     /// List all available standard library modules
     pub fn list_modules(&self) -> Vec<&str> {
         self.modules.keys().map(|s| s.as_str()).collect()
     }
-    
+
     /// Check if a module is a standard library module
     pub fn is_stdlib_module(&self, name: &str) -> bool {
         self.modules.contains_key(name)
     }
-    
+
     /// Get all modules as a HashMap
     pub fn modules(&self) -> &HashMap<String, Module> {
         &self.modules
@@ -88,35 +88,6 @@ impl StandardLibrary {
 impl Default for StandardLibrary {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Helper function to create an external function declaration
-pub(crate) fn create_external_function(
-    runtime_name: &str,
-    parameters: Vec<(&str, TypeSpecifier)>,
-    return_type: TypeSpecifier,
-    calling_convention: crate::ast::CallingConvention,
-) -> ExternalFunction {
-    ExternalFunction {
-        name: Identifier::new(runtime_name.to_string(), SourceLocation::unknown()),
-        library: "STATIC".to_string(),
-        symbol: None,
-        parameters: parameters.into_iter().map(|(name, ty)| Parameter {
-            name: Identifier::new(name.to_string(), SourceLocation::unknown()),
-            param_type: Box::new(ty),
-            intent: None,
-            constraint: None,
-            passing_mode: crate::ast::PassingMode::ByValue,
-            source_location: SourceLocation::unknown(),
-        }).collect(),
-        return_type: Box::new(return_type),
-        calling_convention,
-        thread_safe: true,
-        may_block: false,
-        variadic: false,
-        ownership_info: None,
-        source_location: SourceLocation::unknown(),
     }
 }
 
@@ -132,14 +103,17 @@ pub(crate) fn create_external_function_named(
         name: Identifier::new(aether_name.to_string(), SourceLocation::unknown()),
         library: "STATIC".to_string(),
         symbol: Some(runtime_name.to_string()),
-        parameters: parameters.into_iter().map(|(name, ty)| Parameter {
-            name: Identifier::new(name.to_string(), SourceLocation::unknown()),
-            param_type: Box::new(ty),
-            intent: None,
-            constraint: None,
-            passing_mode: crate::ast::PassingMode::ByValue,
-            source_location: SourceLocation::unknown(),
-        }).collect(),
+        parameters: parameters
+            .into_iter()
+            .map(|(name, ty)| Parameter {
+                name: Identifier::new(name.to_string(), SourceLocation::unknown()),
+                param_type: Box::new(ty),
+                intent: None,
+                constraint: None,
+                passing_mode: crate::ast::PassingMode::ByValue,
+                source_location: SourceLocation::unknown(),
+            })
+            .collect(),
         return_type: Box::new(return_type),
         calling_convention,
         thread_safe: true,
@@ -159,15 +133,20 @@ pub(crate) fn create_function_stub(
     Function {
         name: Identifier::new(name.to_string(), SourceLocation::unknown()),
         intent: None,
-        generic_parameters: vec![],
-        parameters: parameters.into_iter().map(|(name, ty)| Parameter {
-            name: Identifier::new(name.to_string(), SourceLocation::unknown()),
-            param_type: Box::new(ty),
-            intent: None,
-            constraint: None,
-            passing_mode: crate::ast::PassingMode::ByValue,
-            source_location: SourceLocation::unknown(),
-        }).collect(),
+        generic_parameters: Vec::new(),
+        lifetime_parameters: Vec::new(),
+        where_clause: Vec::new(),
+        parameters: parameters
+            .into_iter()
+            .map(|(name, ty)| Parameter {
+                name: Identifier::new(name.to_string(), SourceLocation::unknown()),
+                param_type: Box::new(ty),
+                intent: None,
+                constraint: None,
+                passing_mode: crate::ast::PassingMode::ByValue,
+                source_location: SourceLocation::unknown(),
+            })
+            .collect(),
         return_type: Box::new(return_type),
         metadata: crate::ast::FunctionMetadata {
             preconditions: vec![],
@@ -185,6 +164,7 @@ pub(crate) fn create_function_stub(
             source_location: SourceLocation::unknown(),
         },
         export_info: None,
+        is_async: false,
         source_location: SourceLocation::unknown(),
     }
 }
@@ -192,11 +172,11 @@ pub(crate) fn create_function_stub(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_stdlib_creation() {
         let stdlib = StandardLibrary::new();
-        
+
         // Check that all expected modules are registered
         assert!(stdlib.is_stdlib_module("std.io"));
         assert!(stdlib.is_stdlib_module("std.collections"));
@@ -207,16 +187,16 @@ mod tests {
         assert!(stdlib.is_stdlib_module("std.memory"));
         assert!(stdlib.is_stdlib_module("std.http"));
         assert!(stdlib.is_stdlib_module("std.json"));
-        
+
         // Check that non-existent modules return false
         assert!(!stdlib.is_stdlib_module("std.nonexistent"));
     }
-    
+
     #[test]
     fn test_module_listing() {
         let stdlib = StandardLibrary::new();
         let modules = stdlib.list_modules();
-        
+
         assert_eq!(modules.len(), 9);
         assert!(modules.contains(&"std.io"));
         assert!(modules.contains(&"std.collections"));
@@ -228,15 +208,15 @@ mod tests {
         assert!(modules.contains(&"std.http"));
         assert!(modules.contains(&"std.json"));
     }
-    
+
     #[test]
     fn test_module_retrieval() {
         let stdlib = StandardLibrary::new();
-        
+
         // Test retrieving existing modules
         assert!(stdlib.get_module("std.io").is_some());
         assert!(stdlib.get_module("std.math").is_some());
-        
+
         // Test retrieving non-existent module
         assert!(stdlib.get_module("std.nonexistent").is_none());
     }

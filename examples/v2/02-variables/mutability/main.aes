@@ -1,0 +1,20 @@
+// Mutability Example
+// Demonstrates mutable vs immutable variables
+
+module mutability;
+
+func main() -> Int {
+    // Immutable variable (cannot be changed)
+    let x: Int = 10;
+
+    // Mutable variable (can be changed)
+    let mut counter: Int = 0;
+
+    // Mutate the variable
+    counter = 1;
+    counter = counter + 1;
+    counter = counter + x;
+
+    // counter is now 12 (0 -> 1 -> 2 -> 12)
+    return 0;
+}

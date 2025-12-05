@@ -1,0 +1,183 @@
+module Decode;
+
+// ============================================================================
+// BPE Decoder - Convert token IDs back to text
+//
+// The decoder is simpler than the encoder:
+// 1. Look up each token ID in the reverse vocabulary (ID -> token string)
+// 2. Concatenate all token strings
+// 3. Handle special tokens (BOS, EOS, PAD) by skipping them
+// ============================================================================
+
+// --- FFI: String operations ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_concat")
+func string_concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+@extern(library="aether_runtime", symbol="aether_strdup")
+func aether_strdup(s: String) -> String;
+
+// --- FFI: Int-String Map (ID -> token) ---
+@extern(library="aether_runtime", symbol="int_string_map_new")
+func int_string_map_new() -> Int64;
+
+@extern(library="aether_runtime", symbol="int_string_map_insert")
+func int_string_map_insert(map: Int64, key: Int, value: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="int_string_map_get")
+func int_string_map_get(map: Int64, key: Int) -> String;
+
+@extern(library="aether_runtime", symbol="int_string_map_contains")
+func int_string_map_contains(map: Int64, key: Int) -> Bool;
+
+@extern(library="aether_runtime", symbol="int_string_map_free")
+func int_string_map_free(map: Int64) -> Void;
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+// Decoder configuration
+struct BPEDecoder {
+    // Reverse vocabulary: ID -> token string
+    id_to_token: Int64;
+    // Special token IDs
+    bos_token_id: Int;
+    eos_token_id: Int;
+    pad_token_id: Int;
+    unk_token_id: Int;
+    // Unknown token string (for missing IDs)
+    unk_token: String;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// BPE Decoder Implementation
+// ============================================================================
+
+// Create a new BPE decoder
+func bpe_decoder_new() -> BPEDecoder {
+    return BPEDecoder {
+        id_to_token: int_string_map_new(),
+        bos_token_id: -1,
+        eos_token_id: -1,
+        pad_token_id: -1,
+        unk_token_id: -1,
+        unk_token: "<unk>"
+    };
+}
+
+// Free decoder resources
+func bpe_decoder_free(decoder: BPEDecoder) -> Void {
+    int_string_map_free(decoder.id_to_token);
+}
+
+// Add a token to the decoder vocabulary
+func decoder_add_token(decoder: BPEDecoder, id: Int, token: String) -> Void {
+    int_string_map_insert(decoder.id_to_token, id, token);
+}
+
+// Set special token IDs
+func decoder_set_bos(decoder: BPEDecoder, id: Int) -> Void {
+    decoder.bos_token_id = id;
+}
+
+func decoder_set_eos(decoder: BPEDecoder, id: Int) -> Void {
+    decoder.eos_token_id = id;
+}
+
+func decoder_set_pad(decoder: BPEDecoder, id: Int) -> Void {
+    decoder.pad_token_id = id;
+}
+
+func decoder_set_unk(decoder: BPEDecoder, id: Int, token: String) -> Void {
+    decoder.unk_token_id = id;
+    decoder.unk_token = token;
+}
+
+// Check if a token ID is a special token that should be skipped
+func is_special_token(decoder: BPEDecoder, id: Int) -> Bool {
+    if ({id == decoder.bos_token_id}) {
+        return true;
+    }
+    if ({id == decoder.eos_token_id}) {
+        return true;
+    }
+    if ({id == decoder.pad_token_id}) {
+        return true;
+    }
+    return false;
+}
+
+// Get token string for an ID
+// Returns the token string, or unk_token if not found
+func decoder_get_token(decoder: BPEDecoder, id: Int) -> String {
+    if (int_string_map_contains(decoder.id_to_token, id)) {
+        return int_string_map_get(decoder.id_to_token, id);
+    }
+    return decoder.unk_token;
+}
+
+// ============================================================================
+// Decoding Functions
+// ============================================================================
+
+// Decode a single token ID to string
+func decode_token(decoder: BPEDecoder, id: Int) -> String {
+    // Skip special tokens
+    if (is_special_token(decoder, id)) {
+        return "";
+    }
+    return decoder_get_token(decoder, id);
+}
+
+// Decode a sequence of token IDs to text
+// This version takes individual IDs (for use without arrays)
+func decode_single(decoder: BPEDecoder, id: Int) -> String {
+    return decode_token(decoder, id);
+}
+
+// Decode two tokens and concatenate
+func decode_pair(decoder: BPEDecoder, id1: Int, id2: Int) -> String {
+    let t1 = decode_token(decoder, id1);
+    let t2 = decode_token(decoder, id2);
+    return string_concat(t1, t2);
+}
+
+// Decode three tokens and concatenate
+func decode_triple(decoder: BPEDecoder, id1: Int, id2: Int, id3: Int) -> String {
+    let t1 = decode_token(decoder, id1);
+    let t2 = decode_token(decoder, id2);
+    let t3 = decode_token(decoder, id3);
+    let tmp = string_concat(t1, t2);
+    return string_concat(tmp, t3);
+}
+
+// Decode with explicit skip of special tokens option
+func decode_token_with_options(decoder: BPEDecoder, id: Int, skip_special: Bool) -> String {
+    if (skip_special) {
+        if (is_special_token(decoder, id)) {
+            return "";
+        }
+    }
+    return decoder_get_token(decoder, id);
+}

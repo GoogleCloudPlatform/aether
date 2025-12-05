@@ -1,0 +1,13 @@
+[project]
+name = "starling"
+version = "0.1.0"
+description = "Production LLM inference server in AetherScript"
+
+[build]
+entry = "cmd/starling/main.aether"
+
+[dependencies]
+# Future: external package dependencies
+
+[dev-dependencies]
+# Future: test-only dependencies

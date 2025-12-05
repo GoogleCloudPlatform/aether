@@ -1,0 +1,13 @@
+// Test calling a lambda function
+module test_call;
+
+func main() -> Int {
+    // Define a lambda
+    let add_one = (a: Int) -> Int => {{a + 1}};
+
+    // Call the lambda
+    let result = add_one(41);
+
+    // Return the result (should be 42)
+    return result;
+}

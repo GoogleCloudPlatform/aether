@@ -1,0 +1,41 @@
+module EnumWithData {
+  enum Option {
+      case Some(Int);
+      case None;
+  }
+
+  enum Result {
+      case Ok(Int);
+      case Err(Int);
+  }
+
+  enum Shape {
+      case Circle(Int);
+      case Rectangle(Int);
+      case Square(Int);
+  }
+
+  func unwrap_or(opt: Option, default: Int) -> Int {
+      match opt {
+          Option::Some(value) => { return value; }
+          Option::None => { return default; }
+      }
+  }
+
+  func main() -> Int {
+      let some_value: Option = Option::Some(42);
+      let no_value: Option = Option::None;
+
+      let result1: Int = unwrap_or(opt: some_value, default: 0);
+      let result2: Int = unwrap_or(opt: no_value, default: 99);
+
+      let success: Result = Result::Ok(100);
+      let failure: Result = Result::Err(1);
+
+      let circle: Shape = Shape::Circle(5);
+      let rect: Shape = Shape::Rectangle(200);
+
+      // Verification: result1 should be 42
+      return result1;
+  }
+}

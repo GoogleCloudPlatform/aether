@@ -1,0 +1,65 @@
+// Standard Library Math Example
+// Demonstrates mathematical operations
+
+module stdlib_math;
+
+func abs(n: Int) -> Int {
+    if n < 0 {
+        return 0 - n;
+    } else {
+        return n;
+    }
+}
+
+func min(a: Int, b: Int) -> Int {
+    if a < b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+func max(a: Int, b: Int) -> Int {
+    if a > b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+func clamp(value: Int, low: Int, high: Int) -> Int {
+    if value < low {
+        return low;
+    } else {
+        if value > high {
+            return high;
+        } else {
+            return value;
+        }
+    }
+}
+
+func gcd(a: Int, b: Int) -> Int {
+    var x: Int = abs(a);
+    var y: Int = abs(b);
+
+    while y != 0 {
+        let temp: Int = y;
+        y = x % y;
+        x = temp;
+    }
+
+    return x;
+}
+
+func main() -> Int {
+    let a1: Int = abs(-42);
+    let m1: Int = min(10, 20);
+    let m2: Int = max(10, 20);
+    let c1: Int = clamp(50, 0, 100);
+    let c2: Int = clamp(150, 0, 100);
+    let g: Int = gcd(48, 18);
+
+    // g = 6
+    return g;
+}

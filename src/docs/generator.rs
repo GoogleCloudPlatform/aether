@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::path::Path;
 use crate::error::SemanticError;
+use std::path::Path;
 
-pub struct DocGenerator {
-}
+pub struct DocGenerator {}
 
 impl DocGenerator {
-    pub fn new(output_dir: String) -> Self {
+    pub fn new(_output_dir: String) -> Self {
         Self {}
     }
-    
+
     pub fn generate(&self, _module_path: &Path) -> Result<(), SemanticError> {
         // Placeholder implementation
         Ok(())

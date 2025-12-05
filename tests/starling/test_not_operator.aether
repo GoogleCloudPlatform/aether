@@ -1,0 +1,102 @@
+module TestNotOperator;
+
+// Test for boolean NOT operator fix
+// Previously: !true was returning truthy value (bitwise NOT: ~1 = -2)
+// Fixed: Using XOR with 1 for logical NOT (1 ^ 1 = 0, 0 ^ 1 = 1)
+
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+func main() -> Int {
+    println("=== Boolean NOT Operator Test ===");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    // Test 1: !true should be false
+    println("Test 1: !true should be false");
+    if (!true) {
+        println("  FAIL: !true evaluated to true");
+        failed = {failed + 1};
+    } else {
+        println("  PASS: !true evaluated to false");
+        passed = {passed + 1};
+    }
+
+    // Test 2: !false should be true
+    println("Test 2: !false should be true");
+    if (!false) {
+        println("  PASS: !false evaluated to true");
+        passed = {passed + 1};
+    } else {
+        println("  FAIL: !false evaluated to false");
+        failed = {failed + 1};
+    }
+
+    // Test 3: !!true should be true (double negation)
+    println("Test 3: !!true should be true");
+    if (!!true) {
+        println("  PASS: !!true evaluated to true");
+        passed = {passed + 1};
+    } else {
+        println("  FAIL: !!true evaluated to false");
+        failed = {failed + 1};
+    }
+
+    // Test 4: !!false should be false (double negation)
+    println("Test 4: !!false should be false");
+    if (!!false) {
+        println("  FAIL: !!false evaluated to true");
+        failed = {failed + 1};
+    } else {
+        println("  PASS: !!false evaluated to false");
+        passed = {passed + 1};
+    }
+
+    // Test 5: NOT with comparison result
+    println("Test 5: !(1 == 1) should be false");
+    if (!(1 == 1)) {
+        println("  FAIL: !(1 == 1) evaluated to true");
+        failed = {failed + 1};
+    } else {
+        println("  PASS: !(1 == 1) evaluated to false");
+        passed = {passed + 1};
+    }
+
+    // Test 6: NOT with comparison result (false case)
+    println("Test 6: !(1 == 2) should be true");
+    if (!(1 == 2)) {
+        println("  PASS: !(1 == 2) evaluated to true");
+        passed = {passed + 1};
+    } else {
+        println("  FAIL: !(1 == 2) evaluated to false");
+        failed = {failed + 1};
+    }
+
+    // Summary
+    println("");
+    println("=== Results ===");
+    aether_print("Passed: ");
+    if ({passed == 6}) {
+        println("6/6 - All tests passed!");
+    } else {
+        aether_print("Some tests failed. Passed: ");
+        if ({passed == 0}) { aether_print("0"); }
+        if ({passed == 1}) { aether_print("1"); }
+        if ({passed == 2}) { aether_print("2"); }
+        if ({passed == 3}) { aether_print("3"); }
+        if ({passed == 4}) { aether_print("4"); }
+        if ({passed == 5}) { aether_print("5"); }
+        println("/6");
+    }
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}

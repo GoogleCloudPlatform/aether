@@ -1,0 +1,535 @@
+module KVCacheTest;
+
+// ============================================================================
+// Tests for KV Cache Session Storage
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Float Array ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Int Array ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// KV Cache Configuration
+// ============================================================================
+
+// Model dimensions for KV cache
+// For a typical LLM: layers=32, heads=32, head_dim=128, max_seq=2048
+// KV cache shape per sequence position: (2, layers, heads, head_dim)
+// where 2 = K and V tensors
+
+// Compute cache size for given dimensions
+func compute_kv_size(layers: Int, heads: Int, head_dim: Int, seq_len: Int) -> Int {
+    // 2 for K and V, then layers * heads * head_dim * seq_len
+    return {{{{{2 * layers} * heads} * head_dim} * seq_len}};
+}
+
+// Get index for K tensor at (layer, head, seq_pos, dim)
+func k_index(layers: Int, heads: Int, head_dim: Int, layer: Int, head: Int, seq_pos: Int, dim: Int) -> Int {
+    // K is at offset 0, then (layer * heads * head_dim * seq) + (head * head_dim * seq) + (seq_pos * head_dim) + dim
+    // Simplified layout: [layer][head][seq_pos][dim]
+    let per_head = head_dim;
+    let per_layer_head = {head_dim * heads};
+    let per_layer = {{per_layer_head * heads} * layers};  // This is wrong, let me recalculate
+
+    // Actually use a simpler layout: K[layer * heads * seq * head_dim + head * seq * head_dim + seq_pos * head_dim + dim]
+    // But that's complex. Let's use a flattened approach:
+    // Total size = 2 * layers * heads * head_dim * seq_len
+    // K tensor starts at 0
+    // V tensor starts at layers * heads * head_dim * seq_len
+
+    let kv_offset = 0;  // K tensor
+    let layer_offset = {layer * {{heads * head_dim} * 1}};  // per layer: heads * head_dim * current_seq (but we track seq separately)
+    // Actually for simplicity: index = layer * (heads * head_dim) + head * head_dim + dim
+    // And we need to multiply by seq_pos to get the right block
+
+    // Let's use a cleaner formula:
+    // For each sequence position, we store layers * heads * head_dim values for K and same for V
+    // Index = kv_select * (layers * heads * head_dim) + layer * (heads * head_dim) + head * head_dim + dim
+    // Then multiply everything by seq_pos stride
+
+    // Simpler: treat as 4D array K[seq_pos][layer][head][dim]
+    // index = seq_pos * (layers * heads * head_dim) + layer * (heads * head_dim) + head * head_dim + dim
+    let per_seq = {{layers * heads} * head_dim};
+    let per_layer2 = {heads * head_dim};
+    return {{{{seq_pos * per_seq} + {layer * per_layer2}} + {head * head_dim}} + dim};
+}
+
+// Get index for V tensor
+func v_index(layers: Int, heads: Int, head_dim: Int, max_seq: Int, layer: Int, head: Int, seq_pos: Int, dim: Int) -> Int {
+    // V starts after all K values
+    let k_size = {{layers * heads} * head_dim} * max_seq;
+    return {k_size + k_index(layers, heads, head_dim, layer, head, seq_pos, dim)};
+}
+
+// ============================================================================
+// KV Cache Session - Using handles to avoid ownership issues
+// ============================================================================
+
+// Create KV cache for a session
+// Returns data handle
+func kv_cache_create(layers: Int, heads: Int, head_dim: Int, max_seq: Int) -> Int64 {
+    let size = compute_kv_size(layers, heads, head_dim, max_seq);
+    let mut data = float_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        data = float_array_push(data, 0.0);
+        i = i + 1;
+    }
+    return data;
+}
+
+// Set K value
+func kv_set_k(data: Int64, layers: Int, heads: Int, head_dim: Int, layer: Int, head: Int, seq_pos: Int, dim: Int, value: Float) -> Void {
+    let idx = k_index(layers, heads, head_dim, layer, head, seq_pos, dim);
+    float_array_set(data, idx, value);
+}
+
+// Get K value
+func kv_get_k(data: Int64, layers: Int, heads: Int, head_dim: Int, layer: Int, head: Int, seq_pos: Int, dim: Int) -> Float {
+    let idx = k_index(layers, heads, head_dim, layer, head, seq_pos, dim);
+    return float_array_get(data, idx);
+}
+
+// Set V value
+func kv_set_v(data: Int64, layers: Int, heads: Int, head_dim: Int, max_seq: Int, layer: Int, head: Int, seq_pos: Int, dim: Int, value: Float) -> Void {
+    let idx = v_index(layers, heads, head_dim, max_seq, layer, head, seq_pos, dim);
+    float_array_set(data, idx, value);
+}
+
+// Get V value
+func kv_get_v(data: Int64, layers: Int, heads: Int, head_dim: Int, max_seq: Int, layer: Int, head: Int, seq_pos: Int, dim: Int) -> Float {
+    let idx = v_index(layers, heads, head_dim, max_seq, layer, head, seq_pos, dim);
+    return float_array_get(data, idx);
+}
+
+// Free KV cache
+func kv_cache_free(data: Int64) -> Void {
+    float_array_free(data);
+}
+
+// ============================================================================
+// Session Manager - Tracks multiple sessions
+// ============================================================================
+
+// For simplicity, use parallel arrays for session management:
+// - session_ids: Int array of session IDs
+// - session_caches: We'll track handles separately in tests
+// - session_seq_lens: Current sequence length per session
+
+func create_session_ids(max_sessions: Int) -> Int64 {
+    let mut arr = int_array_create(max_sessions);
+    let mut i = 0;
+    while (i < max_sessions) {
+        arr = int_array_push(arr, -1);  // -1 means unused
+        i = i + 1;
+    }
+    return arr;
+}
+
+func create_session_seq_lens(max_sessions: Int) -> Int64 {
+    let mut arr = int_array_create(max_sessions);
+    let mut i = 0;
+    while (i < max_sessions) {
+        arr = int_array_push(arr, 0);
+        i = i + 1;
+    }
+    return arr;
+}
+
+// Find free slot for new session, returns -1 if none
+func find_free_slot(session_ids: Int64, max_sessions: Int) -> Int {
+    let mut i = 0;
+    while (i < max_sessions) {
+        let id = int_array_get(session_ids, i);
+        if ({id == -1}) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// Find slot for existing session
+func find_session_slot(session_ids: Int64, max_sessions: Int, session_id: Int) -> Int {
+    let mut i = 0;
+    while (i < max_sessions) {
+        let id = int_array_get(session_ids, i);
+        if ({id == session_id}) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+func test_kv_size() -> Bool {
+    println("=== Test: KV Size Computation ===");
+
+    // Small test config: 2 layers, 2 heads, 4 head_dim, 8 max_seq
+    let layers = 2;
+    let heads = 2;
+    let head_dim = 4;
+    let max_seq = 8;
+
+    let size = compute_kv_size(layers, heads, head_dim, max_seq);
+    // 2 (K,V) * 2 layers * 2 heads * 4 head_dim * 8 seq = 256
+    let expected = 256;
+
+    if ({size != expected}) {
+        aether_print("FAIL: Expected ");
+        aether_print(int_to_string(expected));
+        aether_print(", got ");
+        println(int_to_string(size));
+        return false;
+    }
+
+    println("PASS: KV Size Computation");
+    return true;
+}
+
+func test_kv_create() -> Bool {
+    println("=== Test: KV Cache Create ===");
+
+    let layers = 2;
+    let heads = 2;
+    let head_dim = 4;
+    let max_seq = 8;
+
+    let data = kv_cache_create(layers, heads, head_dim, max_seq);
+
+    // Check that we can read initial values (should be 0)
+    let v = kv_get_k(data, layers, heads, head_dim, 0, 0, 0, 0);
+    if ({v != 0.0}) {
+        println("FAIL: Initial K value should be 0");
+        kv_cache_free(data);
+        return false;
+    }
+
+    kv_cache_free(data);
+    println("PASS: KV Cache Create");
+    return true;
+}
+
+func test_kv_read_write() -> Bool {
+    println("=== Test: KV Cache Read/Write ===");
+
+    let layers = 2;
+    let heads = 2;
+    let head_dim = 4;
+    let max_seq = 8;
+
+    let data = kv_cache_create(layers, heads, head_dim, max_seq);
+
+    // Write K value at layer 0, head 1, seq_pos 2, dim 3
+    kv_set_k(data, layers, heads, head_dim, 0, 1, 2, 3, 1.5);
+
+    // Read it back
+    let k = kv_get_k(data, layers, heads, head_dim, 0, 1, 2, 3);
+    if ({k < 1.4}) {
+        println("FAIL: K value should be 1.5");
+        kv_cache_free(data);
+        return false;
+    }
+    if ({k > 1.6}) {
+        println("FAIL: K value should be 1.5 (too high)");
+        kv_cache_free(data);
+        return false;
+    }
+
+    // Write V value at layer 1, head 0, seq_pos 5, dim 2
+    kv_set_v(data, layers, heads, head_dim, max_seq, 1, 0, 5, 2, 2.5);
+
+    // Read it back
+    let v = kv_get_v(data, layers, heads, head_dim, max_seq, 1, 0, 5, 2);
+    if ({v < 2.4}) {
+        println("FAIL: V value should be 2.5");
+        kv_cache_free(data);
+        return false;
+    }
+
+    kv_cache_free(data);
+    println("PASS: KV Cache Read/Write");
+    return true;
+}
+
+func test_kv_independence() -> Bool {
+    println("=== Test: K/V Independence ===");
+
+    let layers = 2;
+    let heads = 2;
+    let head_dim = 4;
+    let max_seq = 8;
+
+    let data = kv_cache_create(layers, heads, head_dim, max_seq);
+
+    // Write K and V at same position
+    kv_set_k(data, layers, heads, head_dim, 0, 0, 0, 0, 1.0);
+    kv_set_v(data, layers, heads, head_dim, max_seq, 0, 0, 0, 0, 2.0);
+
+    // Verify they are independent
+    let k = kv_get_k(data, layers, heads, head_dim, 0, 0, 0, 0);
+    let v = kv_get_v(data, layers, heads, head_dim, max_seq, 0, 0, 0, 0);
+
+    if ({k != 1.0}) {
+        println("FAIL: K should be 1.0");
+        kv_cache_free(data);
+        return false;
+    }
+
+    if ({v != 2.0}) {
+        println("FAIL: V should be 2.0");
+        kv_cache_free(data);
+        return false;
+    }
+
+    kv_cache_free(data);
+    println("PASS: K/V Independence");
+    return true;
+}
+
+func test_session_slots() -> Bool {
+    println("=== Test: Session Slot Management ===");
+
+    let max_sessions = 4;
+    let session_ids = create_session_ids(max_sessions);
+
+    // Initially all slots should be free
+    let slot0 = find_free_slot(session_ids, max_sessions);
+    if ({slot0 != 0}) {
+        println("FAIL: First free slot should be 0");
+        int_array_free(session_ids);
+        return false;
+    }
+
+    // Assign session 100 to slot 0
+    int_array_set(session_ids, 0, 100);
+
+    // Next free slot should be 1
+    let slot1 = find_free_slot(session_ids, max_sessions);
+    if ({slot1 != 1}) {
+        println("FAIL: Second free slot should be 1");
+        int_array_free(session_ids);
+        return false;
+    }
+
+    // Find session 100
+    let found = find_session_slot(session_ids, max_sessions, 100);
+    if ({found != 0}) {
+        println("FAIL: Session 100 should be at slot 0");
+        int_array_free(session_ids);
+        return false;
+    }
+
+    // Find non-existent session
+    let not_found = find_session_slot(session_ids, max_sessions, 999);
+    if ({not_found != -1}) {
+        println("FAIL: Non-existent session should return -1");
+        int_array_free(session_ids);
+        return false;
+    }
+
+    int_array_free(session_ids);
+    println("PASS: Session Slot Management");
+    return true;
+}
+
+func test_session_lifecycle() -> Bool {
+    println("=== Test: Session Lifecycle ===");
+
+    // Model config (small for testing)
+    let layers = 2;
+    let heads = 2;
+    let head_dim = 4;
+    let max_seq = 16;
+    let max_sessions = 4;
+
+    // Create session manager arrays
+    let session_ids = create_session_ids(max_sessions);
+    let session_seq_lens = create_session_seq_lens(max_sessions);
+
+    // Create first session
+    let slot = find_free_slot(session_ids, max_sessions);
+    if ({slot < 0}) {
+        println("FAIL: Should have free slot");
+        int_array_free(session_ids);
+        int_array_free(session_seq_lens);
+        return false;
+    }
+
+    // Assign session
+    int_array_set(session_ids, slot, 1);  // Session ID = 1
+    int_array_set(session_seq_lens, slot, 0);  // Start with 0 tokens
+
+    // Create KV cache for this session
+    let kv_data = kv_cache_create(layers, heads, head_dim, max_seq);
+
+    // Simulate processing a token
+    let seq_pos = 0;
+    // Store K/V values for all layers and heads at position 0
+    let mut layer = 0;
+    while (layer < layers) {
+        let mut head = 0;
+        while (head < heads) {
+            let mut dim = 0;
+            while (dim < head_dim) {
+                // Store some test values
+                let k_val = int_to_float({{{{layer * 100} + {head * 10}} + dim} + 1});
+                let v_val = int_to_float({{{{layer * 100} + {head * 10}} + dim} + 2});
+                kv_set_k(kv_data, layers, heads, head_dim, layer, head, seq_pos, dim, k_val);
+                kv_set_v(kv_data, layers, heads, head_dim, max_seq, layer, head, seq_pos, dim, v_val);
+                dim = dim + 1;
+            }
+            head = head + 1;
+        }
+        layer = layer + 1;
+    }
+
+    // Update sequence length
+    int_array_set(session_seq_lens, slot, 1);
+
+    // Verify stored values
+    let k_check = kv_get_k(kv_data, layers, heads, head_dim, 1, 0, 0, 2);
+    // layer=1, head=0, seq=0, dim=2 -> 1*100 + 0*10 + 2 + 1 = 103
+    if ({k_check < 102.9}) {
+        println("FAIL: K value check failed");
+        kv_cache_free(kv_data);
+        int_array_free(session_ids);
+        int_array_free(session_seq_lens);
+        return false;
+    }
+
+    // Clean up session
+    int_array_set(session_ids, slot, -1);  // Mark slot as free
+    kv_cache_free(kv_data);
+
+    int_array_free(session_ids);
+    int_array_free(session_seq_lens);
+    println("PASS: Session Lifecycle");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("KV Cache Session Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_kv_size()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_kv_create()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_kv_read_write()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_kv_independence()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_session_slots()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_session_lifecycle()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}

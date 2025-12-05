@@ -13,25 +13,26 @@
 // limitations under the License.
 
 //! Verification condition generator
-//! 
+//!
 //! Generates verification conditions from MIR code that can be checked by the SMT solver
 
+use super::contracts::{
+    BinaryOp as ContractBinOp, ConstantValue, Expression as ContractExpr, FunctionContract,
+};
+use super::solver::{Formula, VerificationCondition};
 use crate::error::{SemanticError, SourceLocation};
 use crate::mir::{self, BasicBlockId, Operand, Rvalue, Statement, Terminator};
-use crate::types::Type;
-use crate::ast::PrimitiveType;
-use super::contracts::{FunctionContract, Expression as ContractExpr, BinaryOp as ContractBinOp, ConstantValue};
-use super::solver::{Formula, VerificationCondition};
+use crate::verification::VerificationMode;
 use std::collections::{HashMap, HashSet};
 
 /// Verification condition generator
 pub struct VcGenerator {
     /// Counter for generating unique VC names
     vc_counter: usize,
-    
+
     /// Current path condition
     path_condition: Vec<Formula>,
-    
+
     /// Current variable state
     state: HashMap<String, Formula>,
 }
@@ -41,27 +42,33 @@ pub struct VcGenerator {
 pub enum VcType {
     /// Precondition check
     Precondition,
-    
+
     /// Postcondition check
     Postcondition,
-    
+
     /// Loop invariant preservation
     LoopInvariantPreservation,
-    
+
     /// Loop invariant entry
     LoopInvariantEntry,
-    
+
     /// Assertion check
     Assertion,
-    
+
     /// Array bounds check
     ArrayBounds,
-    
+
     /// Division by zero check
     DivisionByZero,
-    
+
     /// Null pointer check
     NullPointer,
+}
+
+impl Default for VcGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VcGenerator {
@@ -73,7 +80,7 @@ impl VcGenerator {
             state: HashMap::new(),
         }
     }
-    
+
     /// Generate verification conditions for a function
     pub fn generate_function_vcs(
         &mut self,
@@ -81,38 +88,46 @@ impl VcGenerator {
         contract: Option<&FunctionContract>,
     ) -> Result<Vec<VerificationCondition>, SemanticError> {
         let mut vcs = Vec::new();
-        
+
         // Reset state for new function
         self.path_condition.clear();
         self.state.clear();
-        
-        // Initialize parameters in state
-        for (idx, _param) in function.parameters.iter().enumerate() {
+
+        // Initialize parameters in state with their actual names
+        for (idx, param) in function.parameters.iter().enumerate() {
+            let local_name = format!("local_{}", param.local_id);
+            let var_formula = Formula::Var(local_name.clone());
+
+            // Store by local index for MIR lookup
+            self.state.insert(local_name, var_formula.clone());
+
+            // Also store by parameter name for contract expressions
+            if !param.name.is_empty() {
+                self.state.insert(param.name.clone(), var_formula.clone());
+            }
+
+            // Legacy: also store as param_N
             let param_name = format!("param_{}", idx);
-            self.state.insert(param_name.clone(), Formula::Var(param_name));
+            self.state.insert(param_name, var_formula);
         }
-        
-        // Check preconditions at function entry
+
+        // ASSUME preconditions at function entry (add to path condition)
+        // Preconditions are requirements on callers, not obligations to prove
         if let Some(contract) = contract {
             for precond in &contract.preconditions {
                 let formula = self.contract_expr_to_formula(&precond.expression)?;
-                vcs.push(self.create_vc(
-                    format!("precondition_{}", precond.name),
-                    VcType::Precondition,
-                    formula,
-                    precond.location.clone(),
-                ));
+                self.path_condition.push(formula);
             }
         }
-        
+
         // Process each basic block
         let entry_block = function.entry_block;
         let mut visited = HashSet::new();
         self.process_block(function, entry_block, &mut visited, &mut vcs, contract)?;
-        
+
         Ok(vcs)
     }
-    
+
     /// Process a basic block and generate VCs
     fn process_block(
         &mut self,
@@ -127,23 +142,32 @@ impl VcGenerator {
             return Ok(());
         }
         visited.insert(block_id);
-        
+
         let block = &function.basic_blocks[&block_id];
-        
+
         // Process statements
         for stmt in &block.statements {
             self.process_statement(stmt, vcs)?;
         }
-        
+
         // Process terminator
         match &block.terminator {
             Terminator::Return => {
                 // Check postconditions
                 if let Some(contract) = contract {
-                    // Note: In a real implementation, we would track the return value
-                    // through the MIR statements. For now, we assume it's stored in a
-                    // special "return_value" local if there is one.
-                    
+                    // Bind the return value to the actual computed result
+                    // The return_local holds the function's return value
+                    if let Some(return_local) = function.return_local {
+                        let local_name = format!("local_{}", return_local);
+                        if let Some(return_formula) = self.state.get(&local_name).cloned() {
+                            // Bind both "result" and "return_value" to the actual return
+                            self.state
+                                .insert("result".to_string(), return_formula.clone());
+                            self.state
+                                .insert("return_value".to_string(), return_formula);
+                        }
+                    }
+
                     for postcond in &contract.postconditions {
                         let formula = self.contract_expr_to_formula(&postcond.expression)?;
                         let vc_formula = self.apply_path_condition(formula);
@@ -152,13 +176,18 @@ impl VcGenerator {
                             VcType::Postcondition,
                             vc_formula,
                             postcond.location.clone(),
+                            postcond.verification_mode,
                         ));
                     }
                 }
             }
-            Terminator::SwitchInt { discriminant, targets, .. } => {
+            Terminator::SwitchInt {
+                discriminant,
+                targets,
+                ..
+            } => {
                 let disc_formula = self.operand_to_formula(discriminant)?;
-                
+
                 // For now, handle only boolean switches (true/false)
                 if targets.values.len() == 1 && targets.targets.len() == 1 {
                     // Assume value 0 means false, go to otherwise
@@ -168,9 +197,10 @@ impl VcGenerator {
                         self.path_condition.push(disc_formula.clone());
                         self.process_block(function, targets.targets[0], visited, vcs, contract)?;
                         self.path_condition.pop();
-                        
+
                         // False branch (otherwise)
-                        self.path_condition.push(Formula::Not(Box::new(disc_formula)));
+                        self.path_condition
+                            .push(Formula::Not(Box::new(disc_formula)));
                         self.process_block(function, targets.otherwise, visited, vcs, contract)?;
                         self.path_condition.pop();
                     }
@@ -182,6 +212,10 @@ impl VcGenerator {
                     self.process_block(function, targets.otherwise, visited, vcs, contract)?;
                 }
             }
+            Terminator::Concurrent { target, .. } => {
+                // For verification, treat as simple control flow to target
+                self.process_block(function, *target, visited, vcs, contract)?;
+            }
             Terminator::Goto { target } => {
                 self.process_block(function, *target, visited, vcs, contract)?;
             }
@@ -192,7 +226,13 @@ impl VcGenerator {
                 // Drop is a memory operation - no verification needed for now
                 // TODO: Could verify drop safety
             }
-            Terminator::Assert { condition, expected, message: _, target, cleanup: _ } => {
+            Terminator::Assert {
+                condition,
+                expected,
+                message: _,
+                target,
+                cleanup: _,
+            } => {
                 // Generate VC for assertion
                 let cond_formula = self.operand_to_formula(condition)?;
                 let assert_formula = if *expected {
@@ -200,15 +240,16 @@ impl VcGenerator {
                 } else {
                     Formula::Not(Box::new(cond_formula))
                 };
-                
+
                 let vc_formula = self.apply_path_condition(assert_formula);
                 vcs.push(self.create_vc(
                     format!("assertion_{}", self.vc_counter),
                     VcType::Assertion,
                     vc_formula,
                     SourceLocation::unknown(), // TODO: Get proper location
+                    None,
                 ));
-                
+
                 // Continue to target block
                 self.process_block(function, *target, visited, vcs, contract)?;
             }
@@ -216,10 +257,10 @@ impl VcGenerator {
                 // No VCs needed
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Process a statement and generate VCs
     fn process_statement(
         &mut self,
@@ -227,25 +268,32 @@ impl VcGenerator {
         vcs: &mut Vec<VerificationCondition>,
     ) -> Result<(), SemanticError> {
         match stmt {
-            Statement::Assign { place, rvalue, source_info } => {
+            Statement::Assign {
+                place,
+                rvalue,
+                source_info,
+            } => {
                 let value_formula = self.rvalue_to_formula(rvalue)?;
-                
+
                 // Check for division by zero
-                if let Rvalue::BinaryOp { op: mir::BinOp::Div, left: _, right } = rvalue {
+                if let Rvalue::BinaryOp {
+                    op: mir::BinOp::Div,
+                    left: _,
+                    right,
+                } = rvalue
+                {
                     let divisor = self.operand_to_formula(right)?;
-                    let not_zero = Formula::Ne(
-                        Box::new(divisor),
-                        Box::new(Formula::Int(0)),
-                    );
+                    let not_zero = Formula::Ne(Box::new(divisor), Box::new(Formula::Int(0)));
                     let vc_formula = self.apply_path_condition(not_zero);
                     vcs.push(self.create_vc(
                         format!("div_by_zero_check_{}", self.vc_counter),
                         VcType::DivisionByZero,
                         vc_formula,
                         source_info.span.clone(),
+                        None,
                     ));
                 }
-                
+
                 // Update state
                 let local_name = format!("local_{}", place.local);
                 self.state.insert(local_name, value_formula);
@@ -257,10 +305,10 @@ impl VcGenerator {
                 // Nothing to do
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Convert an rvalue to a formula
     fn rvalue_to_formula(&mut self, rvalue: &Rvalue) -> Result<Formula, SemanticError> {
         match rvalue {
@@ -268,14 +316,26 @@ impl VcGenerator {
             Rvalue::BinaryOp { op, left, right } => {
                 let left_formula = self.operand_to_formula(left)?;
                 let right_formula = self.operand_to_formula(right)?;
-                
+
                 Ok(match op {
-                    mir::BinOp::Add => Formula::Add(Box::new(left_formula), Box::new(right_formula)),
-                    mir::BinOp::Sub => Formula::Sub(Box::new(left_formula), Box::new(right_formula)),
-                    mir::BinOp::Mul => Formula::Mul(Box::new(left_formula), Box::new(right_formula)),
-                    mir::BinOp::Div => Formula::Div(Box::new(left_formula), Box::new(right_formula)),
-                    mir::BinOp::Mod => Formula::Mod(Box::new(left_formula), Box::new(right_formula)),
-                    mir::BinOp::Rem => Formula::Mod(Box::new(left_formula), Box::new(right_formula)), // Rem is same as Mod
+                    mir::BinOp::Add => {
+                        Formula::Add(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    mir::BinOp::Sub => {
+                        Formula::Sub(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    mir::BinOp::Mul => {
+                        Formula::Mul(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    mir::BinOp::Div => {
+                        Formula::Div(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    mir::BinOp::Mod => {
+                        Formula::Mod(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    mir::BinOp::Rem => {
+                        Formula::Mod(Box::new(left_formula), Box::new(right_formula))
+                    } // Rem is same as Mod
                     mir::BinOp::Eq => Formula::Eq(Box::new(left_formula), Box::new(right_formula)),
                     mir::BinOp::Ne => Formula::Ne(Box::new(left_formula), Box::new(right_formula)),
                     mir::BinOp::Lt => Formula::Lt(Box::new(left_formula), Box::new(right_formula)),
@@ -307,16 +367,19 @@ impl VcGenerator {
             }
             Rvalue::UnaryOp { op, operand } => {
                 let operand_formula = self.operand_to_formula(operand)?;
-                
+
                 Ok(match op {
-                    mir::UnOp::Neg => Formula::Sub(
-                        Box::new(Formula::Int(0)),
-                        Box::new(operand_formula),
-                    ),
+                    mir::UnOp::Neg => {
+                        Formula::Sub(Box::new(Formula::Int(0)), Box::new(operand_formula))
+                    }
                     mir::UnOp::Not => Formula::Not(Box::new(operand_formula)),
                 })
             }
-            Rvalue::Cast { operand, ty: _, kind: _ } => {
+            Rvalue::Cast {
+                operand,
+                ty: _,
+                kind: _,
+            } => {
                 // For now, ignore casts in verification
                 self.operand_to_formula(operand)
             }
@@ -335,7 +398,12 @@ impl VcGenerator {
                 // TODO: Model memory operations
                 Ok(Formula::Var("ref_value".to_string()))
             }
-            Rvalue::Len(_) => {
+            Rvalue::AddressOf(_) => {
+                // For now, treat address-of as uninterpreted or simple value
+                // TODO: Implement pointer logic in SMT
+                Ok(Formula::Var("pointer_val".to_string()))
+            }
+            Rvalue::Len(_place) => {
                 // Array/slice length - return symbolic value
                 Ok(Formula::Var("array_length".to_string()))
             }
@@ -343,17 +411,23 @@ impl VcGenerator {
                 // Enum discriminant - return symbolic value
                 Ok(Formula::Var("enum_discriminant".to_string()))
             }
+            Rvalue::Closure { func_name, .. } => {
+                // Closure - return symbolic function reference
+                Ok(Formula::Var(format!("closure_{}", func_name)))
+            }
         }
     }
-    
+
     /// Convert an operand to a formula
     fn operand_to_formula(&self, operand: &Operand) -> Result<Formula, SemanticError> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 let local_name = format!("local_{}", place.local);
-                Ok(self.state.get(&local_name)
+                Ok(self
+                    .state
+                    .get(&local_name)
                     .cloned()
-                    .unwrap_or_else(|| Formula::Var(local_name)))
+                    .unwrap_or(Formula::Var(local_name)))
             }
             Operand::Constant(constant) => {
                 let value = &constant.value;
@@ -366,67 +440,94 @@ impl VcGenerator {
                         Formula::Bool(true)
                     }
                     mir::ConstantValue::Char(c) => Formula::Int(*c as i64),
+                    mir::ConstantValue::Function(_) => Formula::Bool(true),
                     mir::ConstantValue::Null => Formula::Bool(false),
                 })
             }
         }
     }
-    
+
     /// Convert a contract expression to a formula
     fn contract_expr_to_formula(&self, expr: &ContractExpr) -> Result<Formula, SemanticError> {
         match expr {
             ContractExpr::Variable(name) => {
                 // Map to current state or create new variable
-                Ok(self.state.get(name)
+                Ok(self
+                    .state
+                    .get(name)
                     .cloned()
                     .unwrap_or_else(|| Formula::Var(name.clone())))
             }
-            ContractExpr::Constant(c) => {
-                Ok(match c {
-                    ConstantValue::Integer(n) => Formula::Int(*n),
-                    ConstantValue::Float(f) => Formula::Real(*f),
-                    ConstantValue::Boolean(b) => Formula::Bool(*b),
-                    ConstantValue::String(_) => Formula::Bool(true),
-                    ConstantValue::Null => Formula::Bool(true),
-                })
-            }
+            ContractExpr::Constant(c) => Ok(match c {
+                ConstantValue::Integer(n) => Formula::Int(*n),
+                ConstantValue::Float(f) => Formula::Real(*f),
+                ConstantValue::Boolean(b) => Formula::Bool(*b),
+                ConstantValue::String(_) => Formula::Bool(true),
+                ConstantValue::Null => Formula::Bool(true),
+            }),
             ContractExpr::BinaryOp { op, left, right } => {
                 let left_formula = self.contract_expr_to_formula(left)?;
                 let right_formula = self.contract_expr_to_formula(right)?;
-                
+
                 Ok(match op {
-                    ContractBinOp::Add => Formula::Add(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Sub => Formula::Sub(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Mul => Formula::Mul(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Div => Formula::Div(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Mod => Formula::Mod(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Eq => Formula::Eq(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Ne => Formula::Ne(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Lt => Formula::Lt(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Le => Formula::Le(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Gt => Formula::Gt(Box::new(left_formula), Box::new(right_formula)),
-                    ContractBinOp::Ge => Formula::Ge(Box::new(left_formula), Box::new(right_formula)),
+                    ContractBinOp::Add => {
+                        Formula::Add(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Sub => {
+                        Formula::Sub(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Mul => {
+                        Formula::Mul(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Div => {
+                        Formula::Div(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Mod => {
+                        Formula::Mod(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Eq => {
+                        Formula::Eq(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Ne => {
+                        Formula::Ne(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Lt => {
+                        Formula::Lt(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Le => {
+                        Formula::Le(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Gt => {
+                        Formula::Gt(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    ContractBinOp::Ge => {
+                        Formula::Ge(Box::new(left_formula), Box::new(right_formula))
+                    }
                     ContractBinOp::And => Formula::And(vec![left_formula, right_formula]),
                     ContractBinOp::Or => Formula::Or(vec![left_formula, right_formula]),
-                    ContractBinOp::Implies => Formula::Implies(Box::new(left_formula), Box::new(right_formula)),
-                    _ => return Err(SemanticError::NotImplemented {
-                        feature: format!("Contract operator {:?}", op),
-                        location: SourceLocation::unknown(),
-                    }),
+                    ContractBinOp::Implies => {
+                        Formula::Implies(Box::new(left_formula), Box::new(right_formula))
+                    }
+                    _ => {
+                        return Err(SemanticError::NotImplemented {
+                            feature: format!("Contract operator {:?}", op),
+                            location: SourceLocation::unknown(),
+                        })
+                    }
                 })
             }
-            ContractExpr::Result => {
-                Ok(self.state.get("result")
-                    .cloned()
-                    .unwrap_or_else(|| Formula::Var("result".to_string())))
-            }
+            ContractExpr::Result => Ok(self
+                .state
+                .get("result")
+                .cloned()
+                .unwrap_or_else(|| Formula::Var("result".to_string()))),
             _ => Err(SemanticError::NotImplemented {
                 feature: "Complex contract expressions".to_string(),
                 location: SourceLocation::unknown(),
             }),
         }
     }
-    
+
     /// Apply path condition to a formula
     fn apply_path_condition(&self, formula: Formula) -> Formula {
         if self.path_condition.is_empty() {
@@ -441,7 +542,7 @@ impl VcGenerator {
             Formula::Implies(Box::new(path_cond), Box::new(formula))
         }
     }
-    
+
     /// Create a verification condition
     fn create_vc(
         &mut self,
@@ -449,12 +550,14 @@ impl VcGenerator {
         vc_type: VcType,
         formula: Formula,
         location: SourceLocation,
+        verification_mode: Option<VerificationMode>,
     ) -> VerificationCondition {
         self.vc_counter += 1;
         VerificationCondition {
             name: format!("{} ({})", name, format!("{:?}", vc_type)),
             formula,
             location,
+            verification_mode,
         }
     }
 }
@@ -462,8 +565,10 @@ impl VcGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::{Function, BasicBlock};
-    
+    use crate::ast::PrimitiveType;
+    use crate::mir::{BasicBlock, Function};
+    use crate::types::Type;
+
     #[test]
     fn test_vc_generator_creation() {
         let vcgen = VcGenerator::new();
@@ -471,11 +576,11 @@ mod tests {
         assert!(vcgen.path_condition.is_empty());
         assert!(vcgen.state.is_empty());
     }
-    
+
     #[test]
     fn test_simple_function_vcs() {
         let mut vcgen = VcGenerator::new();
-        
+
         // Create a simple function with no contracts
         let mut function = Function {
             name: "test".to_string(),
@@ -486,7 +591,7 @@ mod tests {
             entry_block: 0,
             return_local: None,
         };
-        
+
         // Add an empty entry block
         let entry_id = 0;
         let block = BasicBlock {
@@ -496,7 +601,7 @@ mod tests {
         };
         function.basic_blocks.insert(entry_id, block);
         function.entry_block = entry_id;
-        
+
         let vcs = vcgen.generate_function_vcs(&function, None).unwrap();
         assert!(vcs.is_empty()); // No contracts, no VCs
     }

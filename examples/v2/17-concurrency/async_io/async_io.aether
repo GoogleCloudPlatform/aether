@@ -1,0 +1,38 @@
+module async_io;
+
+import io;
+
+// Extern for int conversion if not in io
+@extern(library: "aether_runtime", symbol: "int_to_string")
+func int_to_string(value: Int) -> String;
+
+func slow_task(id: Int) -> Int {
+  io.print("Starting task ");
+  io.println(int_to_string(id));
+  
+  // Simulate work
+  let mut sum: Int = 0;
+  let mut i: Int = 0;
+  while ({i < 1000}) {
+    sum = {sum + i};
+    i = {i + 1};
+  }
+
+  io.print("Finished task ");
+  io.println(int_to_string(id));
+  return sum;
+}
+
+func main() -> Int {
+  io.println("Starting async I/O example");
+
+  // Concurrent block - tasks inside start concurrently
+  concurrent {
+    let res1 = slow_task(1);
+    let res2 = slow_task(2);
+  }
+
+  io.println("Concurrent block finished");
+  
+  return 0;
+}

@@ -13,16 +13,16 @@
 // limitations under the License.
 
 //! Error handling for AetherScript compiler
-//! 
+//!
 //! Comprehensive error types and reporting
 //! Now enhanced with LLM-first structured errors and auto-fix suggestions
 
 mod reporter;
 pub use reporter::DetailedErrorReporter;
 
-pub mod structured;
 pub mod enhancement;
 pub mod intent_analysis;
+pub mod structured;
 
 use std::fmt;
 use thiserror::Error;
@@ -111,6 +111,12 @@ pub enum LexerError {
 
     #[error("Maximum nesting depth exceeded at {location}")]
     MaxNestingDepthExceeded { location: SourceLocation },
+
+    #[error("Unterminated block comment at {location}")]
+    UnterminatedBlockComment { location: SourceLocation },
+
+    #[error("Unexpected end of file")]
+    UnexpectedEof,
 }
 
 /// Parsing errors
@@ -144,7 +150,7 @@ pub enum ParserError {
         construct: String,
         location: SourceLocation,
     },
-    
+
     #[error("Unimplemented feature '{feature}' at {location}")]
     Unimplemented {
         feature: String,
@@ -162,6 +168,13 @@ pub enum ParserError {
     LexerError {
         #[from]
         source: LexerError,
+    },
+
+    #[error("{message} at {location}")]
+    SyntaxError {
+        message: String,
+        location: SourceLocation,
+        suggestion: Option<String>,
     },
 }
 
@@ -247,6 +260,14 @@ pub enum SemanticError {
         location: SourceLocation,
     },
 
+    #[error("Generic argument count mismatch for '{function}': expected {expected} type arguments, found {found} at {location}")]
+    GenericArgumentCountMismatch {
+        function: String,
+        expected: usize,
+        found: usize,
+        location: SourceLocation,
+    },
+
     #[error("Unsupported feature: {feature} at {location}")]
     UnsupportedFeature {
         feature: String,
@@ -254,9 +275,7 @@ pub enum SemanticError {
     },
 
     #[error("Code generation error: {message}")]
-    CodeGenError {
-        message: String,
-    },
+    CodeGenError { message: String },
 
     #[error("Invalid contract {contract_type}: {reason} at {location}")]
     InvalidContract {
@@ -279,9 +298,7 @@ pub enum SemanticError {
     },
 
     #[error("Internal semantic error: {message}")]
-    Internal {
-        message: String,
-    },
+    Internal { message: String },
 
     #[error("Verification error: {message} at {location}")]
     VerificationError {
@@ -294,11 +311,9 @@ pub enum SemanticError {
         feature: String,
         location: SourceLocation,
     },
-    
+
     #[error("IO error: {message}")]
-    IoError {
-        message: String,
-    },
+    IoError { message: String },
 
     #[error("Import error for module '{module}': {reason} at {location}")]
     ImportError {
@@ -319,48 +334,66 @@ pub enum SemanticError {
         reason: String,
         location: SourceLocation,
     },
-    
+
     #[error("Resource leak detected: {resource_type} '{binding}' not released at {location}")]
     ResourceLeak {
         resource_type: String,
         binding: String,
         location: SourceLocation,
     },
-    
+
     #[error("Missing field '{field_name}' in struct '{struct_name}' at {location}")]
     MissingField {
         struct_name: String,
         field_name: String,
         location: SourceLocation,
     },
-    
+
     #[error("Unknown field '{field_name}' in struct '{struct_name}' at {location}")]
     UnknownField {
         struct_name: String,
         field_name: String,
         location: SourceLocation,
     },
-    
+
+    #[error("Trait '{trait_name}' method '{method_name}' not implemented for type '{impl_type}' at {location}")]
+    TraitMethodNotImplemented {
+        trait_name: String,
+        method_name: String,
+        impl_type: String,
+        location: SourceLocation,
+    },
+
+    #[error("Trait '{trait_name}' method '{method_name}' signature mismatch for type '{impl_type}': expected {expected}, found {found} at {location}")]
+    TraitMethodSignatureMismatch {
+        trait_name: String,
+        method_name: String,
+        impl_type: String,
+        expected: String,
+        found: String,
+        location: SourceLocation,
+    },
+
     #[error("Internal error: {message} at {location}")]
     InternalError {
         message: String,
         location: SourceLocation,
     },
-    
+
     #[error("Malformed construct '{construct}': {reason} at {location}")]
     MalformedConstruct {
         construct: String,
         reason: String,
         location: SourceLocation,
     },
-    
+
     #[error("Missing value for enum variant '{variant}' of type '{enum_name}' at {location}")]
     MissingEnumVariantValue {
         variant: String,
         enum_name: String,
         location: SourceLocation,
     },
-    
+
     #[error("Unexpected value for enum variant '{variant}' of type '{enum_name}' which has no associated type at {location}")]
     UnexpectedEnumVariantValue {
         variant: String,
@@ -387,10 +420,7 @@ pub enum CodegenError {
     UnsupportedArchitecture { arch: String },
 
     #[error("FFI type mapping failed for type '{type_name}': {reason}")]
-    FFITypeMappingFailed {
-        type_name: String,
-        reason: String,
-    },
+    FFITypeMappingFailed { type_name: String, reason: String },
 
     #[error("Link error: {message}")]
     LinkError { message: String },
@@ -431,14 +461,14 @@ pub enum CompilerError {
 
     #[error("Internal compiler error: {message}")]
     Internal { message: String },
-    
+
     // Wrapper types for new error system compatibility
     #[error("Parse error: {0}")]
     ParseError(ParseError),
-    
+
     #[error("Type error: {0}")]
     TypeError(TypeError),
-    
+
     #[error("Semantic error occurred")]
     SemanticError(SemanticError),
 }
@@ -565,18 +595,23 @@ impl ErrorReporter {
                 reset_color
             );
         } else {
-            eprintln!(
-                "{}{}: {}",
-                severity_color, diagnostic.severity, reset_color
-            );
+            eprintln!("{}{}: {}", severity_color, diagnostic.severity, reset_color);
         }
 
         if let Some(help) = &diagnostic.help {
-            eprintln!("  {} help: {}", if self.use_colors { "\x1b[32m=" } else { "=" }, help);
+            eprintln!(
+                "  {} help: {}",
+                if self.use_colors { "\x1b[32m=" } else { "=" },
+                help
+            );
         }
 
         if let Some(note) = &diagnostic.note {
-            eprintln!("  {} note: {}", if self.use_colors { "\x1b[36m=" } else { "=" }, note);
+            eprintln!(
+                "  {} note: {}",
+                if self.use_colors { "\x1b[36m=" } else { "=" },
+                note
+            );
         }
 
         if self.use_colors {
@@ -590,23 +625,14 @@ impl ErrorReporter {
             CompilerError::Parser { source } => self.parser_error_to_diagnostic(source),
             CompilerError::Semantic { source } => self.semantic_error_to_diagnostic(source),
             CompilerError::Codegen { source } => self.codegen_error_to_diagnostic(source),
-            CompilerError::IoError { message } => Diagnostic::error(
-                message.clone(),
-                None,
-            ),
-            CompilerError::Internal { message } => Diagnostic::error(
-                format!("Internal compiler error: {}", message),
-                None,
-            ).with_note("This is a bug in the compiler. Please report it.".to_string()),
-            CompilerError::ParseError(e) => Diagnostic::error(
-                format!("Parse error: {}", e),
-                None,
-            ),
-            CompilerError::TypeError(e) => Diagnostic::error(
-                format!("Type error: {}", e),
-                None,
-            ),
-            CompilerError::SemanticError(e) => self.semantic_error_to_diagnostic(&e),
+            CompilerError::IoError { message } => Diagnostic::error(message.clone(), None),
+            CompilerError::Internal { message } => {
+                Diagnostic::error(format!("Internal compiler error: {}", message), None)
+                    .with_note("This is a bug in the compiler. Please report it.".to_string())
+            }
+            CompilerError::ParseError(e) => Diagnostic::error(format!("Parse error: {}", e), None),
+            CompilerError::TypeError(e) => Diagnostic::error(format!("Type error: {}", e), None),
+            CompilerError::SemanticError(e) => self.semantic_error_to_diagnostic(e),
         };
 
         self.report_diagnostic(&diagnostic);
@@ -614,60 +640,69 @@ impl ErrorReporter {
 
     fn lexer_error_to_diagnostic(&self, error: &LexerError) -> Diagnostic {
         match error {
-            LexerError::UnexpectedCharacter { character, location } => {
-                Diagnostic::error(
-                    format!("Unexpected character '{}'", character),
-                    Some(SourceSpan::single(location.clone())),
-                )
-            }
-            LexerError::UnterminatedString { location } => {
-                Diagnostic::error(
-                    "Unterminated string literal".to_string(),
-                    Some(SourceSpan::single(location.clone())),
-                ).with_help("Add closing quote '\"' to terminate the string".to_string())
-            }
-            LexerError::InvalidEscapeSequence { sequence, location } => {
-                Diagnostic::error(
-                    format!("Invalid escape sequence '\\{}'", sequence),
-                    Some(SourceSpan::single(location.clone())),
-                ).with_help("Valid escape sequences are: \\n, \\t, \\\\, \\\"".to_string())
-            }
+            LexerError::UnexpectedCharacter {
+                character,
+                location,
+            } => Diagnostic::error(
+                format!("Unexpected character '{}'", character),
+                Some(SourceSpan::single(location.clone())),
+            ),
+            LexerError::UnterminatedString { location } => Diagnostic::error(
+                "Unterminated string literal".to_string(),
+                Some(SourceSpan::single(location.clone())),
+            )
+            .with_help("Add closing quote '\"' to terminate the string".to_string()),
+            LexerError::InvalidEscapeSequence { sequence, location } => Diagnostic::error(
+                format!("Invalid escape sequence '\\{}'", sequence),
+                Some(SourceSpan::single(location.clone())),
+            )
+            .with_help("Valid escape sequences are: \\n, \\t, \\\\, \\\"".to_string()),
             _ => Diagnostic::error(error.to_string(), None),
         }
     }
 
     fn parser_error_to_diagnostic(&self, error: &ParserError) -> Diagnostic {
         match error {
-            ParserError::UnexpectedToken { found, expected, location } => {
-                Diagnostic::error(
-                    format!("Unexpected token '{}', expected {}", found, expected),
-                    Some(SourceSpan::single(location.clone())),
-                )
-            }
-            ParserError::MissingRequiredField { field, construct, location } => {
-                Diagnostic::error(
-                    format!("Missing required field '{}' in {}", field, construct),
-                    Some(SourceSpan::single(location.clone())),
-                ).with_help(format!("Add the '{}' field to the {} construct", field, construct))
-            }
+            ParserError::UnexpectedToken {
+                found,
+                expected,
+                location,
+            } => Diagnostic::error(
+                format!("Unexpected token '{}', expected {}", found, expected),
+                Some(SourceSpan::single(location.clone())),
+            ),
+            ParserError::MissingRequiredField {
+                field,
+                construct,
+                location,
+            } => Diagnostic::error(
+                format!("Missing required field '{}' in {}", field, construct),
+                Some(SourceSpan::single(location.clone())),
+            )
+            .with_help(format!(
+                "Add the '{}' field to the {} construct",
+                field, construct
+            )),
             _ => Diagnostic::error(error.to_string(), None),
         }
     }
 
     fn semantic_error_to_diagnostic(&self, error: &SemanticError) -> Diagnostic {
         match error {
-            SemanticError::UndefinedSymbol { symbol, location } => {
-                Diagnostic::error(
-                    format!("Undefined symbol '{}'", symbol),
-                    Some(SourceSpan::single(location.clone())),
-                ).with_help("Check the spelling or ensure the symbol is declared".to_string())
-            }
-            SemanticError::TypeMismatch { expected, found, location } => {
-                Diagnostic::error(
-                    format!("Type mismatch: expected {}, found {}", expected, found),
-                    Some(SourceSpan::single(location.clone())),
-                ).with_help("Consider using explicit type conversion".to_string())
-            }
+            SemanticError::UndefinedSymbol { symbol, location } => Diagnostic::error(
+                format!("Undefined symbol '{}'", symbol),
+                Some(SourceSpan::single(location.clone())),
+            )
+            .with_help("Check the spelling or ensure the symbol is declared".to_string()),
+            SemanticError::TypeMismatch {
+                expected,
+                found,
+                location,
+            } => Diagnostic::error(
+                format!("Type mismatch: expected {}, found {}", expected, found),
+                Some(SourceSpan::single(location.clone())),
+            )
+            .with_help("Consider using explicit type conversion".to_string()),
             _ => Diagnostic::error(error.to_string(), None),
         }
     }
@@ -719,10 +754,8 @@ fn edit_distance(a: &str, b: &str) -> usize {
             if a_chars[i - 1] == b_chars[j - 1] {
                 dp[i][j] = dp[i - 1][j - 1];
             } else {
-                dp[i][j] = 1 + std::cmp::min(
-                    std::cmp::min(dp[i - 1][j], dp[i][j - 1]),
-                    dp[i - 1][j - 1],
-                );
+                dp[i][j] =
+                    1 + std::cmp::min(std::cmp::min(dp[i - 1][j], dp[i][j - 1]), dp[i - 1][j - 1]);
             }
         }
     }
@@ -783,10 +816,7 @@ mod tests {
             ErrorRecovery::suggest_correction("DEFINE_FUNCTIO", candidates),
             Some("DEFINE_FUNCTION".to_string())
         );
-        assert_eq!(
-            ErrorRecovery::suggest_correction("xyz", candidates),
-            None
-        );
+        assert_eq!(ErrorRecovery::suggest_correction("xyz", candidates), None);
     }
 
     #[test]

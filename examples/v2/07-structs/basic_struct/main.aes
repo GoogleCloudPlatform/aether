@@ -1,0 +1,34 @@
+// Basic Struct Example
+// Demonstrates struct definition and usage
+
+module basic_struct;
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+struct Rectangle {
+    width: Int,
+    height: Int,
+}
+
+func create_point(x: Int, y: Int) -> Point {
+    return Point { x: x, y: y };
+}
+
+func area(rect: Rectangle) -> Int {
+    return rect.width * rect.height;
+}
+
+func main() -> Int {
+    let p: Point = Point { x: 10, y: 20 };
+    let x_val: Int = p.x;
+    let y_val: Int = p.y;
+
+    let rect: Rectangle = Rectangle { width: 5, height: 10 };
+    let a: Int = area(rect);
+
+    // a = 50
+    return a;
+}

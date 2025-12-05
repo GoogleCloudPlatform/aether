@@ -1,0 +1,18 @@
+
+module map_cleanup_test {
+    func create_and_drop_maps() {
+        let mut m1: ^map<string, int> = {};
+        m1["key1"] = 100;
+        m1["key2"] = 200;
+        
+        let mut m2: ^map<int, string> = {};
+        m2[1] = "value1";
+        m2[2] = "value2";
+        // Maps should be cleaned up when function exits
+    }
+    
+    func main() -> int {
+        create_and_drop_maps();
+        return 0;
+    }
+}

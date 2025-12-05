@@ -13,11 +13,11 @@
 // limitations under the License.
 
 //! Symbol table and scope management for AetherScript
-//! 
+//!
 //! Handles variable and type symbol resolution with hierarchical scopes
 
-use crate::types::{Type, TypeDefinition};
 use crate::error::{SemanticError, SourceLocation};
+use crate::types::{Type, TypeDefinition};
 use std::collections::HashMap;
 
 /// Symbol information
@@ -33,6 +33,8 @@ pub struct Symbol {
     pub is_moved: bool,
     /// Tracks current borrow state
     pub borrow_state: BorrowState,
+    /// FFI symbol name for external functions (e.g., "aether_print" for @extern(symbol="aether_print"))
+    pub ffi_symbol: Option<String>,
 }
 
 /// Borrow state of a symbol
@@ -65,6 +67,30 @@ impl Symbol {
             declaration_location,
             is_moved: false,
             borrow_state: BorrowState::None,
+            ffi_symbol: None,
+        }
+    }
+
+    /// Create a new symbol with an FFI symbol name
+    pub fn new_with_ffi_symbol(
+        name: String,
+        symbol_type: Type,
+        kind: SymbolKind,
+        is_mutable: bool,
+        is_initialized: bool,
+        declaration_location: SourceLocation,
+        ffi_symbol: Option<String>,
+    ) -> Self {
+        Self {
+            name,
+            symbol_type,
+            kind,
+            is_mutable,
+            is_initialized,
+            declaration_location,
+            is_moved: false,
+            borrow_state: BorrowState::None,
+            ffi_symbol,
         }
     }
 }
@@ -109,7 +135,7 @@ impl Scope {
             children: Vec::new(),
         }
     }
-    
+
     /// Add a symbol to this scope
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<(), SemanticError> {
         if self.symbols.contains_key(&symbol.name) {
@@ -120,16 +146,16 @@ impl Scope {
                 previous_location: existing.declaration_location.clone(),
             });
         }
-        
+
         self.symbols.insert(symbol.name.clone(), symbol);
         Ok(())
     }
-    
+
     /// Look up a symbol in this scope only
     pub fn lookup_local(&self, name: &str) -> Option<&Symbol> {
         self.symbols.get(name)
     }
-    
+
     /// Get all symbols in this scope
     pub fn all_symbols(&self) -> impl Iterator<Item = &Symbol> {
         self.symbols.values()
@@ -137,19 +163,20 @@ impl Scope {
 }
 
 /// Symbol table with hierarchical scopes
+#[derive(Debug, Clone)]
 pub struct SymbolTable {
     /// Stack of scopes (index 0 is global scope)
     scopes: Vec<Scope>,
-    
+
     /// Current scope index
     current_scope: usize,
-    
+
     /// Type definitions
     type_definitions: HashMap<String, TypeDefinition>,
-    
+
     /// Module imports mapping module names to their exported symbols
     imports: HashMap<String, HashMap<String, Symbol>>,
-    
+
     /// Current module name
     current_module: Option<String>,
 }
@@ -166,80 +193,135 @@ impl SymbolTable {
             current_module: None,
         }
     }
-    
+
     /// Set the current module
     pub fn set_current_module(&mut self, module_name: Option<String>) {
         self.current_module = module_name;
     }
-    
+
     /// Enter a new scope
     pub fn enter_scope(&mut self, kind: ScopeKind) -> usize {
         let new_scope_index = self.scopes.len();
         let new_scope = Scope::new(kind, Some(self.current_scope));
-        
+
         // Add this scope as a child of the current scope
-        self.scopes[self.current_scope].children.push(new_scope_index);
-        
+        self.scopes[self.current_scope]
+            .children
+            .push(new_scope_index);
+
         self.scopes.push(new_scope);
         self.current_scope = new_scope_index;
-        
+
         new_scope_index
     }
-    
+
     /// Exit the current scope, returning to parent
     pub fn exit_scope(&mut self) -> Result<(), SemanticError> {
         if self.current_scope == 0 {
-            return Err(SemanticError::Internal { 
-                message: "Cannot exit global scope".to_string() 
+            return Err(SemanticError::Internal {
+                message: "Cannot exit global scope".to_string(),
             });
         }
-        
+
         let parent = self.scopes[self.current_scope].parent.unwrap();
         self.current_scope = parent;
         Ok(())
     }
-    
+
     /// Get the current scope
     pub fn current_scope(&self) -> &Scope {
         &self.scopes[self.current_scope]
     }
-    
+
     /// Get a mutable reference to the current scope
     pub fn current_scope_mut(&mut self) -> &mut Scope {
         &mut self.scopes[self.current_scope]
     }
-    
+
     /// Add a symbol to the current scope
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<(), SemanticError> {
         self.current_scope_mut().add_symbol(symbol)
     }
-    
+
+    /// Add a symbol to the global scope (scope 0) - used for imports
+    pub fn add_symbol_to_global(&mut self, symbol: Symbol) -> Result<(), SemanticError> {
+        self.scopes[0].add_symbol(symbol)
+    }
+
     /// Look up a symbol, searching from current scope up to global
     pub fn lookup_symbol(&self, name: &str) -> Option<&Symbol> {
+        eprintln!("SymbolTable: lookup_symbol: Looking for '{}' in scope {}", name, self.current_scope);
         let mut current = self.current_scope;
-        
+
         loop {
             if let Some(symbol) = self.scopes[current].lookup_local(name) {
+                eprintln!("SymbolTable: lookup_symbol: Found '{}' in local scope.", name);
                 return Some(symbol);
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
-        // Check imports
+
+        // If not found in direct scopes, check if it's a qualified name from an imported module
+        // This handles cases like `Alias.functionName`
+        if let Some(dot_idx) = name.find('.') {
+            let module_prefix = &name[..dot_idx];
+            let symbol_name = &name[dot_idx + 1..];
+            eprintln!("SymbolTable: lookup_symbol: Qualified name. Prefix: '{}', Name: '{}'", module_prefix, symbol_name);
+
+            // First, try to resolve the module_prefix as an alias in the current scope
+            let mut current_scope_for_alias_lookup = self.current_scope;
+            let actual_module_name = loop {
+                if let Some(module_alias_symbol) = self.scopes[current_scope_for_alias_lookup].lookup_local(module_prefix) {
+                    eprintln!("SymbolTable: lookup_symbol: Found module alias symbol for '{}': {:?}", module_prefix, module_alias_symbol);
+                    if let Type::Module(actual_mod_name) = &module_alias_symbol.symbol_type {
+                        break Some(actual_mod_name.clone());
+                    }
+                }
+                if let Some(parent) = self.scopes[current_scope_for_alias_lookup].parent {
+                    current_scope_for_alias_lookup = parent;
+                } else {
+                    break None;
+                }
+            };
+            eprintln!("SymbolTable: lookup_symbol: Actual module name resolved: {:?}", actual_module_name);
+
+            if let Some(actual_mod_name) = actual_module_name {
+                eprintln!("SymbolTable: lookup_symbol: Attempting to get from imports with actual name '{}'", actual_mod_name);
+                // Use the actual module name to look up in the imports map
+                if let Some(exported_symbols_map) = self.imports.get(&actual_mod_name) {
+                    eprintln!("SymbolTable: lookup_symbol: Found exported_symbols_map for '{}': {:?}", actual_mod_name, exported_symbols_map);
+                    if let Some(symbol) = exported_symbols_map.get(symbol_name) {
+                        eprintln!("SymbolTable: lookup_symbol: Found symbol '{}' in exported map: {:?}", symbol_name, symbol);
+                        return Some(symbol);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Look up a symbol in any scope (useful for tests or cross-module queries)
+    pub fn lookup_symbol_any_scope(&self, name: &str) -> Option<&Symbol> {
+        for scope in &self.scopes {
+            if let Some(symbol) = scope.lookup_local(name) {
+                return Some(symbol);
+            }
+        }
+        // Check imports as a fallback
         for imported_symbols in self.imports.values() {
             if let Some(symbol) = imported_symbols.get(name) {
                 return Some(symbol);
             }
         }
-        
         None
     }
-    
+
     /// Look up a symbol in a specific scope only
     pub fn lookup_in_scope(&self, name: &str, scope_index: usize) -> Option<&Symbol> {
         if scope_index < self.scopes.len() {
@@ -248,40 +330,58 @@ impl SymbolTable {
             None
         }
     }
-    
+
+    /// Get all symbols across all scopes
+    pub fn get_all_symbols(&self) -> Vec<&Symbol> {
+        self.scopes
+            .iter()
+            .flat_map(|scope| scope.symbols.values())
+            .collect()
+    }
+
     /// Add a type definition
-    pub fn add_type_definition(&mut self, name: String, definition: TypeDefinition) -> Result<(), SemanticError> {
+    pub fn add_type_definition(
+        &mut self,
+        name: String,
+        definition: TypeDefinition,
+    ) -> Result<(), SemanticError> {
         if self.type_definitions.contains_key(&name) {
             return Err(SemanticError::DuplicateDefinition {
                 symbol: name,
                 location: match &definition {
-                    TypeDefinition::Struct { source_location, .. } |
-                    TypeDefinition::Enum { source_location, .. } |
-                    TypeDefinition::Alias { source_location, .. } => source_location.clone(),
+                    TypeDefinition::Struct {
+                        source_location, ..
+                    }
+                    | TypeDefinition::Enum {
+                        source_location, ..
+                    }
+                    | TypeDefinition::Alias {
+                        source_location, ..
+                    } => source_location.clone(),
                 },
                 previous_location: SourceLocation::unknown(), // TODO: Track previous location
             });
         }
-        
+
         self.type_definitions.insert(name, definition);
         Ok(())
     }
-    
+
     /// Look up a type definition
     pub fn lookup_type_definition(&self, name: &str) -> Option<&TypeDefinition> {
         self.type_definitions.get(name)
     }
-    
+
     /// Get all type definitions
     pub fn get_type_definitions(&self) -> &HashMap<String, TypeDefinition> {
         &self.type_definitions
     }
-    
+
     /// Add module imports
     pub fn add_import(&mut self, module_name: String, exported_symbols: HashMap<String, Symbol>) {
         self.imports.insert(module_name, exported_symbols);
     }
-    
+
     /// Check if a variable has been initialized
     pub fn is_variable_initialized(&self, name: &str) -> bool {
         if let Some(symbol) = self.lookup_symbol(name) {
@@ -290,31 +390,31 @@ impl SymbolTable {
             false
         }
     }
-    
+
     /// Mark a variable as initialized
     pub fn mark_variable_initialized(&mut self, name: &str) -> Result<(), SemanticError> {
         // Search through scopes to find and mark the variable
         let mut current = self.current_scope;
-        
+
         loop {
             if let Some(symbol) = self.scopes[current].symbols.get_mut(name) {
                 symbol.is_initialized = true;
                 return Ok(());
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         Err(SemanticError::UndefinedSymbol {
             symbol: name.to_string(),
             location: SourceLocation::unknown(),
         })
     }
-    
+
     /// Check if a variable is mutable
     pub fn is_variable_mutable(&self, name: &str) -> Result<bool, SemanticError> {
         if let Some(symbol) = self.lookup_symbol(name) {
@@ -326,129 +426,127 @@ impl SymbolTable {
             })
         }
     }
-    
+
     /// Get all symbols in the current scope
     pub fn current_scope_symbols(&self) -> impl Iterator<Item = &Symbol> {
         self.current_scope().all_symbols()
     }
-    
+
     /// Get all symbols visible from the current scope
     pub fn visible_symbols(&self) -> Vec<&Symbol> {
         let mut symbols = Vec::new();
         let mut current = self.current_scope;
-        
+
         // Collect symbols from current scope up to global
         loop {
             for symbol in self.scopes[current].all_symbols() {
                 symbols.push(symbol);
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         // Add imported symbols
         for imported_symbols in self.imports.values() {
             for symbol in imported_symbols.values() {
                 symbols.push(symbol);
             }
         }
-        
+
         symbols
     }
-    
+
     /// Check for unused variables in the current scope
     pub fn find_unused_variables(&self) -> Vec<&Symbol> {
         // This is a simple implementation - a more sophisticated one would track usage
         self.current_scope()
             .all_symbols()
-            .filter(|symbol| {
-                symbol.kind == SymbolKind::Variable && !symbol.name.starts_with('_')
-            })
+            .filter(|symbol| symbol.kind == SymbolKind::Variable && !symbol.name.starts_with('_'))
             .collect()
     }
-    
+
     /// Get scope depth (0 = global, 1 = module, 2 = function, etc.)
     pub fn scope_depth(&self) -> usize {
         let mut depth = 0;
         let mut current = self.current_scope;
-        
+
         while let Some(parent) = self.scopes[current].parent {
             depth += 1;
             current = parent;
         }
-        
+
         depth
     }
-    
+
     /// Check if we're in a specific scope kind
     pub fn in_scope_kind(&self, kind: ScopeKind) -> bool {
         let mut current = self.current_scope;
-        
+
         loop {
             if self.scopes[current].kind == kind {
                 return true;
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         false
     }
-    
+
     /// Find the nearest scope of a specific kind
     pub fn find_nearest_scope(&self, kind: ScopeKind) -> Option<usize> {
         let mut current = self.current_scope;
-        
+
         loop {
             if self.scopes[current].kind == kind {
                 return Some(current);
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         None
     }
-    
+
     /// Mark a variable as moved (ownership transferred)
     pub fn mark_variable_moved(&mut self, name: &str) -> Result<(), SemanticError> {
         let mut current = self.current_scope;
-        
+
         loop {
             if let Some(symbol) = self.scopes[current].symbols.get_mut(name) {
                 symbol.is_moved = true;
                 return Ok(());
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         Err(SemanticError::UndefinedSymbol {
             symbol: name.to_string(),
             location: SourceLocation::unknown(),
         })
     }
-    
+
     /// Borrow a variable immutably
     pub fn borrow_variable(&mut self, name: &str) -> Result<(), SemanticError> {
         let mut current = self.current_scope;
-        
+
         loop {
             if let Some(symbol) = self.scopes[current].symbols.get_mut(name) {
                 match &mut symbol.borrow_state {
@@ -469,24 +567,24 @@ impl SymbolTable {
                     }
                 }
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         Err(SemanticError::UndefinedSymbol {
             symbol: name.to_string(),
             location: SourceLocation::unknown(),
         })
     }
-    
+
     /// Borrow a variable mutably
     pub fn borrow_variable_mut(&mut self, name: &str) -> Result<(), SemanticError> {
         let mut current = self.current_scope;
-        
+
         loop {
             if let Some(symbol) = self.scopes[current].symbols.get_mut(name) {
                 if !symbol.is_mutable {
@@ -495,7 +593,7 @@ impl SymbolTable {
                         location: SourceLocation::unknown(),
                     });
                 }
-                
+
                 match &symbol.borrow_state {
                     BorrowState::None => {
                         symbol.borrow_state = BorrowState::BorrowedMut;
@@ -517,24 +615,24 @@ impl SymbolTable {
                     }
                 }
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         Err(SemanticError::UndefinedSymbol {
             symbol: name.to_string(),
             location: SourceLocation::unknown(),
         })
     }
-    
+
     /// Release a borrow
     pub fn release_borrow(&mut self, name: &str) -> Result<(), SemanticError> {
         let mut current = self.current_scope;
-        
+
         loop {
             if let Some(symbol) = self.scopes[current].symbols.get_mut(name) {
                 match &mut symbol.borrow_state {
@@ -559,14 +657,14 @@ impl SymbolTable {
                     }
                 }
             }
-            
+
             if let Some(parent) = self.scopes[current].parent {
                 current = parent;
             } else {
                 break;
             }
         }
-        
+
         Err(SemanticError::UndefinedSymbol {
             symbol: name.to_string(),
             location: SourceLocation::unknown(),
@@ -580,13 +678,12 @@ impl Default for SymbolTable {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Type;
     use crate::ast::PrimitiveType;
-    
+    use crate::types::Type;
+
     fn create_test_symbol(name: &str, symbol_type: Type) -> Symbol {
         Symbol::new(
             name.to_string(),
@@ -597,7 +694,7 @@ mod tests {
             SourceLocation::unknown(),
         )
     }
-    
+
     #[test]
     fn test_symbol_table_creation() {
         let table = SymbolTable::new();
@@ -605,141 +702,147 @@ mod tests {
         assert_eq!(table.scopes.len(), 1);
         assert_eq!(table.scopes[0].kind, ScopeKind::Global);
     }
-    
+
     #[test]
     fn test_scope_management() {
         let mut table = SymbolTable::new();
-        
+
         // Enter function scope
         let func_scope = table.enter_scope(ScopeKind::Function);
         assert_eq!(func_scope, 1);
         assert_eq!(table.current_scope, 1);
         assert_eq!(table.scopes.len(), 2);
-        
+
         // Enter block scope
         let block_scope = table.enter_scope(ScopeKind::Block);
         assert_eq!(block_scope, 2);
         assert_eq!(table.current_scope, 2);
-        
+
         // Exit back to function scope
         assert!(table.exit_scope().is_ok());
         assert_eq!(table.current_scope, 1);
-        
+
         // Exit back to global scope
         assert!(table.exit_scope().is_ok());
         assert_eq!(table.current_scope, 0);
-        
+
         // Cannot exit global scope
         assert!(table.exit_scope().is_err());
     }
-    
+
     #[test]
     fn test_symbol_addition_and_lookup() {
         let mut table = SymbolTable::new();
-        
+
         let symbol = create_test_symbol("x", Type::primitive(PrimitiveType::Integer));
         assert!(table.add_symbol(symbol).is_ok());
-        
+
         // Should find the symbol
         assert!(table.lookup_symbol("x").is_some());
         assert!(table.lookup_symbol("y").is_none());
-        
+
         // Test duplicate symbol error
         let duplicate = create_test_symbol("x", Type::primitive(PrimitiveType::Float));
         assert!(table.add_symbol(duplicate).is_err());
     }
-    
+
     #[test]
     fn test_hierarchical_lookup() {
         let mut table = SymbolTable::new();
-        
+
         // Add symbol in global scope
-        let global_symbol = create_test_symbol("global_var", Type::primitive(PrimitiveType::String));
+        let global_symbol =
+            create_test_symbol("global_var", Type::primitive(PrimitiveType::String));
         assert!(table.add_symbol(global_symbol).is_ok());
-        
+
         // Enter function scope
         table.enter_scope(ScopeKind::Function);
-        
+
         // Add symbol in function scope
         let local_symbol = create_test_symbol("local_var", Type::primitive(PrimitiveType::Integer));
         assert!(table.add_symbol(local_symbol).is_ok());
-        
+
         // Should find both symbols
         assert!(table.lookup_symbol("global_var").is_some());
         assert!(table.lookup_symbol("local_var").is_some());
-        
+
         // Enter block scope
         table.enter_scope(ScopeKind::Block);
-        
+
         // Should still find both symbols
         assert!(table.lookup_symbol("global_var").is_some());
         assert!(table.lookup_symbol("local_var").is_some());
-        
+
         // Add symbol that shadows global
-        let shadow_symbol = create_test_symbol("global_var", Type::primitive(PrimitiveType::Boolean));
+        let shadow_symbol =
+            create_test_symbol("global_var", Type::primitive(PrimitiveType::Boolean));
         assert!(table.add_symbol(shadow_symbol).is_ok());
-        
+
         // Should find the shadowing symbol
         let found = table.lookup_symbol("global_var").unwrap();
         assert_eq!(found.symbol_type, Type::primitive(PrimitiveType::Boolean));
     }
-    
+
     #[test]
     fn test_variable_initialization_tracking() {
         let mut table = SymbolTable::new();
-        
+
         let mut symbol = create_test_symbol("x", Type::primitive(PrimitiveType::Integer));
         symbol.is_initialized = false;
         assert!(table.add_symbol(symbol).is_ok());
-        
+
         // Variable should not be initialized
         assert!(!table.is_variable_initialized("x"));
-        
+
         // Mark as initialized
         assert!(table.mark_variable_initialized("x").is_ok());
         assert!(table.is_variable_initialized("x"));
-        
+
         // Test with non-existent variable
         assert!(table.mark_variable_initialized("y").is_err());
     }
-    
+
     #[test]
     fn test_type_definitions() {
         let mut table = SymbolTable::new();
-        
+
         let type_def = TypeDefinition::Alias {
             target_type: Type::primitive(PrimitiveType::Integer),
             source_location: SourceLocation::unknown(),
         };
-        
-        assert!(table.add_type_definition("MyInt".to_string(), type_def).is_ok());
+
+        assert!(table
+            .add_type_definition("MyInt".to_string(), type_def)
+            .is_ok());
         assert!(table.lookup_type_definition("MyInt").is_some());
         assert!(table.lookup_type_definition("Unknown").is_none());
-        
+
         // Test duplicate type definition
         let duplicate_def = TypeDefinition::Alias {
             target_type: Type::primitive(PrimitiveType::Float),
             source_location: SourceLocation::unknown(),
         };
-        assert!(table.add_type_definition("MyInt".to_string(), duplicate_def).is_err());
+        assert!(table
+            .add_type_definition("MyInt".to_string(), duplicate_def)
+            .is_err());
     }
-    
+
     #[test]
     fn test_scope_kind_checking() {
         let mut table = SymbolTable::new();
-        
+
         assert!(table.in_scope_kind(ScopeKind::Global));
         assert!(!table.in_scope_kind(ScopeKind::Function));
-        
+
         table.enter_scope(ScopeKind::Function);
         assert!(table.in_scope_kind(ScopeKind::Global));
         assert!(table.in_scope_kind(ScopeKind::Function));
-        
+
         table.enter_scope(ScopeKind::Block);
         assert!(table.in_scope_kind(ScopeKind::Global));
         assert!(table.in_scope_kind(ScopeKind::Function));
         assert!(table.in_scope_kind(ScopeKind::Block));
-        
+
         // Test finding nearest scope
         assert_eq!(table.find_nearest_scope(ScopeKind::Block), Some(2));
         assert_eq!(table.find_nearest_scope(ScopeKind::Function), Some(1));

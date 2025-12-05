@@ -13,14 +13,12 @@
 // limitations under the License.
 
 //! Common subexpression elimination optimization pass
-//! 
+//!
 //! Eliminates redundant computations by reusing previously computed values
 
 use super::OptimizationPass;
-use crate::mir::{
-    Function, Statement, Rvalue, Operand, LocalId, Place, BinOp, UnOp,
-};
 use crate::error::SemanticError;
+use crate::mir::{BinOp, Function, LocalId, Operand, Place, Rvalue, Statement, UnOp};
 use std::collections::HashMap;
 
 /// Expression representation for CSE
@@ -55,7 +53,7 @@ impl Expression {
             _ => None, // Only handle simple expressions for now
         }
     }
-    
+
     /// Check if the expression uses a given local
     fn uses_local(&self, local: LocalId) -> bool {
         match self {
@@ -87,18 +85,21 @@ impl CommonSubexpressionEliminationPass {
             eliminated_expressions: 0,
         }
     }
-    
+
     /// Perform CSE within a single basic block
     fn eliminate_in_block(&mut self, statements: &mut Vec<Statement>) -> bool {
         let mut changed = false;
         let mut available_expressions: HashMap<Expression, LocalId> = HashMap::new();
-        
+
         for statement in statements.iter_mut() {
             match statement {
                 Statement::Assign { place, rvalue, .. } => {
-                    // Invalidate expressions that use the assigned local
+                    // Invalidate expressions that were computed by the assigned local
+                    // (since the local now has a new value)
+                    available_expressions.retain(|_, &mut computed_by| computed_by != place.local);
+                    // Also invalidate expressions that use the assigned local
                     available_expressions.retain(|expr, _| !expr.uses_local(place.local));
-                    
+
                     // Check if this expression is already available
                     if let Some(expr) = Expression::from_rvalue(rvalue) {
                         if let Some(&existing_local) = available_expressions.get(&expr) {
@@ -115,18 +116,18 @@ impl CommonSubexpressionEliminationPass {
                         }
                     }
                 }
-                
+
                 Statement::StorageDead(local) => {
                     // Remove expressions computed by this local
                     available_expressions.retain(|_, &mut computed_by| computed_by != *local);
                     // Also remove expressions that use this local
                     available_expressions.retain(|expr, _| !expr.uses_local(*local));
                 }
-                
+
                 _ => {}
             }
         }
-        
+
         changed
     }
 }
@@ -135,15 +136,15 @@ impl OptimizationPass for CommonSubexpressionEliminationPass {
     fn name(&self) -> &'static str {
         "common-subexpression-elimination"
     }
-    
+
     fn run_on_function(&mut self, function: &mut Function) -> Result<bool, SemanticError> {
         let mut changed = false;
-        
+
         // Run CSE on each basic block independently
         for block in function.basic_blocks.values_mut() {
             changed |= self.eliminate_in_block(&mut block.statements);
         }
-        
+
         Ok(changed)
     }
 }
@@ -157,30 +158,33 @@ impl Default for CommonSubexpressionEliminationPass {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::{Builder, Place, SourceInfo, Constant, ConstantValue, BinOp};
-    use crate::types::Type;
     use crate::ast::PrimitiveType;
     use crate::error::SourceLocation;
-    
+    use crate::mir::{BinOp, Builder, Constant, ConstantValue, Place, SourceInfo};
+    use crate::types::Type;
+
     #[test]
     fn test_common_subexpression_elimination() {
         let mut pass = CommonSubexpressionEliminationPass::new();
         let mut builder = Builder::new();
-        
+
         builder.start_function(
             "test".to_string(),
             vec![],
             Type::primitive(PrimitiveType::Integer),
         );
-        
+
         let a = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
         let b = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
         let temp1 = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
         let temp2 = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
-        
+
         // a = 10
         builder.push_statement(Statement::Assign {
-            place: Place { local: a, projection: vec![] },
+            place: Place {
+                local: a,
+                projection: vec![],
+            },
             rvalue: Rvalue::Use(Operand::Constant(Constant {
                 ty: Type::primitive(PrimitiveType::Integer),
                 value: ConstantValue::Integer(10),
@@ -190,10 +194,13 @@ mod tests {
                 scope: 0,
             },
         });
-        
+
         // b = 20
         builder.push_statement(Statement::Assign {
-            place: Place { local: b, projection: vec![] },
+            place: Place {
+                local: b,
+                projection: vec![],
+            },
             rvalue: Rvalue::Use(Operand::Constant(Constant {
                 ty: Type::primitive(PrimitiveType::Integer),
                 value: ConstantValue::Integer(20),
@@ -203,46 +210,64 @@ mod tests {
                 scope: 0,
             },
         });
-        
+
         // temp1 = a + b
         builder.push_statement(Statement::Assign {
-            place: Place { local: temp1, projection: vec![] },
+            place: Place {
+                local: temp1,
+                projection: vec![],
+            },
             rvalue: Rvalue::BinaryOp {
                 op: BinOp::Add,
-                left: Operand::Copy(Place { local: a, projection: vec![] }),
-                right: Operand::Copy(Place { local: b, projection: vec![] }),
+                left: Operand::Copy(Place {
+                    local: a,
+                    projection: vec![],
+                }),
+                right: Operand::Copy(Place {
+                    local: b,
+                    projection: vec![],
+                }),
             },
             source_info: SourceInfo {
                 span: SourceLocation::unknown(),
                 scope: 0,
             },
         });
-        
+
         // temp2 = a + b  (common subexpression)
         builder.push_statement(Statement::Assign {
-            place: Place { local: temp2, projection: vec![] },
+            place: Place {
+                local: temp2,
+                projection: vec![],
+            },
             rvalue: Rvalue::BinaryOp {
                 op: BinOp::Add,
-                left: Operand::Copy(Place { local: a, projection: vec![] }),
-                right: Operand::Copy(Place { local: b, projection: vec![] }),
+                left: Operand::Copy(Place {
+                    local: a,
+                    projection: vec![],
+                }),
+                right: Operand::Copy(Place {
+                    local: b,
+                    projection: vec![],
+                }),
             },
             source_info: SourceInfo {
                 span: SourceLocation::unknown(),
                 scope: 0,
             },
         });
-        
+
         let mut function = builder.finish_function();
-        
+
         // Run CSE
         let changed = pass.run_on_function(&mut function).unwrap();
         assert!(changed);
         assert_eq!(pass.eliminated_expressions, 1);
-        
+
         // Check that the second addition was replaced with a copy
         let block = function.basic_blocks.values().next().unwrap();
         let last_stmt = &block.statements[3];
-        
+
         if let Statement::Assign { rvalue, .. } = last_stmt {
             match rvalue {
                 Rvalue::Use(Operand::Copy(place)) => {
@@ -254,26 +279,29 @@ mod tests {
             panic!("Expected assignment statement");
         }
     }
-    
+
     #[test]
     fn test_cse_with_invalidation() {
         let mut pass = CommonSubexpressionEliminationPass::new();
         let mut builder = Builder::new();
-        
+
         builder.start_function(
             "test".to_string(),
             vec![],
             Type::primitive(PrimitiveType::Integer),
         );
-        
+
         let a = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
         let b = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
         let temp1 = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
         let temp2 = builder.new_local(Type::primitive(PrimitiveType::Integer), false);
-        
+
         // a = 10
         builder.push_statement(Statement::Assign {
-            place: Place { local: a, projection: vec![] },
+            place: Place {
+                local: a,
+                projection: vec![],
+            },
             rvalue: Rvalue::Use(Operand::Constant(Constant {
                 ty: Type::primitive(PrimitiveType::Integer),
                 value: ConstantValue::Integer(10),
@@ -283,10 +311,13 @@ mod tests {
                 scope: 0,
             },
         });
-        
+
         // b = 20
         builder.push_statement(Statement::Assign {
-            place: Place { local: b, projection: vec![] },
+            place: Place {
+                local: b,
+                projection: vec![],
+            },
             rvalue: Rvalue::Use(Operand::Constant(Constant {
                 ty: Type::primitive(PrimitiveType::Integer),
                 value: ConstantValue::Integer(20),
@@ -296,24 +327,36 @@ mod tests {
                 scope: 0,
             },
         });
-        
+
         // temp1 = a + b
         builder.push_statement(Statement::Assign {
-            place: Place { local: temp1, projection: vec![] },
+            place: Place {
+                local: temp1,
+                projection: vec![],
+            },
             rvalue: Rvalue::BinaryOp {
                 op: BinOp::Add,
-                left: Operand::Copy(Place { local: a, projection: vec![] }),
-                right: Operand::Copy(Place { local: b, projection: vec![] }),
+                left: Operand::Copy(Place {
+                    local: a,
+                    projection: vec![],
+                }),
+                right: Operand::Copy(Place {
+                    local: b,
+                    projection: vec![],
+                }),
             },
             source_info: SourceInfo {
                 span: SourceLocation::unknown(),
                 scope: 0,
             },
         });
-        
+
         // a = 30  (invalidates previous expression)
         builder.push_statement(Statement::Assign {
-            place: Place { local: a, projection: vec![] },
+            place: Place {
+                local: a,
+                projection: vec![],
+            },
             rvalue: Rvalue::Use(Operand::Constant(Constant {
                 ty: Type::primitive(PrimitiveType::Integer),
                 value: ConstantValue::Integer(30),
@@ -323,23 +366,32 @@ mod tests {
                 scope: 0,
             },
         });
-        
+
         // temp2 = a + b  (not a common subexpression due to invalidation)
         builder.push_statement(Statement::Assign {
-            place: Place { local: temp2, projection: vec![] },
+            place: Place {
+                local: temp2,
+                projection: vec![],
+            },
             rvalue: Rvalue::BinaryOp {
                 op: BinOp::Add,
-                left: Operand::Copy(Place { local: a, projection: vec![] }),
-                right: Operand::Copy(Place { local: b, projection: vec![] }),
+                left: Operand::Copy(Place {
+                    local: a,
+                    projection: vec![],
+                }),
+                right: Operand::Copy(Place {
+                    local: b,
+                    projection: vec![],
+                }),
             },
             source_info: SourceInfo {
                 span: SourceLocation::unknown(),
                 scope: 0,
             },
         });
-        
+
         let mut function = builder.finish_function();
-        
+
         // Run CSE
         let changed = pass.run_on_function(&mut function).unwrap();
         // Should not change anything since the expression was invalidated

@@ -1,0 +1,21 @@
+// String Operations Example
+// Demonstrates string manipulation
+
+module string_operations;
+
+@extern("C")
+func strlen(s: String) -> Int;
+
+@extern("C")
+func puts(s: String) -> Int;
+
+func main() -> Int {
+    let message: String = "Hello, AetherScript!";
+
+    // Get string length via FFI
+    let len: Int = strlen("test");
+
+    puts("String operations example");
+
+    return len;
+}

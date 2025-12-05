@@ -1,0 +1,558 @@
+module LRUTest;
+
+// ============================================================================
+// Tests for LRU Eviction Policy
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Int Array ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// LRU Cache Implementation
+// ============================================================================
+
+// LRU cache uses parallel arrays:
+// - session_ids: Session ID at each slot (-1 = empty)
+// - access_times: Last access time (monotonic counter)
+// - in_flight: 1 if session is currently being processed (protected)
+// - data_handles: Int64 handles to actual data (not stored here, managed externally)
+
+// Create session_ids array
+func create_session_ids(capacity: Int) -> Int64 {
+    let mut arr = int_array_create(capacity);
+    let mut i = 0;
+    while (i < capacity) {
+        arr = int_array_push(arr, -1);
+        i = i + 1;
+    }
+    return arr;
+}
+
+// Create access_times array
+func create_access_times(capacity: Int) -> Int64 {
+    let mut arr = int_array_create(capacity);
+    let mut i = 0;
+    while (i < capacity) {
+        arr = int_array_push(arr, 0);
+        i = i + 1;
+    }
+    return arr;
+}
+
+// Create in_flight array
+func create_in_flight(capacity: Int) -> Int64 {
+    let mut arr = int_array_create(capacity);
+    let mut i = 0;
+    while (i < capacity) {
+        arr = int_array_push(arr, 0);
+        i = i + 1;
+    }
+    return arr;
+}
+
+// Find slot for a session ID
+func find_slot(session_ids: Int64, capacity: Int, session_id: Int) -> Int {
+    let mut i = 0;
+    while (i < capacity) {
+        let id = int_array_get(session_ids, i);
+        if ({id == session_id}) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// Find empty slot
+func find_empty_slot(session_ids: Int64, capacity: Int) -> Int {
+    let mut i = 0;
+    while (i < capacity) {
+        let id = int_array_get(session_ids, i);
+        if ({id == -1}) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// Find LRU slot (oldest access time, not in-flight)
+func find_lru_slot(session_ids: Int64, access_times: Int64, in_flight: Int64, capacity: Int) -> Int {
+    let mut oldest_slot = -1;
+    let mut oldest_time = 2147483647;  // Max int as initial value
+
+    let mut i = 0;
+    while (i < capacity) {
+        let id = int_array_get(session_ids, i);
+        if ({id != -1}) {
+            // Slot is occupied
+            let flight = int_array_get(in_flight, i);
+            if ({flight == 0}) {
+                // Not in-flight, candidate for eviction
+                let time = int_array_get(access_times, i);
+                if ({time < oldest_time}) {
+                    oldest_time = time;
+                    oldest_slot = i;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return oldest_slot;
+}
+
+// Access a session (updates access time)
+func access_session(session_ids: Int64, access_times: Int64, capacity: Int, session_id: Int, current_time: Int) -> Int {
+    let slot = find_slot(session_ids, capacity, session_id);
+    if ({slot >= 0}) {
+        int_array_set(access_times, slot, current_time);
+    }
+    return slot;
+}
+
+// Mark session as in-flight
+func set_in_flight(in_flight: Int64, slot: Int, value: Int) -> Void {
+    int_array_set(in_flight, slot, value);
+}
+
+// Insert new session, evicting LRU if necessary
+// Returns: slot where inserted, or -1 if all slots are in-flight
+func insert_session(session_ids: Int64, access_times: Int64, in_flight: Int64, capacity: Int, session_id: Int, current_time: Int) -> Int {
+    // First check if session already exists
+    let existing = find_slot(session_ids, capacity, session_id);
+    if ({existing >= 0}) {
+        // Update access time
+        int_array_set(access_times, existing, current_time);
+        return existing;
+    }
+
+    // Try to find empty slot
+    let empty = find_empty_slot(session_ids, capacity);
+    if ({empty >= 0}) {
+        int_array_set(session_ids, empty, session_id);
+        int_array_set(access_times, empty, current_time);
+        int_array_set(in_flight, empty, 0);
+        return empty;
+    }
+
+    // Need to evict LRU
+    let lru = find_lru_slot(session_ids, access_times, in_flight, capacity);
+    if ({lru < 0}) {
+        // All slots are in-flight, cannot evict
+        return -1;
+    }
+
+    // Evict and insert
+    int_array_set(session_ids, lru, session_id);
+    int_array_set(access_times, lru, current_time);
+    int_array_set(in_flight, lru, 0);
+    return lru;
+}
+
+// Remove a session
+func remove_session(session_ids: Int64, in_flight: Int64, capacity: Int, session_id: Int) -> Bool {
+    let slot = find_slot(session_ids, capacity, session_id);
+    if ({slot >= 0}) {
+        int_array_set(session_ids, slot, -1);
+        int_array_set(in_flight, slot, 0);
+        return true;
+    }
+    return false;
+}
+
+// Count active sessions
+func count_sessions(session_ids: Int64, capacity: Int) -> Int {
+    let mut count = 0;
+    let mut i = 0;
+    while (i < capacity) {
+        let id = int_array_get(session_ids, i);
+        if ({id != -1}) {
+            count = {count + 1};
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+func test_empty_cache() -> Bool {
+    println("=== Test: Empty Cache ===");
+
+    let capacity = 4;
+    let session_ids = create_session_ids(capacity);
+    let access_times = create_access_times(capacity);
+    let in_flight = create_in_flight(capacity);
+
+    // Empty cache should have 0 sessions
+    let count = count_sessions(session_ids, capacity);
+    if ({count != 0}) {
+        println("FAIL: Empty cache should have 0 sessions");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    // Find should return -1
+    let slot = find_slot(session_ids, capacity, 100);
+    if ({slot != -1}) {
+        println("FAIL: Should not find session in empty cache");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    int_array_free(session_ids);
+    int_array_free(access_times);
+    int_array_free(in_flight);
+    println("PASS: Empty Cache");
+    return true;
+}
+
+func test_insert_and_find() -> Bool {
+    println("=== Test: Insert and Find ===");
+
+    let capacity = 4;
+    let session_ids = create_session_ids(capacity);
+    let access_times = create_access_times(capacity);
+    let in_flight = create_in_flight(capacity);
+
+    // Insert session 100 at time 1
+    let slot1 = insert_session(session_ids, access_times, in_flight, capacity, 100, 1);
+    if ({slot1 < 0}) {
+        println("FAIL: Insert should succeed");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    // Find it
+    let found = find_slot(session_ids, capacity, 100);
+    if ({found != slot1}) {
+        println("FAIL: Should find at inserted slot");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    // Count should be 1
+    let count = count_sessions(session_ids, capacity);
+    if ({count != 1}) {
+        println("FAIL: Should have 1 session");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    int_array_free(session_ids);
+    int_array_free(access_times);
+    int_array_free(in_flight);
+    println("PASS: Insert and Find");
+    return true;
+}
+
+func test_lru_eviction() -> Bool {
+    println("=== Test: LRU Eviction ===");
+
+    let capacity = 3;
+    let session_ids = create_session_ids(capacity);
+    let access_times = create_access_times(capacity);
+    let in_flight = create_in_flight(capacity);
+
+    // Fill cache with sessions at different times
+    insert_session(session_ids, access_times, in_flight, capacity, 100, 1);  // Oldest
+    insert_session(session_ids, access_times, in_flight, capacity, 200, 2);  // Middle
+    insert_session(session_ids, access_times, in_flight, capacity, 300, 3);  // Newest
+
+    // Cache is full
+    let count = count_sessions(session_ids, capacity);
+    if ({count != 3}) {
+        println("FAIL: Cache should be full");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    // Insert new session - should evict session 100 (oldest)
+    let slot = insert_session(session_ids, access_times, in_flight, capacity, 400, 4);
+    if ({slot < 0}) {
+        println("FAIL: Insert should succeed via eviction");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    // Session 100 should be gone
+    let found100 = find_slot(session_ids, capacity, 100);
+    if ({found100 != -1}) {
+        println("FAIL: Session 100 should have been evicted");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    // Sessions 200, 300, 400 should still exist
+    let found200 = find_slot(session_ids, capacity, 200);
+    let found300 = find_slot(session_ids, capacity, 300);
+    let found400 = find_slot(session_ids, capacity, 400);
+
+    if ({found200 < 0}) {
+        println("FAIL: Session 200 should exist");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+    if ({found300 < 0}) {
+        println("FAIL: Session 300 should exist");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+    if ({found400 < 0}) {
+        println("FAIL: Session 400 should exist");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    int_array_free(session_ids);
+    int_array_free(access_times);
+    int_array_free(in_flight);
+    println("PASS: LRU Eviction");
+    return true;
+}
+
+func test_access_updates_time() -> Bool {
+    println("=== Test: Access Updates Time ===");
+
+    let capacity = 3;
+    let session_ids = create_session_ids(capacity);
+    let access_times = create_access_times(capacity);
+    let in_flight = create_in_flight(capacity);
+
+    // Insert sessions
+    insert_session(session_ids, access_times, in_flight, capacity, 100, 1);
+    insert_session(session_ids, access_times, in_flight, capacity, 200, 2);
+    insert_session(session_ids, access_times, in_flight, capacity, 300, 3);
+
+    // Access session 100 at time 10 (makes it newest)
+    access_session(session_ids, access_times, capacity, 100, 10);
+
+    // Insert new session - should evict 200 (now oldest)
+    insert_session(session_ids, access_times, in_flight, capacity, 400, 11);
+
+    // Session 200 should be gone, 100 should still exist
+    let found100 = find_slot(session_ids, capacity, 100);
+    let found200 = find_slot(session_ids, capacity, 200);
+
+    if ({found100 < 0}) {
+        println("FAIL: Session 100 should still exist after access");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+    if ({found200 != -1}) {
+        println("FAIL: Session 200 should have been evicted");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    int_array_free(session_ids);
+    int_array_free(access_times);
+    int_array_free(in_flight);
+    println("PASS: Access Updates Time");
+    return true;
+}
+
+func test_in_flight_protection() -> Bool {
+    println("=== Test: In-Flight Protection ===");
+
+    let capacity = 3;
+    let session_ids = create_session_ids(capacity);
+    let access_times = create_access_times(capacity);
+    let in_flight = create_in_flight(capacity);
+
+    // Insert sessions
+    let slot100 = insert_session(session_ids, access_times, in_flight, capacity, 100, 1);
+    insert_session(session_ids, access_times, in_flight, capacity, 200, 2);
+    insert_session(session_ids, access_times, in_flight, capacity, 300, 3);
+
+    // Mark session 100 as in-flight (even though it's oldest)
+    set_in_flight(in_flight, slot100, 1);
+
+    // Insert new session - should evict 200 (oldest non-in-flight)
+    insert_session(session_ids, access_times, in_flight, capacity, 400, 4);
+
+    // Session 100 should be protected, 200 should be gone
+    let found100 = find_slot(session_ids, capacity, 100);
+    let found200 = find_slot(session_ids, capacity, 200);
+
+    if ({found100 < 0}) {
+        println("FAIL: In-flight session 100 should be protected");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+    if ({found200 != -1}) {
+        println("FAIL: Session 200 should have been evicted instead");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    int_array_free(session_ids);
+    int_array_free(access_times);
+    int_array_free(in_flight);
+    println("PASS: In-Flight Protection");
+    return true;
+}
+
+func test_all_in_flight() -> Bool {
+    println("=== Test: All In-Flight ===");
+
+    let capacity = 2;
+    let session_ids = create_session_ids(capacity);
+    let access_times = create_access_times(capacity);
+    let in_flight = create_in_flight(capacity);
+
+    // Insert and mark both as in-flight
+    let slot1 = insert_session(session_ids, access_times, in_flight, capacity, 100, 1);
+    let slot2 = insert_session(session_ids, access_times, in_flight, capacity, 200, 2);
+    set_in_flight(in_flight, slot1, 1);
+    set_in_flight(in_flight, slot2, 1);
+
+    // Try to insert new session - should fail
+    let slot3 = insert_session(session_ids, access_times, in_flight, capacity, 300, 3);
+    if ({slot3 != -1}) {
+        println("FAIL: Insert should fail when all slots are in-flight");
+        int_array_free(session_ids);
+        int_array_free(access_times);
+        int_array_free(in_flight);
+        return false;
+    }
+
+    int_array_free(session_ids);
+    int_array_free(access_times);
+    int_array_free(in_flight);
+    println("PASS: All In-Flight");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("LRU Eviction Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_empty_cache()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_insert_and_find()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_lru_eviction()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_access_updates_time()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_in_flight_protection()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_all_in_flight()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}

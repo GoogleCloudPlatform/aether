@@ -18,12 +18,84 @@ use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::ptr;
+use sha2::{Sha256, Digest};
 
 /// File handle structure
 #[repr(C)]
 pub struct FileHandle {
     file: *mut File,
     mode: i32, // 0 = read, 1 = write, 2 = append
+}
+
+/// Check if a file exists
+#[no_mangle]
+pub unsafe extern "C" fn file_exists(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return 0;
+    }
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    if std::path::Path::new(path_str).exists() { 1 } else { 0 }
+}
+
+/// Create a directory (recursive, like mkdir -p)
+#[no_mangle]
+pub unsafe extern "C" fn create_directory(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return 0;
+    }
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    match std::fs::create_dir_all(path_str) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    }
+}
+
+/// Calculate SHA256 checksum of a file
+/// Returns a hex string (caller must free), or null on error
+#[no_mangle]
+pub unsafe extern "C" fn calculate_file_sha256(path: *const c_char) -> *mut c_char {
+    if path.is_null() {
+        return ptr::null_mut();
+    }
+    
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+    
+    let mut file = match File::open(path_str) {
+        Ok(f) => f,
+        Err(_) => return ptr::null_mut(),
+    };
+    
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 8192];
+    
+    loop {
+        match file.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(n) => hasher.update(&buffer[..n]),
+            Err(_) => return ptr::null_mut(),
+        }
+    }
+    
+    let result = hasher.finalize();
+    let hex_string = format!("{:x}\0", result);
+    
+    let len = hex_string.len();
+    let ptr = crate::memory_alloc::aether_safe_malloc(len) as *mut c_char;
+    
+    if !ptr.is_null() {
+        ptr::copy_nonoverlapping(hex_string.as_ptr() as *const c_char, ptr, len);
+    }
+    
+    ptr
 }
 
 /// Open a file
@@ -65,6 +137,7 @@ pub unsafe extern "C" fn aether_open_file(path: *const c_char, mode: *const c_ch
         _ => return ptr::null_mut(),
     };
     
+    // Internal structs use memory allocator (GC or standard)
     let handle = crate::memory::aether_malloc(std::mem::size_of::<FileHandle>() as c_int) as *mut FileHandle;
     if handle.is_null() {
         return ptr::null_mut();
@@ -155,7 +228,8 @@ pub unsafe extern "C" fn aether_allocate_string(size: c_int) -> *mut c_char {
         return ptr::null_mut();
     }
     
-    let ptr = crate::memory::aether_malloc(size + 1) as *mut c_char;
+    // UPDATED: Use memory_alloc to match lib.rs string_free
+    let ptr = crate::memory_alloc::aether_safe_malloc((size + 1) as usize) as *mut c_char;
     if !ptr.is_null() {
         ptr::write_bytes(ptr, 0, (size + 1) as usize);
     }
@@ -207,6 +281,8 @@ pub unsafe extern "C" fn aether_read_line(buffer: *mut c_char) -> c_int {
             };
             
             let bytes = c_string.as_bytes_with_nul();
+            // Note: Caller is responsible for ensuring buffer is large enough
+            // This function is unsafe and potentially dangerous if buffer is too small
             ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, buffer, bytes.len());
             
             (bytes.len() - 1) as c_int
@@ -243,7 +319,8 @@ pub unsafe extern "C" fn aether_list_directory(path: *const c_char, entries: *mu
                         };
                         
                         let bytes = c_string.as_bytes_with_nul();
-                        let str_ptr = crate::memory::aether_malloc(bytes.len() as c_int) as *mut c_char;
+                        // Use memory_alloc for strings
+                        let str_ptr = crate::memory_alloc::aether_safe_malloc(bytes.len()) as *mut c_char;
                         
                         if !str_ptr.is_null() {
                             ptr::copy_nonoverlapping(bytes.as_ptr() as *const c_char, str_ptr, bytes.len());
@@ -257,5 +334,88 @@ pub unsafe extern "C" fn aether_list_directory(path: *const c_char, entries: *mu
             count
         },
         Err(_) => -1,
+    }
+}
+
+// Safely read file content to string with max size limit
+// Matches stdlib/io.aether: read_file_safe(path: String, max_size: Int) -> String
+#[no_mangle]
+pub unsafe extern "C" fn read_file_safe(path: *const c_char, max_size: c_int) -> *mut c_char {
+    if path.is_null() || max_size <= 0 {
+        return ptr::null_mut();
+    }
+    
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+    
+    let mut file = match File::open(path_str) {
+        Ok(f) => f,
+        Err(_) => return ptr::null_mut(),
+    };
+    
+    // Check file size first
+    let file_len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let read_len = std::cmp::min(file_len, max_size as u64) as usize;
+    
+    // Create vector of correct size
+    let mut buffer = Vec::with_capacity(read_len);
+    
+    // Read up to max_size bytes
+    // Use take() to limit read
+    match file.take(max_size as u64).read_to_end(&mut buffer) {
+        Ok(_) => {
+            // Validate UTF-8
+            match String::from_utf8(buffer) {
+                Ok(s) => {
+                    let result = format!("{}\0", s);
+                    let len = result.len();
+                    // Use memory_alloc for string return
+                    let ptr = crate::memory_alloc::aether_safe_malloc(len) as *mut c_char;
+                    if !ptr.is_null() {
+                        ptr::copy_nonoverlapping(result.as_ptr() as *const c_char, ptr, len);
+                    }
+                    ptr
+                },
+                Err(_) => ptr::null_mut(), // Invalid UTF-8
+            }
+        },
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+// Write file safe
+// Matches stdlib/io.aether: write_file_safe(path: String, content: String, append: Bool) -> Bool
+#[no_mangle]
+pub unsafe extern "C" fn write_file_safe(path: *const c_char, content: *const c_char, append: c_int) -> c_int {
+    if path.is_null() || content.is_null() {
+        return 0; // False
+    }
+
+    let path_str = match CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    
+    let content_slice = CStr::from_ptr(content).to_bytes();
+    
+    let mut options = OpenOptions::new();
+    options.write(true).create(true);
+    
+    if append != 0 {
+        options.append(true);
+    } else {
+        options.truncate(true);
+    }
+    
+    match options.open(path_str) {
+        Ok(mut file) => {
+            match file.write_all(content_slice) {
+                Ok(_) => 1, // True
+                Err(_) => 0,
+            }
+        },
+        Err(_) => 0,
     }
 }

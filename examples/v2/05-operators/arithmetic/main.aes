@@ -1,0 +1,27 @@
+// Arithmetic Operators Example
+// Demonstrates +, -, *, /, %
+
+module arithmetic;
+
+func main() -> Int {
+    let a: Int = 20;
+    let b: Int = 7;
+
+    // Addition
+    let sum: Int = a + b;
+
+    // Subtraction
+    let diff: Int = a - b;
+
+    // Multiplication
+    let product: Int = a * b;
+
+    // Division
+    let quotient: Int = a / b;
+
+    // Compound expression
+    let compound: Int = (a + b) * (a - b);
+
+    // sum=27, diff=13, product=140, quotient=2
+    return quotient;
+}

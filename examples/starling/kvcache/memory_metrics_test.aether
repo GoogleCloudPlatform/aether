@@ -1,0 +1,773 @@
+module MemoryMetricsTest;
+
+// ============================================================================
+// Tests for Memory Metrics in Arena Allocator
+// ============================================================================
+// Task 3.5: Track allocated/free/fragmented bytes, expose via metrics endpoint
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Int Array ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// Memory Metrics Structure (using parallel arrays)
+// ============================================================================
+// We track the following metrics:
+// - total_capacity: Total arena size in bytes
+// - allocated_bytes: Currently allocated bytes
+// - free_bytes: Currently free bytes
+// - num_allocations: Number of active allocations
+// - num_frees: Number of completed frees
+// - peak_allocated: Peak allocation high water mark
+// - fragmentation_count: Number of free blocks (fragmentation indicator)
+// - largest_free_block: Size of largest contiguous free region
+
+// Metrics array indices
+// 0 = total_capacity
+// 1 = allocated_bytes
+// 2 = free_bytes
+// 3 = num_allocations
+// 4 = num_frees
+// 5 = peak_allocated
+// 6 = fragmentation_count
+// 7 = largest_free_block
+
+func metrics_create(total_capacity: Int) -> Int64 {
+    let mut arr = int_array_create(8);
+    arr = int_array_push(arr, total_capacity);  // 0: total_capacity
+    arr = int_array_push(arr, 0);               // 1: allocated_bytes
+    arr = int_array_push(arr, total_capacity);  // 2: free_bytes
+    arr = int_array_push(arr, 0);               // 3: num_allocations
+    arr = int_array_push(arr, 0);               // 4: num_frees
+    arr = int_array_push(arr, 0);               // 5: peak_allocated
+    arr = int_array_push(arr, 1);               // 6: fragmentation_count (starts with 1 free block)
+    arr = int_array_push(arr, total_capacity);  // 7: largest_free_block
+    return arr;
+}
+
+func metrics_get_total_capacity(metrics: Int64) -> Int {
+    return int_array_get(metrics, 0);
+}
+
+func metrics_get_allocated_bytes(metrics: Int64) -> Int {
+    return int_array_get(metrics, 1);
+}
+
+func metrics_get_free_bytes(metrics: Int64) -> Int {
+    return int_array_get(metrics, 2);
+}
+
+func metrics_get_num_allocations(metrics: Int64) -> Int {
+    return int_array_get(metrics, 3);
+}
+
+func metrics_get_num_frees(metrics: Int64) -> Int {
+    return int_array_get(metrics, 4);
+}
+
+func metrics_get_peak_allocated(metrics: Int64) -> Int {
+    return int_array_get(metrics, 5);
+}
+
+func metrics_get_fragmentation_count(metrics: Int64) -> Int {
+    return int_array_get(metrics, 6);
+}
+
+func metrics_get_largest_free_block(metrics: Int64) -> Int {
+    return int_array_get(metrics, 7);
+}
+
+// Update metrics on allocation
+func metrics_on_alloc(metrics: Int64, size: Int) -> Void {
+    let allocated = int_array_get(metrics, 1);
+    let free_bytes = int_array_get(metrics, 2);
+    let num_allocs = int_array_get(metrics, 3);
+    let peak = int_array_get(metrics, 5);
+
+    let new_allocated = {allocated + size};
+    let new_free = {free_bytes - size};
+
+    int_array_set(metrics, 1, new_allocated);
+    int_array_set(metrics, 2, new_free);
+    int_array_set(metrics, 3, {num_allocs + 1});
+
+    // Update peak if needed
+    if ({new_allocated > peak}) {
+        int_array_set(metrics, 5, new_allocated);
+    }
+}
+
+// Update metrics on free
+func metrics_on_free(metrics: Int64, size: Int) -> Void {
+    let allocated = int_array_get(metrics, 1);
+    let free_bytes = int_array_get(metrics, 2);
+    let num_frees = int_array_get(metrics, 4);
+
+    int_array_set(metrics, 1, {allocated - size});
+    int_array_set(metrics, 2, {free_bytes + size});
+    int_array_set(metrics, 4, {num_frees + 1});
+}
+
+// Update fragmentation count (number of free blocks)
+func metrics_set_fragmentation(metrics: Int64, count: Int) -> Void {
+    int_array_set(metrics, 6, count);
+}
+
+// Update largest free block size
+func metrics_set_largest_free(metrics: Int64, size: Int) -> Void {
+    int_array_set(metrics, 7, size);
+}
+
+// ============================================================================
+// Arena with Metrics (simplified for testing)
+// ============================================================================
+// Block metadata: offset, size, in_use (1 = allocated, 0 = free)
+// blocks array: [offset0, size0, in_use0, offset1, size1, in_use1, ...]
+
+func blocks_create(max_blocks: Int) -> Int64 {
+    let size = {max_blocks * 3};
+    let mut arr = int_array_create(size);
+    let mut i = 0;
+    while (i < size) {
+        arr = int_array_push(arr, 0);
+        i = i + 1;
+    }
+    return arr;
+}
+
+func block_set(blocks: Int64, idx: Int, offset: Int, size: Int, in_use: Int) -> Void {
+    let base = {idx * 3};
+    int_array_set(blocks, base, offset);
+    int_array_set(blocks, {base + 1}, size);
+    int_array_set(blocks, {base + 2}, in_use);
+}
+
+func block_get_offset(blocks: Int64, idx: Int) -> Int {
+    return int_array_get(blocks, {idx * 3});
+}
+
+func block_get_size(blocks: Int64, idx: Int) -> Int {
+    return int_array_get(blocks, {{idx * 3} + 1});
+}
+
+func block_is_in_use(blocks: Int64, idx: Int) -> Int {
+    return int_array_get(blocks, {{idx * 3} + 2});
+}
+
+// Find free block of sufficient size, returns block index or -1
+func find_free_block(blocks: Int64, num_blocks: Int, required_size: Int) -> Int {
+    let mut i = 0;
+    while (i < num_blocks) {
+        let in_use = block_is_in_use(blocks, i);
+        if ({in_use == 0}) {
+            let size = block_get_size(blocks, i);
+            if ({size >= required_size}) {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// Allocate from arena with metrics tracking
+// Returns block index or -1 if failed
+func arena_alloc_with_metrics(
+    blocks: Int64,
+    num_blocks: Int,
+    required_size: Int,
+    metrics: Int64
+) -> Int {
+    let idx = find_free_block(blocks, num_blocks, required_size);
+    if ({idx < 0}) {
+        return -1;
+    }
+
+    let block_size = block_get_size(blocks, idx);
+    let block_offset = block_get_offset(blocks, idx);
+
+    // For simplicity, we allocate the entire block (no splitting)
+    int_array_set(blocks, {{idx * 3} + 2}, 1);  // Mark in use
+
+    // Update metrics
+    metrics_on_alloc(metrics, block_size);
+    update_fragmentation_metrics(blocks, num_blocks, metrics);
+
+    return idx;
+}
+
+// Free block with metrics tracking
+func arena_free_with_metrics(
+    blocks: Int64,
+    idx: Int,
+    metrics: Int64,
+    num_blocks: Int
+) -> Void {
+    let size = block_get_size(blocks, idx);
+
+    // Mark as free
+    int_array_set(blocks, {{idx * 3} + 2}, 0);
+
+    // Update metrics
+    metrics_on_free(metrics, size);
+    update_fragmentation_metrics(blocks, num_blocks, metrics);
+}
+
+// Calculate and update fragmentation metrics
+func update_fragmentation_metrics(blocks: Int64, num_blocks: Int, metrics: Int64) -> Void {
+    let mut free_count = 0;
+    let mut largest_free = 0;
+    let mut i = 0;
+
+    while (i < num_blocks) {
+        let in_use = block_is_in_use(blocks, i);
+        if ({in_use == 0}) {
+            free_count = {free_count + 1};
+            let size = block_get_size(blocks, i);
+            if ({size > largest_free}) {
+                largest_free = size;
+            }
+        }
+        i = i + 1;
+    }
+
+    metrics_set_fragmentation(metrics, free_count);
+    metrics_set_largest_free(metrics, largest_free);
+}
+
+// Calculate fragmentation ratio (0-100)
+// Fragmentation = 100 * (1 - largest_free / total_free)
+// If all free space is contiguous, fragmentation = 0
+// If many small blocks, fragmentation is high
+func calculate_fragmentation_ratio(metrics: Int64) -> Int {
+    let free_bytes = metrics_get_free_bytes(metrics);
+    let largest_free = metrics_get_largest_free_block(metrics);
+
+    if ({free_bytes <= 0}) {
+        return 0;  // No free space, no fragmentation
+    }
+
+    // ratio = 100 * (free_bytes - largest_free) / free_bytes
+    // This gives 0 if all free space is in one block
+    // And approaches 100 if many small blocks
+    let diff = {free_bytes - largest_free};
+    return {{diff * 100} / free_bytes};
+}
+
+// ============================================================================
+// Metrics Formatting (for HTTP endpoint)
+// ============================================================================
+
+func print_metrics(metrics: Int64) -> Void {
+    aether_print("  total_capacity: ");
+    println(int_to_string(metrics_get_total_capacity(metrics)));
+
+    aether_print("  allocated_bytes: ");
+    println(int_to_string(metrics_get_allocated_bytes(metrics)));
+
+    aether_print("  free_bytes: ");
+    println(int_to_string(metrics_get_free_bytes(metrics)));
+
+    aether_print("  num_allocations: ");
+    println(int_to_string(metrics_get_num_allocations(metrics)));
+
+    aether_print("  num_frees: ");
+    println(int_to_string(metrics_get_num_frees(metrics)));
+
+    aether_print("  peak_allocated: ");
+    println(int_to_string(metrics_get_peak_allocated(metrics)));
+
+    aether_print("  fragmentation_count: ");
+    println(int_to_string(metrics_get_fragmentation_count(metrics)));
+
+    aether_print("  largest_free_block: ");
+    println(int_to_string(metrics_get_largest_free_block(metrics)));
+
+    aether_print("  fragmentation_ratio: ");
+    aether_print(int_to_string(calculate_fragmentation_ratio(metrics)));
+    println("%");
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+func test_metrics_create() -> Bool {
+    println("=== Test: Metrics Create ===");
+
+    let capacity = 1024;
+    let metrics = metrics_create(capacity);
+
+    if ({metrics_get_total_capacity(metrics) != capacity}) {
+        println("FAIL: Total capacity should be 1024");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_allocated_bytes(metrics) != 0}) {
+        println("FAIL: Initial allocated should be 0");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_free_bytes(metrics) != capacity}) {
+        println("FAIL: Initial free should equal capacity");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_peak_allocated(metrics) != 0}) {
+        println("FAIL: Initial peak should be 0");
+        int_array_free(metrics);
+        return false;
+    }
+
+    int_array_free(metrics);
+    println("PASS: Metrics Create");
+    return true;
+}
+
+func test_metrics_on_alloc() -> Bool {
+    println("=== Test: Metrics on Allocation ===");
+
+    let capacity = 1024;
+    let metrics = metrics_create(capacity);
+
+    // Allocate 256 bytes
+    metrics_on_alloc(metrics, 256);
+
+    if ({metrics_get_allocated_bytes(metrics) != 256}) {
+        println("FAIL: Allocated should be 256");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_free_bytes(metrics) != 768}) {
+        println("FAIL: Free should be 768");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_num_allocations(metrics) != 1}) {
+        println("FAIL: Num allocations should be 1");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_peak_allocated(metrics) != 256}) {
+        println("FAIL: Peak should be 256");
+        int_array_free(metrics);
+        return false;
+    }
+
+    // Allocate another 128 bytes
+    metrics_on_alloc(metrics, 128);
+
+    if ({metrics_get_allocated_bytes(metrics) != 384}) {
+        println("FAIL: Allocated should be 384");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_peak_allocated(metrics) != 384}) {
+        println("FAIL: Peak should be 384");
+        int_array_free(metrics);
+        return false;
+    }
+
+    int_array_free(metrics);
+    println("PASS: Metrics on Allocation");
+    return true;
+}
+
+func test_metrics_on_free() -> Bool {
+    println("=== Test: Metrics on Free ===");
+
+    let capacity = 1024;
+    let metrics = metrics_create(capacity);
+
+    // Allocate and then free
+    metrics_on_alloc(metrics, 256);
+    metrics_on_alloc(metrics, 128);
+    metrics_on_free(metrics, 256);
+
+    if ({metrics_get_allocated_bytes(metrics) != 128}) {
+        println("FAIL: Allocated should be 128 after free");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_free_bytes(metrics) != 896}) {
+        println("FAIL: Free should be 896");
+        int_array_free(metrics);
+        return false;
+    }
+
+    if ({metrics_get_num_frees(metrics) != 1}) {
+        println("FAIL: Num frees should be 1");
+        int_array_free(metrics);
+        return false;
+    }
+
+    // Peak should still be 384 (high water mark)
+    if ({metrics_get_peak_allocated(metrics) != 384}) {
+        println("FAIL: Peak should remain at 384");
+        int_array_free(metrics);
+        return false;
+    }
+
+    int_array_free(metrics);
+    println("PASS: Metrics on Free");
+    return true;
+}
+
+func test_fragmentation_metrics() -> Bool {
+    println("=== Test: Fragmentation Metrics ===");
+
+    let capacity = 1024;
+    let max_blocks = 4;
+    let metrics = metrics_create(capacity);
+    let blocks = blocks_create(max_blocks);
+
+    // Initialize 4 blocks of 256 bytes each
+    block_set(blocks, 0, 0, 256, 0);    // Free
+    block_set(blocks, 1, 256, 256, 0);  // Free
+    block_set(blocks, 2, 512, 256, 0);  // Free
+    block_set(blocks, 3, 768, 256, 0);  // Free
+
+    // All free, one contiguous region (in terms of count, 4 blocks)
+    update_fragmentation_metrics(blocks, max_blocks, metrics);
+
+    if ({metrics_get_fragmentation_count(metrics) != 4}) {
+        println("FAIL: Should have 4 free blocks");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    if ({metrics_get_largest_free_block(metrics) != 256}) {
+        println("FAIL: Largest free should be 256");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    // Allocate blocks 0 and 2, leaving holes
+    int_array_set(blocks, 2, 1);   // Block 0 in use
+    int_array_set(blocks, 8, 1);   // Block 2 in use
+    metrics_on_alloc(metrics, 256);
+    metrics_on_alloc(metrics, 256);
+    update_fragmentation_metrics(blocks, max_blocks, metrics);
+
+    // Should have 2 free blocks (1 and 3)
+    if ({metrics_get_fragmentation_count(metrics) != 2}) {
+        aether_print("FAIL: Should have 2 free blocks, got ");
+        println(int_to_string(metrics_get_fragmentation_count(metrics)));
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    int_array_free(metrics);
+    int_array_free(blocks);
+    println("PASS: Fragmentation Metrics");
+    return true;
+}
+
+func test_fragmentation_ratio() -> Bool {
+    println("=== Test: Fragmentation Ratio ===");
+
+    let metrics = metrics_create(1000);
+
+    // Set up: 500 free bytes, largest block is 500 (no fragmentation)
+    int_array_set(metrics, 2, 500);  // free_bytes
+    int_array_set(metrics, 7, 500);  // largest_free_block
+
+    let ratio1 = calculate_fragmentation_ratio(metrics);
+    if ({ratio1 != 0}) {
+        aether_print("FAIL: Should be 0% fragmented, got ");
+        aether_print(int_to_string(ratio1));
+        println("%");
+        int_array_free(metrics);
+        return false;
+    }
+
+    // Set up: 500 free bytes, but largest block is only 100 (80% fragmented)
+    int_array_set(metrics, 7, 100);  // largest_free_block
+
+    let ratio2 = calculate_fragmentation_ratio(metrics);
+    // (500 - 100) / 500 * 100 = 80
+    if ({ratio2 != 80}) {
+        aether_print("FAIL: Should be 80% fragmented, got ");
+        aether_print(int_to_string(ratio2));
+        println("%");
+        int_array_free(metrics);
+        return false;
+    }
+
+    // Edge case: 50% fragmented
+    int_array_set(metrics, 7, 250);  // largest_free_block
+    let ratio3 = calculate_fragmentation_ratio(metrics);
+    if ({ratio3 != 50}) {
+        aether_print("FAIL: Should be 50% fragmented, got ");
+        aether_print(int_to_string(ratio3));
+        println("%");
+        int_array_free(metrics);
+        return false;
+    }
+
+    int_array_free(metrics);
+    println("PASS: Fragmentation Ratio");
+    return true;
+}
+
+func test_arena_alloc_with_metrics() -> Bool {
+    println("=== Test: Arena Alloc with Metrics ===");
+
+    let capacity = 1024;
+    let max_blocks = 4;
+    let metrics = metrics_create(capacity);
+    let blocks = blocks_create(max_blocks);
+
+    // Initialize 4 blocks
+    block_set(blocks, 0, 0, 256, 0);
+    block_set(blocks, 1, 256, 256, 0);
+    block_set(blocks, 2, 512, 256, 0);
+    block_set(blocks, 3, 768, 256, 0);
+
+    // Initial state
+    update_fragmentation_metrics(blocks, max_blocks, metrics);
+
+    // Allocate first block
+    let idx1 = arena_alloc_with_metrics(blocks, max_blocks, 100, metrics);
+    if ({idx1 != 0}) {
+        println("FAIL: Should allocate block 0");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    if ({metrics_get_allocated_bytes(metrics) != 256}) {
+        println("FAIL: Allocated should be 256");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    if ({metrics_get_fragmentation_count(metrics) != 3}) {
+        println("FAIL: Should have 3 free blocks");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    // Allocate second block
+    let idx2 = arena_alloc_with_metrics(blocks, max_blocks, 200, metrics);
+    if ({idx2 != 1}) {
+        println("FAIL: Should allocate block 1");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    if ({metrics_get_num_allocations(metrics) != 2}) {
+        println("FAIL: Should have 2 allocations");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    int_array_free(metrics);
+    int_array_free(blocks);
+    println("PASS: Arena Alloc with Metrics");
+    return true;
+}
+
+func test_arena_free_with_metrics() -> Bool {
+    println("=== Test: Arena Free with Metrics ===");
+
+    let capacity = 1024;
+    let max_blocks = 4;
+    let metrics = metrics_create(capacity);
+    let blocks = blocks_create(max_blocks);
+
+    // Initialize and allocate
+    block_set(blocks, 0, 0, 256, 0);
+    block_set(blocks, 1, 256, 256, 0);
+    block_set(blocks, 2, 512, 256, 0);
+    block_set(blocks, 3, 768, 256, 0);
+
+    arena_alloc_with_metrics(blocks, max_blocks, 100, metrics);
+    arena_alloc_with_metrics(blocks, max_blocks, 100, metrics);
+
+    // Free first block
+    arena_free_with_metrics(blocks, 0, metrics, max_blocks);
+
+    if ({metrics_get_allocated_bytes(metrics) != 256}) {
+        println("FAIL: Should have 256 allocated after free");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    if ({metrics_get_num_frees(metrics) != 1}) {
+        println("FAIL: Should have 1 free");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    if ({metrics_get_fragmentation_count(metrics) != 3}) {
+        println("FAIL: Should have 3 free blocks");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    // Peak should still be 512
+    if ({metrics_get_peak_allocated(metrics) != 512}) {
+        println("FAIL: Peak should be 512");
+        int_array_free(metrics);
+        int_array_free(blocks);
+        return false;
+    }
+
+    int_array_free(metrics);
+    int_array_free(blocks);
+    println("PASS: Arena Free with Metrics");
+    return true;
+}
+
+func test_metrics_print() -> Bool {
+    println("=== Test: Metrics Print Format ===");
+
+    let metrics = metrics_create(4096);
+    metrics_on_alloc(metrics, 1024);
+    metrics_on_alloc(metrics, 512);
+    metrics_on_free(metrics, 512);
+
+    // Just verify it prints without error
+    println("Metrics snapshot:");
+    print_metrics(metrics);
+
+    int_array_free(metrics);
+    println("PASS: Metrics Print Format");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("Memory Metrics Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_metrics_create()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_metrics_on_alloc()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_metrics_on_free()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_fragmentation_metrics()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_fragmentation_ratio()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_arena_alloc_with_metrics()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_arena_free_with_metrics()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_metrics_print()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}

@@ -13,13 +13,17 @@
 // limitations under the License.
 
 mod basic_tests;
-mod multi_file_tests;
-mod verification_tests;
 mod error_system_tests;
-mod resource_tests;
+
+mod multi_file_tests;
 mod pattern_tests;
-mod llm_workflow_tests;
+mod resource_tests;
+mod test_ffi_structs;
+mod test_ffi_function_pointers;
+mod test_ffi_arrays;
+mod test_memory_alloc;
+mod test_starling_ffi;
 mod test_string_runtime;
 mod test_variadic_functions;
-mod test_ffi_structs;
-mod test_memory_alloc;
+mod test_separate_compilation;
+mod verification_tests;

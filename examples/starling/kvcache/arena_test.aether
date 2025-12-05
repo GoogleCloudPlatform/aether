@@ -1,0 +1,387 @@
+module ArenaTest;
+
+// ============================================================================
+// Tests for Arena Allocator
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Float Array ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Int Array ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// Simplified Arena for Testing - Using primitives to avoid ownership issues
+// ============================================================================
+
+// Arena is represented as:
+// - data: Int64 (float array handle)
+// - block_offsets: Int64 (int array handle)
+// - block_sizes: Int64 (int array handle)
+// - block_in_use: Int64 (int array handle)
+// Plus these tracked separately as primitives in test functions
+
+// Create arena and return data handle
+// Also initializes block arrays
+// Returns: data handle (caller must track other state)
+func arena_create(total_size: Int, max_blocks: Int) -> Int64 {
+    let mut data = float_array_create(total_size);
+    let mut i = 0;
+    while (i < total_size) {
+        data = float_array_push(data, 0.0);
+        i = i + 1;
+    }
+    return data;
+}
+
+func create_block_arrays(max_blocks: Int) -> Int64 {
+    let mut arr = int_array_create(max_blocks);
+    let mut i = 0;
+    while (i < max_blocks) {
+        arr = int_array_push(arr, 0);
+        i = i + 1;
+    }
+    return arr;
+}
+
+// Find end offset given block arrays
+func find_end_offset(block_offsets: Int64, block_sizes: Int64, block_in_use: Int64, num_blocks: Int) -> Int {
+    let mut max_end = 0;
+    let mut i = 0;
+    while (i < num_blocks) {
+        let in_use = int_array_get(block_in_use, i);
+        if (in_use == 1) {
+            let offset = int_array_get(block_offsets, i);
+            let size = int_array_get(block_sizes, i);
+            let end = {offset + size};
+            if ({end > max_end}) {
+                max_end = end;
+            }
+        }
+        i = i + 1;
+    }
+    return max_end;
+}
+
+// Allocate from arena
+// Returns offset on success, -1 on failure
+func arena_alloc(
+    block_offsets: Int64, block_sizes: Int64, block_in_use: Int64,
+    num_blocks: Int, total_size: Int, block_size: Int, max_blocks: Int,
+    size: Int
+) -> Int {
+    // Align size to block_size
+    let aligned_size = {{{size + block_size} - 1} / block_size} * block_size;
+
+    if ({num_blocks >= max_blocks}) {
+        return -1;
+    }
+
+    let offset = find_end_offset(block_offsets, block_sizes, block_in_use, num_blocks);
+    if ({{offset + aligned_size} > total_size}) {
+        return -1;
+    }
+
+    // Record the new block
+    int_array_set(block_offsets, num_blocks, offset);
+    int_array_set(block_sizes, num_blocks, aligned_size);
+    int_array_set(block_in_use, num_blocks, 1);
+
+    return offset;
+}
+
+func arena_get(data: Int64, offset: Int) -> Float {
+    return float_array_get(data, offset);
+}
+
+func arena_set(data: Int64, offset: Int, value: Float) -> Void {
+    float_array_set(data, offset, value);
+}
+
+func arena_destroy(data: Int64, block_offsets: Int64, block_sizes: Int64, block_in_use: Int64) -> Void {
+    float_array_free(data);
+    int_array_free(block_offsets);
+    int_array_free(block_sizes);
+    int_array_free(block_in_use);
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+func test_arena_create() -> Bool {
+    println("=== Test: Arena Create ===");
+
+    // Config values
+    let total_size = 1024;
+    let block_size = 64;
+    let max_blocks = 16;
+
+    // Create arena
+    let data = arena_create(total_size, max_blocks);
+    let block_offsets = create_block_arrays(max_blocks);
+    let block_sizes = create_block_arrays(max_blocks);
+    let block_in_use = create_block_arrays(max_blocks);
+    let num_blocks = 0;
+
+    // Check data is initialized to 0
+    let v = arena_get(data, 0);
+    if ({v != 0.0}) {
+        println("FAIL: data should be initialized to 0");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    let v2 = arena_get(data, 100);
+    if ({v2 != 0.0}) {
+        println("FAIL: data[100] should be 0");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    arena_destroy(data, block_offsets, block_sizes, block_in_use);
+    println("PASS: Arena Create");
+    return true;
+}
+
+func test_arena_alloc() -> Bool {
+    println("=== Test: Arena Alloc ===");
+
+    // Config values
+    let total_size = 1024;
+    let block_size = 64;
+    let max_blocks = 16;
+
+    // Create arena
+    let data = arena_create(total_size, max_blocks);
+    let block_offsets = create_block_arrays(max_blocks);
+    let block_sizes = create_block_arrays(max_blocks);
+    let block_in_use = create_block_arrays(max_blocks);
+    let mut num_blocks = 0;
+
+    // Allocate first block (100 elements -> aligned to 128)
+    let offset1 = arena_alloc(block_offsets, block_sizes, block_in_use,
+                              num_blocks, total_size, block_size, max_blocks, 100);
+    if ({offset1 < 0}) {
+        println("FAIL: First allocation should succeed");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+    if ({offset1 != 0}) {
+        println("FAIL: First allocation should be at offset 0");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+    num_blocks = 1;
+
+    // Allocate second block
+    let offset2 = arena_alloc(block_offsets, block_sizes, block_in_use,
+                              num_blocks, total_size, block_size, max_blocks, 100);
+    if ({offset2 < 0}) {
+        println("FAIL: Second allocation should succeed");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    // Second block should be after first (at offset 128 due to alignment)
+    if ({offset2 <= offset1}) {
+        println("FAIL: Second block should be after first");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    arena_destroy(data, block_offsets, block_sizes, block_in_use);
+    println("PASS: Arena Alloc");
+    return true;
+}
+
+func test_arena_read_write() -> Bool {
+    println("=== Test: Arena Read/Write ===");
+
+    let total_size = 1024;
+    let max_blocks = 16;
+
+    let data = arena_create(total_size, max_blocks);
+    let block_offsets = create_block_arrays(max_blocks);
+    let block_sizes = create_block_arrays(max_blocks);
+    let block_in_use = create_block_arrays(max_blocks);
+
+    // Write some values
+    arena_set(data, 0, 1.5);
+    arena_set(data, 1, 2.5);
+    arena_set(data, 10, 10.5);
+
+    // Read them back
+    let v0 = arena_get(data, 0);
+    let v1 = arena_get(data, 1);
+    let v10 = arena_get(data, 10);
+
+    if ({v0 < 1.4}) {
+        println("FAIL: v0 should be 1.5");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+    if ({v0 > 1.6}) {
+        println("FAIL: v0 should be 1.5 (too high)");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    if ({v1 < 2.4}) {
+        println("FAIL: v1 should be 2.5");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    if ({v10 < 10.4}) {
+        println("FAIL: v10 should be 10.5");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    arena_destroy(data, block_offsets, block_sizes, block_in_use);
+    println("PASS: Arena Read/Write");
+    return true;
+}
+
+func test_arena_block_alignment() -> Bool {
+    println("=== Test: Block Alignment ===");
+
+    let total_size = 1024;
+    let block_size = 64;
+    let max_blocks = 16;
+
+    let data = arena_create(total_size, max_blocks);
+    let block_offsets = create_block_arrays(max_blocks);
+    let block_sizes = create_block_arrays(max_blocks);
+    let block_in_use = create_block_arrays(max_blocks);
+    let num_blocks = 0;
+
+    // Allocate 10 elements - should round up to 64
+    let offset = arena_alloc(block_offsets, block_sizes, block_in_use,
+                             num_blocks, total_size, block_size, max_blocks, 10);
+    if ({offset != 0}) {
+        println("FAIL: First allocation should be at offset 0");
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    // Check the allocated size is 64 (aligned)
+    let size = int_array_get(block_sizes, 0);
+    if ({size != 64}) {
+        aether_print("FAIL: Block size should be 64, got ");
+        println(int_to_string(size));
+        arena_destroy(data, block_offsets, block_sizes, block_in_use);
+        return false;
+    }
+
+    arena_destroy(data, block_offsets, block_sizes, block_in_use);
+    println("PASS: Block Alignment");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("Arena Allocator Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_arena_create()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_arena_alloc()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_arena_read_write()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_arena_block_alignment()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}

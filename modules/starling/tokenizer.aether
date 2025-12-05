@@ -1,0 +1,498 @@
+module Tokenizer;
+
+// ============================================================================
+// BPE Tokenizer Implementation
+// ============================================================================
+// Implements Byte Pair Encoding (BPE) tokenization compatible with
+// GPT-2/LLaMA style tokenizers.
+
+// FFI imports for string manipulation
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_char_at")
+func string_char_at(s: String, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="substring")
+func substring(s: String, start: Int, length: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_contains")
+func string_contains(haystack: String, needle: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_index_of")
+func string_index_of(haystack: String, needle: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_trim")
+func string_trim(s: String) -> String;
+
+@extern(library="aether_runtime", symbol="string_split")
+func string_split(s: String, delimiter: String) -> Array<String>;
+
+@extern(library="aether_runtime", symbol="string_join")
+func string_join(parts: Array<String>, delimiter: String) -> String;
+
+@extern(library="aether_runtime", symbol="parse_int")
+func parse_int(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+@extern(library="aether_runtime", symbol="string_concat")
+func string_concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="aether_strdup")
+func strdup(s: String) -> String;
+
+// FFI imports for IO
+@extern(library="aether_runtime", symbol="read_file_safe")
+func read_file(path: String, max_size: Int) -> String;
+
+@extern(library="aether_runtime", symbol="aether_print")
+func print(s: String) -> Void;
+
+// FFI imports for JSON
+type JsonValue = String;
+
+@extern(library="aether_runtime", symbol="parse_json")
+func parse_json(json_string: String) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="json_get_field")
+func json_get_field(json_value: JsonValue, field_name: String) -> JsonValue;
+
+@extern(library="aether_runtime", symbol="to_integer")
+func json_to_int(json_value: JsonValue) -> Int;
+
+@extern(library="aether_runtime", symbol="json_object_keys")
+func json_object_keys(json_value: JsonValue) -> Array<String>;
+
+@extern(library="aether_runtime", symbol="json_array_length")
+func json_array_length(json_value: JsonValue) -> Int;
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+// A merge pair represents two tokens that can be merged
+struct MergePair {
+    first: String;
+    second: String;
+    rank: Int;       // Lower rank = higher priority (merge first)
+}
+
+// Offset tracking for a single token
+struct TokenOffset {
+    start: Int;      // Start position in original text (inclusive)
+    end: Int;        // End position in original text (exclusive)
+}
+
+// Result of tokenization
+struct TokenizeResult {
+    tokens: Array<Int>;
+    offsets: Array<TokenOffset>;
+}
+
+// The main tokenizer struct
+struct Tokenizer {
+    vocab: Map<String, Int>;           // token string -> token ID
+    reverse_vocab: Map<Int, String>;   // token ID -> token string
+    merges: Array<MergePair>;          // Ordered list of merge operations
+    merge_ranks: Map<String, Int>;     // "first second" -> rank
+    unk_token_id: Int;                 // ID for unknown tokens
+    bos_token_id: Int;                 // Beginning of sequence
+    eos_token_id: Int;                 // End of sequence
+}
+
+// ============================================================================
+// Tokenizer Loading
+// ============================================================================
+
+// Load vocabulary from a JSON file (format: {"token": id, ...})
+func load_vocab_from_json(path: String) -> Map<String, Int> {
+    let content = read_file(path, 100000000); // 100MB limit
+    let json = parse_json(content);
+
+    let vocab: Map<String, Int> = {};
+
+    // Get all keys from the JSON object
+    let keys = json_object_keys(json);
+    let num_keys = keys.length;
+
+    let mut i = 0;
+    while (i < num_keys) {
+        let key = keys[i];
+        let value_json = json_get_field(json, key);
+        let value = json_to_int(value_json);
+        vocab.insert(key, value);
+        i = i + 1;
+    }
+
+    return vocab;
+}
+
+// Build reverse vocabulary (ID -> token string)
+func build_reverse_vocab(vocab: Map<String, Int>) -> Map<Int, String> {
+    let reverse: Map<Int, String> = {};
+
+    // Iterate through vocab and build reverse mapping
+    // Note: This requires map iteration which we'll implement via keys
+    let keys = vocab.keys();
+    let num_keys = keys.length;
+
+    let mut i = 0;
+    while (i < num_keys) {
+        let token = keys[i];
+        let id = vocab.get(token);
+        reverse.insert(id, token);
+        i = i + 1;
+    }
+
+    return reverse;
+}
+
+// Parse merges from a merges.txt file
+// Format: "token1 token2" per line (space-separated pairs)
+func load_merges_from_file(path: String) -> Array<MergePair> {
+    let content = read_file(path, 100000000);
+    let lines = string_split(content, "\n");
+
+    let merges: Array<MergePair> = [];
+    let num_lines = lines.length;
+
+    let mut rank = 0;
+    let mut i = 0;
+
+    while (i < num_lines) {
+        let line = string_trim(lines[i]);
+        let line_len = string_length(line);
+
+        // Skip empty lines and comments (lines starting with #)
+        if (line_len > 0) {
+            let first_char = string_char_at(line, 0);
+            if (first_char != 35) {  // 35 = '#'
+                // Split by space
+                let parts = string_split(line, " ");
+                if (parts.length >= 2) {
+                    let merge = MergePair {
+                        first: parts[0],
+                        second: parts[1],
+                        rank: rank
+                    };
+                    merges.push(merge);
+                    rank = rank + 1;
+                }
+            }
+        }
+        i = i + 1;
+    }
+
+    return merges;
+}
+
+// Build merge ranks lookup table
+func build_merge_ranks(merges: Array<MergePair>) -> Map<String, Int> {
+    let ranks: Map<String, Int> = {};
+    let num_merges = merges.length;
+
+    let mut i = 0;
+    while (i < num_merges) {
+        let merge = merges[i];
+        // Key format: "first second"
+        let key = string_concat(merge.first, " ");
+        let key2 = string_concat(key, merge.second);
+        ranks.insert(key2, merge.rank);
+        i = i + 1;
+    }
+
+    return ranks;
+}
+
+// Create a tokenizer from vocab and merges files
+func create_tokenizer(vocab_path: String, merges_path: String) -> Tokenizer {
+    let vocab = load_vocab_from_json(vocab_path);
+    let reverse_vocab = build_reverse_vocab(vocab);
+    let merges = load_merges_from_file(merges_path);
+    let merge_ranks = build_merge_ranks(merges);
+
+    // Find special token IDs (default to -1 if not found)
+    let unk_id = vocab.get_or_default("<unk>", -1);
+    let bos_id = vocab.get_or_default("<s>", -1);
+    let eos_id = vocab.get_or_default("</s>", -1);
+
+    return Tokenizer {
+        vocab: vocab,
+        reverse_vocab: reverse_vocab,
+        merges: merges,
+        merge_ranks: merge_ranks,
+        unk_token_id: unk_id,
+        bos_token_id: bos_id,
+        eos_token_id: eos_id
+    };
+}
+
+// ============================================================================
+// BPE Encoding
+// ============================================================================
+
+// Convert a character code to a single-character string
+func char_to_string(char_code: Int) -> String {
+    // For now, we'll use a simple approach via the runtime
+    // This creates a string from a character code
+    let s = substring("", 0, 0);  // Empty string placeholder
+    // TODO: Need a proper char_from_code FFI function
+    return s;
+}
+
+// Split text into initial tokens (characters/bytes)
+// Returns array of single-character strings
+func split_to_chars(text: String) -> Array<String> {
+    let chars: Array<String> = [];
+    let len = string_length(text);
+
+    let mut i = 0;
+    while (i < len) {
+        let char_str = substring(text, i, 1);
+        chars.push(char_str);
+        i = i + 1;
+    }
+
+    return chars;
+}
+
+// Get the merge rank for a pair of tokens (returns -1 if not found)
+func get_merge_rank(tokenizer: Tokenizer, first: String, second: String) -> Int {
+    let key = string_concat(first, " ");
+    let key2 = string_concat(key, second);
+    return tokenizer.merge_ranks.get_or_default(key2, -1);
+}
+
+// Find the best merge in a list of tokens
+// Returns the index of the first token in the pair to merge, or -1 if no merge found
+func find_best_merge(tokenizer: Tokenizer, tokens: Array<String>) -> Int {
+    let num_tokens = tokens.length;
+    if (num_tokens < 2) {
+        return -1;
+    }
+
+    let mut best_idx = -1;
+    let mut best_rank = 999999999;  // Very large number
+
+    let mut i = 0;
+    while (i < num_tokens - 1) {
+        let first = tokens[i];
+        let second = tokens[i + 1];
+        let rank = get_merge_rank(tokenizer, first, second);
+
+        if (rank >= 0) {
+            if (rank < best_rank) {
+                best_rank = rank;
+                best_idx = i;
+            }
+        }
+        i = i + 1;
+    }
+
+    return best_idx;
+}
+
+// Apply BPE merges to a list of tokens
+func apply_bpe_merges(tokenizer: Tokenizer, initial_tokens: Array<String>) -> Array<String> {
+    let mut tokens = initial_tokens;
+
+    // Repeatedly find and apply the best merge
+    let mut merge_idx = find_best_merge(tokenizer, tokens);
+
+    while (merge_idx >= 0) {
+        // Merge tokens at merge_idx and merge_idx + 1
+        let first = tokens[merge_idx];
+        let second = tokens[merge_idx + 1];
+        let merged = string_concat(first, second);
+
+        // Build new token list
+        let new_tokens: Array<String> = [];
+        let num_tokens = tokens.length;
+
+        let mut i = 0;
+        while (i < num_tokens) {
+            if (i == merge_idx) {
+                new_tokens.push(merged);
+                i = i + 2;  // Skip both merged tokens
+            } else {
+                new_tokens.push(tokens[i]);
+                i = i + 1;
+            }
+        }
+
+        tokens = new_tokens;
+        merge_idx = find_best_merge(tokenizer, tokens);
+    }
+
+    return tokens;
+}
+
+// Convert token strings to IDs
+func tokens_to_ids(tokenizer: Tokenizer, tokens: Array<String>) -> Array<Int> {
+    let ids: Array<Int> = [];
+    let num_tokens = tokens.length;
+
+    let mut i = 0;
+    while (i < num_tokens) {
+        let token = tokens[i];
+        let id = tokenizer.vocab.get_or_default(token, tokenizer.unk_token_id);
+        ids.push(id);
+        i = i + 1;
+    }
+
+    return ids;
+}
+
+// Encode text to token IDs (main encode function)
+func encode(tokenizer: Tokenizer, text: String) -> Array<Int> {
+    // Step 1: Split into characters
+    let chars = split_to_chars(text);
+
+    // Step 2: Apply BPE merges
+    let bpe_tokens = apply_bpe_merges(tokenizer, chars);
+
+    // Step 3: Convert to IDs
+    let ids = tokens_to_ids(tokenizer, bpe_tokens);
+
+    return ids;
+}
+
+// Encode with offset tracking
+func encode_with_offsets(tokenizer: Tokenizer, text: String) -> TokenizeResult {
+    let chars = split_to_chars(text);
+    let num_chars = chars.length;
+
+    // Track which original character each token position came from
+    let mut char_indices: Array<Int> = [];
+    let mut i = 0;
+    while (i < num_chars) {
+        char_indices.push(i);
+        i = i + 1;
+    }
+
+    // Apply BPE with offset tracking
+    let mut tokens = chars;
+    let mut offsets = char_indices;
+
+    let mut merge_idx = find_best_merge(tokenizer, tokens);
+
+    while (merge_idx >= 0) {
+        let first = tokens[merge_idx];
+        let second = tokens[merge_idx + 1];
+        let merged = string_concat(first, second);
+
+        // Build new token list and offset list
+        let new_tokens: Array<String> = [];
+        let new_offsets: Array<Int> = [];
+        let num_tokens = tokens.length;
+
+        let mut j = 0;
+        while (j < num_tokens) {
+            if (j == merge_idx) {
+                new_tokens.push(merged);
+                new_offsets.push(offsets[j]);  // Keep the start offset
+                j = j + 2;
+            } else {
+                new_tokens.push(tokens[j]);
+                new_offsets.push(offsets[j]);
+                j = j + 1;
+            }
+        }
+
+        tokens = new_tokens;
+        offsets = new_offsets;
+        merge_idx = find_best_merge(tokenizer, tokens);
+    }
+
+    // Convert to IDs and build TokenOffset array
+    let ids: Array<Int> = [];
+    let token_offsets: Array<TokenOffset> = [];
+    let num_tokens = tokens.length;
+
+    let mut k = 0;
+    while (k < num_tokens) {
+        let token = tokens[k];
+        let id = tokenizer.vocab.get_or_default(token, tokenizer.unk_token_id);
+        ids.push(id);
+
+        let start = offsets[k];
+        let token_len = string_length(token);
+        let end = start + token_len;
+
+        let offset = TokenOffset {
+            start: start,
+            end: end
+        };
+        token_offsets.push(offset);
+
+        k = k + 1;
+    }
+
+    return TokenizeResult {
+        tokens: ids,
+        offsets: token_offsets
+    };
+}
+
+// ============================================================================
+// Decoding
+// ============================================================================
+
+// Decode token IDs back to text
+func decode(tokenizer: Tokenizer, ids: Array<Int>) -> String {
+    let parts: Array<String> = [];
+    let num_ids = ids.length;
+
+    let mut i = 0;
+    while (i < num_ids) {
+        let id = ids[i];
+        let token = tokenizer.reverse_vocab.get_or_default(id, "<unk>");
+        parts.push(token);
+        i = i + 1;
+    }
+
+    // Join all tokens (no delimiter for BPE)
+    return string_join(parts, "");
+}
+
+// Decode a single token ID
+func decode_token(tokenizer: Tokenizer, id: Int) -> String {
+    return tokenizer.reverse_vocab.get_or_default(id, "<unk>");
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+// Get vocabulary size
+func vocab_size(tokenizer: Tokenizer) -> Int {
+    return tokenizer.vocab.size();
+}
+
+// Check if a token exists in vocabulary
+func has_token(tokenizer: Tokenizer, token: String) -> Bool {
+    return tokenizer.vocab.contains_key(token);
+}
+
+// Get token ID (returns unk_token_id if not found)
+func get_token_id(tokenizer: Tokenizer, token: String) -> Int {
+    return tokenizer.vocab.get_or_default(token, tokenizer.unk_token_id);
+}
+
+// Get special token IDs
+func get_unk_token_id(tokenizer: Tokenizer) -> Int {
+    return tokenizer.unk_token_id;
+}
+
+func get_bos_token_id(tokenizer: Tokenizer) -> Int {
+    return tokenizer.bos_token_id;
+}
+
+func get_eos_token_id(tokenizer: Tokenizer) -> Int {
+    return tokenizer.eos_token_id;
+}

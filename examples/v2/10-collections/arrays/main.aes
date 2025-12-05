@@ -1,0 +1,37 @@
+// Arrays Example
+// Demonstrates array creation and access
+
+module arrays;
+
+@extern("C")
+func puts(s: String) -> Int;
+
+@extern("C")
+func int_to_string(i: Int) -> String;
+
+func sum_array(arr: Array<Int>, len: Int) -> Int {
+    var sum: Int = 0;
+    var i: Int = 0;
+
+    while i < len {
+        sum = sum + arr[i];
+        i = i + 1;
+    }
+
+    return sum;
+}
+
+func main() -> Int {
+    let numbers: Array<Int> = [1, 2, 3, 4, 5];
+
+    // Verify access
+    let first: Int = numbers[0];
+    puts("First element:");
+    puts(int_to_string(first));
+
+    let total: Int = sum_array(numbers, 5);
+    puts("Total:");
+    puts(int_to_string(total));
+
+    return total;
+}

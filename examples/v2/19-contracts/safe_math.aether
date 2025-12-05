@@ -1,0 +1,46 @@
+module SafeMath;
+
+// Function: safe_divide
+// Intent: Divides two integers, ensuring the denominator is not zero.
+// @pre({denominator != 0}, message="Division by zero is not allowed.", verify=abstract)
+// @post({result == numerator / denominator}, message="Result is the mathematical quotient.")
+func safe_divide(numerator: Int, denominator: Int) -> Int {
+    return numerator / denominator;
+}
+
+// Function: safe_sqrt
+// Intent: Calculates the integer square root of a non-negative number.
+// @pre({value >= 0}, message="Input for square root must be non-negative.", verify=instantiation)
+// @post({result * result <= value && (result + 1) * (result + 1) > value}, message="Result is the integer square root.")
+func safe_sqrt(value: Int) -> Int {
+    if value == 0 {
+        return 0;
+    }
+    let mut low = 1;
+    let mut high = value;
+    let mut ans = 0;
+    while low <= high {
+        let mid = low + (high - low) / 2;
+        if mid * mid <= value {
+            ans = mid;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return ans;
+}
+
+// Function: sum_positive
+// Intent: Calculates the sum of all positive numbers in an array.
+// @pre({array.length > 0}, message="Array must not be empty.")
+// @post({result >= 0}, message="The sum of positive numbers cannot be negative.", verify=combined)
+func sum_positive(array: Array<Int>) -> Int {
+    let mut sum = 0;
+    for x in array {
+        if x > 0 {
+            sum = sum + x;
+        }
+    }
+    return sum;
+}

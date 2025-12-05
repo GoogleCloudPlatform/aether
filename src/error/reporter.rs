@@ -13,12 +13,12 @@
 // limitations under the License.
 
 //! Error reporter with source context display
-//! 
+//!
 //! Provides detailed error messages with source code snippets
 
-use crate::error::{ParserError, SemanticError, LexerError, SourceLocation};
-use std::fs;
+use crate::error::{LexerError, ParserError, SemanticError, SourceLocation};
 use std::collections::HashMap;
+use std::fs;
 
 /// Error reporter that displays errors with source context
 pub struct DetailedErrorReporter {
@@ -37,7 +37,11 @@ impl DetailedErrorReporter {
     /// Report a parser error with context
     pub fn report_parser_error(&mut self, error: &ParserError) {
         match error {
-            ParserError::UnexpectedToken { found, expected, location } => {
+            ParserError::UnexpectedToken {
+                found,
+                expected,
+                location,
+            } => {
                 self.report_error_with_context(
                     "Unexpected token",
                     &format!("Expected {}, but found {}", expected, found),
@@ -50,14 +54,13 @@ impl DetailedErrorReporter {
                 eprintln!("  --> expected {}", expected);
             }
             ParserError::MalformedSExpression { reason, location } => {
-                self.report_error_with_context(
-                    "Malformed S-expression",
-                    reason,
-                    location,
-                    "error",
-                );
+                self.report_error_with_context("Malformed S-expression", reason, location, "error");
             }
-            ParserError::MissingRequiredField { field, construct, location } => {
+            ParserError::MissingRequiredField {
+                field,
+                construct,
+                location,
+            } => {
                 self.report_error_with_context(
                     "Missing required field",
                     &format!("Field '{}' is required in {}", field, construct),
@@ -65,7 +68,10 @@ impl DetailedErrorReporter {
                     "error",
                 );
             }
-            ParserError::InvalidConstruct { construct, location } => {
+            ParserError::InvalidConstruct {
+                construct,
+                location,
+            } => {
                 self.report_error_with_context(
                     "Invalid construct",
                     &format!("'{}' is not valid here", construct),
@@ -73,7 +79,11 @@ impl DetailedErrorReporter {
                     "error",
                 );
             }
-            ParserError::DuplicateField { field, construct, location } => {
+            ParserError::DuplicateField {
+                field,
+                construct,
+                location,
+            } => {
                 self.report_error_with_context(
                     "Duplicate field",
                     &format!("Field '{}' appears more than once in {}", field, construct),
@@ -92,6 +102,16 @@ impl DetailedErrorReporter {
                     "error",
                 );
             }
+            ParserError::SyntaxError {
+                message,
+                location,
+                suggestion,
+            } => {
+                self.report_error_with_context("Syntax error", message, location, "error");
+                if let Some(hint) = suggestion {
+                    eprintln!("  hint: {}", hint);
+                }
+            }
         }
     }
 
@@ -106,7 +126,11 @@ impl DetailedErrorReporter {
                     "error",
                 );
             }
-            SemanticError::TypeMismatch { expected, found, location } => {
+            SemanticError::TypeMismatch {
+                expected,
+                found,
+                location,
+            } => {
                 self.report_error_with_context(
                     "Type mismatch",
                     &format!("Expected type '{}', but found '{}'", expected, found),
@@ -114,7 +138,11 @@ impl DetailedErrorReporter {
                     "error",
                 );
             }
-            SemanticError::DuplicateDefinition { symbol, location, previous_location } => {
+            SemanticError::DuplicateDefinition {
+                symbol,
+                location,
+                previous_location,
+            } => {
                 self.report_error_with_context(
                     "Duplicate definition",
                     &format!("'{}' is already defined", symbol),
@@ -137,7 +165,10 @@ impl DetailedErrorReporter {
     /// Report a lexer error with context
     pub fn report_lexer_error(&mut self, error: &LexerError) {
         match error {
-            LexerError::UnexpectedCharacter { character, location } => {
+            LexerError::UnexpectedCharacter {
+                character,
+                location,
+            } => {
                 self.report_error_with_context(
                     "Unexpected character",
                     &format!("Character '{}' is not valid here", character),
@@ -177,38 +208,45 @@ impl DetailedErrorReporter {
     ) {
         // Print error header
         eprintln!("{}: {}", level, title);
-        eprintln!("  --> {}:{}:{}", location.file, location.line, location.column);
+        eprintln!(
+            "  --> {}:{}:{}",
+            location.file, location.line, location.column
+        );
         eprintln!();
 
         // Try to load and display source context
         if let Ok(lines) = self.get_source_lines(&location.file) {
             let line_num = location.line;
             let col_num = location.column;
-            
+
             // Calculate line number width for alignment
             let line_num_width = line_num.to_string().len().max(3);
-            
+
             // Show context lines (1 before and 1 after if available)
             let start_line = line_num.saturating_sub(1).max(1);
             let end_line = (line_num + 1).min(lines.len());
-            
+
             for i in start_line..=end_line {
                 if i > lines.len() {
                     break;
                 }
-                
+
                 let line = &lines[i - 1];
                 let line_str = format!("{:>width$}", i, width = line_num_width);
-                
+
                 if i == line_num {
                     // Highlight the error line
                     eprintln!("{} |     {}", line_str, line);
-                    
+
                     // Show caret pointing to error position
                     let padding = " ".repeat(line_num_width + 6 + col_num.saturating_sub(1));
-                    let caret = "^".repeat(1); // Could calculate actual token length
-                    eprintln!("{} {} {}", " ".repeat(line_num_width), "|", padding.clone() + &caret);
-                    eprintln!("{} {} {} {}", " ".repeat(line_num_width), "|", padding, message);
+                    let caret = "^".to_string(); // Could calculate actual token length
+                    eprintln!(
+                        "{} | {}",
+                        " ".repeat(line_num_width),
+                        padding.clone() + &caret
+                    );
+                    eprintln!("{} | {} {}", " ".repeat(line_num_width), padding, message);
                 } else {
                     // Context lines
                     eprintln!("{} |     {}", line_str, line);

@@ -1,6 +1,150 @@
-/target
+# Rust/Cargo build artifacts
+/target/
+target/
 *.o
-runtime/target/debug/
+*.a
+*.so
+*.dylib
+*.dll
+*.rlib
+*.rmeta
+Cargo.lock
 
-# macOS specific files
+# Runtime build artifacts
+runtime/target/
+runtime/debug/
+runtime/release/
+runtime/deps/
+
+# LLVM/Compiler artifacts
+*.bc
+*.ll
+*.s
+build/
+out/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+
+# macOS system files
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+
+# Log files
+*.log
+logs/
+*.err
+
+# Test artifacts
+test_output/
+*.test
+*.bench
+
+# Coverage files
+*.gcov
+*.gcda
+*.gcno
+coverage/
+lcov.info
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+*.pdf
+
+# Package files
+*.tar.gz
+*.zip
+dist/
+pkg/
+
+# Python (for any scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Node.js (if any tooling uses it)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Debugging
+core
+core.*
+*.core
+.gdb_history
+
+# Profiling
+*.prof
+perf.data
+perf.data.old
+
+# Misc
+tags
+TAGS
+.tags
+# Claude Code
+.claude/
+
+# Compiled binaries
+hello_v2
+
+# Compiled example binaries
+examples/**/main
+
+# Main binary in root
+/main
+*.exe
+test_memory_alloc
+test_realloc
+
+# Compiled example binaries
+examples/v2/**/*/basic_enum
+examples/v2/**/main

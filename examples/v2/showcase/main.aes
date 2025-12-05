@@ -1,0 +1,222 @@
+// AetherScript V2 Syntax Showcase
+// This example demonstrates all major V2 syntax features
+
+module showcase;
+
+// ============================================
+// Enums - with and without data
+// ============================================
+
+enum Color {
+    case Red;
+    case Green;
+    case Blue;
+}
+
+enum Option {
+    case Some(Int);
+    case None;
+}
+
+enum Result {
+    case Ok(Int);
+    case Err(Int);
+}
+
+// ============================================
+// Structs - basic and nested
+// ============================================
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+struct Rectangle {
+    top_left: Point,
+    width: Int,
+    height: Int,
+}
+
+// ============================================
+// Functions - basic and recursive
+// ============================================
+
+func add(a: Int, b: Int) -> Int {
+    return a + b;
+}
+
+func multiply(a: Int, b: Int) -> Int {
+    return a * b;
+}
+
+func factorial(n: Int) -> Int {
+    if n <= 1 {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+
+func fibonacci(n: Int) -> Int {
+    if n <= 0 {
+        return 0;
+    } else {
+        if n == 1 {
+            return 1;
+        } else {
+            return fibonacci(n - 1) + fibonacci(n - 2);
+        }
+    }
+}
+
+// ============================================
+// Working with enums and pattern matching
+// ============================================
+
+func unwrap_or(opt: Option, default_val: Int) -> Int {
+    match opt {
+        Option::Some(value) => { return value; }
+        Option::None => { return default_val; }
+    }
+}
+
+func get_color_value(c: Color) -> Int {
+    match c {
+        Color::Red => { return 0; }
+        Color::Green => { return 1; }
+        Color::Blue => { return 2; }
+    }
+}
+
+// ============================================
+// Struct operations
+// ============================================
+
+func create_point(x: Int, y: Int) -> Point {
+    return Point { x: x, y: y };
+}
+
+func point_sum(p: Point) -> Int {
+    return p.x + p.y;
+}
+
+func rectangle_area(rect: Rectangle) -> Int {
+    return rect.width * rect.height;
+}
+
+// ============================================
+// Control flow examples
+// ============================================
+
+func max(a: Int, b: Int) -> Int {
+    if a > b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+func min(a: Int, b: Int) -> Int {
+    if a < b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+func clamp(value: Int, min_val: Int, max_val: Int) -> Int {
+    if value < min_val {
+        return min_val;
+    } else {
+        if value > max_val {
+            return max_val;
+        } else {
+            return value;
+        }
+    }
+}
+
+func is_positive(n: Int) -> Bool {
+    return n > 0;
+}
+
+func is_zero(n: Int) -> Bool {
+    return n == 0;
+}
+
+// ============================================
+// Loops
+// ============================================
+
+func sum_to_n(n: Int) -> Int {
+    var total: Int = 0;
+    var i: Int = 1;
+
+    while i <= n {
+        total = total + i;
+        i = i + 1;
+    }
+
+    return total;
+}
+
+func count_down(start: Int) -> Int {
+    var count: Int = start;
+
+    while count > 0 {
+        count = count - 1;
+    }
+
+    return count;
+}
+
+// ============================================
+// Main function
+// ============================================
+
+func main() -> Int {
+    // Test basic arithmetic
+    let sum: Int = add(10, 20);
+    let product: Int = multiply(5, 6);
+
+    // Test recursive functions
+    let fact5: Int = factorial(5);
+    let fib7: Int = fibonacci(7);
+
+    // Test structs
+    let origin: Point = create_point(0, 0);
+    let point: Point = Point { x: 10, y: 20 };
+    let rect: Rectangle = Rectangle {
+        top_left: origin,
+        width: 100,
+        height: 50,
+    };
+    let area: Int = rectangle_area(rect);
+
+    // Test enums
+    let some_val: Option = Option::Some(42);
+    let none_val: Option = Option::None;
+    let unwrapped: Int = unwrap_or(some_val, 0);
+    let default_used: Int = unwrap_or(none_val, -1);
+
+    // Test pattern matching with colors
+    let red: Color = Color::Red;
+    let color_val: Int = get_color_value(red);
+
+    // Test control flow
+    let maximum: Int = max(10, 20);
+    let minimum: Int = min(10, 20);
+    let clamped: Int = clamp(150, 0, 100);
+
+    // Test loops
+    let sum_10: Int = sum_to_n(10);
+    let zero: Int = count_down(5);
+
+    // Test boolean operations
+    let positive: Bool = is_positive(5);
+    let is_z: Bool = is_zero(0);
+
+    // Return factorial(5) = 120
+    return fact5;
+}

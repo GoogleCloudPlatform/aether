@@ -1,0 +1,28 @@
+// Logical Operators Example
+// Demonstrates &&, ||, !
+
+module logical;
+
+func main() -> Int {
+    let a: Bool = true;
+    let b: Bool = false;
+
+    // Logical AND
+    let and_result: Bool = a && b;
+
+    // Logical OR
+    let or_result: Bool = a || b;
+
+    // Logical NOT
+    let not_a: Bool = !a;
+    let not_b: Bool = !b;
+
+    // Compound logical expression
+    let compound: Bool = (a || b) && !(a && b);
+
+    if or_result {
+        return 1;
+    } else {
+        return 0;
+    }
+}

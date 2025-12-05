@@ -1,0 +1,48 @@
+// Nested Structs Example
+// Demonstrates struct composition
+
+module nested_structs;
+
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+struct Line {
+    start: Point,
+    end: Point,
+}
+
+struct Rectangle {
+    top_left: Point,
+    bottom_right: Point,
+}
+
+func manhattan_distance(line: Line) -> Int {
+    var dx: Int = line.end.x - line.start.x;
+    var dy: Int = line.end.y - line.start.y;
+
+    // Absolute values
+    if dx < 0 {
+        dx = 0 - dx;
+    }
+    if dy < 0 {
+        dy = 0 - dy;
+    }
+
+    return dx + dy;
+}
+
+func main() -> Int {
+    let p1: Point = Point { x: 0, y: 0 };
+    let p2: Point = Point { x: 3, y: 4 };
+
+    let line: Line = Line { start: p1, end: p2 };
+
+    let rect: Rectangle = Rectangle {
+        top_left: Point { x: 0, y: 0 },
+        bottom_right: Point { x: 100, y: 50 },
+    };
+
+    return rect.bottom_right.x;
+}

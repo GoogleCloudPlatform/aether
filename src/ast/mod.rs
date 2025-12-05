@@ -13,10 +13,11 @@
 // limitations under the License.
 
 //! Abstract Syntax Tree definitions for AetherScript
-//! 
+//!
 //! Defines AST node types for all language constructs
 
 use crate::error::SourceLocation;
+use crate::verification::VerificationMode;
 use serde::{Deserialize, Serialize};
 
 pub mod resource;
@@ -45,6 +46,8 @@ pub struct Module {
     pub imports: Vec<ImportStatement>,
     pub exports: Vec<ExportStatement>,
     pub type_definitions: Vec<TypeDefinition>,
+    pub trait_definitions: Vec<TraitDefinition>,
+    pub impl_blocks: Vec<TraitImpl>,
     pub constant_declarations: Vec<ConstantDeclaration>,
     pub function_definitions: Vec<Function>,
     pub external_functions: Vec<ExternalFunction>,
@@ -83,14 +86,19 @@ pub enum TypeDefinition {
         name: Identifier,
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
+        lifetime_parameters: Vec<LifetimeParameter>,
+        where_clause: Vec<WhereClause>,
         fields: Vec<StructField>,
         export_as: Option<String>, // For FFI
+        is_copy: bool,             // @derive(Copy) annotation
         source_location: SourceLocation,
     },
     Enumeration {
         name: Identifier,
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
+        lifetime_parameters: Vec<LifetimeParameter>,
+        where_clause: Vec<WhereClause>,
         variants: Vec<EnumVariant>,
         source_location: SourceLocation,
     },
@@ -99,6 +107,7 @@ pub enum TypeDefinition {
         original_type: Box<TypeSpecifier>,
         intent: Option<String>,
         generic_parameters: Vec<GenericParameter>,
+        lifetime_parameters: Vec<LifetimeParameter>,
         source_location: SourceLocation,
     },
 }
@@ -115,7 +124,73 @@ pub struct StructField {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnumVariant {
     pub name: Identifier,
-    pub associated_type: Option<Box<TypeSpecifier>>, // Type held by the variant (HOLDS)
+    pub associated_types: Vec<TypeSpecifier>, // Types held by the variant
+    pub source_location: SourceLocation,
+}
+
+/// Trait definition (like Rust traits or Java interfaces)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitDefinition {
+    pub name: Identifier,
+    pub generic_parameters: Vec<GenericParameter>,
+    pub where_clause: Vec<WhereClause>,
+    pub axioms: Vec<TraitAxiom>,
+    pub methods: Vec<TraitMethod>,
+    pub source_location: SourceLocation,
+}
+
+/// Method signature in a trait (may have default implementation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitMethod {
+    pub name: Identifier,
+    pub generic_parameters: Vec<GenericParameter>,
+    pub parameters: Vec<Parameter>,
+    pub return_type: Box<TypeSpecifier>,
+    pub default_body: Option<Block>, // None = required, Some = default impl
+    pub source_location: SourceLocation,
+}
+
+/// Trait implementation or inherent implementation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitImpl {
+    pub generic_parameters: Vec<GenericParameter>,
+    pub trait_name: Option<Identifier>,
+    pub trait_generic_args: Vec<TypeSpecifier>,
+    pub for_type: Box<TypeSpecifier>,
+    pub where_clause: Vec<WhereClause>,
+    pub methods: Vec<Function>,
+    pub source_location: SourceLocation,
+}
+
+/// Trait axiom - a logical property that all implementations must satisfy
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraitAxiom {
+    pub name: Option<Identifier>, // Optional name for debugging/error messages
+    pub quantifiers: Vec<Quantifier>, // forall/exists bindings
+    pub condition: Box<Expression>, // The axiom expression
+    pub source_location: SourceLocation,
+}
+
+/// Universal/existential quantifier binding
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Quantifier {
+    pub kind: QuantifierKind,
+    pub variables: Vec<QuantifierVariable>,
+    pub source_location: SourceLocation,
+}
+
+/// Kind of quantifier
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum QuantifierKind {
+    ForAll, // Universal quantifier: for all x...
+    Exists, // Existential quantifier: there exists x...
+}
+
+/// Variable binding in a quantifier
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuantifierVariable {
+    pub name: Identifier,
+    pub var_type: Box<TypeSpecifier>,
     pub source_location: SourceLocation,
 }
 
@@ -192,6 +267,7 @@ pub enum TypeSpecifier {
     Owned {
         base_type: Box<TypeSpecifier>,
         ownership: OwnershipKind,
+        lifetime: Option<Identifier>,
         source_location: SourceLocation,
     },
 }
@@ -224,20 +300,36 @@ pub enum PrimitiveType {
     Void,
     SizeT,
     UIntPtrT,
+    // New fixed-width types
+    UInt8,
+    Int8,
+    UInt16,
+    Int16,
+    UInt32,
+    Int32,
+    UInt64,
 }
 
 impl PrimitiveType {
     /// Check if this is a numeric type
     pub fn is_numeric(&self) -> bool {
-        matches!(self, 
-            PrimitiveType::Integer | 
-            PrimitiveType::Integer32 | 
-            PrimitiveType::Integer64 |
-            PrimitiveType::Float |
-            PrimitiveType::Float32 |
-            PrimitiveType::Float64 |
-            PrimitiveType::SizeT |
-            PrimitiveType::UIntPtrT
+        matches!(
+            self,
+            PrimitiveType::Integer
+                | PrimitiveType::Integer32
+                | PrimitiveType::Integer64
+                | PrimitiveType::Float
+                | PrimitiveType::Float32
+                | PrimitiveType::Float64
+                | PrimitiveType::SizeT
+                | PrimitiveType::UIntPtrT
+                | PrimitiveType::UInt8
+                | PrimitiveType::Int8
+                | PrimitiveType::UInt16
+                | PrimitiveType::Int16
+                | PrimitiveType::UInt32
+                | PrimitiveType::Int32
+                | PrimitiveType::UInt64
         )
     }
 }
@@ -257,6 +349,13 @@ impl std::fmt::Display for PrimitiveType {
             PrimitiveType::Void => write!(f, "VOID"),
             PrimitiveType::SizeT => write!(f, "SIZE_T"),
             PrimitiveType::UIntPtrT => write!(f, "UINTPTR_T"),
+            PrimitiveType::UInt8 => write!(f, "UINT8"),
+            PrimitiveType::Int8 => write!(f, "INT8"),
+            PrimitiveType::UInt16 => write!(f, "UINT16"),
+            PrimitiveType::Int16 => write!(f, "INT16"),
+            PrimitiveType::UInt32 => write!(f, "UINT32"),
+            PrimitiveType::Int32 => write!(f, "INT32"),
+            PrimitiveType::UInt64 => write!(f, "UINT64"),
         }
     }
 }
@@ -271,6 +370,13 @@ pub struct ConstantDeclaration {
     pub source_location: SourceLocation,
 }
 
+/// Lifetime parameter for functions and types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LifetimeParameter {
+    pub name: Identifier,
+    pub source_location: SourceLocation,
+}
+
 /// Generic type parameter for functions and types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenericParameter {
@@ -280,17 +386,29 @@ pub struct GenericParameter {
     pub source_location: SourceLocation,
 }
 
+/// Where clause constraint binding a type parameter to trait bounds
+/// Example: `T: Display + Debug` in `where T: Display + Debug`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhereClause {
+    pub type_param: Identifier,
+    pub constraints: Vec<Identifier>,
+    pub source_location: SourceLocation,
+}
+
 /// Function definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Function {
     pub name: Identifier,
     pub intent: Option<String>,
     pub generic_parameters: Vec<GenericParameter>,
+    pub lifetime_parameters: Vec<LifetimeParameter>,
+    pub where_clause: Vec<WhereClause>,
     pub parameters: Vec<Parameter>,
     pub return_type: Box<TypeSpecifier>,
     pub metadata: FunctionMetadata,
     pub body: Block,
     pub export_info: Option<ExportInfo>,
+    pub is_async: bool, // New async support
     pub source_location: SourceLocation,
 }
 
@@ -314,7 +432,7 @@ pub enum PassingMode {
 }
 
 /// Function metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FunctionMetadata {
     pub preconditions: Vec<ContractAssertion>,
     pub postconditions: Vec<ContractAssertion>,
@@ -333,6 +451,9 @@ pub struct ContractAssertion {
     pub condition: Box<Expression>,
     pub failure_action: FailureAction,
     pub message: Option<String>,
+    /// Whether to enforce this contract at runtime (default: false, static verification only)
+    pub runtime_check: bool,
+    pub verification_mode: Option<VerificationMode>, // Added for per-contract verification mode
     pub source_location: SourceLocation,
 }
 
@@ -542,6 +663,15 @@ pub enum Statement {
     },
     Expression {
         expr: Box<Expression>,
+        source_location: SourceLocation,
+    },
+    Match {
+        value: Box<Expression>,
+        arms: Vec<MatchArm>,
+        source_location: SourceLocation,
+    },
+    Concurrent {
+        block: Block,
         source_location: SourceLocation,
     },
 }
@@ -765,6 +895,13 @@ pub enum Expression {
         field_name: Identifier,
         source_location: SourceLocation,
     },
+    /// Method call: receiver.method(args)
+    MethodCall {
+        receiver: Box<Expression>,
+        method_name: Identifier,
+        arguments: Vec<Argument>,
+        source_location: SourceLocation,
+    },
     ArrayAccess {
         array: Box<Expression>,
         index: Box<Expression>,
@@ -783,6 +920,7 @@ pub enum Expression {
     // Pointer operations
     AddressOf {
         operand: Box<Expression>,
+        mutability: bool,
         source_location: SourceLocation,
     },
     Dereference {
@@ -813,21 +951,68 @@ pub enum Expression {
         entries: Vec<MapEntry>,
         source_location: SourceLocation,
     },
-    
+
     // Pattern matching
     Match {
         value: Box<Expression>,
         cases: Vec<MatchCase>,
         source_location: SourceLocation,
     },
-    
+
     // Enum variant construction
     EnumVariant {
         enum_name: Identifier,
         variant_name: Identifier,
-        value: Option<Box<Expression>>,
+        values: Vec<Expression>,
         source_location: SourceLocation,
     },
+
+    // Lambda/closure expression
+    Lambda {
+        /// Captured variables from enclosing scope
+        captures: Vec<Capture>,
+        parameters: Vec<Parameter>,
+        return_type: Option<Box<TypeSpecifier>>,
+        body: LambdaBody,
+        source_location: SourceLocation,
+    },
+
+    /// Range expression: start..end or start..=end
+    Range {
+        start: Option<Box<Expression>>,
+        end: Option<Box<Expression>>,
+        inclusive: bool,
+        source_location: SourceLocation,
+    },
+}
+
+/// Lambda body - either a single expression or a block
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LambdaBody {
+    Expression(Box<Expression>),
+    Block(Block),
+}
+
+/// Capture mode for closure captures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CaptureMode {
+    /// Capture by value (copy)
+    ByValue,
+    /// Capture by reference (borrow)
+    ByReference,
+    /// Capture by mutable reference
+    ByMutableReference,
+}
+
+/// A single capture in a closure capture list
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Capture {
+    /// The name of the captured variable
+    pub name: Identifier,
+    /// How the variable is captured
+    pub mode: CaptureMode,
+    /// Source location
+    pub source_location: SourceLocation,
 }
 
 /// Cast failure behavior
@@ -848,6 +1033,7 @@ pub enum PointerOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionCall {
     pub function_reference: FunctionReference,
+    pub explicit_type_arguments: Vec<TypeSpecifier>,
     pub arguments: Vec<Argument>,
     pub variadic_arguments: Vec<Box<Expression>>, // For variadic functions
 }
@@ -855,9 +1041,16 @@ pub struct FunctionCall {
 /// Function reference
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FunctionReference {
-    Local { name: Identifier },
-    Qualified { module: Identifier, name: Identifier },
-    External { name: Identifier },
+    Local {
+        name: Identifier,
+    },
+    Qualified {
+        module: Identifier,
+        name: Identifier,
+    },
+    External {
+        name: Identifier,
+    },
 }
 
 /// Function argument
@@ -884,11 +1077,20 @@ pub struct MapEntry {
     pub source_location: SourceLocation,
 }
 
-/// Match case in pattern matching
+/// Match case in pattern matching (for Expression::Match)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchCase {
     pub pattern: Pattern,
     pub body: Box<Expression>,
+    pub source_location: SourceLocation,
+}
+
+/// Match arm in pattern matching (for Statement::Match with block bodies)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub guard: Option<Box<Expression>>,
+    pub body: Block,
     pub source_location: SourceLocation,
 }
 
@@ -899,13 +1101,19 @@ pub enum Pattern {
     EnumVariant {
         enum_name: Option<Identifier>, // None for unqualified variant
         variant_name: Identifier,
-        binding: Option<Identifier>, // Variable to bind the associated value
+        bindings: Vec<Identifier>, // Variables to bind the associated values
         nested_pattern: Option<Box<Pattern>>, // For nested patterns like (Some (Ok x))
         source_location: SourceLocation,
     },
     /// Match a literal value
     Literal {
         value: Box<Expression>,
+        source_location: SourceLocation,
+    },
+    /// Match a struct (e.g. Point { x: 0, y: 0 })
+    Struct {
+        struct_name: Identifier,
+        fields: Vec<(Identifier, Pattern)>,
         source_location: SourceLocation,
     },
     /// Wildcard pattern (matches anything)
@@ -924,7 +1132,10 @@ pub struct Identifier {
 
 impl Identifier {
     pub fn new(name: String, source_location: SourceLocation) -> Self {
-        Self { name, source_location }
+        Self {
+            name,
+            source_location,
+        }
     }
 }
 
@@ -960,11 +1171,15 @@ impl ASTPrettyPrinter {
         let mut result = String::new();
         result.push_str("Program {\n");
         self.indent();
-        
+
         for module in &program.modules {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_module(module)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_module(module)
+            ));
         }
-        
+
         self.dedent();
         result.push_str("}\n");
         result
@@ -974,27 +1189,47 @@ impl ASTPrettyPrinter {
         let mut result = String::new();
         result.push_str(&format!("Module '{}' {{\n", module.name.name));
         self.indent();
-        
+
         if let Some(intent) = &module.intent {
-            result.push_str(&format!("{}intent: \"{}\"\n", self.current_indent(), intent));
+            result.push_str(&format!(
+                "{}intent: \"{}\"\n",
+                self.current_indent(),
+                intent
+            ));
         }
-        
+
         for import in &module.imports {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_import(import)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_import(import)
+            ));
         }
-        
+
         for type_def in &module.type_definitions {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_type_definition(type_def)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_type_definition(type_def)
+            ));
         }
-        
+
         for constant in &module.constant_declarations {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_constant_declaration(constant)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_constant_declaration(constant)
+            ));
         }
-        
+
         for function in &module.function_definitions {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_function(function)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_function(function)
+            ));
         }
-        
+
         self.dedent();
         result.push_str(&format!("{}}}", self.current_indent()));
         result
@@ -1013,7 +1248,11 @@ impl ASTPrettyPrinter {
             TypeDefinition::Structured { name, fields, .. } => {
                 let mut result = format!("struct {} {{\n", name.name);
                 for field in fields {
-                    result.push_str(&format!("  {}: {},\n", field.name.name, self.print_type_specifier(&field.field_type)));
+                    result.push_str(&format!(
+                        "  {}: {},\n",
+                        field.name.name,
+                        self.print_type_specifier(&field.field_type)
+                    ));
                 }
                 result.push('}');
                 result
@@ -1026,8 +1265,16 @@ impl ASTPrettyPrinter {
                 result.push('}');
                 result
             }
-            TypeDefinition::Alias { new_name, original_type, .. } => {
-                format!("type {} = {}", new_name.name, self.print_type_specifier(original_type))
+            TypeDefinition::Alias {
+                new_name,
+                original_type,
+                ..
+            } => {
+                format!(
+                    "type {} = {}",
+                    new_name.name,
+                    self.print_type_specifier(original_type)
+                )
             }
         }
     }
@@ -1036,41 +1283,94 @@ impl ASTPrettyPrinter {
         match type_spec {
             TypeSpecifier::Primitive { type_name, .. } => format!("{:?}", type_name),
             TypeSpecifier::Named { name, .. } => name.name.clone(),
-            TypeSpecifier::Array { element_type, size, .. } => {
+            TypeSpecifier::Array {
+                element_type, size, ..
+            } => {
                 if let Some(size) = size {
-                    format!("[{}; {}]", self.print_type_specifier(element_type), self.print_expression(size))
+                    format!(
+                        "[{}; {}]",
+                        self.print_type_specifier(element_type),
+                        self.print_expression(size)
+                    )
                 } else {
                     format!("[{}]", self.print_type_specifier(element_type))
                 }
             }
-            TypeSpecifier::Map { key_type, value_type, .. } => {
-                format!("Map<{}, {}>", self.print_type_specifier(key_type), self.print_type_specifier(value_type))
+            TypeSpecifier::Map {
+                key_type,
+                value_type,
+                ..
+            } => {
+                format!(
+                    "Map<{}, {}>",
+                    self.print_type_specifier(key_type),
+                    self.print_type_specifier(value_type)
+                )
             }
-            TypeSpecifier::Pointer { target_type, is_mutable, .. } => {
+            TypeSpecifier::Pointer {
+                target_type,
+                is_mutable,
+                ..
+            } => {
                 if *is_mutable {
                     format!("*mut {}", self.print_type_specifier(target_type))
                 } else {
                     format!("*const {}", self.print_type_specifier(target_type))
                 }
             }
-            TypeSpecifier::Function { parameter_types, return_type, .. } => {
-                let params: Vec<String> = parameter_types.iter().map(|t| self.print_type_specifier(t)).collect();
-                format!("fn({}) -> {}", params.join(", "), self.print_type_specifier(return_type))
+            TypeSpecifier::Function {
+                parameter_types,
+                return_type,
+                ..
+            } => {
+                let params: Vec<String> = parameter_types
+                    .iter()
+                    .map(|t| self.print_type_specifier(t))
+                    .collect();
+                format!(
+                    "fn({}) -> {}",
+                    params.join(", "),
+                    self.print_type_specifier(return_type)
+                )
             }
-            TypeSpecifier::Generic { base_type, type_arguments, .. } => {
-                let args: Vec<String> = type_arguments.iter().map(|t| self.print_type_specifier(t)).collect();
+            TypeSpecifier::Generic {
+                base_type,
+                type_arguments,
+                ..
+            } => {
+                let args: Vec<String> = type_arguments
+                    .iter()
+                    .map(|t| self.print_type_specifier(t))
+                    .collect();
                 format!("{}<{}>", base_type.name, args.join(", "))
             }
-            TypeSpecifier::Owned { ownership, base_type, .. } => {
+            TypeSpecifier::Owned {
+                ownership,
+                base_type,
+                lifetime,
+                ..
+            } => {
                 let prefix = match ownership {
                     OwnershipKind::Owned => "^",
                     OwnershipKind::Borrowed => "&",
                     OwnershipKind::BorrowedMut => "&mut ",
                     OwnershipKind::Shared => "~",
                 };
-                format!("{}{}", prefix, self.print_type_specifier(base_type))
+                let lifetime_str = if let Some(lt) = lifetime {
+                    format!("'{}", lt.name)
+                } else {
+                    "".to_string()
+                };
+                format!(
+                    "{}{}{}",
+                    prefix,
+                    lifetime_str,
+                    self.print_type_specifier(base_type)
+                )
             }
-            TypeSpecifier::TypeParameter { name, constraints, .. } => {
+            TypeSpecifier::TypeParameter {
+                name, constraints, ..
+            } => {
                 if constraints.is_empty() {
                     name.name.clone()
                 } else {
@@ -1083,21 +1383,34 @@ impl ASTPrettyPrinter {
     }
 
     fn print_constant_declaration(&self, constant: &ConstantDeclaration) -> String {
-        format!("const {}: {} = {}", 
-                constant.name.name, 
-                self.print_type_specifier(&constant.type_spec),
-                self.print_expression(&constant.value))
+        format!(
+            "const {}: {} = {}",
+            constant.name.name,
+            self.print_type_specifier(&constant.type_spec),
+            self.print_expression(&constant.value)
+        )
     }
 
     fn print_function(&mut self, function: &Function) -> String {
         let mut result = format!("fn {}(", function.name.name);
-        
-        let params: Vec<String> = function.parameters.iter().map(|p| {
-            format!("{}: {}", p.name.name, self.print_type_specifier(&p.param_type))
-        }).collect();
+
+        let params: Vec<String> = function
+            .parameters
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}: {}",
+                    p.name.name,
+                    self.print_type_specifier(&p.param_type)
+                )
+            })
+            .collect();
         result.push_str(&params.join(", "));
-        result.push_str(&format!(") -> {} {{\n", self.print_type_specifier(&function.return_type)));
-        
+        result.push_str(&format!(
+            ") -> {} {{\n",
+            self.print_type_specifier(&function.return_type)
+        ));
+
         self.indent();
         result.push_str(&self.print_block(&function.body));
         self.dedent();
@@ -1108,15 +1421,26 @@ impl ASTPrettyPrinter {
     fn print_block(&mut self, block: &Block) -> String {
         let mut result = String::new();
         for statement in &block.statements {
-            result.push_str(&format!("{}{}\n", self.current_indent(), self.print_statement(statement)));
+            result.push_str(&format!(
+                "{}{}\n",
+                self.current_indent(),
+                self.print_statement(statement)
+            ));
         }
         result
     }
 
-    fn print_statement(&self, statement: &Statement) -> String {
+    fn print_statement(&mut self, statement: &Statement) -> String {
         match statement {
-            Statement::VariableDeclaration { name, type_spec, mutability, initial_value, .. } => {
-                let mut result = format!("{} {}: {}", 
+            Statement::VariableDeclaration {
+                name,
+                type_spec,
+                mutability,
+                initial_value,
+                ..
+            } => {
+                let mut result = format!(
+                    "{} {}: {}",
                     match mutability {
                         Mutability::Mutable => "let mut",
                         Mutability::Immutable => "let",
@@ -1131,7 +1455,11 @@ impl ASTPrettyPrinter {
                 result
             }
             Statement::Assignment { target, value, .. } => {
-                format!("{} = {};", self.print_assignment_target(target), self.print_expression(value))
+                format!(
+                    "{} = {};",
+                    self.print_assignment_target(target),
+                    self.print_expression(value)
+                )
             }
             Statement::Return { value, .. } => {
                 if let Some(value) = value {
@@ -1139,6 +1467,14 @@ impl ASTPrettyPrinter {
                 } else {
                     "return;".to_string()
                 }
+            }
+            Statement::Concurrent { block, .. } => {
+                let mut result = "concurrent {\n".to_string();
+                self.indent();
+                result.push_str(&self.print_block(block));
+                self.dedent();
+                result.push_str(&format!("{}}}", self.current_indent()));
+                result
             }
             _ => "/* other statement */".to_string(),
         }
@@ -1148,13 +1484,24 @@ impl ASTPrettyPrinter {
         match target {
             AssignmentTarget::Variable { name } => name.name.clone(),
             AssignmentTarget::ArrayElement { array, index } => {
-                format!("{}[{}]", self.print_expression(array), self.print_expression(index))
+                format!(
+                    "{}[{}]",
+                    self.print_expression(array),
+                    self.print_expression(index)
+                )
             }
-            AssignmentTarget::StructField { instance, field_name } => {
+            AssignmentTarget::StructField {
+                instance,
+                field_name,
+            } => {
                 format!("{}.{}", self.print_expression(instance), field_name.name)
             }
             AssignmentTarget::MapValue { map, key } => {
-                format!("{}[{}]", self.print_expression(map), self.print_expression(key))
+                format!(
+                    "{}[{}]",
+                    self.print_expression(map),
+                    self.print_expression(key)
+                )
             }
             AssignmentTarget::Dereference { pointer } => {
                 format!("*{}", self.print_expression(pointer))
@@ -1171,18 +1518,42 @@ impl ASTPrettyPrinter {
             Expression::NullLiteral { .. } => "null".to_string(),
             Expression::Variable { name, .. } => name.name.clone(),
             Expression::Add { left, right, .. } => {
-                format!("({} + {})", self.print_expression(left), self.print_expression(right))
+                format!(
+                    "({} + {})",
+                    self.print_expression(left),
+                    self.print_expression(right)
+                )
             }
             Expression::FunctionCall { call, .. } => {
                 let func_name = match &call.function_reference {
                     FunctionReference::Local { name } => name.name.clone(),
-                    FunctionReference::Qualified { module, name } => format!("{}.{}", module.name, name.name),
+                    FunctionReference::Qualified { module, name } => {
+                        format!("{}.{}", module.name, name.name)
+                    }
                     FunctionReference::External { name } => name.name.clone(),
                 };
-                let args: Vec<String> = call.arguments.iter().map(|arg| {
-                    format!("{}: {}", arg.parameter_name.name, self.print_expression(&arg.value))
-                }).collect();
-                format!("{}({})", func_name, args.join(", "))
+                let type_args_str = if !call.explicit_type_arguments.is_empty() {
+                    let args: Vec<String> = call
+                        .explicit_type_arguments
+                        .iter()
+                        .map(|ts| self.print_type_specifier(ts))
+                        .collect();
+                    format!("<{}>", args.join(", "))
+                } else {
+                    "".to_string()
+                };
+                let args: Vec<String> = call
+                    .arguments
+                    .iter()
+                    .map(|arg| {
+                        format!(
+                            "{}: {}",
+                            arg.parameter_name.name,
+                            self.print_expression(&arg.value)
+                        )
+                    })
+                    .collect();
+                format!("{}{}({})", func_name, type_args_str, args.join(", "))
             }
             _ => "/* expression */".to_string(),
         }
@@ -1196,54 +1567,4 @@ impl Default for ASTPrettyPrinter {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_identifier_creation() {
-        let loc = SourceLocation::new("test.aether".to_string(), 1, 1, 0);
-        let id = Identifier::new("test_identifier".to_string(), loc.clone());
-        
-        assert_eq!(id.name, "test_identifier");
-        assert_eq!(id.source_location, loc);
-    }
-    
-    #[test]
-    fn test_ast_pretty_printer() {
-        let mut printer = ASTPrettyPrinter::new();
-        let loc = SourceLocation::new("test.aether".to_string(), 1, 1, 0);
-        
-        let module = Module {
-            name: Identifier::new("test_module".to_string(), loc.clone()),
-            intent: Some("Test module".to_string()),
-            imports: vec![],
-            exports: vec![],
-            type_definitions: vec![],
-            constant_declarations: vec![],
-            function_definitions: vec![],
-            external_functions: vec![],
-            source_location: loc,
-        };
-        
-        let output = printer.print_module(&module);
-        assert!(output.contains("Module 'test_module'"));
-        assert!(output.contains("intent: \"Test module\""));
-    }
-    
-    #[test]
-    fn test_expression_serialization() {
-        let loc = SourceLocation::new("test.aether".to_string(), 1, 1, 0);
-        let expr = Expression::IntegerLiteral {
-            value: 42,
-            source_location: loc,
-        };
-        
-        let serialized = serde_json::to_string(&expr).unwrap();
-        let deserialized: Expression = serde_json::from_str(&serialized).unwrap();
-        
-        match deserialized {
-            Expression::IntegerLiteral { value, .. } => assert_eq!(value, 42),
-            _ => panic!("Deserialization failed"),
-        }
-    }
-}
+mod tests;

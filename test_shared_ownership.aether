@@ -1,0 +1,23 @@
+
+module shared_ownership_test {
+    func use_shared_string(s: ~String) -> Int {
+        // Just use the shared string
+        return 0;
+    }
+    
+    func test_shared() {
+        let s1: ~String = ~"Shared string";
+        let s2: ~String = s1;  // Ref count = 2
+        let s3: ~String = s2;  // Ref count = 3
+        
+        use_shared_string(s1);
+        use_shared_string(s2);
+        use_shared_string(s3);
+        // String should only be freed when last reference goes out of scope
+    }
+    
+    func main() -> Int {
+        test_shared();
+        return 0;
+    }
+}

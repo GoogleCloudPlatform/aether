@@ -13,19 +13,23 @@
 // limitations under the License.
 
 //! End-to-end compilation pipeline
-//! 
+//!
 //! Integrates all compiler phases from source code to executable
 
-use crate::ast::Program;
+#![allow(dead_code)]
+
+use crate::abi;
+use crate::ast::{Module, Program};
 use crate::error::{CompilerError, SemanticError};
-use crate::lexer::Lexer;
+use crate::lexer::v2 as lexer_v2;
 use crate::llvm_backend::LLVMBackend;
 use crate::mir;
 use crate::optimizations::OptimizationManager;
-use crate::parser::Parser;
+use crate::parser::v2 as parser_v2;
 use crate::profiling::CompilationProfiler;
 use crate::semantic::SemanticAnalyzer;
 use crate::stdlib::StandardLibrary;
+use crate::verification::{ast_to_contract, VerificationEngine, VerificationResult};
 
 use inkwell::context::Context;
 use rayon::prelude::*;
@@ -33,6 +37,72 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 // use std::sync::{Arc, Mutex};
+
+/// Find the AetherScript runtime library.
+/// Searches in order:
+/// 1. AETHER_RUNTIME_PATH environment variable
+/// 2. ./runtime/target/release/ relative to current directory
+/// 3. Relative to the compiler executable
+fn find_runtime_library() -> Result<PathBuf, CompilerError> {
+    let lib_name = if cfg!(target_os = "macos") {
+        "libaether_runtime.dylib"
+    } else if cfg!(target_os = "windows") {
+        "aether_runtime.dll"
+    } else {
+        "libaether_runtime.so"
+    };
+
+    // Check environment variable first
+    if let Ok(path) = std::env::var("AETHER_RUNTIME_PATH") {
+        let runtime_path = PathBuf::from(&path);
+        if runtime_path.is_file() {
+            return Ok(runtime_path);
+        }
+        // If it's a directory, look for the library inside
+        let lib_path = runtime_path.join(lib_name);
+        if lib_path.exists() {
+            return Ok(lib_path);
+        }
+    }
+
+    // Check relative to current directory
+    let local_path = PathBuf::from("runtime/target/release").join(lib_name);
+    if local_path.exists() {
+        return Ok(local_path);
+    }
+
+    // Check relative to compiler executable
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            // Check in same directory as executable
+            let same_dir = exe_dir.join(lib_name);
+            if same_dir.exists() {
+                return Ok(same_dir);
+            }
+            // Check in lib subdirectory
+            let lib_dir = exe_dir.join("lib").join(lib_name);
+            if lib_dir.exists() {
+                return Ok(lib_dir);
+            }
+            // Check in ../lib relative to executable
+            if let Some(parent) = exe_dir.parent() {
+                let parent_lib = parent.join("lib").join(lib_name);
+                if parent_lib.exists() {
+                    return Ok(parent_lib);
+                }
+            }
+        }
+    }
+
+    Err(CompilerError::IoError {
+        message: format!(
+            "AetherScript runtime library ({}) not found. \
+            Set AETHER_RUNTIME_PATH environment variable or build the runtime with: \
+            cd runtime && cargo build --release",
+            lib_name
+        ),
+    })
+}
 
 /// Compilation options
 #[derive(Debug, Clone)]
@@ -49,6 +119,8 @@ pub struct CompileOptions {
     pub library_paths: Vec<PathBuf>,
     /// Additional libraries to link
     pub link_libraries: Vec<String>,
+    /// Additional object files to link
+    pub link_objects: Vec<PathBuf>,
     /// Verbose output
     pub verbose: bool,
     /// Keep intermediate files
@@ -63,6 +135,10 @@ pub struct CompileOptions {
     pub syntax_only: bool,
     /// Compile as a library (shared object/dylib)
     pub compile_as_library: bool,
+    /// Enable formal verification of contracts (@pre/@post)
+    pub enable_verification: bool,
+    /// Emit ABI files (.abi) alongside compilation
+    pub emit_abi: bool,
 }
 
 impl Default for CompileOptions {
@@ -74,6 +150,7 @@ impl Default for CompileOptions {
             target_triple: None,
             library_paths: vec![],
             link_libraries: vec![],
+            link_objects: vec![],
             verbose: false,
             keep_intermediates: false,
             enable_profiling: false,
@@ -81,6 +158,8 @@ impl Default for CompileOptions {
             emit_object_only: false,
             syntax_only: false,
             compile_as_library: false,
+            enable_verification: false, // Disabled by default
+            emit_abi: false, // Disabled by default
         }
     }
 }
@@ -94,6 +173,8 @@ pub struct CompilationResult {
     pub intermediate_files: Vec<PathBuf>,
     /// Compilation statistics
     pub stats: CompilationStats,
+    /// Verification results (if verification was enabled)
+    pub verification_results: Option<Vec<VerificationResult>>,
 }
 
 /// Compilation statistics
@@ -126,12 +207,46 @@ impl CompilationPipeline {
         }
     }
 
+    /// Parse a single source file using V2 parser
+    fn parse_file(
+        &self,
+        path: &Path,
+        source: &str,
+        verbose: bool,
+    ) -> Result<Module, CompilerError> {
+        Self::parse_source(path, source, verbose)
+    }
+
+    /// Parse source code using V2 parser (static for use in parallel contexts)
+    pub fn parse_source(path: &Path, source: &str, verbose: bool) -> Result<Module, CompilerError> {
+        let filename = path.to_string_lossy().to_string();
+
+        // Use V2 lexer and parser (Swift/Rust-like syntax)
+        let mut lexer = lexer_v2::Lexer::new(source, filename);
+        let tokens = lexer.tokenize()?;
+
+        // Debug: Print token stream if verbose is enabled
+        if verbose {
+            eprintln!("Token stream for {}:", path.display());
+            eprintln!("=================");
+            for token in &tokens {
+                eprintln!("{:?}", token);
+            }
+            eprintln!("=================\n");
+        }
+        let mut parser = parser_v2::Parser::new(tokens);
+        parser.parse_module().map_err(CompilerError::from)
+    }
+
     /// Compile multiple source files into a single executable
-    pub fn compile_files(&mut self, input_files: &[PathBuf]) -> Result<CompilationResult, CompilerError> {
+    pub fn compile_files(
+        &mut self,
+        input_files: &[PathBuf],
+    ) -> Result<CompilationResult, CompilerError> {
         let start_time = std::time::Instant::now();
         let mut stats = CompilationStats::default();
         let mut intermediate_files = Vec::new();
-        
+
         // Initialize profiler if enabled
         let mut profiler = CompilationProfiler::new();
         if self.options.enable_profiling {
@@ -144,78 +259,76 @@ impl CompilationPipeline {
         }
         let parse_start = std::time::Instant::now();
         let program = {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("parsing")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("parsing"))
+            } else {
+                None
+            };
+
             // Decide whether to use parallel or sequential parsing
             let modules = if self.options.parallel && input_files.len() > 1 {
                 // Parallel parsing
+                let verbose_for_parallel = self.options.verbose; // Capture verbose flag for parallel closure
                 let results: Result<Vec<_>, _> = input_files
                     .par_iter()
-                    .map(|input_file| {
+                    .map(move |input_file| {
+                        // Add 'move' to transfer ownership of captured variables
                         // Read file
-                        let source = fs::read_to_string(input_file)
-                            .map_err(|e| CompilerError::IoError {
+                        let source =
+                            fs::read_to_string(input_file).map_err(|e| CompilerError::IoError {
                                 message: format!("Failed to read {}: {}", input_file.display(), e),
                             })?;
-                        
+
                         let lines = source.lines().count();
-                        
-                        // Tokenize
-                        let mut lexer = Lexer::new(&source, input_file.to_string_lossy().to_string());
-                        let tokens = lexer.tokenize()?;
-                        
-                        // Parse module
-                        let mut parser = Parser::new(tokens);
-                        let module = parser.parse_module()?;
-                        
-                        Ok::<(crate::ast::Module, usize), CompilerError>((module, lines))
+
+                        // Parse with V2 parser
+                        let module = Self::parse_source(input_file, &source, verbose_for_parallel)?; // Pass verbose
+
+                        Ok::<(Module, usize), CompilerError>((module, lines))
                     })
                     .collect();
-                
+
                 let parsed_modules = results?;
-                
+
                 // Update stats
                 for (_, lines) in &parsed_modules {
                     stats.lines_of_code += lines;
                 }
-                
+
                 parsed_modules.into_iter().map(|(m, _)| m).collect()
             } else {
                 // Sequential parsing for single file or when parallel is disabled
                 let mut modules = vec![];
-                
+
                 for input_file in input_files {
                     // Read file
-                    let source = fs::read_to_string(input_file)
-                        .map_err(|e| CompilerError::IoError {
+                    let source =
+                        fs::read_to_string(input_file).map_err(|e| CompilerError::IoError {
                             message: format!("Failed to read {}: {}", input_file.display(), e),
                         })?;
-                    
+
                     stats.lines_of_code += source.lines().count();
-                    
-                    // Tokenize
-                    let mut lexer = Lexer::new(&source, input_file.to_string_lossy().to_string());
-                    let tokens = lexer.tokenize()?;
-                    
-                    // Parse module
-                    let mut parser = Parser::new(tokens);
-                    let module = parser.parse_module()?;
-                    
+
+                    // Parse with appropriate syntax version
+                    let module = self.parse_file(input_file, &source, self.options.verbose)?;
+
                     modules.push(module);
                 }
-                
+
                 modules
             };
-            
+
             Program {
                 modules,
                 source_location: crate::error::SourceLocation::unknown(),
             }
         };
-        
+
         stats.modules_compiled = program.modules.len();
-        stats.phase_times.insert("parsing".to_string(), parse_start.elapsed().as_millis());
-        
+        stats
+            .phase_times
+            .insert("parsing".to_string(), parse_start.elapsed().as_millis());
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_parsing");
         }
@@ -225,24 +338,88 @@ impl CompilationPipeline {
             println!("Phase 2: Semantic analysis...");
         }
         let semantic_start = std::time::Instant::now();
-        
-        let symbol_table = {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("semantic_analysis")) } else { None };
-            
+
+        let (symbol_table, captures, complete_program, dependency_objects) = {
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("semantic_analysis"))
+            } else {
+                None
+            };
+
             let mut analyzer = SemanticAnalyzer::new();
+
+            // Add library paths to module search paths
+            for path in &self.options.library_paths {
+                analyzer.add_module_search_path(path.clone());
+            }
+
             analyzer.analyze_program(&program)?;
-            
+
             let analysis_stats = analyzer.get_statistics().clone();
             stats.functions_compiled = analysis_stats.functions_analyzed;
-            
-            // Extract symbol table for MIR lowering
-            analyzer.get_symbol_table()
+
+            // Extract symbol table and captures for MIR lowering
+            let captures = analyzer.get_captures().clone();
+            // We need a list of all modules including imported ones for MIR generation
+            // SemanticAnalyzer doesn't expose get_analyzed_modules directly if not public
+            // but it does expose get_symbol_table.
+            // Let's rely on the symbol table's module info or just use the program modules
+            // for now, assuming imports are handled.
+            // Actually, for MIR generation of the main program, we primarily need the
+            // AST of the modules we are compiling. Imported modules are needed for
+            // symbol resolution, which is handled by the symbol table.
+            // So we might not need `get_analyzed_modules` if `symbol_table` has everything.
+
+            let complete_prog = program.clone();
+            // If we need to inline code from imported modules, we'd need their ASTs.
+            // For now, let's proceed with just the explicit program modules.
+
+            // Collect object files from ABI-loaded dependencies for linking
+            let dependency_objects = analyzer.get_dependency_object_files();
+
+            (analyzer.get_symbol_table().clone(), captures, complete_prog, dependency_objects)
         };
-        
-        stats.phase_times.insert("semantic_analysis".to_string(), semantic_start.elapsed().as_millis());
-        
+
+        stats.phase_times.insert(
+            "semantic_analysis".to_string(),
+            semantic_start.elapsed().as_millis(),
+        );
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_semantic_analysis");
+        }
+
+        // Phase 2.5: ABI generation (if enabled)
+        if self.options.emit_abi {
+            if self.options.verbose {
+                println!("Phase 2.5: Generating ABI files...");
+            }
+
+            for (idx, module) in complete_program.modules.iter().enumerate() {
+                let source_path = if idx < input_files.len() {
+                    &input_files[idx]
+                } else {
+                    continue; // Skip modules without source files
+                };
+
+                // Generate ABI output path:
+                // - If output path is specified, use output_path.abi (e.g., /tmp/io -> /tmp/io.abi)
+                // - Otherwise, use source_path.abi (e.g., stdlib/io.aether -> stdlib/io.abi)
+                let abi_path = if let Some(ref output) = self.options.output {
+                    output.with_extension("abi")
+                } else {
+                    source_path.with_extension("abi")
+                };
+
+                if self.options.verbose {
+                    println!("  Generating ABI: {}", abi_path.display());
+                }
+
+                abi::generate_abi_file(module, &symbol_table, source_path, &abi_path)?;
+
+                // ABI files are output files, not intermediates - don't add to intermediate_files
+                // so they won't be cleaned up
+            }
         }
 
         // If syntax-only mode, stop here
@@ -250,14 +427,15 @@ impl CompilationPipeline {
             if self.options.verbose {
                 println!("\nSyntax check completed successfully!");
             }
-            
+
             stats.total_time_ms = start_time.elapsed().as_millis();
-            
+
             // Return dummy result for syntax check
             return Ok(CompilationResult {
                 executable_path: PathBuf::from("syntax-check-only"),
                 intermediate_files,
                 stats,
+                verification_results: None, // No verification in syntax-only mode
             });
         }
 
@@ -266,40 +444,166 @@ impl CompilationPipeline {
             println!("Phase 3: Generating intermediate representation...");
         }
         let mir_start = std::time::Instant::now();
-        
+
         let mut mir_program = {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("mir_generation")) } else { None };
-            
-            eprintln!("AST has {} modules", program.modules.len());
-            for module in &program.modules {
-                eprintln!("  Module '{}' has {} functions", module.name.name, module.function_definitions.len());
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("mir_generation"))
+            } else {
+                None
+            };
+
+            eprintln!("AST has {} modules", complete_program.modules.len());
+            for module in &complete_program.modules {
+                eprintln!(
+                    "  Module '{}' has {} functions",
+                    module.name.name,
+                    module.function_definitions.len()
+                );
                 for (idx, func) in module.function_definitions.iter().enumerate() {
                     eprintln!("    Function {}: {}", idx, func.name.name);
                 }
-                eprintln!("  Module '{}' has {} constants", module.name.name, module.constant_declarations.len());
+                eprintln!(
+                    "  Module '{}' has {} constants",
+                    module.name.name,
+                    module.constant_declarations.len()
+                );
                 for (idx, constant) in module.constant_declarations.iter().enumerate() {
                     eprintln!("    Constant {}: {}", idx, constant.name.name);
                 }
             }
-            
-            mir::lowering::lower_ast_to_mir_with_symbols(&program, symbol_table)?
+
+            mir::lowering::lower_ast_to_mir_with_symbols_and_captures(
+                &complete_program,
+                symbol_table,
+                captures,
+            )?
         };
-        
-        stats.phase_times.insert("mir_generation".to_string(), mir_start.elapsed().as_millis());
-        
+
+        stats.phase_times.insert(
+            "mir_generation".to_string(),
+            mir_start.elapsed().as_millis(),
+        );
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_mir_generation");
         }
+
+        // Phase 3.1: Monomorphization
+        if self.options.verbose {
+            println!("Phase 3.1: Running monomorphization...");
+        }
+        let mono_start = std::time::Instant::now();
+
+        let mut monomorphizer = mir::monomorphization::Monomorphizer::new();
+        monomorphizer.run(&mut mir_program);
+
+        stats.phase_times.insert(
+            "monomorphization".to_string(),
+            mono_start.elapsed().as_millis(),
+        );
+
+        // Phase 3.5: Verification (optional)
+        let verification_results = if self.options.enable_verification {
+            if self.options.verbose {
+                println!("Phase 3.5: Running formal verification...");
+            }
+            let verify_start = std::time::Instant::now();
+
+            // Run verification in a separate scope to allow profiler reuse
+            let results = {
+                let _timer = if self.options.enable_profiling {
+                    Some(profiler.start_phase("verification"))
+                } else {
+                    None
+                };
+
+                // Extract contracts from AST
+                let contracts = ast_to_contract::extract_program_contracts(&complete_program)
+                    .map_err(|e| {
+                        CompilerError::SemanticError(SemanticError::VerificationError {
+                            message: format!("Failed to extract contracts: {}", e),
+                            location: crate::error::SourceLocation::unknown(),
+                        })
+                    })?;
+
+                if self.options.verbose {
+                    println!("  Extracted {} contracts from AST", contracts.len());
+                    for (name, contract) in &contracts {
+                        println!(
+                            "    Contract '{}': {} pre, {} post",
+                            name,
+                            contract.preconditions.len(),
+                            contract.postconditions.len()
+                        );
+                    }
+                    println!("  MIR functions:");
+                    for name in mir_program.functions.keys() {
+                        println!("    Function: '{}'", name);
+                    }
+                }
+
+                // Create verification engine and register contracts
+                let mut engine = VerificationEngine::new();
+                for (name, contract) in contracts {
+                    engine.add_function_contract(name, contract);
+                }
+
+                // Run verification on MIR
+                engine.verify_program(&mir_program)?
+            };
+
+            // Report verification results
+            let mut all_verified = true;
+            for result in &results {
+                if !result.verified {
+                    all_verified = false;
+                    if self.options.verbose {
+                        println!("  ⚠ Function '{}' verification FAILED", result.name);
+                        for condition in &result.conditions {
+                            if !condition.verified {
+                                println!("    - {} at {:?}", condition.name, condition.location);
+                            }
+                        }
+                        for counterexample in &result.counterexamples {
+                            println!("    Counterexample: {:?}", counterexample.assignments);
+                        }
+                    }
+                } else if self.options.verbose {
+                    println!("  ✓ Function '{}' verified", result.name);
+                }
+            }
+
+            stats.phase_times.insert(
+                "verification".to_string(),
+                verify_start.elapsed().as_millis(),
+            );
+
+            if self.options.enable_profiling {
+                profiler.snapshot_memory("after_verification");
+            }
+
+            if !all_verified && self.options.verbose {
+                println!("\n  Warning: Some contracts could not be verified");
+            }
+
+            Some(results)
+        } else {
+            None
+        };
 
         // Phase 4: Optimization
         if self.options.verbose {
             println!("Phase 4: Running optimizations...");
         }
         let opt_start = std::time::Instant::now();
-        
+
         if self.options.optimization_level > 0 {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("optimization")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("optimization"))
+            } else {
+                None
+            };
+
             let mut opt_manager = OptimizationManager::new();
             // Set up optimization passes based on level
             if self.options.optimization_level > 0 {
@@ -307,9 +611,11 @@ impl CompilationPipeline {
             }
             opt_manager.optimize_program(&mut mir_program)?;
         }
-        
-        stats.phase_times.insert("optimization".to_string(), opt_start.elapsed().as_millis());
-        
+
+        stats
+            .phase_times
+            .insert("optimization".to_string(), opt_start.elapsed().as_millis());
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_optimization");
         }
@@ -319,35 +625,42 @@ impl CompilationPipeline {
             println!("Phase 5: Generating LLVM IR...");
         }
         let codegen_start = std::time::Instant::now();
-        
+
         let context = Context::create();
-        let module_name = input_files.first()
+        let module_name = input_files
+            .first()
             .and_then(|p| p.file_stem())
             .and_then(|s| s.to_str())
             .unwrap_or("main");
-        
+
         let mut backend = LLVMBackend::new(&context, module_name);
-        
+
         {
-            let _timer = if self.options.enable_profiling { Some(profiler.start_phase("llvm_codegen")) } else { None };
-            
+            let _timer = if self.options.enable_profiling {
+                Some(profiler.start_phase("llvm_codegen"))
+            } else {
+                None
+            };
+
             // Initialize LLVM targets
             LLVMBackend::initialize_targets();
-            
+
             // Set target triple - use specified or native
-            let target_triple = self.options.target_triple.clone()
-                .unwrap_or_else(|| {
-                    use crate::llvm_backend::TargetArch;
-                    TargetArch::native().target_triple().to_string()
-                });
+            let target_triple = self.options.target_triple.clone().unwrap_or_else(|| {
+                use crate::llvm_backend::TargetArch;
+                TargetArch::native().target_triple().to_string()
+            });
             backend.set_target_triple(&target_triple)?;
-            
+
             // Generate LLVM IR from MIR
             backend.generate_ir(&mir_program)?;
         }
-        
-        stats.phase_times.insert("llvm_codegen".to_string(), codegen_start.elapsed().as_millis());
-        
+
+        stats.phase_times.insert(
+            "llvm_codegen".to_string(),
+            codegen_start.elapsed().as_millis(),
+        );
+
         if self.options.enable_profiling {
             profiler.snapshot_memory("after_llvm_codegen");
         }
@@ -357,28 +670,36 @@ impl CompilationPipeline {
             println!("Phase 6: Generating object file...");
         }
         let object_start = std::time::Instant::now();
-        
+
         let object_file = self.generate_object_file(&backend, module_name)?;
         if self.options.keep_intermediates {
             intermediate_files.push(object_file.clone());
         }
-        
-        stats.phase_times.insert("object_generation".to_string(), object_start.elapsed().as_millis());
+
+        stats.phase_times.insert(
+            "object_generation".to_string(),
+            object_start.elapsed().as_millis(),
+        );
 
         // Check if output is object file only
-        let output_is_object = self.options.output.as_ref()
+        let output_is_object = self
+            .options
+            .output
+            .as_ref()
             .map(|p| p.extension().map(|e| e == "o").unwrap_or(false))
             .unwrap_or(false);
-        
+
         let executable_path = if output_is_object || self.options.emit_object_only {
             // Just copy the object file to the output path
-            let output_path = self.options.output.clone()
+            let output_path = self
+                .options
+                .output
+                .clone()
                 .unwrap_or_else(|| object_file.clone());
             if object_file != output_path {
-                fs::copy(&object_file, &output_path)
-                    .map_err(|e| CompilerError::IoError {
-                        message: format!("Failed to copy object file: {}", e),
-                    })?;
+                fs::copy(&object_file, &output_path).map_err(|e| CompilerError::IoError {
+                    message: format!("Failed to copy object file: {}", e),
+                })?;
             }
             output_path
         } else {
@@ -391,15 +712,28 @@ impl CompilationPipeline {
                 }
             }
             let link_start = std::time::Instant::now();
-            
+
             let output_path = if self.options.compile_as_library {
                 self.link_library(&object_file, module_name)?
             } else {
-                self.link_executable(&object_file, module_name)?
+                // Combine the main object file with dependency object files from ABI imports
+                let mut all_objects = vec![object_file];
+                all_objects.extend(dependency_objects.clone());
+
+                if self.options.verbose && !dependency_objects.is_empty() {
+                    println!("  Linking {} dependency object files from ABI imports", dependency_objects.len());
+                    for obj in &dependency_objects {
+                        println!("    - {}", obj.display());
+                    }
+                }
+
+                self.link_executable(&all_objects, module_name)?
             };
-            
-            stats.phase_times.insert("linking".to_string(), link_start.elapsed().as_millis());
-            
+
+            stats
+                .phase_times
+                .insert("linking".to_string(), link_start.elapsed().as_millis());
+
             output_path
         };
 
@@ -418,7 +752,7 @@ impl CompilationPipeline {
             println!("Total time: {}ms", stats.total_time_ms);
             println!("Output: {}", executable_path.display());
         }
-        
+
         // Print profiling report if enabled
         if self.options.enable_profiling {
             profiler.print_summary();
@@ -428,96 +762,139 @@ impl CompilationPipeline {
             executable_path,
             intermediate_files,
             stats,
+            verification_results,
         })
     }
 
     /// Generate object file from LLVM module
-    fn generate_object_file(&self, backend: &LLVMBackend, base_name: &str) -> Result<PathBuf, CompilerError> {
-        let object_path = PathBuf::from(format!("{}.o", base_name));
-        
+    fn generate_object_file(
+        &self,
+        backend: &LLVMBackend,
+        base_name: &str,
+    ) -> Result<PathBuf, CompilerError> {
+        // If output path is specified, use its directory + base_name.o
+        // If output path is an object file (ends in .o), use it directly.
+        let object_path = if let Some(ref output) = self.options.output {
+            if output.extension().map_or(false, |ext| ext == "o") {
+                output.clone()
+            } else {
+                // Output is likely an executable path (e.g., /tmp/test_dir/main)
+                // We want /tmp/test_dir/main.o or /tmp/test_dir/module.o
+                if let Some(parent) = output.parent() {
+                    parent.join(format!("{}.o", base_name))
+                } else {
+                    PathBuf::from(format!("{}.o", base_name))
+                }
+            }
+        } else {
+            PathBuf::from(format!("{}.o", base_name))
+        };
+
         // Write object file
         backend.write_object_file(&object_path)?;
-        
+
         Ok(object_path)
     }
 
     /// Link object file(s) into executable
-    fn link_executable(&self, object_file: &Path, base_name: &str) -> Result<PathBuf, CompilerError> {
-        let output_path = self.options.output.clone()
+    fn link_executable(
+        &self,
+        object_files: &[PathBuf],
+        base_name: &str,
+    ) -> Result<PathBuf, CompilerError> {
+        let output_path = self
+            .options
+            .output
+            .clone()
             .unwrap_or_else(|| PathBuf::from(base_name));
-        
+
         // Use system linker (ld or clang)
         let mut cmd = if cfg!(target_os = "macos") {
             Command::new("clang")
         } else {
             Command::new("cc")
         };
-        
+
         cmd.arg("-o").arg(&output_path);
-        cmd.arg(object_file);
-        
+
+        // Add primary object files
+        for obj in object_files {
+            cmd.arg(obj);
+        }
+
+        // Add additional object files from options
+        for obj in &self.options.link_objects {
+            cmd.arg(obj);
+        }
+
         // Add library paths
         for lib_path in &self.options.library_paths {
             cmd.arg(format!("-L{}", lib_path.display()));
         }
-        
+
         // Add libraries
         for lib in &self.options.link_libraries {
             cmd.arg(format!("-l{}", lib));
         }
-        
-        // Add AetherScript runtime library directly
-        let runtime_lib_path = PathBuf::from("/Users/keithballinger/Desktop/projects/logos/runtime/target/release/libaether_runtime.dylib");
-        
+
+        // Add AetherScript runtime library
+        let runtime_lib_path = find_runtime_library()?;
         cmd.arg(&runtime_lib_path);
-        
+
         // Add standard C library
         if !self.options.link_libraries.contains(&"c".to_string()) {
             cmd.arg("-lc");
         }
-        
+
         // Add math library if needed
         if !self.options.link_libraries.contains(&"m".to_string()) {
             cmd.arg("-lm");
         }
-        
+
         if self.options.verbose {
             println!("Linking command: {:?}", cmd);
         }
-        
-        let output = cmd.output()
-            .map_err(|e| CompilerError::IoError {
-                message: format!("Failed to run linker: {}", e),
-            })?;
-        
+
+        let output = cmd.output().map_err(|e| CompilerError::IoError {
+            message: format!("Failed to run linker: {}", e),
+        })?;
+
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
             return Err(SemanticError::InvalidType {
                 type_name: "linking".to_string(),
                 reason: format!("linker error: {}", error_msg),
                 location: crate::error::SourceLocation::unknown(),
-            }.into());
+            }
+            .into());
         }
-        
+
         // Make executable on Unix
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = fs::metadata(&output_path)
                 .map_err(|e| CompilerError::IoError {
-                    message: format!("Failed to get metadata for {}: {}", output_path.display(), e),
+                    message: format!(
+                        "Failed to get metadata for {}: {}",
+                        output_path.display(),
+                        e
+                    ),
                 })?
                 .permissions();
             perms.set_mode(0o755);
-            fs::set_permissions(&output_path, perms)
-                .map_err(|e| CompilerError::IoError {
-                    message: format!("Failed to set permissions on {}: {}", output_path.display(), e),
-                })?;
+            fs::set_permissions(&output_path, perms).map_err(|e| CompilerError::IoError {
+                message: format!(
+                    "Failed to set permissions on {}: {}",
+                    output_path.display(),
+                    e
+                ),
+            })?;
         }
-        
+
         Ok(output_path)
     }
-    
+
     /// Link object file(s) into a shared library
     fn link_library(&self, object_file: &Path, base_name: &str) -> Result<PathBuf, CompilerError> {
         let lib_extension = if cfg!(target_os = "macos") {
@@ -527,17 +904,28 @@ impl CompilationPipeline {
         } else {
             "so"
         };
-        
-        let lib_prefix = if cfg!(target_os = "windows") { "" } else { "lib" };
-        
-        let output_path = self.options.output.clone()
-            .unwrap_or_else(|| PathBuf::from(format!("{}{}.{}", lib_prefix, base_name, lib_extension)));
-        
+
+        let lib_prefix = if cfg!(target_os = "windows") {
+            ""
+        } else {
+            "lib"
+        };
+
+        let output_path = self.options.output.clone().unwrap_or_else(|| {
+            PathBuf::from(format!("{}{}.{}", lib_prefix, base_name, lib_extension))
+        });
+
         // Use system linker to create shared library
         let mut cmd = if cfg!(target_os = "macos") {
             let mut cmd = Command::new("clang");
             cmd.arg("-dynamiclib");
-            cmd.arg("-install_name").arg(format!("@rpath/{}", output_path.file_name().unwrap().to_string_lossy()));
+            cmd.arg("-install_name").arg(format!(
+                "@rpath/{}",
+                output_path
+                    .file_name()
+                    .expect("output path should have a file name")
+                    .to_string_lossy()
+            ));
             cmd
         } else if cfg!(target_os = "windows") {
             let mut cmd = Command::new("cl");
@@ -549,47 +937,47 @@ impl CompilationPipeline {
             cmd.arg("-fPIC");
             cmd
         };
-        
+
         cmd.arg("-o").arg(&output_path);
         cmd.arg(object_file);
-        
+
         // Add library paths
         for lib_path in &self.options.library_paths {
             cmd.arg(format!("-L{}", lib_path.display()));
         }
-        
+
         // Add libraries
         for lib in &self.options.link_libraries {
             cmd.arg(format!("-l{}", lib));
         }
-        
+
         // Add AetherScript runtime library
-        let runtime_lib_path = PathBuf::from("/Users/keithballinger/Desktop/projects/logos/runtime/target/release/libaether_runtime.dylib");
+        let runtime_lib_path = find_runtime_library()?;
         cmd.arg(&runtime_lib_path);
-        
+
         // Add standard C library
         if !self.options.link_libraries.contains(&"c".to_string()) {
             cmd.arg("-lc");
         }
-        
+
         if self.options.verbose {
             println!("Library linking command: {:?}", cmd);
         }
-        
-        let output = cmd.output()
-            .map_err(|e| CompilerError::IoError {
-                message: format!("Failed to run linker: {}", e),
-            })?;
-        
+
+        let output = cmd.output().map_err(|e| CompilerError::IoError {
+            message: format!("Failed to run linker: {}", e),
+        })?;
+
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
             return Err(SemanticError::InvalidType {
                 type_name: "linking".to_string(),
                 reason: format!("linker error: {}", error_msg),
                 location: crate::error::SourceLocation::unknown(),
-            }.into());
+            }
+            .into());
         }
-        
+
         Ok(output_path)
     }
 }
@@ -612,7 +1000,7 @@ mod tests {
         stats.lines_of_code = 100;
         stats.modules_compiled = 2;
         stats.functions_compiled = 10;
-        
+
         assert_eq!(stats.lines_of_code, 100);
         assert_eq!(stats.modules_compiled, 2);
         assert_eq!(stats.functions_compiled, 10);
@@ -625,9 +1013,41 @@ mod tests {
             optimization_level: 3,
             ..Default::default()
         };
-        
+
         let pipeline = CompilationPipeline::new(opts);
         assert_eq!(pipeline.options.optimization_level, 3);
         assert!(pipeline.options.verbose);
+    }
+
+    #[test]
+    fn test_parse_source_v2() {
+        use std::path::Path;
+
+        let v2_source = "module test;";
+        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source, false);
+
+        assert!(result.is_ok());
+        let module = result.unwrap();
+        assert_eq!(module.name.name, "test");
+    }
+
+    #[test]
+    fn test_parse_source_v2_with_function() {
+        use std::path::Path;
+
+        let v2_source = r#"
+module test;
+
+func add(a: Int, b: Int) -> Int {
+    return {a + b};
+}
+"#;
+        let result = CompilationPipeline::parse_source(Path::new("test.aes"), v2_source, false);
+
+        assert!(result.is_ok());
+        let module = result.unwrap();
+        assert_eq!(module.name.name, "test");
+        assert_eq!(module.function_definitions.len(), 1);
+        assert_eq!(module.function_definitions[0].name.name, "add");
     }
 }

@@ -1,0 +1,65 @@
+module Arrays;
+
+// ============================================================================
+// Typed Array Primitives
+// ============================================================================
+// Low-level FFI bindings for typed arrays.
+// These are wrapped by the generic Array<T> type in the compiler, but exposed
+// here for explicit use and verification.
+
+// ----------------------------------------------------------------------------
+// UInt8 Array
+// ----------------------------------------------------------------------------
+
+@extern(library="aether_runtime", symbol="array_u8_create")
+func array_u8_create(capacity: Int) -> Pointer<Void>;
+
+@extern(library="aether_runtime", symbol="array_u8_push")
+func array_u8_push(array: Pointer<Void>, value: UInt8) -> Pointer<Void>;
+
+// Safe getter with bounds check contract
+@pre({index >= 0 && index < array_u8_length(array)}, message="Index out of bounds")
+@extern(library="aether_runtime", symbol="array_u8_get")
+func array_u8_get(array: Pointer<Void>, index: Int) -> UInt8;
+
+// Unchecked getter - unsafe if used directly, but target for optimization
+// The compiler can rewrite `array_u8_get` to this if the @pre condition is proven
+@extern(library="aether_runtime", symbol="array_u8_get_unchecked")
+func array_u8_get_unchecked(array: Pointer<Void>, index: Int) -> UInt8;
+
+@pre({index >= 0 && index < array_u8_length(array)}, message="Index out of bounds")
+@extern(library="aether_runtime", symbol="array_u8_set")
+func array_u8_set(array: Pointer<Void>, index: Int, value: UInt8) -> Void;
+
+@extern(library="aether_runtime", symbol="array_u8_length")
+func array_u8_length(array: Pointer<Void>) -> Int;
+
+@extern(library="aether_runtime", symbol="array_u8_free")
+func array_u8_free(array: Pointer<Void>) -> Void;
+
+// ----------------------------------------------------------------------------
+// Float32 Array
+// ----------------------------------------------------------------------------
+
+@extern(library="aether_runtime", symbol="array_f32_create")
+func array_f32_create(capacity: Int) -> Pointer<Void>;
+
+@extern(library="aether_runtime", symbol="array_f32_push")
+func array_f32_push(array: Pointer<Void>, value: Float32) -> Pointer<Void>;
+
+@pre({index >= 0 && index < array_f32_length(array)}, message="Index out of bounds")
+@extern(library="aether_runtime", symbol="array_f32_get")
+func array_f32_get(array: Pointer<Void>, index: Int) -> Float32;
+
+@extern(library="aether_runtime", symbol="array_f32_get_unchecked")
+func array_f32_get_unchecked(array: Pointer<Void>, index: Int) -> Float32;
+
+@pre({index >= 0 && index < array_f32_length(array)}, message="Index out of bounds")
+@extern(library="aether_runtime", symbol="array_f32_set")
+func array_f32_set(array: Pointer<Void>, index: Int, value: Float32) -> Void;
+
+@extern(library="aether_runtime", symbol="array_f32_length")
+func array_f32_length(array: Pointer<Void>) -> Int;
+
+@extern(library="aether_runtime", symbol="array_f32_free")
+func array_f32_free(array: Pointer<Void>) -> Void;

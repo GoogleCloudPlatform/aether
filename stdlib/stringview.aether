@@ -1,0 +1,182 @@
+module StringView;
+
+// ============================================================================
+// StringView - Zero-copy string views for high-performance string processing
+// ============================================================================
+//
+// StringView provides zero-copy substrings and efficient string operations.
+// Views reference existing string data without allocation.
+//
+// Key benefits:
+// - substring/trim/slice operations are O(1), no allocation
+// - Arena allocation for bulk string creation with single deallocation
+//
+// ============================================================================
+
+// ============================================================================
+// Core StringView Primitives
+// ============================================================================
+
+// Create a view of a substring (zero-copy)
+// @pre({start >= 0}, message="Start index must be non-negative")
+// @pre({len >= 0}, message="Length must be non-negative")
+@extern(library="aether_runtime", symbol="stringview_create")
+@export
+func view_create(parent: String, start: Int, len: Int) -> Int64;
+
+// Create a view of an entire string
+@extern(library="aether_runtime", symbol="stringview_from_string")
+@export
+func view_from_string(s: String) -> Int64;
+
+// Get length of a view
+// @post({result >= 0}, message="Length is non-negative")
+@extern(library="aether_runtime", symbol="stringview_length")
+@export
+func view_length(view: Int64) -> Int;
+
+// Get byte at index (returns 0 for out of bounds)
+// @pre({index >= 0}, message="Index must be non-negative")
+@extern(library="aether_runtime", symbol="stringview_char_at")
+@export
+func view_char_at(view: Int64, index: Int) -> Int;
+
+// Create a sub-view (zero-copy)
+@extern(library="aether_runtime", symbol="stringview_slice")
+@export
+func view_slice(view: Int64, start: Int, len: Int) -> Int64;
+
+// Compare two views for equality
+@extern(library="aether_runtime", symbol="stringview_equals")
+@export
+func view_equals(a: Int64, b: Int64) -> Int;
+
+// Compare view to string
+@extern(library="aether_runtime", symbol="stringview_equals_str")
+@export
+func view_equals_str(view: Int64, s: String) -> Int;
+
+// Materialize view to owned string (allocates)
+@extern(library="aether_runtime", symbol="stringview_to_string")
+@export
+func view_to_string(view: Int64) -> String;
+
+// Free a view handle (does NOT free underlying string)
+@extern(library="aether_runtime", symbol="stringview_free")
+@export
+func view_free(view: Int64) -> Void;
+
+// Trim whitespace (returns new view, zero-copy)
+@extern(library="aether_runtime", symbol="stringview_trim")
+@export
+func view_trim(view: Int64) -> Int64;
+
+// Check if view starts with prefix
+@extern(library="aether_runtime", symbol="stringview_starts_with")
+@export
+func view_starts_with(view: Int64, prefix: String) -> Int;
+
+// Find first occurrence of byte, returns -1 if not found
+@extern(library="aether_runtime", symbol="stringview_find_byte")
+@export
+func view_find_byte(view: Int64, byte: Int) -> Int;
+
+// ============================================================================
+// Arena - Bulk allocation with single deallocation
+// ============================================================================
+
+// Create an arena with given capacity
+// @pre({capacity > 0}, message="Capacity must be positive")
+@extern(library="aether_runtime", symbol="arena_create")
+@export
+func arena_create(capacity: Int) -> Int64;
+
+// Allocate raw bytes from arena
+@extern(library="aether_runtime", symbol="arena_alloc")
+@export
+func arena_alloc(arena: Int64, size: Int) -> Int64;
+
+// Allocate and copy a string into arena
+@extern(library="aether_runtime", symbol="arena_alloc_string")
+@export
+func arena_alloc_string(arena: Int64, src: String) -> String;
+
+// Allocate string from a view
+@extern(library="aether_runtime", symbol="arena_alloc_from_view")
+@export
+func arena_alloc_from_view(arena: Int64, view: Int64) -> String;
+
+// Reset arena (free all allocations, keep capacity)
+@extern(library="aether_runtime", symbol="arena_reset")
+@export
+func arena_reset(arena: Int64) -> Void;
+
+// Get bytes used in arena
+@extern(library="aether_runtime", symbol="arena_bytes_used")
+@export
+func arena_bytes_used(arena: Int64) -> Int;
+
+// Get remaining capacity
+@extern(library="aether_runtime", symbol="arena_bytes_remaining")
+@export
+func arena_bytes_remaining(arena: Int64) -> Int;
+
+// Destroy arena and free all memory
+@extern(library="aether_runtime", symbol="arena_destroy")
+@export
+func arena_destroy(arena: Int64) -> Void;
+
+// ============================================================================
+// Byte Operations - Building blocks for string functions
+// ============================================================================
+
+// Check if byte is ASCII lowercase (a-z)
+@extern(library="aether_runtime", symbol="byte_is_lower")
+@export
+func byte_is_lower(b: Int) -> Int;
+
+// Check if byte is ASCII uppercase (A-Z)
+@extern(library="aether_runtime", symbol="byte_is_upper")
+@export
+func byte_is_upper(b: Int) -> Int;
+
+// Check if byte is ASCII digit (0-9)
+@extern(library="aether_runtime", symbol="byte_is_digit")
+@export
+func byte_is_digit(b: Int) -> Int;
+
+// Check if byte is ASCII whitespace
+@extern(library="aether_runtime", symbol="byte_is_whitespace")
+@export
+func byte_is_whitespace(b: Int) -> Int;
+
+// Convert byte to uppercase
+@extern(library="aether_runtime", symbol="byte_to_upper")
+@export
+func byte_to_upper(b: Int) -> Int;
+
+// Convert byte to lowercase
+@extern(library="aether_runtime", symbol="byte_to_lower")
+@export
+func byte_to_lower(b: Int) -> Int;
+
+// Create single-character string from byte (allocates)
+@extern(library="aether_runtime", symbol="byte_to_string")
+@export
+func byte_to_string(b: Int) -> String;
+
+// ============================================================================
+// String primitives (re-exported for convenience)
+// ============================================================================
+
+@extern(library="aether_runtime", symbol="string_concat")
+@export
+func concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="string_length")
+@export
+func length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_char_at")
+@export
+func char_at(s: String, index: Int) -> Int;

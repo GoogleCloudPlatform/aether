@@ -18,28 +18,28 @@
 
 use crate::error::SemanticError;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, mpsc};
-use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 
 /// Actor system for managing all actors
 #[derive(Debug)]
 pub struct ActorSystem {
     /// System state
     state: ActorSystemState,
-    
+
     /// Registry of all actors
     actors: Arc<Mutex<HashMap<ActorId, ActorInfo>>>,
-    
+
     /// Supervisor hierarchy
     supervisors: Arc<Mutex<HashMap<ActorId, SupervisorInfo>>>,
-    
+
     /// Message dispatcher
     dispatcher: MessageDispatcher,
-    
+
     /// System statistics
     stats: ActorSystemStats,
-    
+
     /// Shutdown signal
     shutdown: Arc<AtomicBool>,
 }
@@ -59,16 +59,16 @@ pub enum ActorSystemState {
 pub struct ActorSystemConfig {
     /// Maximum number of actors
     pub max_actors: usize,
-    
+
     /// Default mailbox size
     pub default_mailbox_size: usize,
-    
+
     /// Actor startup timeout
     pub actor_startup_timeout: Duration,
-    
+
     /// Message processing timeout
     pub message_timeout: Duration,
-    
+
     /// Enable supervision
     pub enable_supervision: bool,
 }
@@ -78,19 +78,19 @@ pub struct ActorSystemConfig {
 pub struct ActorSystemStats {
     /// Total actors created
     pub actors_created: AtomicU64,
-    
+
     /// Total actors destroyed
     pub actors_destroyed: AtomicU64,
-    
+
     /// Total messages sent
     pub messages_sent: AtomicU64,
-    
+
     /// Total messages processed
     pub messages_processed: AtomicU64,
-    
+
     /// Total supervision restarts
     pub supervision_restarts: AtomicU64,
-    
+
     /// System uptime
     pub uptime_start: Option<Instant>,
 }
@@ -100,19 +100,18 @@ pub type ActorId = u64;
 
 /// Individual actor
 #[derive(Debug)]
-pub struct Actor {
-}
+pub struct Actor {}
 
 /// Actor state trait
 pub trait ActorState: Send + std::fmt::Debug {
     /// Handle incoming message
     fn handle_message(&mut self, message: ActorMessage) -> ActorResult;
-    
+
     /// Initialize actor
     fn initialize(&mut self) -> ActorResult {
         ActorResult::Success
     }
-    
+
     /// Cleanup on shutdown
     fn cleanup(&mut self) -> ActorResult {
         ActorResult::Success
@@ -124,10 +123,10 @@ pub trait ActorState: Send + std::fmt::Debug {
 pub struct ActorHandle {
     /// Actor ID
     id: ActorId,
-    
+
     /// Actor name
     name: String,
-    
+
     /// Message sender
     sender: mpsc::Sender<ActorMessage>,
 }
@@ -173,13 +172,13 @@ pub struct SupervisorInfo {
 pub enum SupervisionStrategy {
     /// Restart only the failed child
     OneForOne,
-    
+
     /// Restart all children when one fails
     OneForAll,
-    
+
     /// Restart failed child and all children started after it
     RestForOne,
-    
+
     /// Stop all children and the supervisor
     Escalate,
 }
@@ -189,10 +188,10 @@ pub enum SupervisionStrategy {
 pub struct MessageDispatcher {
     /// Message routing table
     routes: Arc<Mutex<HashMap<ActorId, mpsc::Sender<ActorMessage>>>>,
-    
+
     /// Dead letter queue
     dead_letters: Arc<Mutex<Vec<DeadLetter>>>,
-    
+
     /// Dispatcher statistics
     stats: DispatcherStats,
 }
@@ -219,19 +218,19 @@ pub struct DispatcherStats {
 pub struct ActorMessage {
     /// Message ID
     pub id: u64,
-    
+
     /// Sender actor ID
     pub sender: Option<ActorId>,
-    
+
     /// Target actor ID
     pub target: ActorId,
-    
+
     /// Message payload
     pub payload: MessagePayload,
-    
+
     /// Message timestamp
     pub timestamp: Instant,
-    
+
     /// Message priority
     pub priority: MessagePriority,
 }
@@ -241,22 +240,22 @@ pub struct ActorMessage {
 pub enum MessagePayload {
     /// Text message
     Text(String),
-    
+
     /// Integer value
     Integer(i64),
-    
+
     /// Float value
     Float(f64),
-    
+
     /// Boolean value
     Boolean(bool),
-    
+
     /// Binary data
     Binary(Vec<u8>),
-    
+
     /// Structured data
     Struct(HashMap<String, MessagePayload>),
-    
+
     /// System message
     System(SystemMessage),
 }
@@ -266,16 +265,16 @@ pub enum MessagePayload {
 pub enum SystemMessage {
     /// Start the actor
     Start,
-    
+
     /// Stop the actor
     Stop,
-    
+
     /// Restart the actor
     Restart,
-    
+
     /// Query actor status
     Status,
-    
+
     /// Supervision directive
     Supervise(SupervisionDirective),
 }
@@ -303,13 +302,13 @@ pub enum MessagePriority {
 pub enum ActorResult {
     /// Actor operation succeeded
     Success,
-    
+
     /// Actor operation failed
     Failure(String),
-    
+
     /// Actor should be restarted
     Restart,
-    
+
     /// Actor should be stopped
     Stop,
 }
@@ -325,23 +324,26 @@ impl ActorSystem {
             shutdown: Arc::new(AtomicBool::new(false)),
         }
     }
-    
+
     /// Start the actor system
     pub fn start(&mut self) -> Result<(), SemanticError> {
         if self.state != ActorSystemState::Idle {
             return Err(SemanticError::Internal {
-                message: format!("Actor system already started, current state: {:?}", self.state),
+                message: format!(
+                    "Actor system already started, current state: {:?}",
+                    self.state
+                ),
             });
         }
-        
+
         self.state = ActorSystemState::Starting;
         self.shutdown.store(false, Ordering::Relaxed);
         self.stats.uptime_start = Some(Instant::now());
         self.state = ActorSystemState::Running;
-        
+
         Ok(())
     }
-    
+
     /// Stop the actor system
     pub fn stop(&mut self) -> Result<(), SemanticError> {
         if self.state != ActorSystemState::Running {
@@ -349,17 +351,17 @@ impl ActorSystem {
                 message: format!("Actor system not running, current state: {:?}", self.state),
             });
         }
-        
+
         self.state = ActorSystemState::Stopping;
         self.shutdown.store(true, Ordering::Relaxed);
-        
+
         // Stop all actors
         self.stop_all_actors()?;
-        
+
         self.state = ActorSystemState::Stopped;
         Ok(())
     }
-    
+
     /// Create a new actor
     pub fn create_actor<S>(&mut self, name: String, _state: S) -> Result<ActorHandle, SemanticError>
     where
@@ -370,19 +372,19 @@ impl ActorSystem {
                 message: "Actor system is not running".to_string(),
             });
         }
-        
+
         let actor_id = self.next_actor_id();
-        let (sender, receiver) = mpsc::channel();
-        
+        let (sender, _) = mpsc::channel();
+
         let handle = ActorHandle {
             id: actor_id,
             name: name.clone(),
             sender: sender.clone(),
         };
-        
+
         // Register the actor with the dispatcher
         self.dispatcher.register_actor(actor_id, sender.clone())?;
-        
+
         // Register the actor
         let info = ActorInfo {
             id: actor_id,
@@ -395,22 +397,22 @@ impl ActorSystem {
             message_count: 0,
             restart_count: 0,
         };
-        
+
         {
             let mut actors = self.actors.lock().map_err(|_| SemanticError::Internal {
                 message: "Failed to lock actors registry".to_string(),
             })?;
             actors.insert(actor_id, info);
         }
-        
+
         // Register with dispatcher
         self.dispatcher.register_actor(actor_id, sender)?;
-        
+
         self.stats.actors_created.fetch_add(1, Ordering::Relaxed);
-        
+
         Ok(handle)
     }
-    
+
     /// Create a supervisor actor
     pub fn create_supervisor(
         &mut self,
@@ -418,7 +420,7 @@ impl ActorSystem {
         strategy: SupervisionStrategy,
     ) -> Result<ActorHandle, SemanticError> {
         let supervisor_id = self.next_actor_id();
-        
+
         // Create supervisor info
         let supervisor_info = SupervisorInfo {
             id: supervisor_id,
@@ -427,49 +429,52 @@ impl ActorSystem {
             restart_window: Duration::from_secs(60),
             children: Vec::new(),
         };
-        
+
         {
-            let mut supervisors = self.supervisors.lock().map_err(|_| SemanticError::Internal {
-                message: "Failed to lock supervisors registry".to_string(),
-            })?;
+            let mut supervisors = self
+                .supervisors
+                .lock()
+                .map_err(|_| SemanticError::Internal {
+                    message: "Failed to lock supervisors registry".to_string(),
+                })?;
             supervisors.insert(supervisor_id, supervisor_info);
         }
-        
+
         // Create the supervisor as a regular actor with special state
         let supervisor_state = SupervisorState::new(strategy);
         self.create_actor(name, supervisor_state)
     }
-    
+
     /// Send a message to an actor
     pub fn send_message(&mut self, message: ActorMessage) -> Result<(), SemanticError> {
         self.dispatcher.dispatch_message(message)
     }
-    
+
     /// Get actor information
     pub fn get_actor_info(&self, actor_id: ActorId) -> Option<ActorInfo> {
         self.actors.lock().ok()?.get(&actor_id).cloned()
     }
-    
+
     /// Get system statistics
     pub fn stats(&self) -> &ActorSystemStats {
         &self.stats
     }
-    
+
     /// Check if system is running
     pub fn is_running(&self) -> bool {
         self.state == ActorSystemState::Running
     }
-    
+
     fn next_actor_id(&mut self) -> ActorId {
         static NEXT_ID: AtomicU64 = AtomicU64::new(1);
         NEXT_ID.fetch_add(1, Ordering::Relaxed)
     }
-    
+
     fn stop_all_actors(&mut self) -> Result<(), SemanticError> {
         let actors = self.actors.lock().map_err(|_| SemanticError::Internal {
             message: "Failed to lock actors registry".to_string(),
         })?;
-        
+
         for (actor_id, _) in actors.iter() {
             let stop_message = ActorMessage {
                 id: 0,
@@ -479,11 +484,17 @@ impl ActorSystem {
                 timestamp: Instant::now(),
                 priority: MessagePriority::System,
             };
-            
+
             let _ = self.dispatcher.dispatch_message(stop_message);
         }
-        
+
         Ok(())
+    }
+}
+
+impl Default for MessageDispatcher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -495,23 +506,27 @@ impl MessageDispatcher {
             stats: DispatcherStats::default(),
         }
     }
-    
+
     /// Register an actor with the dispatcher
-    pub fn register_actor(&mut self, actor_id: ActorId, sender: mpsc::Sender<ActorMessage>) -> Result<(), SemanticError> {
+    pub fn register_actor(
+        &mut self,
+        actor_id: ActorId,
+        sender: mpsc::Sender<ActorMessage>,
+    ) -> Result<(), SemanticError> {
         let mut routes = self.routes.lock().map_err(|_| SemanticError::Internal {
             message: "Failed to lock routing table".to_string(),
         })?;
-        
+
         routes.insert(actor_id, sender);
         Ok(())
     }
-    
+
     /// Dispatch a message to an actor
     pub fn dispatch_message(&self, message: ActorMessage) -> Result<(), SemanticError> {
         let routes = self.routes.lock().map_err(|_| SemanticError::Internal {
             message: "Failed to lock routing table".to_string(),
         })?;
-        
+
         if let Some(sender) = routes.get(&message.target) {
             match sender.send(message.clone()) {
                 Ok(()) => {
@@ -532,22 +547,29 @@ impl MessageDispatcher {
             Ok(())
         }
     }
-    
-    fn send_to_dead_letters(&self, message: ActorMessage, reason: String) -> Result<(), SemanticError> {
-        let mut dead_letters = self.dead_letters.lock().map_err(|_| SemanticError::Internal {
-            message: "Failed to lock dead letters queue".to_string(),
-        })?;
-        
+
+    fn send_to_dead_letters(
+        &self,
+        message: ActorMessage,
+        reason: String,
+    ) -> Result<(), SemanticError> {
+        let mut dead_letters = self
+            .dead_letters
+            .lock()
+            .map_err(|_| SemanticError::Internal {
+                message: "Failed to lock dead letters queue".to_string(),
+            })?;
+
         let dead_letter = DeadLetter {
             target: message.target,
             message,
             reason,
             timestamp: Instant::now(),
         };
-        
+
         dead_letters.push(dead_letter);
         self.stats.dead_letters.fetch_add(1, Ordering::Relaxed);
-        
+
         Ok(())
     }
 }
@@ -557,14 +579,18 @@ impl ActorHandle {
     pub fn send(&self, payload: MessagePayload) -> Result<(), SemanticError> {
         self.send_with_priority(payload, MessagePriority::Normal)
     }
-    
+
     /// Send a high priority message to this actor
     pub fn send_high_priority(&self, payload: MessagePayload) -> Result<(), SemanticError> {
         self.send_with_priority(payload, MessagePriority::High)
     }
-    
+
     /// Send a message with specific priority
-    pub fn send_with_priority(&self, payload: MessagePayload, priority: MessagePriority) -> Result<(), SemanticError> {
+    pub fn send_with_priority(
+        &self,
+        payload: MessagePayload,
+        priority: MessagePriority,
+    ) -> Result<(), SemanticError> {
         let message = ActorMessage {
             id: 0, // Would be generated properly
             sender: None,
@@ -573,19 +599,21 @@ impl ActorHandle {
             timestamp: Instant::now(),
             priority,
         };
-        
-        self.sender.send(message).map_err(|_| SemanticError::Internal {
-            message: format!("Failed to send message to actor {}", self.name),
-        })?;
-        
+
+        self.sender
+            .send(message)
+            .map_err(|_| SemanticError::Internal {
+                message: format!("Failed to send message to actor {}", self.name),
+            })?;
+
         Ok(())
     }
-    
+
     /// Get actor ID
     pub fn id(&self) -> ActorId {
         self.id
     }
-    
+
     /// Get actor name
     pub fn name(&self) -> &str {
         &self.name
@@ -594,11 +622,10 @@ impl ActorHandle {
 
 /// Simple supervisor state implementation
 #[derive(Debug)]
-struct SupervisorState {
-}
+struct SupervisorState {}
 
 impl SupervisorState {
-    fn new(strategy: SupervisionStrategy) -> Self {
+    fn new(_strategy: SupervisionStrategy) -> Self {
         Self {}
     }
 }
@@ -642,19 +669,19 @@ impl ActorSystemStats {
     pub fn uptime(&self) -> Option<Duration> {
         self.uptime_start.map(|start| start.elapsed())
     }
-    
+
     pub fn actors_created(&self) -> u64 {
         self.actors_created.load(Ordering::Relaxed)
     }
-    
+
     pub fn actors_destroyed(&self) -> u64 {
         self.actors_destroyed.load(Ordering::Relaxed)
     }
-    
+
     pub fn messages_sent(&self) -> u64 {
         self.messages_sent.load(Ordering::Relaxed)
     }
-    
+
     pub fn messages_processed(&self) -> u64 {
         self.messages_processed.load(Ordering::Relaxed)
     }
@@ -663,12 +690,12 @@ impl ActorSystemStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[derive(Debug)]
     struct TestActor {
         messages_received: u32,
     }
-    
+
     impl TestActor {
         fn new() -> Self {
             Self {
@@ -676,21 +703,21 @@ mod tests {
             }
         }
     }
-    
+
     impl ActorState for TestActor {
         fn handle_message(&mut self, _message: ActorMessage) -> ActorResult {
             self.messages_received += 1;
             ActorResult::Success
         }
     }
-    
+
     #[test]
     fn test_actor_system_creation() {
         let system = ActorSystem::new();
         assert_eq!(system.state, ActorSystemState::Idle);
         assert!(!system.is_running());
     }
-    
+
     #[test]
     fn test_actor_system_start_stop() {
         let mut system = ActorSystem::new();
@@ -699,46 +726,48 @@ mod tests {
         assert!(system.stop().is_ok());
         assert_eq!(system.state, ActorSystemState::Stopped);
     }
-    
+
     #[test]
     fn test_actor_creation() {
         let mut system = ActorSystem::new();
         assert!(system.start().is_ok());
-        
+
         let test_state = TestActor::new();
         let handle = system.create_actor("test_actor".to_string(), test_state);
         assert!(handle.is_ok());
-        
+
         let handle = handle.unwrap();
         assert_eq!(handle.name(), "test_actor");
         assert!(handle.id() > 0);
     }
-    
+
     #[test]
     fn test_message_dispatcher() {
         let dispatcher = MessageDispatcher::new();
         assert_eq!(dispatcher.stats.messages_routed.load(Ordering::Relaxed), 0);
     }
-    
+
     #[test]
     fn test_actor_handle_messaging() {
         let mut system = ActorSystem::new();
         assert!(system.start().is_ok());
-        
+
         let test_state = TestActor::new();
-        let handle = system.create_actor("test_actor".to_string(), test_state).unwrap();
-        
+        let handle = system
+            .create_actor("test_actor".to_string(), test_state)
+            .unwrap();
+
         // For now, just test that we can create an actor handle
         // Full messaging would require implementing the actor runtime
         assert_eq!(handle.name(), "test_actor");
         assert!(handle.id() > 0);
     }
-    
+
     #[test]
     fn test_supervision_strategy() {
         assert!(SupervisionStrategy::OneForOne != SupervisionStrategy::OneForAll);
     }
-    
+
     #[test]
     fn test_message_priority() {
         assert!(MessagePriority::System > MessagePriority::High);

@@ -25,6 +25,16 @@ lazy_static = "1.4"
 libc = "0.2"
 chrono = "0.4"
 backtrace = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+unicode-segmentation = "1.10"
+sha2 = "0.10"
+rand = "0.8"
+memmap2 = "0.9"
+
+[[bin]]
+name = "gen-gguf"
+path = "src/bin/gen_gguf.rs"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["libloaderapi", "minwindef"] }

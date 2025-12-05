@@ -1,0 +1,47 @@
+// Runtime Contract Success Example
+// Demonstrates contracts with check=runtime that PASS at runtime
+//
+// Compile with: aether compile main.aes -o main
+// Run with: ./main
+// Expected output: "All contracts passed!"
+
+module runtime_success;
+
+@extern("C")
+func puts(s: String) -> Int;
+
+// This function has runtime precondition checks
+// They will be checked at runtime and pass for valid inputs
+@pre({a >= 0}, check=runtime)
+@pre({b >= 0}, check=runtime)
+@post({return_value >= a}, check=runtime)
+@post({return_value >= b}, check=runtime)
+func safe_add(a: Int, b: Int) -> Int {
+    return a + b;
+}
+
+// Division with runtime checks for safety
+@pre({b != 0}, check=runtime)
+@post({return_value * b <= a}, check=runtime)
+func safe_divide(a: Int, b: Int) -> Int {
+    return a / b;
+}
+
+// Ensure a value is positive
+@pre({n > 0}, check=runtime)
+@post({return_value > 0}, check=runtime)
+func double_positive(n: Int) -> Int {
+    return n * 2;
+}
+
+func main() -> Int {
+    // Call with valid inputs - all contracts pass
+    let sum: Int = safe_add(5, 10);
+    let quotient: Int = safe_divide(20, 4);
+    let doubled: Int = double_positive(7);
+
+    // Print success message
+    puts("All runtime contracts passed successfully!");
+
+    return 0;
+}

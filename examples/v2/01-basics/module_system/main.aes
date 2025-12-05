@@ -1,0 +1,21 @@
+// Module System Example
+// Demonstrates module declaration in AetherScript V2
+
+module module_demo;
+
+// Helper function in this module
+func helper(x: Int) -> Int {
+    return x * 2;
+}
+
+// Another helper
+func add(a: Int, b: Int) -> Int {
+    return a + b;
+}
+
+func main() -> Int {
+    let x: Int = helper(5);
+    let y: Int = add(x, 10);
+    // y = 20 (helper(5) = 10, add(10, 10) = 20)
+    return 0;
+}

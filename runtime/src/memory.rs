@@ -256,8 +256,11 @@ pub unsafe extern "C" fn aether_malloc(size: c_int) -> *mut c_void {
     if size <= 0 {
         return ptr::null_mut();
     }
-    
-    let mut manager = MEMORY_MANAGER.lock().unwrap();
+
+    let mut manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.allocate(size as usize)
 }
 
@@ -267,8 +270,11 @@ pub unsafe extern "C" fn aether_free(ptr: *mut c_void) {
     if ptr.is_null() {
         return;
     }
-    
-    let mut manager = MEMORY_MANAGER.lock().unwrap();
+
+    let mut manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.deallocate(ptr);
 }
 
@@ -277,13 +283,19 @@ pub unsafe extern "C" fn aether_free(ptr: *mut c_void) {
 pub unsafe extern "C" fn aether_realloc(ptr: *mut c_void, new_size: c_int) -> *mut c_void {
     if new_size <= 0 {
         if !ptr.is_null() {
-            let mut manager = MEMORY_MANAGER.lock().unwrap();
+            let mut manager = match MEMORY_MANAGER.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
             manager.deallocate(ptr);
         }
         return ptr::null_mut();
     }
-    
-    let mut manager = MEMORY_MANAGER.lock().unwrap();
+
+    let mut manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.reallocate(ptr, new_size as usize)
 }
 
@@ -293,8 +305,11 @@ pub unsafe extern "C" fn aether_gc_add_root(ptr: *mut c_void) {
     if ptr.is_null() {
         return;
     }
-    
-    let mut manager = MEMORY_MANAGER.lock().unwrap();
+
+    let mut manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.add_root(ptr);
 }
 
@@ -304,29 +319,41 @@ pub unsafe extern "C" fn aether_gc_remove_root(ptr: *mut c_void) {
     if ptr.is_null() {
         return;
     }
-    
-    let mut manager = MEMORY_MANAGER.lock().unwrap();
+
+    let mut manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.remove_root(ptr);
 }
 
 /// Manually trigger garbage collection
 #[no_mangle]
 pub unsafe extern "C" fn aether_gc_collect() {
-    let mut manager = MEMORY_MANAGER.lock().unwrap();
+    let mut manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.collect_garbage();
 }
 
 /// Get memory statistics
 #[no_mangle]
 pub unsafe extern "C" fn aether_memory_used() -> c_int {
-    let manager = MEMORY_MANAGER.lock().unwrap();
+    let manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.total_allocated as c_int
 }
 
 /// Get allocation count
 #[no_mangle]
 pub unsafe extern "C" fn aether_allocation_count() -> c_int {
-    let manager = MEMORY_MANAGER.lock().unwrap();
+    let manager = match MEMORY_MANAGER.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     manager.allocation_count as c_int
 }
 
@@ -336,15 +363,264 @@ pub unsafe extern "C" fn aether_strdup(s: *const c_char) -> *mut c_char {
     if s.is_null() {
         return ptr::null_mut();
     }
-    
+
     let len = libc::strlen(s);
     let new_str = aether_malloc((len + 1) as c_int) as *mut c_char;
-    
+
     if !new_str.is_null() {
         ptr::copy_nonoverlapping(s, new_str, len + 1);
     }
-    
+
     new_str
+}
+
+/// Write a byte at offset
+#[no_mangle]
+pub unsafe extern "C" fn aether_write_byte(ptr: *mut c_void, offset: c_int, value: c_int) {
+    if ptr.is_null() || offset < 0 {
+        return;
+    }
+
+    let byte_ptr = (ptr as *mut u8).add(offset as usize);
+    *byte_ptr = value as u8;
+}
+
+/// Read a byte at offset
+#[no_mangle]
+pub unsafe extern "C" fn aether_read_byte(ptr: *const c_void, offset: c_int) -> c_int {
+    if ptr.is_null() || offset < 0 {
+        return 0;
+    }
+
+    let byte_ptr = (ptr as *const u8).add(offset as usize);
+    *byte_ptr as c_int
+}
+
+/// Write an i32 at offset
+#[no_mangle]
+pub unsafe extern "C" fn aether_write_i32(ptr: *mut c_void, offset: c_int, value: c_int) {
+    if ptr.is_null() || offset < 0 {
+        return;
+    }
+
+    let i32_ptr = (ptr as *mut u8).add(offset as usize) as *mut c_int;
+    *i32_ptr = value;
+}
+
+/// Read an i32 at offset
+#[no_mangle]
+pub unsafe extern "C" fn aether_read_i32(ptr: *const c_void, offset: c_int) -> c_int {
+    if ptr.is_null() || offset < 0 {
+        return 0;
+    }
+
+    let i32_ptr = (ptr as *const u8).add(offset as usize) as *mut c_int;
+    *i32_ptr
+}
+
+/// Write an i64 at offset
+#[no_mangle]
+pub unsafe extern "C" fn aether_write_i64(ptr: *mut c_void, offset: c_int, value: i64) {
+    if ptr.is_null() || offset < 0 {
+        return;
+    }
+
+    let i64_ptr = (ptr as *mut u8).add(offset as usize) as *mut i64;
+    *i64_ptr = value;
+}
+
+/// Read an i64 at offset
+#[no_mangle]
+pub unsafe extern "C" fn aether_read_i64(ptr: *const c_void, offset: c_int) -> i64 {
+    if ptr.is_null() || offset < 0 {
+        return 0;
+    }
+
+    let i64_ptr = (ptr as *const u8).add(offset as usize) as *mut i64;
+    *i64_ptr
+}
+
+/// Check if pointer is null
+#[no_mangle]
+pub extern "C" fn ptr_is_null(ptr: i64) -> c_int {
+    if ptr == 0 {
+        1
+    } else {
+        0
+    }
+}
+
+/// Convert i64 to i32 (truncate)
+#[no_mangle]
+pub extern "C" fn int64_to_int(value: i64) -> c_int {
+    value as c_int
+}
+
+/// Convert i32 to i64
+#[no_mangle]
+pub extern "C" fn int_to_int64(value: c_int) -> i64 {
+    value as i64
+}
+
+/// Check if a file exists
+#[no_mangle]
+pub unsafe extern "C" fn file_exists(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return 0;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(path);
+    match c_str.to_str() {
+        Ok(path_str) => {
+            if std::path::Path::new(path_str).exists() { 1 } else { 0 }
+        }
+        Err(_) => 0,
+    }
+}
+
+/// Get file size in bytes
+#[no_mangle]
+pub unsafe extern "C" fn file_size(path: *const c_char) -> i64 {
+    if path.is_null() {
+        return -1;
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(path);
+    match c_str.to_str() {
+        Ok(path_str) => {
+            match std::fs::metadata(path_str) {
+                Ok(meta) => meta.len() as i64,
+                Err(_) => -1,
+            }
+        }
+        Err(_) => -1,
+    }
+}
+
+/// Compute SHA256 hash of a file and return as hex string
+/// Returns null on error, caller must free the returned string
+#[no_mangle]
+pub unsafe extern "C" fn sha256_file(path: *const c_char) -> *mut c_char {
+    use sha2::{Sha256, Digest};
+    use std::io::Read;
+
+    if path.is_null() {
+        return ptr::null_mut();
+    }
+
+    let c_str = std::ffi::CStr::from_ptr(path);
+    let path_str = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let mut file = match std::fs::File::open(path_str) {
+        Ok(f) => f,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 8192];
+
+    loop {
+        match file.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(n) => hasher.update(&buffer[..n]),
+            Err(_) => return ptr::null_mut(),
+        }
+    }
+
+    let result = hasher.finalize();
+    let hex_string: String = result.iter().map(|b| format!("{:02x}", b)).collect();
+
+    // Allocate and copy the hex string
+    let c_string = match std::ffi::CString::new(hex_string) {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    aether_strdup(c_string.as_ptr())
+}
+
+/// Verify a file's SHA256 hash matches expected
+/// Returns 1 if matches, 0 if mismatch, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn sha256_verify(path: *const c_char, expected: *const c_char) -> c_int {
+    if path.is_null() || expected.is_null() {
+        return -1;
+    }
+
+    let actual = sha256_file(path);
+    if actual.is_null() {
+        return -1;
+    }
+
+    let result = libc::strcmp(actual, expected);
+    aether_free(actual as *mut c_void);
+
+    if result == 0 { 1 } else { 0 }
+}
+
+/// Copy a file from source to destination
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn file_copy(src: *const c_char, dst: *const c_char) -> c_int {
+    if src.is_null() || dst.is_null() {
+        return -1;
+    }
+
+    let src_str = match std::ffi::CStr::from_ptr(src).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let dst_str = match std::ffi::CStr::from_ptr(dst).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match std::fs::copy(src_str, dst_str) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+/// Create directories recursively
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn mkdir_recursive(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return -1;
+    }
+
+    let path_str = match std::ffi::CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match std::fs::create_dir_all(path_str) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+/// Delete a file
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub unsafe extern "C" fn file_delete(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return -1;
+    }
+
+    let path_str = match std::ffi::CStr::from_ptr(path).to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    match std::fs::remove_file(path_str) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
 }
 
 #[cfg(test)]
@@ -355,7 +631,8 @@ mod tests {
     fn test_malloc_free() {
         unsafe {
             // Test basic allocation
-            let ptr = aether_malloc(100);
+            let ptr_addr = aether_malloc(100);
+            let ptr = ptr_addr as *mut c_void;
             assert!(!ptr.is_null());
             
             // Write and read data
@@ -369,7 +646,7 @@ mod tests {
             }
             
             // Free memory
-            aether_free(ptr);
+            aether_free(ptr_addr);
         }
     }
     
@@ -429,34 +706,130 @@ mod tests {
             // Allocate memory
             let ptr1 = aether_malloc(1000);
             let ptr2 = aether_malloc(2000);
-            
+
             // Add to root set to prevent GC from collecting them
             aether_gc_add_root(ptr1);
             aether_gc_add_root(ptr2);
-            
+
             // Just verify that allocations succeeded
             assert!(!ptr1.is_null());
             assert!(!ptr2.is_null());
             assert!(ptr1 != ptr2);
-            
+
             // Verify memory was actually allocated by checking we can write to it
             *(ptr1 as *mut u8) = 42;
             *(ptr2 as *mut u8) = 43;
             assert_eq!(*(ptr1 as *mut u8), 42);
             assert_eq!(*(ptr2 as *mut u8), 43);
-            
+
             // Remove from root set before freeing
             aether_gc_remove_root(ptr1);
             aether_gc_remove_root(ptr2);
-            
+
             // Free memory
             aether_free(ptr1);
             aether_free(ptr2);
-            
+
             // After freeing, we shouldn't crash when allocating again
             let ptr3 = aether_malloc(500);
             assert!(!ptr3.is_null());
             aether_free(ptr3);
+        }
+    }
+
+    #[test]
+    fn test_byte_access() {
+        unsafe {
+            let ptr_addr = aether_malloc(64);
+            let ptr = ptr_addr as *mut c_void;
+            assert!(!ptr.is_null());
+
+            // Write bytes at various offsets
+            aether_write_byte(ptr, 0, 42);
+            aether_write_byte(ptr, 10, 100);
+            aether_write_byte(ptr, 63, 255);
+
+            // Read them back
+            assert_eq!(aether_read_byte(ptr, 0), 42);
+            assert_eq!(aether_read_byte(ptr, 10), 100);
+            assert_eq!(aether_read_byte(ptr, 63), 255);
+
+            aether_free(ptr_addr);
+        }
+    }
+
+    #[test]
+    fn test_i32_access() {
+        unsafe {
+            let ptr_addr = aether_malloc(64);
+            let ptr = ptr_addr as *mut c_void;
+            assert!(!ptr.is_null());
+
+            // Write i32 values at various offsets
+            aether_write_i32(ptr, 0, 12345);
+            aether_write_i32(ptr, 4, -99999);
+            aether_write_i32(ptr, 60, 2147483647); // Max i32
+
+            // Read them back
+            assert_eq!(aether_read_i32(ptr, 0), 12345);
+            assert_eq!(aether_read_i32(ptr, 4), -99999);
+            assert_eq!(aether_read_i32(ptr, 60), 2147483647);
+
+            aether_free(ptr_addr);
+        }
+    }
+
+    #[test]
+    fn test_i64_access() {
+        unsafe {
+            let ptr_addr = aether_malloc(64);
+            let ptr = ptr_addr as *mut c_void;
+            assert!(!ptr.is_null());
+
+            // Write i64 values at various offsets
+            aether_write_i64(ptr, 0, 9223372036854775807); // Max i64
+            aether_write_i64(ptr, 8, -1234567890123456);
+            aether_write_i64(ptr, 56, 0);
+
+            // Read them back
+            assert_eq!(aether_read_i64(ptr, 0), 9223372036854775807);
+            assert_eq!(aether_read_i64(ptr, 8), -1234567890123456);
+            assert_eq!(aether_read_i64(ptr, 56), 0);
+
+            aether_free(ptr_addr);
+        }
+    }
+
+    #[test]
+    fn test_mixed_access() {
+        unsafe {
+            let ptr_addr = aether_malloc(64);
+            let ptr = ptr_addr as *mut c_void;
+            assert!(!ptr.is_null());
+
+            // Simulate Node4 structure:
+            // Offset 0-3: node_type (i32)
+            // Offset 4-7: num_children (i32)
+            // Offset 8-15: version (i64)
+            // Offset 16-23: partial_key (8 bytes)
+            // Offset 24-27: keys (4 bytes)
+
+            aether_write_i32(ptr, 0, 0); // node_type = NODE4
+            aether_write_i32(ptr, 4, 2); // num_children = 2
+            aether_write_i64(ptr, 8, 42); // version = 42
+
+            // Write keys
+            aether_write_byte(ptr, 24, b'a' as c_int);
+            aether_write_byte(ptr, 25, b'z' as c_int);
+
+            // Read back and verify
+            assert_eq!(aether_read_i32(ptr, 0), 0);
+            assert_eq!(aether_read_i32(ptr, 4), 2);
+            assert_eq!(aether_read_i64(ptr, 8), 42);
+            assert_eq!(aether_read_byte(ptr, 24), b'a' as c_int);
+            assert_eq!(aether_read_byte(ptr, 25), b'z' as c_int);
+
+            aether_free(ptr_addr);
         }
     }
 }

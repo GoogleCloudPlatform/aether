@@ -1,471 +1,94 @@
-; AetherScript Standard Library - Concurrency Primitives
-; Provides safe concurrency operations with deadlock prevention
+module concurrency;
 
-(DEFINE_MODULE
-  (NAME "std.concurrency")
-  (INTENT "Concurrency primitives with safety guarantees and deadlock prevention")
-  
-  ; Concurrency type definitions
-  (DEFINE_TYPE
-    (NAME "thread")
-    (INTENT "Thread handle")
-    (FIELD (NAME "handle") (TYPE INT))
-    (FIELD (NAME "is_alive") (TYPE BOOL)))
-  
-  (DEFINE_TYPE
-    (NAME "mutex")
-    (INTENT "Mutual exclusion lock")
-    (FIELD (NAME "handle") (TYPE INT))
-    (FIELD (NAME "is_locked") (TYPE BOOL))
-    (FIELD (NAME "owner_thread") (TYPE INT)))
-  
-  (DEFINE_TYPE
-    (NAME "semaphore")
-    (INTENT "Counting semaphore")
-    (FIELD (NAME "handle") (TYPE INT))
-    (FIELD (NAME "count") (TYPE INT))
-    (FIELD (NAME "max_count") (TYPE INT)))
-  
-  (DEFINE_TYPE
-    (NAME "channel")
-    (INTENT "Thread-safe message channel")
-    (FIELD (NAME "handle") (TYPE INT))
-    (FIELD (NAME "capacity") (TYPE INT))
-    (FIELD (NAME "is_closed") (TYPE BOOL)))
-  
-  (DEFINE_TYPE
-    (NAME "atomic_int")
-    (INTENT "Atomic integer for lock-free operations")
-    (FIELD (NAME "value") (TYPE INT)))
-  
-  ; Thread operations
-  
-  (DEFINE_FUNCTION
-    (NAME "thread_create")
-    (INTENT "Create and start a new thread")
-    (ACCEPTS_PARAMETER (NAME "function") (TYPE (FUNCTION () VOID)) (INTENT "Function to run in thread"))
-    (ACCEPTS_PARAMETER (NAME "stack_size") (TYPE INT) (INTENT "Stack size in bytes"))
-    (RETURNS (TYPE "thread"))
-    
-    (PRECONDITION
-      (LOGICAL_AND
-        (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "function") (NULL_LITERAL))
-        (PREDICATE_GREATER_THAN (VARIABLE_REFERENCE "stack_size") (INTEGER_LITERAL 4096)))
-      (PROOF_HINT "Valid function and stack size"))
-    
-    (POSTCONDITION
-      (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "is_alive")
-      (PROOF_HINT "Created thread is alive"))
-    
-    (RESOURCE_CONTRACT
-      (MAX_MEMORY_MB (EXPRESSION_DIVIDE (VARIABLE_REFERENCE "stack_size") (INTEGER_LITERAL 1048576)))
-      (ENFORCEMENT RUNTIME))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (CREATES "thread"))
-      (EXCEPTION_SAFETY STRONG))
-    
-    (BODY
-      (DECLARE_VARIABLE (NAME "thread") (TYPE "thread"))
-      
-      (DECLARE_VARIABLE (NAME "handle") (TYPE INT)
-        (INITIAL_VALUE (CALL_FUNCTION "aether_thread_create"
-          (ARGUMENTS 
-            (VARIABLE_REFERENCE "function")
-            (VARIABLE_REFERENCE "stack_size")))))
-      
-      (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "handle") (INTEGER_LITERAL 0))
-        (THEN_EXECUTE
-          (THROW_EXCEPTION (TYPE "concurrency_error")
-            (MESSAGE (STRING_LITERAL "Failed to create thread")))))
-      
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "thread") "handle"))
-        (SOURCE (VARIABLE_REFERENCE "handle")))
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "thread") "is_alive"))
-        (SOURCE (BOOL_LITERAL TRUE)))
-      
-      (RETURN_VALUE (VARIABLE_REFERENCE "thread"))))
-  
-  (DEFINE_FUNCTION
-    (NAME "thread_join")
-    (INTENT "Wait for thread to complete")
-    (ACCEPTS_PARAMETER (NAME "thread") (TYPE "thread") (INTENT "Thread to join"))
-    (ACCEPTS_PARAMETER (NAME "timeout_ms") (TYPE INT) (INTENT "Timeout in milliseconds, -1 for infinite"))
-    (RETURNS (TYPE BOOL))
-    
-    (PRECONDITION
-      (FIELD_ACCESS (VARIABLE_REFERENCE "thread") "is_alive")
-      (PROOF_HINT "Thread must be alive"))
-    
-    (POSTCONDITION
-      (LOGICAL_IMPLICATION
-        (VARIABLE_REFERENCE "RETURNED_VALUE")
-        (PREDICATE_NOT (FIELD_ACCESS (VARIABLE_REFERENCE "thread") "is_alive")))
-      (PROOF_HINT "Successful join means thread is no longer alive"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (MODIFIES "thread"))
-      (EXCEPTION_SAFETY NO_THROW))
-    
-    (BODY
-      (DECLARE_VARIABLE (NAME "result") (TYPE BOOL)
-        (INITIAL_VALUE (CALL_FUNCTION "aether_thread_join"
-          (ARGUMENTS 
-            (FIELD_ACCESS (VARIABLE_REFERENCE "thread") "handle")
-            (VARIABLE_REFERENCE "timeout_ms")))))
-      
-      (IF_CONDITION (VARIABLE_REFERENCE "result")
-        (THEN_EXECUTE
-          (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "thread") "is_alive"))
-            (SOURCE (BOOL_LITERAL FALSE)))))
-      
-      (RETURN_VALUE (VARIABLE_REFERENCE "result"))))
-  
-  ; Mutex operations
-  
-  (DEFINE_FUNCTION
-    (NAME "mutex_create")
-    (INTENT "Create a new mutex")
-    (RETURNS (TYPE "mutex"))
-    
-    (POSTCONDITION
-      (PREDICATE_NOT (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "is_locked"))
-      (PROOF_HINT "New mutex is unlocked"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (CREATES "mutex"))
-      (EXCEPTION_SAFETY STRONG))
-    
-    (BODY
-      (DECLARE_VARIABLE (NAME "mutex") (TYPE "mutex"))
-      
-      (DECLARE_VARIABLE (NAME "handle") (TYPE INT)
-        (INITIAL_VALUE (CALL_FUNCTION "aether_mutex_create" (ARGUMENTS))))
-      
-      (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "handle") (INTEGER_LITERAL 0))
-        (THEN_EXECUTE
-          (THROW_EXCEPTION (TYPE "concurrency_error")
-            (MESSAGE (STRING_LITERAL "Failed to create mutex")))))
-      
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "handle"))
-        (SOURCE (VARIABLE_REFERENCE "handle")))
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "is_locked"))
-        (SOURCE (BOOL_LITERAL FALSE)))
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "owner_thread"))
-        (SOURCE (INTEGER_LITERAL -1)))
-      
-      (RETURN_VALUE (VARIABLE_REFERENCE "mutex"))))
-  
-  (DEFINE_FUNCTION
-    (NAME "mutex_lock")
-    (INTENT "Lock mutex with deadlock prevention")
-    (ACCEPTS_PARAMETER (NAME "mutex") (TYPE "mutex") (INTENT "Mutex to lock"))
-    (ACCEPTS_PARAMETER (NAME "timeout_ms") (TYPE INT) (INTENT "Lock timeout, -1 for infinite"))
-    (RETURNS (TYPE BOOL))
-    
-    (PRECONDITION
-      (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "mutex") (NULL_LITERAL))
-      (PROOF_HINT "Valid mutex"))
-    
-    (POSTCONDITION
-      (LOGICAL_IMPLICATION
-        (VARIABLE_REFERENCE "RETURNED_VALUE")
-        (LOGICAL_AND
-          (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "is_locked")
-          (PREDICATE_EQUALS 
-            (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "owner_thread")
-            (CALL_FUNCTION "thread_current_id" (ARGUMENTS)))))
-      (PROOF_HINT "Successful lock means mutex is locked by current thread"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (MODIFIES "mutex"))
-      (EXCEPTION_SAFETY STRONG))
-    
-    (BODY
-      ; Check for recursive lock attempt (deadlock prevention)
-      (IF_CONDITION (LOGICAL_AND
-          (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "is_locked")
-          (PREDICATE_EQUALS 
-            (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "owner_thread")
-            (CALL_FUNCTION "thread_current_id" (ARGUMENTS))))
-        (THEN_EXECUTE
-          (THROW_EXCEPTION (TYPE "deadlock_error")
-            (MESSAGE (STRING_LITERAL "Recursive mutex lock detected")))))
-      
-      (DECLARE_VARIABLE (NAME "result") (TYPE BOOL)
-        (INITIAL_VALUE (CALL_FUNCTION "aether_mutex_lock"
-          (ARGUMENTS 
-            (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "handle")
-            (VARIABLE_REFERENCE "timeout_ms")))))
-      
-      (IF_CONDITION (VARIABLE_REFERENCE "result")
-        (THEN_EXECUTE
-          (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "is_locked"))
-            (SOURCE (BOOL_LITERAL TRUE)))
-          (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "owner_thread"))
-            (SOURCE (CALL_FUNCTION "thread_current_id" (ARGUMENTS))))))
-      
-      (RETURN_VALUE (VARIABLE_REFERENCE "result"))))
-  
-  (DEFINE_FUNCTION
-    (NAME "mutex_unlock")
-    (INTENT "Unlock mutex safely")
-    (ACCEPTS_PARAMETER (NAME "mutex") (TYPE "mutex") (INTENT "Mutex to unlock"))
-    (RETURNS (TYPE VOID))
-    
-    (PRECONDITION
-      (LOGICAL_AND
-        (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "is_locked")
-        (PREDICATE_EQUALS 
-          (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "owner_thread")
-          (CALL_FUNCTION "thread_current_id" (ARGUMENTS))))
-      (PROOF_HINT "Mutex must be locked by current thread"))
-    
-    (POSTCONDITION
-      (PREDICATE_NOT (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "is_locked"))
-      (PROOF_HINT "Mutex is unlocked after call"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (MODIFIES "mutex"))
-      (EXCEPTION_SAFETY NO_THROW))
-    
-    (BODY
-      (CALL_FUNCTION "aether_mutex_unlock"
-        (ARGUMENTS (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "handle")))
-      
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "is_locked"))
-        (SOURCE (BOOL_LITERAL FALSE)))
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "mutex") "owner_thread"))
-        (SOURCE (INTEGER_LITERAL -1)))
-      
-      (RETURN_VOID)))
-  
-  ; Channel operations
-  
-  (DEFINE_FUNCTION
-    (NAME "channel_create")
-    (INTENT "Create thread-safe message channel")
-    (ACCEPTS_PARAMETER (NAME "capacity") (TYPE INT) (INTENT "Channel capacity, 0 for unbuffered"))
-    (RETURNS (TYPE "channel"))
-    
-    (PRECONDITION
-      (PREDICATE_GREATER_THAN_OR_EQUAL_TO (VARIABLE_REFERENCE "capacity") (INTEGER_LITERAL 0))
-      (PROOF_HINT "Capacity must be non-negative"))
-    
-    (POSTCONDITION
-      (PREDICATE_NOT (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "is_closed"))
-      (PROOF_HINT "New channel is open"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (CREATES "channel"))
-      (EXCEPTION_SAFETY STRONG))
-    
-    (BODY
-      (DECLARE_VARIABLE (NAME "channel") (TYPE "channel"))
-      
-      (DECLARE_VARIABLE (NAME "handle") (TYPE INT)
-        (INITIAL_VALUE (CALL_FUNCTION "aether_channel_create"
-          (ARGUMENTS (VARIABLE_REFERENCE "capacity")))))
-      
-      (IF_CONDITION (PREDICATE_LESS_THAN (VARIABLE_REFERENCE "handle") (INTEGER_LITERAL 0))
-        (THEN_EXECUTE
-          (THROW_EXCEPTION (TYPE "concurrency_error")
-            (MESSAGE (STRING_LITERAL "Failed to create channel")))))
-      
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "channel") "handle"))
-        (SOURCE (VARIABLE_REFERENCE "handle")))
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "channel") "capacity"))
-        (SOURCE (VARIABLE_REFERENCE "capacity")))
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "channel") "is_closed"))
-        (SOURCE (BOOL_LITERAL FALSE)))
-      
-      (RETURN_VALUE (VARIABLE_REFERENCE "channel"))))
-  
-  (DEFINE_FUNCTION
-    (NAME "channel_send")
-    (INTENT "Send message through channel")
-    (ACCEPTS_PARAMETER (NAME "channel") (TYPE "channel") (INTENT "Channel to send on"))
-    (ACCEPTS_PARAMETER (NAME "message") (TYPE INT) (INTENT "Message to send"))
-    (ACCEPTS_PARAMETER (NAME "timeout_ms") (TYPE INT) (INTENT "Send timeout"))
-    (RETURNS (TYPE BOOL))
-    
-    (PRECONDITION
-      (PREDICATE_NOT (FIELD_ACCESS (VARIABLE_REFERENCE "channel") "is_closed"))
-      (PROOF_HINT "Channel must be open"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (WRITES "channel"))
-      (EXCEPTION_SAFETY BASIC))
-    
-    (BODY
-      (RETURN_VALUE (CALL_FUNCTION "aether_channel_send"
-        (ARGUMENTS 
-          (FIELD_ACCESS (VARIABLE_REFERENCE "channel") "handle")
-          (VARIABLE_REFERENCE "message")
-          (VARIABLE_REFERENCE "timeout_ms"))))))
-  
-  (DEFINE_FUNCTION
-    (NAME "channel_receive")
-    (INTENT "Receive message from channel")
-    (ACCEPTS_PARAMETER (NAME "channel") (TYPE "channel") (INTENT "Channel to receive from"))
-    (ACCEPTS_PARAMETER (NAME "timeout_ms") (TYPE INT) (INTENT "Receive timeout"))
-    (ACCEPTS_PARAMETER (NAME "message") (TYPE (POINTER INT)) (INTENT "Output for received message"))
-    (RETURNS (TYPE BOOL))
-    
-    (PRECONDITION
-      (PREDICATE_NOT_EQUALS (VARIABLE_REFERENCE "message") (NULL_LITERAL))
-      (PROOF_HINT "Message pointer must be valid"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (READS "channel") (MODIFIES "message"))
-      (EXCEPTION_SAFETY BASIC))
-    
-    (BODY
-      (RETURN_VALUE (CALL_FUNCTION "aether_channel_receive"
-        (ARGUMENTS 
-          (FIELD_ACCESS (VARIABLE_REFERENCE "channel") "handle")
-          (VARIABLE_REFERENCE "message")
-          (VARIABLE_REFERENCE "timeout_ms"))))))
-  
-  ; Atomic operations
-  
-  (DEFINE_FUNCTION
-    (NAME "atomic_create")
-    (INTENT "Create atomic integer")
-    (ACCEPTS_PARAMETER (NAME "initial") (TYPE INT) (INTENT "Initial value"))
-    (RETURNS (TYPE "atomic_int"))
-    
-    (POSTCONDITION
-      (PREDICATE_EQUALS 
-        (FIELD_ACCESS (VARIABLE_REFERENCE "RETURNED_VALUE") "value")
-        (VARIABLE_REFERENCE "initial"))
-      (PROOF_HINT "Atomic has initial value"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE TRUE)
-      (DETERMINISTIC TRUE))
-    
-    (BODY
-      (DECLARE_VARIABLE (NAME "atomic") (TYPE "atomic_int"))
-      (ASSIGN (TARGET (FIELD_ACCESS (VARIABLE_REFERENCE "atomic") "value"))
-        (SOURCE (VARIABLE_REFERENCE "initial")))
-      (RETURN_VALUE (VARIABLE_REFERENCE "atomic"))))
-  
-  (DEFINE_FUNCTION
-    (NAME "atomic_load")
-    (INTENT "Atomically load value")
-    (ACCEPTS_PARAMETER (NAME "atomic") (TYPE "atomic_int") (INTENT "Atomic to read"))
-    (RETURNS (TYPE INT))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (READS "atomic"))
-      (DETERMINISTIC FALSE))
-    
-    (BODY
-      (RETURN_VALUE (CALL_FUNCTION "aether_atomic_load"
-        (ARGUMENTS (ADDRESS_OF (FIELD_ACCESS (VARIABLE_REFERENCE "atomic") "value")))))))
-  
-  (DEFINE_FUNCTION
-    (NAME "atomic_store")
-    (INTENT "Atomically store value")
-    (ACCEPTS_PARAMETER (NAME "atomic") (TYPE "atomic_int") (INTENT "Atomic to write"))
-    (ACCEPTS_PARAMETER (NAME "value") (TYPE INT) (INTENT "Value to store"))
-    (RETURNS (TYPE VOID))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (MODIFIES "atomic"))
-      (DETERMINISTIC TRUE))
-    
-    (BODY
-      (CALL_FUNCTION "aether_atomic_store"
-        (ARGUMENTS 
-          (ADDRESS_OF (FIELD_ACCESS (VARIABLE_REFERENCE "atomic") "value"))
-          (VARIABLE_REFERENCE "value")))
-      (RETURN_VOID)))
-  
-  (DEFINE_FUNCTION
-    (NAME "atomic_add")
-    (INTENT "Atomically add to value")
-    (ACCEPTS_PARAMETER (NAME "atomic") (TYPE "atomic_int") (INTENT "Atomic to modify"))
-    (ACCEPTS_PARAMETER (NAME "delta") (TYPE INT) (INTENT "Value to add"))
-    (RETURNS (TYPE INT))
-    
-    (POSTCONDITION
-      (PREDICATE_EQUALS 
-        (VARIABLE_REFERENCE "RETURNED_VALUE")
-        (EXPRESSION_ADD 
-          (VARIABLE_REFERENCE "atomic@pre.value")
-          (VARIABLE_REFERENCE "delta")))
-      (PROOF_HINT "Returns new value after addition"))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (MODIFIES "atomic"))
-      (DETERMINISTIC TRUE))
-    
-    (BODY
-      (RETURN_VALUE (CALL_FUNCTION "aether_atomic_fetch_add"
-        (ARGUMENTS 
-          (ADDRESS_OF (FIELD_ACCESS (VARIABLE_REFERENCE "atomic") "value"))
-          (VARIABLE_REFERENCE "delta"))))))
-  
-  ; Utility functions
-  
-  (DEFINE_FUNCTION
-    (NAME "thread_current_id")
-    (INTENT "Get current thread ID")
-    (RETURNS (TYPE INT))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS NONE)
-      (DETERMINISTIC FALSE))
-    
-    (BODY
-      (RETURN_VALUE (CALL_FUNCTION "aether_thread_current_id" (ARGUMENTS)))))
-  
-  (DEFINE_FUNCTION
-    (NAME "thread_yield")
-    (INTENT "Yield current thread's time slice")
-    (RETURNS (TYPE VOID))
-    
-    (BEHAVIORAL_SPEC
-      (PURE FALSE)
-      (SIDE_EFFECTS (MODIFIES "scheduler"))
-      (DETERMINISTIC FALSE))
-    
-    (BODY
-      (CALL_FUNCTION "aether_thread_yield" (ARGUMENTS))
-      (RETURN_VOID)))
-  
-  ; Export all types and functions
-  (EXPORT_TYPE "thread")
-  (EXPORT_TYPE "mutex")
-  (EXPORT_TYPE "semaphore")
-  (EXPORT_TYPE "channel")
-  (EXPORT_TYPE "atomic_int")
-  (EXPORT_FUNCTION "thread_create")
-  (EXPORT_FUNCTION "thread_join")
-  (EXPORT_FUNCTION "mutex_create")
-  (EXPORT_FUNCTION "mutex_lock")
-  (EXPORT_FUNCTION "mutex_unlock")
-  (EXPORT_FUNCTION "channel_create")
-  (EXPORT_FUNCTION "channel_send")
-  (EXPORT_FUNCTION "channel_receive")
-  (EXPORT_FUNCTION "atomic_create")
-  (EXPORT_FUNCTION "atomic_load")
-  (EXPORT_FUNCTION "atomic_store")
-  (EXPORT_FUNCTION "atomic_add")
-  (EXPORT_FUNCTION "thread_current_id")
-  (EXPORT_FUNCTION "thread_yield")
-)
+// Threading types
+pub struct Thread {
+  handle: Int,
+  is_alive: Bool,
+}
+
+pub struct Mutex {
+  handle: Int,
+  is_locked: Bool,
+  owner_thread: Int,
+}
+
+pub struct Semaphore {
+  handle: Int,
+  count: Int,
+  max_count: Int,
+}
+
+pub struct Channel {
+  handle: Int,
+  capacity: Int,
+  is_closed: Bool,
+}
+
+pub struct AtomicInt {
+  value: Int,
+}
+
+// Future type for async/await
+pub struct Future<T> {
+  handle: Int,
+}
+
+// Extern declarations
+@extern(library: "aether_runtime", symbol: "aether_thread_create")
+func aether_thread_create(function: Int, stack_size: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_thread_join")
+func aether_thread_join(handle: Int, timeout_ms: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_thread_current_id")
+func aether_thread_current_id() -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_thread_yield")
+func aether_thread_yield() -> Void;
+
+@extern(library: "aether_runtime", symbol: "aether_mutex_create")
+func aether_mutex_create() -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_mutex_lock")
+func aether_mutex_lock(handle: Int, timeout_ms: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_mutex_unlock")
+func aether_mutex_unlock(handle: Int) -> Void;
+
+@extern(library: "aether_runtime", symbol: "aether_channel_create")
+func aether_channel_create(capacity: Int) -> Int;
+
+@extern(library: "aether_runtime", symbol: "aether_channel_send")
+func aether_channel_send(handle: Int, value: Int, timeout_ms: Int) -> Int;
+
+// Note: channel_receive expects a pointer to value, which we can't easily represent in V2 yet without pointers
+// We'll use a wrapper or simplified version if needed.
+// For now, let's skip complex channel ops if they require pointers not yet fully exposed in V2 syntax.
+
+// Wrappers
+
+pub func thread_yield() -> Void {
+  aether_thread_yield();
+}
+
+pub func thread_current_id() -> Int {
+  return aether_thread_current_id();
+}
+
+pub func mutex_create() -> Mutex {
+  let handle = aether_mutex_create();
+  return Mutex {
+    handle: handle,
+    is_locked: false,
+    owner_thread: -1
+  };
+}
+
+pub func mutex_lock(mutex: Mutex, timeout_ms: Int) -> Bool {
+  let res = aether_mutex_lock(mutex.handle, timeout_ms);
+  return {res > 0};
+}
+
+pub func mutex_unlock(mutex: Mutex) -> Void {
+  aether_mutex_unlock(mutex.handle);
+}

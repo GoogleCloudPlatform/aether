@@ -1,0 +1,20 @@
+// Let Bindings Example
+// Demonstrates immutable variable declarations
+
+module let_bindings;
+
+func main() -> Int {
+    // Basic let binding with type annotation
+    let x: Int = 42;
+    let y: Int = 100;
+
+    // Using variables in expressions
+    let sum: Int = x + y;
+    let product: Int = x * y;
+
+    // Different types
+    let flag: Bool = true;
+    let pi: Float = 3.14159;
+
+    return 0;
+}

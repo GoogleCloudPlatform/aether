@@ -1,0 +1,740 @@
+module GGUFParserTest;
+
+// ============================================================================
+// Tests for GGUF Model File Parser
+// ============================================================================
+// Task 4.1: Parse GGUF model files (header, metadata, tensor info)
+// GGUF Format: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Type Conversion ---
+@extern(library="aether_runtime", symbol="ptr_is_null")
+func ptr_is_null(ptr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int64_to_int")
+func int64_to_int(value: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_to_int64")
+func int_to_int64(value: Int) -> Int64;
+
+// --- FFI: Memory Operations ---
+@extern(library="aether_runtime", symbol="aether_malloc")
+func aether_malloc(size: Int) -> Int64;
+
+// Note: aether_free has FFI signature issues with pointer types
+// For now, we'll skip freeing test buffers (small memory leak in tests only)
+
+@extern(library="aether_runtime", symbol="aether_read_byte")
+func aether_read_byte(ptr: Int64, offset: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="aether_read_i32")
+func aether_read_i32(ptr: Int64, offset: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="aether_read_i64")
+func aether_read_i64(ptr: Int64, offset: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="aether_write_byte")
+func aether_write_byte(ptr: Int64, offset: Int, value: Int) -> Void;
+
+@extern(library="aether_runtime", symbol="aether_write_i32")
+func aether_write_i32(ptr: Int64, offset: Int, value: Int) -> Void;
+
+@extern(library="aether_runtime", symbol="aether_write_i64")
+func aether_write_i64(ptr: Int64, offset: Int, value: Int64) -> Void;
+
+// --- FFI: File Operations ---
+@extern(library="aether_runtime", symbol="aether_open_file")
+func aether_open_file(path: String, mode: String) -> Int64;
+
+@extern(library="aether_runtime", symbol="aether_close_file")
+func aether_close_file(handle: Int64) -> Void;
+
+@extern(library="aether_runtime", symbol="aether_file_size")
+func aether_file_size(handle: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="aether_read_file")
+func aether_read_file(handle: Int64, buffer: Int64, size: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="aether_write_file")
+func aether_write_file(handle: Int64, data: Int64, size: Int) -> Int;
+
+// --- FFI: Int Array (for storing parsed data) ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// GGUF Constants
+// ============================================================================
+
+// GGUF Magic: "GGUF" = 0x46554747 (little-endian: G G U F)
+// Byte 0: 'G' = 0x47 = 71
+// Byte 1: 'G' = 0x47 = 71
+// Byte 2: 'U' = 0x55 = 85
+// Byte 3: 'F' = 0x46 = 70
+
+func gguf_magic_byte0() -> Int { return 71; }  // 'G'
+func gguf_magic_byte1() -> Int { return 71; }  // 'G'
+func gguf_magic_byte2() -> Int { return 85; }  // 'U'
+func gguf_magic_byte3() -> Int { return 70; }  // 'F'
+
+// GGUF Version (current is 3)
+func gguf_version() -> Int { return 3; }
+
+// GGUF Value Types
+func gguf_type_uint8() -> Int { return 0; }
+func gguf_type_int8() -> Int { return 1; }
+func gguf_type_uint16() -> Int { return 2; }
+func gguf_type_int16() -> Int { return 3; }
+func gguf_type_uint32() -> Int { return 4; }
+func gguf_type_int32() -> Int { return 5; }
+func gguf_type_float32() -> Int { return 6; }
+func gguf_type_bool() -> Int { return 7; }
+func gguf_type_string() -> Int { return 8; }
+func gguf_type_array() -> Int { return 9; }
+func gguf_type_uint64() -> Int { return 10; }
+func gguf_type_int64() -> Int { return 11; }
+func gguf_type_float64() -> Int { return 12; }
+
+// GGUF Tensor Types (ggml_type)
+func ggml_type_f32() -> Int { return 0; }
+func ggml_type_f16() -> Int { return 1; }
+func ggml_type_q4_0() -> Int { return 2; }
+func ggml_type_q4_1() -> Int { return 3; }
+func ggml_type_q5_0() -> Int { return 6; }
+func ggml_type_q5_1() -> Int { return 7; }
+func ggml_type_q8_0() -> Int { return 8; }
+
+// ============================================================================
+// GGUF Header Parsing
+// ============================================================================
+
+// GGUF Header structure:
+// Offset 0:  Magic (4 bytes) "GGUF"
+// Offset 4:  Version (4 bytes, uint32)
+// Offset 8:  Tensor count (8 bytes, uint64)
+// Offset 16: Metadata KV count (8 bytes, uint64)
+// Total header size: 24 bytes
+
+// Check if buffer contains valid GGUF magic
+func gguf_check_magic(buffer: Int64) -> Bool {
+    let b0 = aether_read_byte(buffer, 0);
+    let b1 = aether_read_byte(buffer, 1);
+    let b2 = aether_read_byte(buffer, 2);
+    let b3 = aether_read_byte(buffer, 3);
+
+    if ({b0 != gguf_magic_byte0()}) {
+        return false;
+    }
+    if ({b1 != gguf_magic_byte1()}) {
+        return false;
+    }
+    if ({b2 != gguf_magic_byte2()}) {
+        return false;
+    }
+    if ({b3 != gguf_magic_byte3()}) {
+        return false;
+    }
+    return true;
+}
+
+// Read GGUF version from buffer
+func gguf_read_version(buffer: Int64) -> Int {
+    return aether_read_i32(buffer, 4);
+}
+
+// Read tensor count from buffer
+func gguf_read_tensor_count(buffer: Int64) -> Int64 {
+    return aether_read_i64(buffer, 8);
+}
+
+// Read metadata KV count from buffer
+func gguf_read_metadata_kv_count(buffer: Int64) -> Int64 {
+    return aether_read_i64(buffer, 16);
+}
+
+// ============================================================================
+// GGUF Metadata Parsing
+// ============================================================================
+
+// Read a string from buffer (length-prefixed)
+// Returns: length of string, stores characters in provided array
+func gguf_read_string_length(buffer: Int64, offset: Int) -> Int64 {
+    return aether_read_i64(buffer, offset);
+}
+
+// Read string bytes into int array (for now, we'll just skip strings)
+// offset points to start of string (after length)
+func gguf_skip_string(buffer: Int64, offset: Int) -> Int {
+    let len = aether_read_i64(buffer, offset);
+    // String length is 8 bytes, plus the string content
+    return {{offset + 8} + int64_to_int(len)};
+}
+
+// Read value type
+func gguf_read_value_type(buffer: Int64, offset: Int) -> Int {
+    return aether_read_i32(buffer, offset);
+}
+
+// Skip a value based on its type, returns new offset
+func gguf_skip_value(buffer: Int64, offset: Int, value_type: Int) -> Int {
+    // uint8, int8, bool: 1 byte
+    if ({value_type == 0}) { return {offset + 1}; }
+    if ({value_type == 1}) { return {offset + 1}; }
+    if ({value_type == 7}) { return {offset + 1}; }
+
+    // uint16, int16: 2 bytes
+    if ({value_type == 2}) { return {offset + 2}; }
+    if ({value_type == 3}) { return {offset + 2}; }
+
+    // uint32, int32, float32: 4 bytes
+    if ({value_type == 4}) { return {offset + 4}; }
+    if ({value_type == 5}) { return {offset + 4}; }
+    if ({value_type == 6}) { return {offset + 4}; }
+
+    // uint64, int64, float64: 8 bytes
+    if ({value_type == 10}) { return {offset + 8}; }
+    if ({value_type == 11}) { return {offset + 8}; }
+    if ({value_type == 12}) { return {offset + 8}; }
+
+    // string: 8 bytes length + content
+    if ({value_type == 8}) {
+        return gguf_skip_string(buffer, offset);
+    }
+
+    // array: type (4) + count (8) + elements
+    if ({value_type == 9}) {
+        let elem_type = aether_read_i32(buffer, offset);
+        let count_i64 = aether_read_i64(buffer, {offset + 4});
+        let count = int64_to_int(count_i64);
+        let mut pos = {offset + 12};
+        let mut i = 0;
+        while ({i < count}) {
+            pos = gguf_skip_value(buffer, pos, elem_type);
+            i = {i + 1};
+        }
+        return pos;
+    }
+
+    // Unknown type, return offset unchanged
+    return offset;
+}
+
+// Skip a metadata key-value pair, returns new offset
+func gguf_skip_kv(buffer: Int64, offset: Int) -> Int {
+    // Skip key (string)
+    let after_key = gguf_skip_string(buffer, offset);
+    // Read value type
+    let value_type = gguf_read_value_type(buffer, after_key);
+    // Skip value
+    return gguf_skip_value(buffer, {after_key + 4}, value_type);
+}
+
+// ============================================================================
+// GGUF Tensor Info Parsing
+// ============================================================================
+
+// Tensor info structure:
+// - Name: string (8 bytes length + content)
+// - N dimensions: uint32 (4 bytes)
+// - Dimensions: uint64 array (8 * n_dims bytes)
+// - Type: uint32 (4 bytes)
+// - Offset: uint64 (8 bytes)
+
+// Skip tensor info entry, returns new offset
+func gguf_skip_tensor_info(buffer: Int64, offset: Int) -> Int {
+    // Skip name
+    let after_name = gguf_skip_string(buffer, offset);
+    // Read n_dims
+    let n_dims = aether_read_i32(buffer, after_name);
+    // Skip dimensions
+    let after_dims = {after_name + 4 + {n_dims * 8}};
+    // Skip type (4 bytes) and offset (8 bytes)
+    return {after_dims + 12};
+}
+
+// Read tensor name length
+func gguf_read_tensor_name_length(buffer: Int64, offset: Int) -> Int64 {
+    return aether_read_i64(buffer, offset);
+}
+
+// Read tensor n_dims
+func gguf_read_tensor_ndims(buffer: Int64, offset: Int, name_length: Int) -> Int {
+    // Name is 8 bytes length + content, then n_dims
+    return aether_read_i32(buffer, {offset + 8 + name_length});
+}
+
+// Read tensor dimension at index
+func gguf_read_tensor_dim(buffer: Int64, offset: Int, name_length: Int, dim_idx: Int) -> Int64 {
+    let dims_start = {offset + 8 + name_length + 4};
+    return aether_read_i64(buffer, {dims_start + {dim_idx * 8}});
+}
+
+// Read tensor type
+func gguf_read_tensor_type(buffer: Int64, offset: Int, name_length: Int, n_dims: Int) -> Int {
+    let type_offset = {offset + 8 + name_length + 4 + {n_dims * 8}};
+    return aether_read_i32(buffer, type_offset);
+}
+
+// Read tensor data offset
+func gguf_read_tensor_offset(buffer: Int64, offset: Int, name_length: Int, n_dims: Int) -> Int64 {
+    let offset_loc = {offset + 8 + name_length + 4 + {n_dims * 8} + 4};
+    return aether_read_i64(buffer, offset_loc);
+}
+
+// ============================================================================
+// GGUF File Loading
+// ============================================================================
+
+// Parse result codes
+func gguf_ok() -> Int { return 0; }
+func gguf_err_open_failed() -> Int { return -1; }
+func gguf_err_read_failed() -> Int { return -2; }
+func gguf_err_invalid_magic() -> Int { return -3; }
+func gguf_err_unsupported_version() -> Int { return -4; }
+func gguf_err_alloc_failed() -> Int { return -5; }
+
+// ============================================================================
+// Test Helper: Create a minimal GGUF buffer in memory
+// ============================================================================
+
+func create_test_gguf_header(tensor_count: Int64, metadata_count: Int64) -> Int64 {
+    // Allocate buffer for header (24 bytes)
+    let buffer = aether_malloc(24);
+    if ({ptr_is_null(buffer) == 1}) {
+        return int_to_int64(0);
+    }
+
+    // Write magic "GGUF"
+    aether_write_byte(buffer, 0, 71);  // 'G'
+    aether_write_byte(buffer, 1, 71);  // 'G'
+    aether_write_byte(buffer, 2, 85);  // 'U'
+    aether_write_byte(buffer, 3, 70);  // 'F'
+
+    // Write version (3)
+    aether_write_i32(buffer, 4, 3);
+
+    // Write tensor count
+    aether_write_i64(buffer, 8, tensor_count);
+
+    // Write metadata KV count
+    aether_write_i64(buffer, 16, metadata_count);
+
+    return buffer;
+}
+
+// Create a more complete test GGUF with metadata
+func create_test_gguf_with_metadata() -> Int64 {
+    // Header (24) + 1 metadata KV (key "test" + int32 value 42)
+    // Key: length (8) + "test" (4) = 12 bytes
+    // Value: type (4) + value (4) = 8 bytes
+    // Total: 24 + 12 + 8 = 44 bytes
+
+    let buffer = aether_malloc(64);  // Extra space for safety
+    if ({ptr_is_null(buffer) == 1}) {
+        return int_to_int64(0);
+    }
+
+    // Write header
+    aether_write_byte(buffer, 0, 71);   // 'G'
+    aether_write_byte(buffer, 1, 71);   // 'G'
+    aether_write_byte(buffer, 2, 85);   // 'U'
+    aether_write_byte(buffer, 3, 70);   // 'F'
+    aether_write_i32(buffer, 4, 3);     // Version
+    aether_write_i64(buffer, 8, int_to_int64(1));     // 1 tensor
+    aether_write_i64(buffer, 16, int_to_int64(1));    // 1 metadata KV
+
+    // Write metadata key "test"
+    aether_write_i64(buffer, 24, int_to_int64(4));    // Key length = 4
+    aether_write_byte(buffer, 32, 116); // 't'
+    aether_write_byte(buffer, 33, 101); // 'e'
+    aether_write_byte(buffer, 34, 115); // 's'
+    aether_write_byte(buffer, 35, 116); // 't'
+
+    // Write value type (int32 = 5) and value (42)
+    aether_write_i32(buffer, 36, 5);    // Type: int32
+    aether_write_i32(buffer, 40, 42);   // Value: 42
+
+    // Write tensor info "weights"
+    aether_write_i64(buffer, 44, int_to_int64(7));    // Name length = 7
+    aether_write_byte(buffer, 52, 119); // 'w'
+    aether_write_byte(buffer, 53, 101); // 'e'
+    aether_write_byte(buffer, 54, 105); // 'i'
+    aether_write_byte(buffer, 55, 103); // 'g'
+    aether_write_byte(buffer, 56, 104); // 'h'
+    aether_write_byte(buffer, 57, 116); // 't'
+    aether_write_byte(buffer, 58, 115); // 's'
+
+    // n_dims = 2
+    aether_write_i32(buffer, 59, 2);
+
+    // This would need more bytes for dims, type, offset...
+    // For now, just the basic header test
+
+    return buffer;
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+func test_gguf_magic() -> Bool {
+    println("=== Test: GGUF Magic Check ===");
+
+    let buffer = create_test_gguf_header(int_to_int64(0), int_to_int64(0));
+    if ({ptr_is_null(buffer) == 1}) {
+        println("FAIL: Could not allocate buffer");
+        return false;
+    }
+
+    if (!gguf_check_magic(buffer)) {
+        println("FAIL: Valid magic not detected");
+        
+        return false;
+    }
+
+    // Corrupt magic and verify detection
+    aether_write_byte(buffer, 0, 0);
+    if (gguf_check_magic(buffer)) {
+        println("FAIL: Corrupted magic not detected");
+        
+        return false;
+    }
+
+    
+    println("PASS: GGUF Magic Check");
+    return true;
+}
+
+func test_gguf_version() -> Bool {
+    println("=== Test: GGUF Version Read ===");
+
+    let buffer = create_test_gguf_header(int_to_int64(0), int_to_int64(0));
+    if ({ptr_is_null(buffer) == 1}) {
+        println("FAIL: Could not allocate buffer");
+        return false;
+    }
+
+    let version = gguf_read_version(buffer);
+    if ({version != 3}) {
+        aether_print("FAIL: Expected version 3, got ");
+        println(int_to_string(version));
+        
+        return false;
+    }
+
+    
+    println("PASS: GGUF Version Read");
+    return true;
+}
+
+func test_gguf_tensor_count() -> Bool {
+    println("=== Test: GGUF Tensor Count ===");
+
+    let buffer = create_test_gguf_header(int_to_int64(42), int_to_int64(0));
+    if ({ptr_is_null(buffer) == 1}) {
+        println("FAIL: Could not allocate buffer");
+        return false;
+    }
+
+    let count = gguf_read_tensor_count(buffer);
+    if ({int64_to_int(count) != 42}) {
+        aether_print("FAIL: Expected tensor count 42, got ");
+        println(int_to_string(int64_to_int(count)));
+        
+        return false;
+    }
+
+    
+    println("PASS: GGUF Tensor Count");
+    return true;
+}
+
+func test_gguf_metadata_count() -> Bool {
+    println("=== Test: GGUF Metadata KV Count ===");
+
+    let buffer = create_test_gguf_header(int_to_int64(0), int_to_int64(100));
+    if ({ptr_is_null(buffer) == 1}) {
+        println("FAIL: Could not allocate buffer");
+        return false;
+    }
+
+    let count = gguf_read_metadata_kv_count(buffer);
+    if ({int64_to_int(count) != 100}) {
+        aether_print("FAIL: Expected metadata count 100, got ");
+        println(int_to_string(int64_to_int(count)));
+        
+        return false;
+    }
+
+    
+    println("PASS: GGUF Metadata KV Count");
+    return true;
+}
+
+func test_gguf_string_skip() -> Bool {
+    println("=== Test: GGUF String Skip ===");
+
+    // Create buffer with a string: length (8) + "hello" (5)
+    let buffer = aether_malloc(32);
+    if ({ptr_is_null(buffer) == 1}) {
+        println("FAIL: Could not allocate buffer");
+        return false;
+    }
+
+    aether_write_i64(buffer, 0, int_to_int64(5));     // Length = 5
+    aether_write_byte(buffer, 8, 104);  // 'h'
+    aether_write_byte(buffer, 9, 101);  // 'e'
+    aether_write_byte(buffer, 10, 108); // 'l'
+    aether_write_byte(buffer, 11, 108); // 'l'
+    aether_write_byte(buffer, 12, 111); // 'o'
+
+    let new_offset = gguf_skip_string(buffer, 0);
+    // Should be 8 (length) + 5 (string) = 13
+    if ({new_offset != 13}) {
+        aether_print("FAIL: Expected offset 13, got ");
+        println(int_to_string(new_offset));
+        
+        return false;
+    }
+
+    
+    println("PASS: GGUF String Skip");
+    return true;
+}
+
+func test_gguf_value_skip() -> Bool {
+    println("=== Test: GGUF Value Skip ===");
+
+    let buffer = aether_malloc(16);
+    if ({ptr_is_null(buffer) == 1}) {
+        println("FAIL: Could not allocate buffer");
+        return false;
+    }
+
+    // Test int32 skip (4 bytes)
+    let offset1 = gguf_skip_value(buffer, 0, 5);  // int32 type
+    if ({offset1 != 4}) {
+        aether_print("FAIL: int32 skip should be 4, got ");
+        println(int_to_string(offset1));
+        
+        return false;
+    }
+
+    // Test int64 skip (8 bytes)
+    let offset2 = gguf_skip_value(buffer, 0, 11);  // int64 type
+    if ({offset2 != 8}) {
+        aether_print("FAIL: int64 skip should be 8, got ");
+        println(int_to_string(offset2));
+        
+        return false;
+    }
+
+    // Test bool skip (1 byte)
+    let offset3 = gguf_skip_value(buffer, 0, 7);  // bool type
+    if ({offset3 != 1}) {
+        aether_print("FAIL: bool skip should be 1, got ");
+        println(int_to_string(offset3));
+        
+        return false;
+    }
+
+    
+    println("PASS: GGUF Value Skip");
+    return true;
+}
+
+func test_gguf_header_parsing() -> Bool {
+    println("=== Test: GGUF Full Header Parse ===");
+
+    // Create a complete test header
+    let buffer = create_test_gguf_header(int_to_int64(32), int_to_int64(10));
+    if ({ptr_is_null(buffer) == 1}) {
+        println("FAIL: Could not allocate buffer");
+        return false;
+    }
+
+    // Verify all fields
+    if (!gguf_check_magic(buffer)) {
+        println("FAIL: Magic check failed");
+        
+        return false;
+    }
+
+    let version = gguf_read_version(buffer);
+    if ({version != 3}) {
+        println("FAIL: Version mismatch");
+        
+        return false;
+    }
+
+    let tensor_count = gguf_read_tensor_count(buffer);
+    if ({int64_to_int(tensor_count) != 32}) {
+        println("FAIL: Tensor count mismatch");
+        
+        return false;
+    }
+
+    let metadata_count = gguf_read_metadata_kv_count(buffer);
+    if ({int64_to_int(metadata_count) != 10}) {
+        println("FAIL: Metadata count mismatch");
+        
+        return false;
+    }
+
+    
+    println("PASS: GGUF Full Header Parse");
+    return true;
+}
+
+func test_gguf_constants() -> Bool {
+    println("=== Test: GGUF Constants ===");
+
+    // Verify magic bytes
+    if ({gguf_magic_byte0() != 71}) {
+        println("FAIL: Magic byte 0 should be 71");
+        return false;
+    }
+    if ({gguf_magic_byte3() != 70}) {
+        println("FAIL: Magic byte 3 should be 70");
+        return false;
+    }
+
+    // Verify version
+    if ({gguf_version() != 3}) {
+        println("FAIL: Version should be 3");
+        return false;
+    }
+
+    // Verify type constants
+    if ({gguf_type_int32() != 5}) {
+        println("FAIL: INT32 type should be 5");
+        return false;
+    }
+    if ({gguf_type_string() != 8}) {
+        println("FAIL: STRING type should be 8");
+        return false;
+    }
+
+    // Verify tensor type constants
+    if ({ggml_type_f32() != 0}) {
+        println("FAIL: F32 type should be 0");
+        return false;
+    }
+    if ({ggml_type_q4_0() != 2}) {
+        println("FAIL: Q4_0 type should be 2");
+        return false;
+    }
+
+    println("PASS: GGUF Constants");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("GGUF Parser Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_gguf_constants()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_gguf_magic()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_gguf_version()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_gguf_tensor_count()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_gguf_metadata_count()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_gguf_string_skip()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_gguf_value_skip()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_gguf_header_parsing()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}

@@ -1,0 +1,17 @@
+// Constants Example
+// Demonstrates compile-time constants
+
+module constants;
+
+const MAX_SIZE: Int = 100;
+const PI: Float = 3.14159265359;
+const GREETING: String = "Hello";
+
+func calculate_area(radius: Float) -> Float {
+    return PI * radius * radius;
+}
+
+func main() -> Int {
+    let area: Float = calculate_area(5.0);
+    return 0;
+}

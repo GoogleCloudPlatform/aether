@@ -466,3 +466,136 @@ pub unsafe extern "C" fn socket_send(socket_fd: c_int, data: *const c_char) -> c
 pub unsafe extern "C" fn socket_close(socket_fd: c_int) {
     crate::network::tcp_close(socket_fd);
 }
+
+// ============================================================================
+// HTTP Request Parsing Helper Functions
+// ============================================================================
+
+/// Extract HTTP method from raw request string (e.g., "GET", "POST")
+/// Returns allocated C string, caller must free
+#[no_mangle]
+pub unsafe extern "C" fn http_parse_method(request: *const c_char) -> *mut c_char {
+    if request.is_null() {
+        return ptr::null_mut();
+    }
+
+    let request_str = match CStr::from_ptr(request).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let method = request_str.lines().next()
+        .and_then(|line| line.split_whitespace().next())
+        .unwrap_or("");
+
+    let result = format!("{}\0", method);
+    let len = result.len();
+    let ptr = crate::memory::aether_malloc(len as c_int) as *mut c_char;
+
+    if !ptr.is_null() {
+        std::ptr::copy_nonoverlapping(result.as_ptr() as *const c_char, ptr, len);
+    }
+
+    ptr
+}
+
+/// Extract HTTP path from raw request string (e.g., "/v1/tokenize")
+/// Returns allocated C string, caller must free
+#[no_mangle]
+pub unsafe extern "C" fn http_parse_path(request: *const c_char) -> *mut c_char {
+    if request.is_null() {
+        return ptr::null_mut();
+    }
+
+    let request_str = match CStr::from_ptr(request).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    let path = request_str.lines().next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .unwrap_or("/");
+
+    let result = format!("{}\0", path);
+    let len = result.len();
+    let ptr = crate::memory::aether_malloc(len as c_int) as *mut c_char;
+
+    if !ptr.is_null() {
+        std::ptr::copy_nonoverlapping(result.as_ptr() as *const c_char, ptr, len);
+    }
+
+    ptr
+}
+
+/// Extract HTTP body from raw request string (content after \r\n\r\n)
+/// Returns allocated C string, caller must free
+#[no_mangle]
+pub unsafe extern "C" fn http_parse_body(request: *const c_char) -> *mut c_char {
+    if request.is_null() {
+        return ptr::null_mut();
+    }
+
+    let request_str = match CStr::from_ptr(request).to_str() {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    // Find the body separator (double CRLF)
+    let body = if let Some(pos) = request_str.find("\r\n\r\n") {
+        &request_str[pos + 4..]
+    } else if let Some(pos) = request_str.find("\n\n") {
+        &request_str[pos + 2..]
+    } else {
+        ""
+    };
+
+    let result = format!("{}\0", body);
+    let len = result.len();
+    let ptr = crate::memory::aether_malloc(len as c_int) as *mut c_char;
+
+    if !ptr.is_null() {
+        std::ptr::copy_nonoverlapping(result.as_ptr() as *const c_char, ptr, len);
+    }
+
+    ptr
+}
+
+/// Create HTTP response with JSON content type
+/// Returns allocated C string, caller must free
+#[no_mangle]
+pub unsafe extern "C" fn http_create_json_response(
+    status_code: c_int,
+    json_body: *const c_char
+) -> *mut c_char {
+    let body_str = if json_body.is_null() {
+        "{}"
+    } else {
+        match CStr::from_ptr(json_body).to_str() {
+            Ok(s) => s,
+            Err(_) => "{}"
+        }
+    };
+
+    let status_text = match status_code {
+        200 => "OK",
+        400 => "Bad Request",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        500 => "Internal Server Error",
+        _ => "Unknown"
+    };
+
+    let response = format!(
+        "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}\0",
+        status_code, status_text, body_str.len(), body_str
+    );
+
+    let len = response.len();
+    let ptr = crate::memory::aether_malloc(len as c_int) as *mut c_char;
+
+    if !ptr.is_null() {
+        std::ptr::copy_nonoverlapping(response.as_ptr() as *const c_char, ptr, len);
+    }
+
+    ptr
+}

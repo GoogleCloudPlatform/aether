@@ -1,0 +1,39 @@
+module Io;
+
+// @pre({path.length > 0}, message="File path cannot be empty.")
+// @pre({max_size > 0}, message="Max size must be positive.")
+// @post({result.length <= max_size}, message="Read content length respects max_size.")
+@extern(library="aether_runtime", symbol="read_file_safe")
+@export
+func read_file_safe(path: String, max_size: Int) -> String;
+
+// @pre({path.length > 0}, message="File path cannot be empty.")
+// @post({result == true}, message="File write operation should succeed.")
+@extern(library="aether_runtime", symbol="write_file_safe")
+@export
+func write_file_safe(path: String, content: String, append: Bool) -> Bool;
+
+@extern(library="aether_runtime", symbol="aether_print")
+@export
+func print(message: String) -> Void;
+
+@extern(library="aether_runtime", symbol="aether_println")
+@export
+func println(message: String) -> Void;
+
+// @post({result.length >= 0}, message="Read line might be empty but not null.")
+@extern(library="aether_runtime", symbol="aether_read_line")
+@export
+func read_line() -> String;
+
+@extern(library="aether_runtime", symbol="calculate_file_sha256")
+@export
+func calculate_file_sha256(path: String) -> String;
+
+@extern(library="aether_runtime", symbol="file_exists")
+@export
+func file_exists(path: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="create_directory")
+@export
+func create_directory(path: String) -> Bool;

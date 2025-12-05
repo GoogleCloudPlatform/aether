@@ -1,26 +1,22 @@
-(DEFINE_MODULE
-  (NAME 'large_file')
-  (INTENT "Large file for performance testing")
-  (CONTENT
-    (DECLARE_CONSTANT (NAME 'CONST_1') (TYPE INTEGER) (VALUE 1) (INTENT "Constant 1"))
-    (DECLARE_CONSTANT (NAME 'CONST_2') (TYPE INTEGER) (VALUE 2) (INTENT "Constant 2"))
-    (DECLARE_CONSTANT (NAME 'CONST_3') (TYPE INTEGER) (VALUE 3) (INTENT "Constant 3"))
-    (DECLARE_CONSTANT (NAME 'CONST_4') (TYPE INTEGER) (VALUE 4) (INTENT "Constant 4"))
-    (DECLARE_CONSTANT (NAME 'CONST_5') (TYPE INTEGER) (VALUE 5) (INTENT "Constant 5"))
-    (DECLARE_CONSTANT (NAME 'CONST_6') (TYPE INTEGER) (VALUE 6) (INTENT "Constant 6"))
-    (DECLARE_CONSTANT (NAME 'CONST_7') (TYPE INTEGER) (VALUE 7) (INTENT "Constant 7"))
-    (DECLARE_CONSTANT (NAME 'CONST_8') (TYPE INTEGER) (VALUE 8) (INTENT "Constant 8"))
-    (DECLARE_CONSTANT (NAME 'CONST_9') (TYPE INTEGER) (VALUE 9) (INTENT "Constant 9"))
-    (DECLARE_CONSTANT (NAME 'CONST_10') (TYPE INTEGER) (VALUE 10) (INTENT "Constant 10"))
-    (DECLARE_CONSTANT (NAME 'CONST_11') (TYPE INTEGER) (VALUE 11) (INTENT "Constant 11"))
-    (DECLARE_CONSTANT (NAME 'CONST_12') (TYPE INTEGER) (VALUE 12) (INTENT "Constant 12"))
-    (DECLARE_CONSTANT (NAME 'CONST_13') (TYPE INTEGER) (VALUE 13) (INTENT "Constant 13"))
-    (DECLARE_CONSTANT (NAME 'CONST_14') (TYPE INTEGER) (VALUE 14) (INTENT "Constant 14"))
-    (DECLARE_CONSTANT (NAME 'CONST_15') (TYPE INTEGER) (VALUE 15) (INTENT "Constant 15"))
-    (DECLARE_CONSTANT (NAME 'CONST_16') (TYPE INTEGER) (VALUE 16) (INTENT "Constant 16"))
-    (DECLARE_CONSTANT (NAME 'CONST_17') (TYPE INTEGER) (VALUE 17) (INTENT "Constant 17"))
-    (DECLARE_CONSTANT (NAME 'CONST_18') (TYPE INTEGER) (VALUE 18) (INTENT "Constant 18"))
-    (DECLARE_CONSTANT (NAME 'CONST_19') (TYPE INTEGER) (VALUE 19) (INTENT "Constant 19"))
-    (DECLARE_CONSTANT (NAME 'CONST_20') (TYPE INTEGER) (VALUE 20) (INTENT "Constant 20"))
-  )
-)
+module large_file {
+  const CONST_1: Int = 1;
+  const CONST_2: Int = 2;
+  const CONST_3: Int = 3;
+  const CONST_4: Int = 4;
+  const CONST_5: Int = 5;
+  const CONST_6: Int = 6;
+  const CONST_7: Int = 7;
+  const CONST_8: Int = 8;
+  const CONST_9: Int = 9;
+  const CONST_10: Int = 10;
+  const CONST_11: Int = 11;
+  const CONST_12: Int = 12;
+  const CONST_13: Int = 13;
+  const CONST_14: Int = 14;
+  const CONST_15: Int = 15;
+  const CONST_16: Int = 16;
+  const CONST_17: Int = 17;
+  const CONST_18: Int = 18;
+  const CONST_19: Int = 19;
+  const CONST_20: Int = 20;
+}

@@ -13,13 +13,17 @@
 // limitations under the License.
 
 //! Lexical analysis for AetherScript
-//! 
+//!
 //! Tokenizes S-expression based AetherScript source code
 
+#![allow(dead_code)]
+
+pub mod v2;
+
 use crate::error::{LexerError, SourceLocation};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use unicode_segmentation::UnicodeSegmentation;
-use serde::{Serialize, Deserialize};
 
 /// Token types for AetherScript
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,9 +47,10 @@ pub enum TokenType {
     NullValue,
 
     // Ownership annotations
-    Caret,      // ^ for owned
-    Ampersand,  // & for borrowed
-    Tilde,      // ~ for shared
+    Caret,            // ^ for owned
+    Ampersand,        // & for borrowed
+    Tilde,            // ~ for shared
+    Lifetime(String), // 'a, 'b, etc.
 
     // Comments and whitespace
     Comment(String),
@@ -108,73 +113,181 @@ impl Lexer {
     fn initialize_keywords(&mut self) {
         let keywords = [
             // Module and import keywords
-            "DEFINE_MODULE", "IMPORT_MODULE", "EXPORTS_FUNCTION", "EXPORTS_TYPE", "EXPORTS_CONSTANT",
+            "DEFINE_MODULE",
+            "IMPORT_MODULE",
+            "EXPORTS_FUNCTION",
+            "EXPORTS_TYPE",
+            "EXPORTS_CONSTANT",
             // Declaration keywords
-            "DECLARE_VARIABLE", "DECLARE_CONSTANT", "DECLARE_EXTERNAL_FUNCTION",
+            "DECLARE_VARIABLE",
+            "DECLARE_CONSTANT",
+            "DECLARE_EXTERNAL_FUNCTION",
             // Type definition keywords
-            "DEFINE_STRUCTURED_TYPE", "DEFINE_ENUMERATION_TYPE", "DEFINE_TYPE_ALIAS",
+            "DEFINE_STRUCTURED_TYPE",
+            "DEFINE_ENUMERATION_TYPE",
+            "DEFINE_TYPE_ALIAS",
             "DEFINE_FUNCTION",
             // Enumeration and pattern matching keywords
-            "VARIANTS", "VARIANT", "HOLDS", "MATCH_EXPRESSION", "CASE",
+            "VARIANTS",
+            "VARIANT",
+            "HOLDS",
+            "MATCH_EXPRESSION",
+            "CASE",
             // Type keywords
-            "INTEGER", "FLOAT", "STRING", "CHAR", "BOOLEAN", "VOID", "ARRAY_OF_TYPE", 
-            "MAP_FROM_TYPE_TO_TYPE", "POINTER_TO",
+            "INTEGER",
+            "FLOAT",
+            "STRING",
+            "CHAR",
+            "BOOLEAN",
+            "VOID",
+            "ARRAY_OF_TYPE",
+            "MAP_FROM_TYPE_TO_TYPE",
+            "POINTER_TO",
             // Function keywords
-            "ACCEPTS_PARAMETER", "RETURNS", "BODY", "CALL_FUNCTION", "RETURN_VALUE", "RETURN_VOID",
+            "ACCEPTS_PARAMETER",
+            "RETURNS",
+            "BODY",
+            "CALL_FUNCTION",
+            "RETURN_VALUE",
+            "RETURN_VOID",
             // Expression keywords
-            "EXPRESSION_ADD", "EXPRESSION_SUBTRACT", "EXPRESSION_MULTIPLY", "EXPRESSION_DIVIDE",
-            "EXPRESSION_INTEGER_DIVIDE", "EXPRESSION_MODULO", "EXPRESSION_NEGATE",
+            "EXPRESSION_ADD",
+            "EXPRESSION_SUBTRACT",
+            "EXPRESSION_MULTIPLY",
+            "EXPRESSION_DIVIDE",
+            "EXPRESSION_INTEGER_DIVIDE",
+            "EXPRESSION_MODULO",
+            "EXPRESSION_NEGATE",
             // Predicate keywords
-            "PREDICATE_EQUALS", "PREDICATE_NOT_EQUALS", "PREDICATE_LESS_THAN",
-            "PREDICATE_LESS_THAN_OR_EQUAL_TO", "PREDICATE_GREATER_THAN", "PREDICATE_GREATER_THAN_OR_EQUAL_TO",
+            "PREDICATE_EQUALS",
+            "PREDICATE_NOT_EQUALS",
+            "PREDICATE_LESS_THAN",
+            "PREDICATE_LESS_THAN_OR_EQUAL_TO",
+            "PREDICATE_GREATER_THAN",
+            "PREDICATE_GREATER_THAN_OR_EQUAL_TO",
             // Logical keywords
-            "LOGICAL_AND", "LOGICAL_OR", "LOGICAL_NOT",
+            "LOGICAL_AND",
+            "LOGICAL_OR",
+            "LOGICAL_NOT",
             // String operations
-            "STRING_CONCAT", "STRING_LENGTH", "STRING_CHAR_AT", "SUBSTRING", "STRING_EQUALS", "STRING_CONTAINS",
+            "STRING_CONCAT",
+            "STRING_LENGTH",
+            "STRING_CHAR_AT",
+            "SUBSTRING",
+            "STRING_EQUALS",
+            "STRING_CONTAINS",
             // Type conversion
-            "CAST_TO_TYPE", "TO_STRING", "TO_INTEGER", "TO_FLOAT",
+            "CAST_TO_TYPE",
+            "TO_STRING",
+            "TO_INTEGER",
+            "TO_FLOAT",
             // Control flow keywords
-            "IF_CONDITION", "THEN_EXECUTE", "ELSE_IF_CONDITION", "ELSE_EXECUTE",
-            "LOOP_WHILE_CONDITION", "LOOP_FOR_EACH_ELEMENT", "LOOP_FIXED_ITERATIONS",
-            "COUNTER", "FROM", "TO", "STEP", "DO",
-            "BREAK_LOOP", "CONTINUE_LOOP",
+            "IF_CONDITION",
+            "THEN_EXECUTE",
+            "ELSE_IF_CONDITION",
+            "ELSE_EXECUTE",
+            "LOOP_WHILE_CONDITION",
+            "LOOP_FOR_EACH_ELEMENT",
+            "LOOP_FIXED_ITERATIONS",
+            "COUNTER",
+            "FROM",
+            "TO",
+            "STEP",
+            "DO",
+            "BREAK_LOOP",
+            "CONTINUE_LOOP",
             // Assignment and access keywords
-            "ASSIGN", "TARGET_VARIABLE", "SOURCE_EXPRESSION", "GET_FIELD_VALUE",
-            "GET_ARRAY_ELEMENT", "SET_ARRAY_ELEMENT", "GET_MAP_VALUE", "SET_MAP_VALUE",
+            "ASSIGN",
+            "TARGET_VARIABLE",
+            "SOURCE_EXPRESSION",
+            "GET_FIELD_VALUE",
+            "GET_ARRAY_ELEMENT",
+            "SET_ARRAY_ELEMENT",
+            "GET_MAP_VALUE",
+            "SET_MAP_VALUE",
             // Error handling keywords
-            "TRY_EXECUTE", "CATCH_EXCEPTION", "FINALLY_EXECUTE", "THROW_EXCEPTION",
+            "TRY_EXECUTE",
+            "CATCH_EXCEPTION",
+            "FINALLY_EXECUTE",
+            "THROW_EXCEPTION",
             // Metadata keywords
-            "INTENT", "PRECONDITION", "POSTCONDITION", "INVARIANT", "ALGORITHM_HINT",
-            "PERFORMANCE_EXPECTATION", "COMPLEXITY_EXPECTATION",
+            "INTENT",
+            "PRECONDITION",
+            "POSTCONDITION",
+            "INVARIANT",
+            "ALGORITHM_HINT",
+            "PERFORMANCE_EXPECTATION",
+            "COMPLEXITY_EXPECTATION",
             // Pointer operations
-            "ADDRESS_OF", "DEREFERENCE", "POINTER_ADD",
+            "ADDRESS_OF",
+            "DEREFERENCE",
+            "POINTER_ADD",
             // Mutability
             "mut",
             // FFI keywords
-            "LIBRARY", "SYMBOL", "CALLING_CONVENTION", "CONVENTION", "THREAD_SAFE", "MAY_BLOCK", "VARIADIC",
+            "LIBRARY",
+            "SYMBOL",
+            "CALLING_CONVENTION",
+            "CONVENTION",
+            "THREAD_SAFE",
+            "MAY_BLOCK",
+            "VARIADIC",
             // Construction keywords
-            "CONSTRUCT", "FIELD_VALUE", "ARRAY_LITERAL", "ARRAY_LENGTH", "MAP_LITERAL",
+            "CONSTRUCT",
+            "FIELD_VALUE",
+            "ARRAY_LITERAL",
+            "ARRAY_LENGTH",
+            "MAP_LITERAL",
             // Misc keywords
-            "NAME", "TYPE", "VALUE", "MUTABILITY", "MUTABLE", "IMMUTABLE",
-            "FIELD", "PARAMETER", "ARGUMENT", "ELEMENTS", "ENTRY", "KEY",
-            "OWNERSHIP", "LIFETIME", "PASSING", "BY_VALUE", "BY_REFERENCE",
-            "GENERIC_PARAMETERS", "PARAM",
+            "NAME",
+            "TYPE",
+            "VALUE",
+            "MUTABILITY",
+            "MUTABLE",
+            "IMMUTABLE",
+            "FIELD",
+            "PARAMETER",
+            "ARGUMENT",
+            "ELEMENTS",
+            "ENTRY",
+            "KEY",
+            "OWNERSHIP",
+            "LIFETIME",
+            "PASSING",
+            "BY_VALUE",
+            "BY_REFERENCE",
+            "GENERIC_PARAMETERS",
+            "PARAM",
             // Content and container keywords
-            "CONTENT", "ARGUMENTS", "CONDITION", "BOOLEAN_EXPRESSION", 
-            "ITERATION_BODY", "ELEMENT_VARIABLE", "INDEX_VARIABLE", "COLLECTION",
-            "PROTECTED_BLOCK", "HANDLER_BLOCK", "CLEANUP_BLOCK",
+            "CONTENT",
+            "ARGUMENTS",
+            "CONDITION",
+            "BOOLEAN_EXPRESSION",
+            "ITERATION_BODY",
+            "ELEMENT_VARIABLE",
+            "INDEX_VARIABLE",
+            "COLLECTION",
+            "PROTECTED_BLOCK",
+            "HANDLER_BLOCK",
+            "CLEANUP_BLOCK",
             // Wildcard pattern
             "_",
         ];
 
         for keyword in keywords {
-            self.keywords.insert(keyword.to_string(), keyword.to_string());
+            self.keywords
+                .insert(keyword.to_string(), keyword.to_string());
         }
     }
 
     /// Get the current source location
     fn current_location(&self) -> SourceLocation {
-        SourceLocation::new(self.file_name.clone(), self.line, self.column, self.position)
+        SourceLocation::new(
+            self.file_name.clone(),
+            self.line,
+            self.column,
+            self.position,
+        )
     }
 
     /// Advance to the next character
@@ -407,14 +520,14 @@ impl Lexer {
             if ch == '\'' {
                 // End of quoted identifier
                 self.advance();
-                
+
                 // Check if it's a keyword or identifier
                 let token_type = if self.keywords.contains_key(&identifier) {
                     TokenType::Keyword(identifier.clone())
                 } else {
                     TokenType::Identifier(identifier.clone())
                 };
-                
+
                 return Ok(Token::new(token_type, start_location, lexeme));
             } else if ch == '\n' || ch == '\r' {
                 return Err(LexerError::UnterminatedString {
@@ -447,11 +560,15 @@ impl Lexer {
                 // End of quoted content
                 lexeme.push(ch);
                 self.advance();
-                
+
                 // Determine if this is a character literal or quoted identifier
                 if content.len() == 1 {
                     // Single character - treat as character literal
-                    let character = content.chars().next().unwrap();
+                    // Safe: we just verified content.len() == 1
+                    let character = content
+                        .chars()
+                        .next()
+                        .expect("content verified to have exactly 1 char");
                     return Ok(Token::new(
                         TokenType::Character(character),
                         start_location,
@@ -464,7 +581,7 @@ impl Lexer {
                     } else {
                         TokenType::Identifier(content.clone())
                     };
-                    
+
                     return Ok(Token::new(token_type, start_location, lexeme));
                 }
             } else if ch == '\\' {
@@ -578,7 +695,10 @@ impl Lexer {
                     self.skip_whitespace();
                     continue;
                 }
-                Some(ch) if ch.is_ascii_digit() || (ch == '-' && self.peek().is_some_and(|c| c.is_ascii_digit())) => {
+                Some(ch)
+                    if ch.is_ascii_digit()
+                        || (ch == '-' && self.peek().is_some_and(|c| c.is_ascii_digit())) =>
+                {
                     return self.read_number();
                 }
                 Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => {
@@ -668,15 +788,26 @@ mod tests {
 
         assert!(matches!(tokens[0].token_type, TokenType::Integer(42)));
         assert!(matches!(tokens[1].token_type, TokenType::Integer(-17)));
-        assert!(matches!(tokens[2].token_type, TokenType::Float(f) if (f - 3.14).abs() < f64::EPSILON));
-        assert!(matches!(tokens[3].token_type, TokenType::Float(f) if (f - (-2.5)).abs() < f64::EPSILON));
-        assert!(matches!(tokens[4].token_type, TokenType::Float(f) if (f - 1.5e10).abs() < f64::EPSILON));
-        assert!(matches!(tokens[5].token_type, TokenType::Float(f) if (f - 2E-3).abs() < f64::EPSILON));
+        assert!(
+            matches!(tokens[2].token_type, TokenType::Float(f) if (f - 3.14).abs() < f64::EPSILON)
+        );
+        assert!(
+            matches!(tokens[3].token_type, TokenType::Float(f) if (f - (-2.5)).abs() < f64::EPSILON)
+        );
+        assert!(
+            matches!(tokens[4].token_type, TokenType::Float(f) if (f - 1.5e10).abs() < f64::EPSILON)
+        );
+        assert!(
+            matches!(tokens[5].token_type, TokenType::Float(f) if (f - 2E-3).abs() < f64::EPSILON)
+        );
     }
 
     #[test]
     fn test_strings() {
-        let mut lexer = Lexer::new(r#""hello" "world\n" "test\"quote""#, "test.aether".to_string());
+        let mut lexer = Lexer::new(
+            r#""hello" "world\n" "test\"quote""#,
+            "test.aether".to_string(),
+        );
         let tokens = lexer.tokenize().unwrap();
 
         assert!(matches!(tokens[0].token_type, TokenType::String(ref s) if s == "hello"));
@@ -686,10 +817,15 @@ mod tests {
 
     #[test]
     fn test_identifiers_and_keywords() {
-        let mut lexer = Lexer::new("DEFINE_FUNCTION my_var TRUE FALSE NULL_VALUE", "test.aether".to_string());
+        let mut lexer = Lexer::new(
+            "DEFINE_FUNCTION my_var TRUE FALSE NULL_VALUE",
+            "test.aether".to_string(),
+        );
         let tokens = lexer.tokenize().unwrap();
 
-        assert!(matches!(tokens[0].token_type, TokenType::Keyword(ref k) if k == "DEFINE_FUNCTION"));
+        assert!(
+            matches!(tokens[0].token_type, TokenType::Keyword(ref k) if k == "DEFINE_FUNCTION")
+        );
         assert!(matches!(tokens[1].token_type, TokenType::Identifier(ref i) if i == "my_var"));
         assert!(matches!(tokens[2].token_type, TokenType::Boolean(true)));
         assert!(matches!(tokens[3].token_type, TokenType::Boolean(false)));
@@ -701,7 +837,9 @@ mod tests {
         let mut lexer = Lexer::new("; This is a comment\n(", "test.aether".to_string());
         let tokens = lexer.tokenize().unwrap();
 
-        assert!(matches!(tokens[0].token_type, TokenType::Comment(ref c) if c == "This is a comment"));
+        assert!(
+            matches!(tokens[0].token_type, TokenType::Comment(ref c) if c == "This is a comment")
+        );
         assert!(matches!(tokens[1].token_type, TokenType::LeftParen));
     }
 
@@ -709,24 +847,33 @@ mod tests {
     fn test_error_cases() {
         // Unterminated string
         let mut lexer = Lexer::new(r#""unterminated"#, "test.aether".to_string());
-        assert!(matches!(lexer.tokenize(), Err(LexerError::UnterminatedString { .. })));
+        assert!(matches!(
+            lexer.tokenize(),
+            Err(LexerError::UnterminatedString { .. })
+        ));
 
         // Invalid escape sequence
         let mut lexer = Lexer::new(r#""\x""#, "test.aether".to_string());
-        assert!(matches!(lexer.tokenize(), Err(LexerError::InvalidEscapeSequence { .. })));
+        assert!(matches!(
+            lexer.tokenize(),
+            Err(LexerError::InvalidEscapeSequence { .. })
+        ));
 
         // Unexpected character
         let mut lexer = Lexer::new("@", "test.aether".to_string());
-        assert!(matches!(lexer.tokenize(), Err(LexerError::UnexpectedCharacter { .. })));
+        assert!(matches!(
+            lexer.tokenize(),
+            Err(LexerError::UnexpectedCharacter { .. })
+        ));
     }
 
     #[test]
     fn test_peek_token() {
         let mut lexer = Lexer::new("(", "test.aether".to_string());
-        
+
         let peeked = lexer.peek_token().unwrap();
         assert!(matches!(peeked.token_type, TokenType::LeftParen));
-        
+
         let actual = lexer.next_token().unwrap();
         assert!(matches!(actual.token_type, TokenType::LeftParen));
     }
@@ -737,7 +884,9 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
 
         assert!(matches!(tokens[0].token_type, TokenType::Identifier(ref i) if i == "hello_world"));
-        assert!(matches!(tokens[1].token_type, TokenType::Keyword(ref k) if k == "DEFINE_FUNCTION"));
+        assert!(
+            matches!(tokens[1].token_type, TokenType::Keyword(ref k) if k == "DEFINE_FUNCTION")
+        );
     }
 
     #[test]
@@ -747,10 +896,10 @@ mod tests {
 
         assert_eq!(tokens[0].location.line, 1);
         assert_eq!(tokens[0].location.column, 1);
-        
+
         assert_eq!(tokens[1].location.line, 2);
         assert_eq!(tokens[1].location.column, 3);
-        
+
         assert_eq!(tokens[2].location.line, 3);
         assert_eq!(tokens[2].location.column, 1);
     }

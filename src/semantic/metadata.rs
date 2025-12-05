@@ -13,12 +13,12 @@
 // limitations under the License.
 
 //! Enhanced Metadata System for LLM-First Language
-//! 
+//!
 //! This module implements the rich metadata system that makes AetherScript
 //! optimal for LLM code generation and verification.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Semantic type definition beyond primitive types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,8 +89,14 @@ pub enum SideEffectType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RetryPolicy {
     None,
-    Fixed { attempts: u32, delay_ms: u64 },
-    ExponentialBackoff { max_attempts: u32, initial_delay_ms: u64 },
+    Fixed {
+        attempts: u32,
+        delay_ms: u64,
+    },
+    ExponentialBackoff {
+        max_attempts: u32,
+        initial_delay_ms: u64,
+    },
     Custom(String),
 }
 
@@ -227,11 +233,11 @@ pub struct GenerationHints {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StylePreference {
-    Defensive,      // Lots of validation
-    Performance,    // Optimize for speed
-    Readable,       // Optimize for clarity
-    Minimal,        // Least code possible
-    Comprehensive,  // Handle all edge cases
+    Defensive,     // Lots of validation
+    Performance,   // Optimize for speed
+    Readable,      // Optimize for clarity
+    Minimal,       // Least code possible
+    Comprehensive, // Handle all edge cases
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -414,6 +420,12 @@ pub struct MetadataRepository {
     pub global_hints: GenerationHints,
 }
 
+impl Default for MetadataRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetadataRepository {
     pub fn new() -> Self {
         Self {
@@ -453,7 +465,7 @@ impl MetadataRepository {
     /// Check if a type is semantically valid
     pub fn validate_semantic_type(&self, type_name: &str, value: &str) -> Result<(), String> {
         if let Some(sem_type) = self.types.get(type_name) {
-            if let Some(constraint) = &sem_type.constraint {
+            if let Some(_constraint) = &sem_type.constraint {
                 // TODO: Implement regex validation
                 // For now, just check if it's not empty
                 if value.is_empty() {

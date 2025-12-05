@@ -1,0 +1,29 @@
+// Match Basics Example
+// Demonstrates fundamental pattern matching
+
+module match_basics;
+
+func grade_to_points(grade: Int) -> Int {
+    match grade {
+        90 => { return 4; }
+        80 => { return 3; }
+        70 => { return 2; }
+        60 => { return 1; }
+        _ => { return 0; }
+    }
+}
+
+func describe_number(n: Int) -> Int {
+    match n {
+        0 => { return 100; }
+        1 => { return 101; }
+        _ => { return 999; }
+    }
+}
+
+func main() -> Int {
+    let points: Int = grade_to_points(80);
+    let desc: Int = describe_number(42);
+
+    return points;
+}

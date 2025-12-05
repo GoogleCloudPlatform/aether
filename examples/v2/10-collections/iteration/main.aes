@@ -1,0 +1,24 @@
+// Collection Iteration Example
+// Demonstrates iterating over collections
+
+module iteration;
+
+func main() -> Int {
+    var sum: Int = 0;
+
+    // Iterate over a range
+    for i in 1..=10 {
+        sum = sum + i;
+    }
+
+    // Nested iteration
+    var product: Int = 0;
+    for i in 1..4 {
+        for j in 1..4 {
+            product = product + i * j;
+        }
+    }
+
+    // sum = 55 (1+2+...+10)
+    return sum;
+}

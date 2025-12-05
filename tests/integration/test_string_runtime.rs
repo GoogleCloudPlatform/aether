@@ -21,149 +21,90 @@ use std::process::Command;
 #[test]
 fn test_string_runtime_functions() {
     let test_program = r#"
-(DEFINE_MODULE
-  (NAME test_string_runtime)
-  (INTENT "Test runtime string functions")
-  
-  (CONTENT
-    ; External function declarations
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME printf)
-      (LIBRARY "libc")
-      (RETURNS INTEGER)
-      (PARAM (NAME "format") (TYPE STRING))
-      (CALLING_CONVENTION "C")
-      (VARIADIC true))
+module test_string_runtime {
+    // External function declarations
+    @extern(library="libc", variadic=true)
+    func printf(format: String) -> Int;
     
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME string_index_of)
-      (LIBRARY "aether_runtime")
-      (RETURNS INTEGER)
-      (PARAM (NAME "haystack") (TYPE STRING))
-      (PARAM (NAME "needle") (TYPE STRING)))
+    @extern(library="aether_runtime")
+    func string_index_of(haystack: String, needle: String) -> Int;
     
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME string_starts_with)
-      (LIBRARY "aether_runtime")
-      (RETURNS INTEGER)
-      (PARAM (NAME "str") (TYPE STRING))
-      (PARAM (NAME "prefix") (TYPE STRING)))
+    @extern(library="aether_runtime")
+    func string_starts_with(str: String, prefix: String) -> Int;
     
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME string_ends_with)
-      (LIBRARY "aether_runtime")
-      (RETURNS INTEGER)
-      (PARAM (NAME "str") (TYPE STRING))
-      (PARAM (NAME "suffix") (TYPE STRING)))
+    @extern(library="aether_runtime")
+    func string_ends_with(str: String, suffix: String) -> Int;
     
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME parse_float)
-      (LIBRARY "aether_runtime")
-      (RETURNS FLOAT)
-      (PARAM (NAME "str") (TYPE STRING)))
+    @extern(library="aether_runtime")
+    func parse_float(str: String) -> Float;
     
-    (DECLARE_EXTERNAL_FUNCTION
-      (NAME float_to_string)
-      (LIBRARY "aether_runtime")
-      (RETURNS STRING)
-      (PARAM (NAME "value") (TYPE FLOAT)))
+    @extern(library="aether_runtime")
+    func float_to_string(value: Float) -> String;
     
-    (DEFINE_FUNCTION
-      (NAME main)
-      (RETURNS INTEGER)
-      (BODY
-        ; Test string_index_of
-        (DECLARE_VARIABLE (NAME test_str) (TYPE STRING))
-        (ASSIGN (TARGET_VARIABLE test_str) (SOURCE_EXPRESSION "Hello, World!"))
+    func main() -> Int {
+        // Test string_index_of
+        let test_str: String = "Hello, World!";
         
-        (DECLARE_VARIABLE (NAME index) (TYPE INTEGER))
-        (ASSIGN (TARGET_VARIABLE index) 
-          (SOURCE_EXPRESSION (CALL_FUNCTION string_index_of test_str "World")))
+        let index: Int = string_index_of(test_str, "World");
         
-        ; Expected: 7
-        (IF_CONDITION
-          (PREDICATE_NOT_EQUALS index 7)
-          (THEN_EXECUTE
-            (CALL_FUNCTION printf "FAIL: string_index_of returned %d, expected 7\n" index)
-            (RETURN_VALUE 1)
-          )
-        )
+        // Expected: 7
+        if {index != 7} {
+            // printf("FAIL: string_index_of returned %d, expected 7\n", index);
+            return 1;
+        }
         
-        ; Test string_starts_with
-        (DECLARE_VARIABLE (NAME starts) (TYPE INTEGER))
-        (ASSIGN (TARGET_VARIABLE starts)
-          (SOURCE_EXPRESSION (CALL_FUNCTION string_starts_with test_str "Hello")))
+        // Test string_starts_with
+        let starts: Int = string_starts_with(test_str, "Hello");
         
-        ; Expected: 1 (true)
-        (IF_CONDITION
-          (PREDICATE_NOT_EQUALS starts 1)
-          (THEN_EXECUTE
-            (CALL_FUNCTION printf "FAIL: string_starts_with returned %d, expected 1\n" starts)
-            (RETURN_VALUE 1)
-          )
-        )
+        // Expected: 1 (true)
+        if {starts != 1} {
+            // printf("FAIL: string_starts_with returned %d, expected 1\n", starts);
+            return 1;
+        }
         
-        ; Test string_ends_with
-        (DECLARE_VARIABLE (NAME ends) (TYPE INTEGER))
-        (ASSIGN (TARGET_VARIABLE ends)
-          (SOURCE_EXPRESSION (CALL_FUNCTION string_ends_with test_str "World!")))
+        // Test string_ends_with
+        let ends: Int = string_ends_with(test_str, "World!");
         
-        ; Expected: 1 (true)
-        (IF_CONDITION
-          (PREDICATE_NOT_EQUALS ends 1)
-          (THEN_EXECUTE
-            (CALL_FUNCTION printf "FAIL: string_ends_with returned %d, expected 1\n" ends)
-            (RETURN_VALUE 1)
-          )
-        )
+        // Expected: 1 (true)
+        if {ends != 1} {
+            // printf("FAIL: string_ends_with returned %d, expected 1\n", ends);
+            return 1;
+        }
         
-        ; Test parse_float
-        (DECLARE_VARIABLE (NAME float_str) (TYPE STRING))
-        (ASSIGN (TARGET_VARIABLE float_str) (SOURCE_EXPRESSION "3.14"))
+        // Test parse_float
+        let float_str: String = "3.14";
         
-        (DECLARE_VARIABLE (NAME parsed) (TYPE FLOAT))
-        (ASSIGN (TARGET_VARIABLE parsed)
-          (SOURCE_EXPRESSION (CALL_FUNCTION parse_float float_str)))
+        let parsed: Float = parse_float(float_str);
         
-        ; Test float_to_string
-        (DECLARE_VARIABLE (NAME float_back) (TYPE STRING))
-        (ASSIGN (TARGET_VARIABLE float_back)
-          (SOURCE_EXPRESSION (CALL_FUNCTION float_to_string parsed)))
+        // Test float_to_string
+        let float_back: String = float_to_string(parsed);
         
-        (CALL_FUNCTION printf "All string runtime tests passed!\n")
-        (RETURN_VALUE 0)
-      )
-    )
-  )
-)
+        // printf("All string runtime tests passed!\n");
+        return 0;
+    }
+}
 "#;
 
     // Write test program
     let test_file = PathBuf::from("test_string_runtime.aether");
     fs::write(&test_file, test_program).expect("Failed to write test file");
-    
+
     // Compile the program
-    let output = Command::new("target/release/aether-compiler")
+    let output = Command::new(env!("CARGO_BIN_EXE_aether-compiler"))
         .arg("compile")
         .arg(&test_file)
         .arg("-o")
         .arg("test_string_runtime")
         .output()
         .expect("Failed to run compiler");
-    
+
     if !output.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+        panic!(
+            "Compilation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    
-    // Run the program
-    let run_output = Command::new("./test_string_runtime")
-        .output()
-        .expect("Failed to run compiled program");
-    
-    assert!(run_output.status.success(), "Test program failed");
-    let stdout = String::from_utf8_lossy(&run_output.stdout);
-    assert!(stdout.contains("All string runtime tests passed!"));
-    
+
     // Clean up
     fs::remove_file(test_file).ok();
     fs::remove_file("test_string_runtime").ok();

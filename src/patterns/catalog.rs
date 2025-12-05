@@ -13,11 +13,10 @@
 // limitations under the License.
 
 //! Standard Pattern Catalog
-//! 
+//!
 //! Pre-verified patterns for common programming tasks
 
 use super::*;
-use crate::verification::contracts::{Expression as ContractExpr, BinaryOp};
 use std::collections::HashMap;
 
 /// Helper to create a default FunctionContract for patterns
@@ -42,25 +41,25 @@ fn create_pattern_contract(name: &str) -> FunctionContract {
 /// Load all standard patterns
 pub fn load_all_patterns() -> Vec<Pattern> {
     let mut patterns = Vec::new();
-    
+
     // Data structure patterns
     patterns.extend(load_data_structure_patterns());
-    
+
     // Algorithm patterns
     patterns.extend(load_algorithm_patterns());
-    
+
     // I/O patterns
     patterns.extend(load_io_patterns());
-    
+
     // Resource management patterns
     patterns.extend(load_resource_patterns());
-    
+
     // Error handling patterns
     patterns.extend(load_error_patterns());
-    
+
     // Validation patterns
     patterns.extend(load_validation_patterns());
-    
+
     patterns
 }
 
@@ -129,9 +128,9 @@ fn load_data_structure_patterns() -> Vec<Pattern> {
 "#.to_string(),
             }),
             contract: {
-                let mut contract = create_pattern_contract("safe_array_access");
+
                 // intent: "Safe array element access with bounds checking"
-                contract
+                create_pattern_contract("safe_array_access")
             },
             composition_rules: vec![
                 CompositionRule {
@@ -173,7 +172,7 @@ fn load_data_structure_patterns() -> Vec<Pattern> {
                 scalability: "O(1) - constant time".to_string(),
             },
         },
-        
+
         // Dynamic array pattern
         Pattern {
             id: "dynamic_array".to_string(),
@@ -294,7 +293,12 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
             intent: "Find element in sorted array using binary search".to_string(),
             description: "Efficient O(log n) search in a sorted array".to_string(),
             metadata: PatternMetadata {
-                tags: vec!["search".to_string(), "binary-search".to_string(), "sorted".to_string(), "algorithm".to_string()],
+                tags: vec![
+                    "search".to_string(),
+                    "binary-search".to_string(),
+                    "sorted".to_string(),
+                    "algorithm".to_string(),
+                ],
                 requires: vec!["sorted_array".to_string()],
                 provides: vec!["efficient_search".to_string()],
                 author: "aetherlang".to_string(),
@@ -350,52 +354,54 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
                 return_type_template: "INTEGER".to_string(),
                 body_template: r#"(BODY
   (DECLARE_VARIABLE (NAME "left") (TYPE INTEGER) (INITIAL_VALUE (INTEGER_LITERAL 0)))
-  (DECLARE_VARIABLE (NAME "right") (TYPE INTEGER) 
+  (DECLARE_VARIABLE (NAME "right") (TYPE INTEGER)
     (INITIAL_VALUE (EXPRESSION_SUBTRACT (ARRAY_LENGTH arr) (INTEGER_LITERAL 1))))
-  
+
   (LOOP_WHILE_CONDITION
     (PREDICATE_LESS_THAN_OR_EQUAL_TO left right)
     (BODY
       (DECLARE_VARIABLE (NAME "mid") (TYPE INTEGER)
-        (INITIAL_VALUE (EXPRESSION_INTEGER_DIVIDE 
+        (INITIAL_VALUE (EXPRESSION_INTEGER_DIVIDE
           (EXPRESSION_ADD left right) (INTEGER_LITERAL 2))))
-      
+
       (IF_CONDITION
         (PREDICATE_EQUALS (GET_ARRAY_ELEMENT arr mid) target)
         (THEN_EXECUTE (RETURN_VALUE mid))
         (ELSE_IF_CONDITION
           (PREDICATE_LESS_THAN (GET_ARRAY_ELEMENT arr mid) target)
-          (THEN_EXECUTE (ASSIGN (TARGET_VARIABLE "left") 
+          (THEN_EXECUTE (ASSIGN (TARGET_VARIABLE "left")
             (SOURCE_EXPRESSION (EXPRESSION_ADD mid (INTEGER_LITERAL 1)))))
           (ELSE_EXECUTE (ASSIGN (TARGET_VARIABLE "right")
             (SOURCE_EXPRESSION (EXPRESSION_SUBTRACT mid (INTEGER_LITERAL 1)))))))))
-  
-  (RETURN_VALUE (INTEGER_LITERAL -1)))"#.to_string(),
-                contract_template: Some(r#"(PRECONDITION 
+
+  (RETURN_VALUE (INTEGER_LITERAL -1)))"#
+                    .to_string(),
+                contract_template: Some(
+                    r#"(PRECONDITION
   (CUSTOM "array_is_sorted(arr)")
   (FAILURE_ACTION THROW_EXCEPTION)
   (PROOF_HINT "Array must be sorted for binary search"))
 (POSTCONDITION
   (CUSTOM "result == -1 || arr[result] == target")
-  (PROOF_HINT "Returns index of target or -1 if not found"))"#.to_string()),
+  (PROOF_HINT "Returns index of target or -1 if not found"))"#
+                        .to_string(),
+                ),
             }),
             contract: {
-                let mut contract = create_pattern_contract("binary_search");
                 // intent: "Binary search in sorted array"
-                contract
+                create_pattern_contract("binary_search")
             },
             composition_rules: vec![],
-            examples: vec![
-                PatternExample {
-                    name: "Search for integer".to_string(),
-                    description: "Binary search for integer in sorted array".to_string(),
-                    parameters: HashMap::from([
-                        ("element_type".to_string(), ParameterValue::Type("INTEGER".to_string())),
-                    ]),
-                    preview: "Returns index of element or -1".to_string(),
-                    verified: true,
-                },
-            ],
+            examples: vec![PatternExample {
+                name: "Search for integer".to_string(),
+                description: "Binary search for integer in sorted array".to_string(),
+                parameters: HashMap::from([(
+                    "element_type".to_string(),
+                    ParameterValue::Type("INTEGER".to_string()),
+                )]),
+                preview: "Returns index of element or -1".to_string(),
+                verified: true,
+            }],
             performance: PerformanceProfile {
                 execution_time: ExecutionTime {
                     best_case_us: 1,
@@ -411,7 +417,6 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
                 scalability: "O(log n) time complexity".to_string(),
             },
         },
-        
         // Map/filter/reduce pattern
         Pattern {
             id: "map_filter_reduce".to_string(),
@@ -420,7 +425,13 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
             intent: "Transform, filter, and aggregate array data".to_string(),
             description: "Functional programming pattern for data transformation".to_string(),
             metadata: PatternMetadata {
-                tags: vec!["functional".to_string(), "map".to_string(), "filter".to_string(), "reduce".to_string(), "transform".to_string()],
+                tags: vec![
+                    "functional".to_string(),
+                    "map".to_string(),
+                    "filter".to_string(),
+                    "reduce".to_string(),
+                    "transform".to_string(),
+                ],
                 requires: vec![],
                 provides: vec!["data_transformation".to_string()],
                 author: "aetherlang".to_string(),
@@ -485,20 +496,20 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
       (RESOURCE_BINDING "temp_array")
       (VALUE (CALL_FUNCTION
         (NAME "aether_alloc")
-        (ARGUMENT (EXPRESSION_MULTIPLY 
+        (ARGUMENT (EXPRESSION_MULTIPLY
           (ARRAY_LENGTH {{input_array}})
           (SIZEOF (ELEMENT_TYPE {{input_array}}))))))
       (CLEANUP "aether_free"))
     (BODY
-      (DECLARE_VARIABLE (NAME "write_index") (TYPE INTEGER) 
+      (DECLARE_VARIABLE (NAME "write_index") (TYPE INTEGER)
         (INITIAL_VALUE (INTEGER_LITERAL 0)) (MUTABLE TRUE))
-      
+
       ;; Map and filter
       (LOOP_FOR_EACH_ELEMENT
         (COLLECTION {{input_array}})
         (ELEMENT_BINDING "elem")
         (BODY
-          (DECLARE_VARIABLE (NAME "mapped") 
+          (DECLARE_VARIABLE (NAME "mapped")
             (INITIAL_VALUE {{map_expr}}))
           (IF_CONDITION {{filter_predicate}}
             (THEN_EXECUTE
@@ -506,9 +517,9 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
                 (SET_ARRAY_ELEMENT temp_array write_index mapped)
                 (ASSIGN (TARGET_VARIABLE "write_index")
                   (SOURCE_EXPRESSION (EXPRESSION_ADD write_index (INTEGER_LITERAL 1)))))))))
-      
+
       ;; Reduce
-      (DECLARE_VARIABLE (NAME "result") 
+      (DECLARE_VARIABLE (NAME "result")
         (INITIAL_VALUE {{initial_value}}) (MUTABLE TRUE))
       (LOOP_FIXED_ITERATIONS
         (COUNTER "i")
@@ -516,12 +527,12 @@ fn load_algorithm_patterns() -> Vec<Pattern> {
         (TO write_index)
         (DO
           (ASSIGN (TARGET_VARIABLE "result")
-            (SOURCE_EXPRESSION {{reduce_expr}})))))))"#.to_string(),
+            (SOURCE_EXPRESSION {{reduce_expr}})))))))"#
+                    .to_string(),
             }),
             contract: {
-                let mut contract = create_pattern_contract("map_filter_reduce");
                 // intent: "Functional data transformation"
-                contract
+                create_pattern_contract("map_filter_reduce")
             },
             composition_rules: vec![],
             examples: vec![],
@@ -552,9 +563,16 @@ fn load_io_patterns() -> Vec<Pattern> {
             name: "Safe File Read".to_string(),
             category: PatternCategory::InputOutput,
             intent: "Read file contents safely with automatic resource cleanup".to_string(),
-            description: "Read entire file into memory with proper error handling and resource management".to_string(),
+            description:
+                "Read entire file into memory with proper error handling and resource management"
+                    .to_string(),
             metadata: PatternMetadata {
-                tags: vec!["file".to_string(), "io".to_string(), "read".to_string(), "safe".to_string()],
+                tags: vec![
+                    "file".to_string(),
+                    "io".to_string(),
+                    "read".to_string(),
+                    "safe".to_string(),
+                ],
                 requires: vec!["file_system".to_string()],
                 provides: vec!["file_content".to_string()],
                 author: "aetherlang".to_string(),
@@ -585,17 +603,18 @@ fn load_io_patterns() -> Vec<Pattern> {
                     param_type: ParameterType::IntegerConstant,
                     description: "Maximum file size in bytes".to_string(),
                     default: Some(ParameterValue::Integer(1024 * 1024)), // 1MB
-                    constraints: vec![ParameterConstraint::Range { min: 1, max: 100 * 1024 * 1024 }],
+                    constraints: vec![ParameterConstraint::Range {
+                        min: 1,
+                        max: 100 * 1024 * 1024,
+                    }],
                 },
             ],
             template: PatternTemplate::Function(FunctionTemplate {
                 name_template: "read_file_safe".to_string(),
-                parameters: vec![
-                    ParameterTemplate {
-                        name_template: "path".to_string(),
-                        type_template: "STRING".to_string(),
-                    },
-                ],
+                parameters: vec![ParameterTemplate {
+                    name_template: "path".to_string(),
+                    type_template: "STRING".to_string(),
+                }],
                 return_type_template: "STRING".to_string(),
                 body_template: r#"(BODY
   (TRY_EXECUTE
@@ -614,7 +633,7 @@ fn load_io_patterns() -> Vec<Pattern> {
           ;; Check file size
           (DECLARE_VARIABLE (NAME "size") (TYPE INTEGER)
             (INITIAL_VALUE (CALL_FUNCTION (NAME "file_size") (ARGUMENT file))))
-          
+
           (IF_CONDITION
             (PREDICATE_GREATER_THAN size (INTEGER_LITERAL {{max_size}}))
             (THEN_EXECUTE
@@ -622,7 +641,7 @@ fn load_io_patterns() -> Vec<Pattern> {
                 (CALL_FUNCTION
                   (NAME "create_error")
                   (ARGUMENT (STRING_LITERAL "File too large"))))))
-          
+
           ;; Read file content
           (RESOURCE_SCOPE
             (NAME "buffer_scope")
@@ -639,10 +658,10 @@ fn load_io_patterns() -> Vec<Pattern> {
                 (ARGUMENT file)
                 (ARGUMENT buffer)
                 (ARGUMENT size))
-              
+
               ;; Null-terminate
               (SET_ARRAY_ELEMENT buffer size (INTEGER_LITERAL 0))
-              
+
               (RETURN_VALUE (CALL_FUNCTION
                 (NAME "string_from_buffer")
                 (ARGUMENT buffer))))))))
@@ -650,14 +669,18 @@ fn load_io_patterns() -> Vec<Pattern> {
       (EXCEPTION_TYPE "FileError")
       (BINDING_VARIABLE "e")
       (HANDLER_BLOCK
-        (RETURN_VALUE (STRING_LITERAL ""))))))"#.to_string(),
-                contract_template: Some(r#"(PRECONDITION
+        (RETURN_VALUE (STRING_LITERAL ""))))))"#
+                    .to_string(),
+                contract_template: Some(
+                    r#"(PRECONDITION
   (PREDICATE_NOT_EQUALS path "")
   (FAILURE_ACTION THROW_EXCEPTION)
   (PROOF_HINT "Path must not be empty"))
 (POSTCONDITION
   (CUSTOM "result != NULL")
-  (PROOF_HINT "Always returns a valid string, empty on error"))"#.to_string()),
+  (PROOF_HINT "Always returns a valid string, empty on error"))"#
+                        .to_string(),
+                ),
             }),
             contract: {
                 let mut contract = create_pattern_contract("safe_file_read");
@@ -706,9 +729,15 @@ fn load_resource_patterns() -> Vec<Pattern> {
             name: "RAII Wrapper".to_string(),
             category: PatternCategory::ResourceManagement,
             intent: "Wrap resource in RAII pattern for automatic cleanup".to_string(),
-            description: "Resource Acquisition Is Initialization pattern ensures cleanup".to_string(),
+            description: "Resource Acquisition Is Initialization pattern ensures cleanup"
+                .to_string(),
             metadata: PatternMetadata {
-                tags: vec!["raii".to_string(), "resource".to_string(), "cleanup".to_string(), "automatic".to_string()],
+                tags: vec![
+                    "raii".to_string(),
+                    "resource".to_string(),
+                    "cleanup".to_string(),
+                    "automatic".to_string(),
+                ],
                 requires: vec![],
                 provides: vec!["automatic_cleanup".to_string()],
                 author: "aetherlang".to_string(),
@@ -765,25 +794,23 @@ fn load_resource_patterns() -> Vec<Pattern> {
     (VALUE {{acquire_expr}})
     (CLEANUP "{{cleanup_func}}"))
   (CLEANUP_ORDER "REVERSE_ACQUISITION")
-  (BODY {{operation}}))"#.to_string(),
+  (BODY {{operation}}))"#
+                    .to_string(),
             }),
             contract: {
-                let mut contract = create_pattern_contract("raii_wrapper");
                 // intent: "RAII resource management"
-                contract
+                create_pattern_contract("raii_wrapper")
             },
-            composition_rules: vec![
-                CompositionRule {
-                    id: "nest_raii".to_string(),
-                    condition: CompositionCondition::CompatibleWith {
-                        pattern_id: "raii_wrapper".to_string(),
-                    },
-                    action: CompositionAction::Nested {
-                        parent_param: "operation".to_string(),
-                    },
-                    priority: 10,
+            composition_rules: vec![CompositionRule {
+                id: "nest_raii".to_string(),
+                condition: CompositionCondition::CompatibleWith {
+                    pattern_id: "raii_wrapper".to_string(),
                 },
-            ],
+                action: CompositionAction::Nested {
+                    parent_param: "operation".to_string(),
+                },
+                priority: 10,
+            }],
             examples: vec![],
             performance: PerformanceProfile {
                 execution_time: ExecutionTime {
@@ -814,7 +841,12 @@ fn load_error_patterns() -> Vec<Pattern> {
             intent: "Handle errors using Result type pattern".to_string(),
             description: "Explicit error handling with Result<T, E> pattern".to_string(),
             metadata: PatternMetadata {
-                tags: vec!["error".to_string(), "result".to_string(), "option".to_string(), "maybe".to_string()],
+                tags: vec![
+                    "error".to_string(),
+                    "result".to_string(),
+                    "option".to_string(),
+                    "maybe".to_string(),
+                ],
                 requires: vec![],
                 provides: vec!["explicit_errors".to_string()],
                 author: "aetherlang".to_string(),
@@ -851,25 +883,23 @@ fn load_error_patterns() -> Vec<Pattern> {
             template: PatternTemplate::Module(ModuleTemplate {
                 name_template: "result_{{ok_type}}_{{error_type}}".to_string(),
                 imports: vec![],
-                types: vec![
-                    r#"(DEFINE_ENUMERATION_TYPE
+                types: vec![r#"(DEFINE_ENUMERATION_TYPE
   (NAME "Result_{{ok_type}}_{{error_type}}")
   (VARIANT (NAME "Ok") (DATA {{ok_type}}))
-  (VARIANT (NAME "Err") (DATA {{error_type}})))"#.to_string()
-                ],
+  (VARIANT (NAME "Err") (DATA {{error_type}})))"#
+                    .to_string()],
                 functions: vec![
                     FunctionTemplate {
                         name_template: "is_ok_{{ok_type}}_{{error_type}}".to_string(),
-                        parameters: vec![
-                            ParameterTemplate {
-                                name_template: "result".to_string(),
-                                type_template: "Result_{{ok_type}}_{{error_type}}".to_string(),
-                            },
-                        ],
+                        parameters: vec![ParameterTemplate {
+                            name_template: "result".to_string(),
+                            type_template: "Result_{{ok_type}}_{{error_type}}".to_string(),
+                        }],
                         return_type_template: "BOOLEAN".to_string(),
                         body_template: r#"(MATCH result
   (CASE "Ok" (RETURN_VALUE (BOOLEAN_LITERAL TRUE)))
-  (CASE "Err" (RETURN_VALUE (BOOLEAN_LITERAL FALSE))))"#.to_string(),
+  (CASE "Err" (RETURN_VALUE (BOOLEAN_LITERAL FALSE))))"#
+                            .to_string(),
                         contract_template: None,
                     },
                     FunctionTemplate {
@@ -887,15 +917,15 @@ fn load_error_patterns() -> Vec<Pattern> {
                         return_type_template: "{{ok_type}}".to_string(),
                         body_template: r#"(MATCH result
   (CASE "Ok" (BINDING "value") (RETURN_VALUE value))
-  (CASE "Err" (RETURN_VALUE default)))"#.to_string(),
+  (CASE "Err" (RETURN_VALUE default)))"#
+                            .to_string(),
                         contract_template: None,
                     },
                 ],
             }),
             contract: {
-                let mut contract = create_pattern_contract("result_type");
                 // intent: "Explicit error handling with Result type"
-                contract
+                create_pattern_contract("result_type")
             },
             composition_rules: vec![],
             examples: vec![],
@@ -928,7 +958,12 @@ fn load_validation_patterns() -> Vec<Pattern> {
             intent: "Validate and sanitize user input".to_string(),
             description: "Comprehensive input validation with clear error messages".to_string(),
             metadata: PatternMetadata {
-                tags: vec!["validation".to_string(), "input".to_string(), "sanitize".to_string(), "security".to_string()],
+                tags: vec![
+                    "validation".to_string(),
+                    "input".to_string(),
+                    "sanitize".to_string(),
+                    "security".to_string(),
+                ],
                 requires: vec![],
                 provides: vec!["validated_input".to_string()],
                 author: "aetherlang".to_string(),
@@ -957,7 +992,13 @@ fn load_validation_patterns() -> Vec<Pattern> {
                 PatternParameter {
                     name: "validation_type".to_string(),
                     param_type: ParameterType::Choice {
-                        options: vec!["email".to_string(), "url".to_string(), "phone".to_string(), "integer".to_string(), "positive_number".to_string()],
+                        options: vec![
+                            "email".to_string(),
+                            "url".to_string(),
+                            "phone".to_string(),
+                            "integer".to_string(),
+                            "positive_number".to_string(),
+                        ],
                     },
                     description: "Type of validation to perform".to_string(),
                     default: None,
@@ -966,19 +1007,17 @@ fn load_validation_patterns() -> Vec<Pattern> {
             ],
             template: PatternTemplate::Function(FunctionTemplate {
                 name_template: "validate_{{validation_type}}".to_string(),
-                parameters: vec![
-                    ParameterTemplate {
-                        name_template: "input".to_string(),
-                        type_template: "STRING".to_string(),
-                    },
-                ],
+                parameters: vec![ParameterTemplate {
+                    name_template: "input".to_string(),
+                    type_template: "STRING".to_string(),
+                }],
                 return_type_template: "BOOLEAN".to_string(),
                 body_template: r#"(BODY
   {{#if (eq validation_type "email")}}
   (LOGICAL_AND
     (PREDICATE_NOT_EQUALS input "")
     (EXPRESSION_CONTAINS input "@")
-    (EXPRESSION_CONTAINS (SUBSTRING input 
+    (EXPRESSION_CONTAINS (SUBSTRING input
       (EXPRESSION_ADD (STRING_INDEX_OF input "@") (INTEGER_LITERAL 1))
       (STRING_LENGTH input))
       "."))
@@ -992,26 +1031,27 @@ fn load_validation_patterns() -> Vec<Pattern> {
     (CATCH_EXCEPTION
       (EXCEPTION_TYPE "ParseError")
       (HANDLER_BLOCK (RETURN_VALUE (BOOLEAN_LITERAL FALSE)))))
-  {{/if}})"#.to_string(),
-                contract_template: Some(r#"(POSTCONDITION
+  {{/if}})"#
+                    .to_string(),
+                contract_template: Some(
+                    r#"(POSTCONDITION
   (CUSTOM "result implies input_is_valid")
-  (PROOF_HINT "True result means input passed validation"))"#.to_string()),
+  (PROOF_HINT "True result means input passed validation"))"#
+                        .to_string(),
+                ),
             }),
             contract: {
-                let mut contract = create_pattern_contract("input_validation");
                 // intent: "Validate user input"
-                contract
+                create_pattern_contract("input_validation")
             },
-            composition_rules: vec![
-                CompositionRule {
-                    id: "chain_validations".to_string(),
-                    condition: CompositionCondition::CompatibleWith {
-                        pattern_id: "input_validation".to_string(),
-                    },
-                    action: CompositionAction::Sequential,
-                    priority: 10,
+            composition_rules: vec![CompositionRule {
+                id: "chain_validations".to_string(),
+                condition: CompositionCondition::CompatibleWith {
+                    pattern_id: "input_validation".to_string(),
                 },
-            ],
+                action: CompositionAction::Sequential,
+                priority: 10,
+            }],
             examples: vec![],
             performance: PerformanceProfile {
                 execution_time: ExecutionTime {

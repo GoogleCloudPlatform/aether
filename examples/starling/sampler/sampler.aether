@@ -1,0 +1,626 @@
+module Sampler;
+
+// ============================================================================
+// Sampler Framework - Logit processing and token sampling
+//
+// The sampler converts model logits to probabilities and samples tokens.
+// Key operations:
+// 1. Apply temperature scaling
+// 2. Apply top-k filtering
+// 3. Apply top-p (nucleus) filtering
+// 4. Convert to probabilities (softmax)
+// 5. Sample from distribution
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Random Number Generator ---
+@extern(library="aether_runtime", symbol="rng_seed")
+func rng_seed(seed: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="rng_next")
+func rng_next() -> Int;
+
+@extern(library="aether_runtime", symbol="rng_next_range")
+func rng_next_range(max: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="rng_next_float")
+func rng_next_float() -> Float;
+
+// --- FFI: Float Array ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Int Array ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+// --- FFI: Math ---
+@extern(library="aether_runtime", symbol="math_exp")
+func math_exp(x: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="math_log")
+func math_log(x: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="math_max_f")
+func math_max_f(a: Float, b: Float) -> Float;
+
+@extern(library="aether_runtime", symbol="int_to_float")
+func int_to_float(x: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_to_int")
+func float_to_int(x: Float) -> Int;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// Sampler Configuration
+// ============================================================================
+
+// Sampler parameters
+struct SamplerConfig {
+    temperature: Float;       // Temperature for scaling (1.0 = no change)
+    top_k: Int;               // Top-k filtering (0 = disabled)
+    top_p: Float;             // Top-p nucleus filtering (1.0 = disabled)
+    repetition_penalty: Float; // Repetition penalty (1.0 = disabled)
+    frequency_penalty: Float;  // Frequency penalty (0.0 = disabled)
+    presence_penalty: Float;   // Presence penalty (0.0 = disabled)
+    seed: Int;                 // Random seed for determinism
+}
+
+// Create default sampler config
+func default_config() -> SamplerConfig {
+    return SamplerConfig {
+        temperature: 1.0,
+        top_k: 0,
+        top_p: 1.0,
+        repetition_penalty: 1.0,
+        frequency_penalty: 0.0,
+        presence_penalty: 0.0,
+        seed: 12345
+    };
+}
+
+// ============================================================================
+// Softmax - Convert logits to probabilities
+// ============================================================================
+
+// Compute softmax over logits array
+// Returns array of probabilities (must be freed by caller)
+func softmax(logits: Int64) -> Int64 {
+    let n = float_array_length(logits);
+    if (n == 0) {
+        return float_array_create(0);
+    }
+
+    // Find max for numerical stability
+    let mut max_val = float_array_get(logits, 0);
+    let mut i = 1;
+    while (i < n) {
+        let val = float_array_get(logits, i);
+        max_val = math_max_f(max_val, val);
+        i = i + 1;
+    }
+
+    // Compute exp(x - max) and sum
+    let mut probs = float_array_create(n);
+    let mut sum = 0.0;
+    i = 0;
+    while (i < n) {
+        let val = float_array_get(logits, i);
+        let exp_val = math_exp({val - max_val});
+        probs = float_array_push(probs, exp_val);
+        sum = {sum + exp_val};
+        i = i + 1;
+    }
+
+    // Normalize
+    i = 0;
+    while (i < n) {
+        let val = float_array_get(probs, i);
+        float_array_set(probs, i, {val / sum});
+        i = i + 1;
+    }
+
+    return probs;
+}
+
+// ============================================================================
+// Temperature Scaling
+// ============================================================================
+
+// Apply temperature scaling to logits (in-place)
+func apply_temperature(logits: Int64, temperature: Float) -> Void {
+    if ({temperature <= 0.0}) {
+        return;  // Invalid temperature
+    }
+    if ({temperature == 1.0}) {
+        return;  // No change needed
+    }
+
+    let n = float_array_length(logits);
+    let mut i = 0;
+    while (i < n) {
+        let val = float_array_get(logits, i);
+        float_array_set(logits, i, {val / temperature});
+        i = i + 1;
+    }
+}
+
+// ============================================================================
+// Top-K Filtering
+// ============================================================================
+
+// Apply top-k filtering: keep only k highest probability tokens
+// Sets all other logits to -infinity (very negative)
+func apply_top_k(logits: Int64, k: Int) -> Void {
+    let n = float_array_length(logits);
+    if (k <= 0) {
+        return;  // Disabled
+    }
+    if (k >= n) {
+        return;  // Keep all
+    }
+
+    // Find k-th largest value using simple selection
+    // For production, would use quickselect or partial sort
+    let NEG_INF = -1000000.0;
+
+    // Simple approach: find min of top-k values
+    // First pass: find indices of top-k
+    let mut indices = int_array_create(k);
+    let mut min_in_top_k = NEG_INF;
+
+    let mut found = 0;
+    let mut threshold = 1000000.0;  // Start with max
+
+    while (found < k) {
+        let mut best_idx = -1;
+        let mut best_val = NEG_INF;
+
+        let mut i = 0;
+        while (i < n) {
+            let val = float_array_get(logits, i);
+            // Find largest value below threshold (or equal if still finding)
+            if ({val < threshold}) {
+                if ({val > best_val}) {
+                    best_val = val;
+                    best_idx = i;
+                }
+            }
+            i = i + 1;
+        }
+
+        if (best_idx >= 0) {
+            indices = int_array_push(indices, best_idx);
+            threshold = best_val;
+            if ({best_val < min_in_top_k}) {
+                min_in_top_k = best_val;
+            }
+            found = found + 1;
+        } else {
+            // Handle ties - keep looking
+            found = k;  // Exit
+        }
+    }
+
+    // Set all values below min_in_top_k to NEG_INF
+    let mut i = 0;
+    while (i < n) {
+        let val = float_array_get(logits, i);
+        if ({val < min_in_top_k}) {
+            float_array_set(logits, i, NEG_INF);
+        }
+        i = i + 1;
+    }
+
+    int_array_free(indices);
+}
+
+// ============================================================================
+// Top-P (Nucleus) Filtering
+// ============================================================================
+
+// Apply top-p filtering: keep smallest set of tokens with cumulative prob >= p
+func apply_top_p(probs: Int64, p: Float) -> Void {
+    let n = float_array_length(probs);
+    if ({p >= 1.0}) {
+        return;  // Keep all
+    }
+    if ({p <= 0.0}) {
+        return;  // Invalid
+    }
+
+    // Sort indices by probability (descending)
+    // For simplicity, use selection sort
+    let mut sorted_indices = int_array_create(n);
+    let mut used = int_array_create(n);
+
+    // Initialize used array
+    let mut i = 0;
+    while (i < n) {
+        used = int_array_push(used, 0);
+        i = i + 1;
+    }
+
+    // Selection sort
+    i = 0;
+    while (i < n) {
+        let mut best_idx = -1;
+        let mut best_val = -1.0;
+
+        let mut j = 0;
+        while (j < n) {
+            if (int_array_get(used, j) == 0) {
+                let val = float_array_get(probs, j);
+                if ({val > best_val}) {
+                    best_val = val;
+                    best_idx = j;
+                }
+            }
+            j = j + 1;
+        }
+
+        if (best_idx >= 0) {
+            sorted_indices = int_array_push(sorted_indices, best_idx);
+            // Mark as used - create new array with updated value
+            let old_used = used;
+            used = int_array_create(n);
+            j = 0;
+            while (j < n) {
+                if (j == best_idx) {
+                    used = int_array_push(used, 1);
+                } else {
+                    used = int_array_push(used, int_array_get(old_used, j));
+                }
+                j = j + 1;
+            }
+            int_array_free(old_used);
+        }
+        i = i + 1;
+    }
+
+    // Find cutoff point
+    let mut cumsum = 0.0;
+    let mut cutoff_idx = 0;
+    i = 0;
+    while (i < n) {
+        let idx = int_array_get(sorted_indices, i);
+        let prob = float_array_get(probs, idx);
+        cumsum = {cumsum + prob};
+        if ({cumsum >= p}) {
+            cutoff_idx = i;
+            i = n;  // Exit loop
+        } else {
+            cutoff_idx = i;
+            i = i + 1;
+        }
+    }
+
+    // Zero out probabilities below cutoff
+    i = cutoff_idx + 1;
+    while (i < n) {
+        let idx = int_array_get(sorted_indices, i);
+        float_array_set(probs, idx, 0.0);
+        i = i + 1;
+    }
+
+    // Renormalize
+    let mut sum = 0.0;
+    i = 0;
+    while (i < n) {
+        sum = {sum + float_array_get(probs, i)};
+        i = i + 1;
+    }
+
+    if ({sum > 0.0}) {
+        i = 0;
+        while (i < n) {
+            let val = float_array_get(probs, i);
+            float_array_set(probs, i, {val / sum});
+            i = i + 1;
+        }
+    }
+
+    int_array_free(sorted_indices);
+    int_array_free(used);
+}
+
+// ============================================================================
+// Penalty Functions
+// ============================================================================
+
+// Apply repetition penalty to logits based on context tokens
+// Tokens that appear in context have their logits divided/multiplied by penalty
+// penalty > 1.0 reduces probability of repeated tokens
+func apply_repetition_penalty(logits: Int64, context: Int64, penalty: Float) -> Void {
+    if ({penalty == 1.0}) {
+        return;  // No penalty
+    }
+    if ({penalty <= 0.0}) {
+        return;  // Invalid penalty
+    }
+
+    let n_logits = float_array_length(logits);
+    let n_context = int_array_length(context);
+
+    // For each token in context, apply penalty to its logit
+    let mut i = 0;
+    while (i < n_context) {
+        let token_id = int_array_get(context, i);
+        if ({token_id >= 0}) {
+            if ({token_id < n_logits}) {
+                let logit = float_array_get(logits, token_id);
+                // If logit > 0, divide by penalty; if logit < 0, multiply by penalty
+                if ({logit > 0.0}) {
+                    float_array_set(logits, token_id, {logit / penalty});
+                } else {
+                    float_array_set(logits, token_id, {logit * penalty});
+                }
+            }
+        }
+        i = i + 1;
+    }
+}
+
+// Apply frequency penalty to logits
+// Penalty is proportional to token count in context
+// frequency_penalty > 0 penalizes frequent tokens
+func apply_frequency_penalty(logits: Int64, token_counts: Int64, penalty: Float) -> Void {
+    if ({penalty == 0.0}) {
+        return;  // No penalty
+    }
+
+    let n = float_array_length(logits);
+    let n_counts = int_array_length(token_counts);
+
+    // Subtract penalty * count from each logit
+    let mut i = 0;
+    while (i < n) {
+        if (i < n_counts) {
+            let count = int_array_get(token_counts, i);
+            if (count > 0) {
+                let logit = float_array_get(logits, i);
+                let count_f = int_to_float(count);
+                float_array_set(logits, i, {logit - {penalty * count_f}});
+            }
+        }
+        i = i + 1;
+    }
+}
+
+// Apply presence penalty to logits
+// Flat penalty for any token that has appeared at least once
+// presence_penalty > 0 penalizes tokens that have appeared
+func apply_presence_penalty(logits: Int64, token_counts: Int64, penalty: Float) -> Void {
+    if ({penalty == 0.0}) {
+        return;  // No penalty
+    }
+
+    let n = float_array_length(logits);
+    let n_counts = int_array_length(token_counts);
+
+    // Subtract flat penalty from logit if token has appeared
+    let mut i = 0;
+    while (i < n) {
+        if (i < n_counts) {
+            let count = int_array_get(token_counts, i);
+            if (count > 0) {
+                let logit = float_array_get(logits, i);
+                float_array_set(logits, i, {logit - penalty});
+            }
+        }
+        i = i + 1;
+    }
+}
+
+// Build token count array from context
+// Returns array where index is token_id and value is count
+func build_token_counts(context: Int64, vocab_size: Int) -> Int64 {
+    let mut counts = int_array_create(vocab_size);
+
+    // Initialize all counts to 0
+    let mut i = 0;
+    while (i < vocab_size) {
+        counts = int_array_push(counts, 0);
+        i = i + 1;
+    }
+
+    // Count occurrences
+    let n = int_array_length(context);
+    i = 0;
+    while (i < n) {
+        let token_id = int_array_get(context, i);
+        if ({token_id >= 0}) {
+            if ({token_id < vocab_size}) {
+                let current = int_array_get(counts, token_id);
+                int_array_set(counts, token_id, {current + 1});
+            }
+        }
+        i = i + 1;
+    }
+
+    return counts;
+}
+
+// ============================================================================
+// Multinomial Sampling
+// ============================================================================
+
+// Sample from probability distribution
+// Returns index of sampled token
+func sample_token(probs: Int64) -> Int {
+    let n = float_array_length(probs);
+    if (n == 0) {
+        return -1;
+    }
+
+    let r = rng_next_float();
+    let mut cumsum = 0.0;
+
+    let mut i = 0;
+    while (i < n) {
+        cumsum = {cumsum + float_array_get(probs, i)};
+        if ({r < cumsum}) {
+            return i;
+        }
+        i = i + 1;
+    }
+
+    // Fallback to last token
+    return {n - 1};
+}
+
+// ============================================================================
+// Full Sampling Pipeline
+// ============================================================================
+
+// Sample a token from logits using full pipeline
+func sample_from_logits(logits: Int64, config: SamplerConfig) -> Int {
+    let n = float_array_length(logits);
+    if (n == 0) {
+        return -1;
+    }
+
+    // Copy logits to avoid modifying original
+    let mut working = float_array_create(n);
+    let mut i = 0;
+    while (i < n) {
+        working = float_array_push(working, float_array_get(logits, i));
+        i = i + 1;
+    }
+
+    // 1. Apply temperature
+    apply_temperature(working, config.temperature);
+
+    // 2. Apply top-k (before softmax)
+    if (config.top_k > 0) {
+        apply_top_k(working, config.top_k);
+    }
+
+    // 3. Convert to probabilities
+    let probs = softmax(working);
+    float_array_free(working);
+
+    // 4. Apply top-p (after softmax)
+    if ({config.top_p < 1.0}) {
+        apply_top_p(probs, config.top_p);
+    }
+
+    // 5. Sample token
+    let token = sample_token(probs);
+    float_array_free(probs);
+
+    return token;
+}
+
+// ============================================================================
+// Stop Conditions
+// ============================================================================
+
+// Generation state for tracking stop conditions
+struct GenerationState {
+    tokens_generated: Int;     // Number of tokens generated so far
+    max_tokens: Int;           // Maximum tokens to generate (0 = unlimited)
+    eos_token_id: Int;         // End of sequence token ID (-1 = disabled)
+    stop_triggered: Bool;      // Whether a stop condition was triggered
+    stop_reason: Int;          // 0 = none, 1 = max_tokens, 2 = eos, 3 = stop_string
+}
+
+// Create default generation state
+func default_generation_state() -> GenerationState {
+    return GenerationState {
+        tokens_generated: 0,
+        max_tokens: 256,
+        eos_token_id: -1,
+        stop_triggered: false,
+        stop_reason: 0
+    };
+}
+
+// Check if generation should stop due to max tokens
+func check_max_tokens(state: GenerationState) -> Bool {
+    if (state.max_tokens <= 0) {
+        return false;  // No limit
+    }
+    return {state.tokens_generated >= state.max_tokens};
+}
+
+// Check if token is EOS
+func check_eos_token(token_id: Int, eos_token_id: Int) -> Bool {
+    if (eos_token_id < 0) {
+        return false;  // EOS disabled
+    }
+    return {token_id == eos_token_id};
+}
+
+// Check all stop conditions
+// Returns: 0 = continue, 1 = max_tokens, 2 = eos, 3 = stop_string
+func check_stop_conditions(token_id: Int, state: GenerationState) -> Int {
+    // Check max tokens
+    if (check_max_tokens(state)) {
+        return 1;
+    }
+
+    // Check EOS
+    if (check_eos_token(token_id, state.eos_token_id)) {
+        return 2;
+    }
+
+    // Stop string matching would require decoded text - handled separately
+    return 0;
+}
+
+// Update generation state after generating a token
+func update_generation_state(state: GenerationState, token_id: Int) -> GenerationState {
+    let stop_reason = check_stop_conditions(token_id, state);
+    return GenerationState {
+        tokens_generated: {state.tokens_generated + 1},
+        max_tokens: state.max_tokens,
+        eos_token_id: state.eos_token_id,
+        stop_triggered: {stop_reason > 0},
+        stop_reason: stop_reason
+    };
+}

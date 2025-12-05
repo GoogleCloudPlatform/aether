@@ -1,0 +1,318 @@
+module Arena;
+
+// ============================================================================
+// Arena Allocator - Fixed-size memory arena for KV cache
+//
+// Provides efficient memory management for KV cache tensors with:
+// - Block-based allocation
+// - Free list management
+// - Shape and dtype metadata
+// ============================================================================
+
+// --- FFI: Print/Debug ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: Memory ---
+@extern(library="aether_runtime", symbol="aether_safe_malloc")
+func aether_malloc(size: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="aether_safe_free")
+func aether_free(ptr: Int64) -> Void;
+
+// --- FFI: Float Array (for tensor storage) ---
+@extern(library="aether_runtime", symbol="float_array_create")
+func float_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_push")
+func float_array_push(arr: Int64, value: Float) -> Int64;
+
+@extern(library="aether_runtime", symbol="float_array_get")
+func float_array_get(arr: Int64, index: Int) -> Float;
+
+@extern(library="aether_runtime", symbol="float_array_set")
+func float_array_set(arr: Int64, index: Int, value: Float) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_length")
+func float_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="float_array_free")
+func float_array_free(arr: Int64) -> Void;
+
+// --- FFI: Int Array (for block tracking) ---
+@extern(library="aether_runtime", symbol="int_array_create")
+func int_array_create(capacity: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_push")
+func int_array_push(arr: Int64, value: Int) -> Int64;
+
+@extern(library="aether_runtime", symbol="int_array_get")
+func int_array_get(arr: Int64, index: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_set")
+func int_array_set(arr: Int64, index: Int, value: Int) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_length")
+func int_array_length(arr: Int64) -> Int;
+
+@extern(library="aether_runtime", symbol="int_array_free")
+func int_array_free(arr: Int64) -> Void;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+// ============================================================================
+// Block Metadata
+// ============================================================================
+
+// Data types for tensors
+// 0 = Float32, 1 = Float16, 2 = Int8, 3 = Int4
+struct BlockMetadata {
+    block_id: Int;        // Unique block identifier
+    offset: Int;          // Offset in arena (in elements)
+    size: Int;            // Size of allocation (in elements)
+    dtype: Int;           // Data type (0=f32, 1=f16, 2=i8, 3=i4)
+    in_use: Bool;         // Whether block is currently allocated
+    // Shape info (for tensors)
+    dim0: Int;            // First dimension
+    dim1: Int;            // Second dimension
+    dim2: Int;            // Third dimension (0 if 2D)
+    dim3: Int;            // Fourth dimension (0 if 3D or less)
+}
+
+// Create empty block metadata
+func empty_block(id: Int, offset: Int, size: Int) -> BlockMetadata {
+    return BlockMetadata {
+        block_id: id,
+        offset: offset,
+        size: size,
+        dtype: 0,
+        in_use: false,
+        dim0: 0,
+        dim1: 0,
+        dim2: 0,
+        dim3: 0
+    };
+}
+
+// ============================================================================
+// Arena Allocator
+// ============================================================================
+
+// Arena configuration
+struct ArenaConfig {
+    total_size: Int;       // Total arena size in elements
+    block_size: Int;       // Minimum block size
+    max_blocks: Int;       // Maximum number of blocks to track
+}
+
+// Default arena config: 1M elements, 1K block size, 1K max blocks
+func default_arena_config() -> ArenaConfig {
+    return ArenaConfig {
+        total_size: 1048576,   // 1M elements (4MB for f32)
+        block_size: 1024,      // 1K minimum block
+        max_blocks: 1024       // Track up to 1K blocks
+    };
+}
+
+// Arena state
+struct Arena {
+    data: Int64;            // Float array for actual data storage
+    config: ArenaConfig;    // Configuration
+    // Block tracking (stored as parallel arrays for simplicity)
+    block_offsets: Int64;   // Int array of offsets
+    block_sizes: Int64;     // Int array of sizes
+    block_in_use: Int64;    // Int array of in_use flags (0/1)
+    num_blocks: Int;        // Number of blocks tracked
+    next_block_id: Int;     // Next block ID to assign
+    // Metrics
+    allocated_elements: Int;
+    free_elements: Int;
+}
+
+// Create a new arena
+func arena_create(config: ArenaConfig) -> Arena {
+    // Allocate data storage
+    let mut data = float_array_create(config.total_size);
+    let mut i = 0;
+    while (i < config.total_size) {
+        data = float_array_push(data, 0.0);
+        i = i + 1;
+    }
+
+    // Create block tracking arrays
+    let block_offsets = int_array_create(config.max_blocks);
+    let block_sizes = int_array_create(config.max_blocks);
+    let block_in_use = int_array_create(config.max_blocks);
+
+    return Arena {
+        data: data,
+        config: config,
+        block_offsets: block_offsets,
+        block_sizes: block_sizes,
+        block_in_use: block_in_use,
+        num_blocks: 0,
+        next_block_id: 0,
+        allocated_elements: 0,
+        free_elements: config.total_size
+    };
+}
+
+// Find a free block of at least the requested size
+// Returns block index or -1 if not found
+func find_free_block(arena: Arena, size: Int) -> Int {
+    let mut i = 0;
+    while (i < arena.num_blocks) {
+        let in_use = int_array_get(arena.block_in_use, i);
+        if (in_use == 0) {
+            let block_size = int_array_get(arena.block_sizes, i);
+            if ({block_size >= size}) {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+// Find contiguous free space at end of arena
+func find_end_offset(arena: Arena) -> Int {
+    let mut max_end = 0;
+    let mut i = 0;
+    while (i < arena.num_blocks) {
+        let in_use = int_array_get(arena.block_in_use, i);
+        if (in_use == 1) {
+            let offset = int_array_get(arena.block_offsets, i);
+            let size = int_array_get(arena.block_sizes, i);
+            let end = {offset + size};
+            if ({end > max_end}) {
+                max_end = end;
+            }
+        }
+        i = i + 1;
+    }
+    return max_end;
+}
+
+// Allocate a block from the arena
+// Returns block_id on success, -1 on failure
+func arena_alloc(arena: Arena, size: Int) -> Int {
+    // Round up to block size
+    let block_size = arena.config.block_size;
+    let aligned_size = {{{size + block_size} - 1} / block_size} * block_size;
+
+    // Check if we have enough free space
+    if ({aligned_size > arena.free_elements}) {
+        return -1;  // Out of memory
+    }
+
+    // Try to find a free block first (reuse)
+    let existing = find_free_block(arena, aligned_size);
+    if ({existing >= 0}) {
+        // Reuse existing block
+        int_array_set(arena.block_in_use, existing, 1);
+        // Update metrics (arena is passed by value, so this is local)
+        return int_array_get(arena.block_offsets, existing);
+    }
+
+    // Allocate new block at end
+    if ({arena.num_blocks >= arena.config.max_blocks}) {
+        return -1;  // Too many blocks
+    }
+
+    let offset = find_end_offset(arena);
+    if ({{offset + aligned_size} > arena.config.total_size}) {
+        return -1;  // No space at end
+    }
+
+    // Record the new block
+    let block_idx = arena.num_blocks;
+    int_array_push(arena.block_offsets, offset);
+    int_array_push(arena.block_sizes, aligned_size);
+    int_array_push(arena.block_in_use, 1);
+
+    return offset;
+}
+
+// Free a block (mark as available for reuse)
+func arena_free_block(arena: Arena, offset: Int) -> Bool {
+    let mut i = 0;
+    while (i < arena.num_blocks) {
+        let block_offset = int_array_get(arena.block_offsets, i);
+        if ({block_offset == offset}) {
+            int_array_set(arena.block_in_use, i, 0);
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// Get value from arena at offset
+func arena_get(arena: Arena, offset: Int) -> Float {
+    return float_array_get(arena.data, offset);
+}
+
+// Set value in arena at offset
+func arena_set(arena: Arena, offset: Int, value: Float) -> Void {
+    float_array_set(arena.data, offset, value);
+}
+
+// Free the entire arena
+func arena_destroy(arena: Arena) -> Void {
+    float_array_free(arena.data);
+    int_array_free(arena.block_offsets);
+    int_array_free(arena.block_sizes);
+    int_array_free(arena.block_in_use);
+}
+
+// ============================================================================
+// Arena Metrics
+// ============================================================================
+
+struct ArenaMetrics {
+    total_size: Int;
+    allocated_blocks: Int;
+    free_blocks: Int;
+    fragmentation_ratio: Float;  // 0.0 = no fragmentation, 1.0 = fully fragmented
+}
+
+func arena_get_metrics(arena: Arena) -> ArenaMetrics {
+    let mut allocated = 0;
+    let mut free = 0;
+    let mut i = 0;
+
+    while (i < arena.num_blocks) {
+        let in_use = int_array_get(arena.block_in_use, i);
+        if (in_use == 1) {
+            allocated = {allocated + 1};
+        } else {
+            free = {free + 1};
+        }
+        i = i + 1;
+    }
+
+    // Simple fragmentation metric: ratio of free blocks to total
+    let total = arena.num_blocks;
+    let frag = if (total > 0) {
+        int_to_float(free) / int_to_float(total)
+    } else {
+        0.0
+    };
+
+    return ArenaMetrics {
+        total_size: arena.config.total_size,
+        allocated_blocks: allocated,
+        free_blocks: free,
+        fragmentation_ratio: frag
+    };
+}

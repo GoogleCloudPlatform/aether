@@ -10,3 +10,4 @@ cc c606cba4fb7e0888201d2b1d054a3a98924167fab1a208ec020f7a9e52aab568 # shrinks to
 cc 825d427be62f1f68a521ebea2122182de7f6c235cc7dec1e935615a8b7a1d73d # shrinks to const_name = "a", int_value = 0, _string_value = ""
 cc 9262070d33deefe7dfe1956f4f3a28c4fbcc0f3aee186a445cb66cc11293c9d3 # shrinks to module_name = "A"
 cc 7c409d23758cef7610356a34c34fc18ef5d6c4be76877000a39644cd58cdfc54 # shrinks to identifier = "_"
+cc f94eee1796b53813d02f3ebfd742e98305c26d008696e14f6075d868297199de # shrinks to tokens = []

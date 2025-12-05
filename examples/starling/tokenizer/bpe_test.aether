@@ -1,0 +1,349 @@
+module BPETest;
+
+// ============================================================================
+// Tests for BPE Encoder - Simplified to work with ownership semantics
+// ============================================================================
+
+// --- FFI: String operations ---
+@extern(library="aether_runtime", symbol="aether_print")
+func aether_print(s: String) -> Void;
+
+@extern(library="aether_runtime", symbol="string_length")
+func string_length(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_equals")
+func string_equals(a: String, b: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_concat")
+func string_concat(a: String, b: String) -> String;
+
+@extern(library="aether_runtime", symbol="int_to_string")
+func int_to_string(i: Int) -> String;
+
+// --- FFI: UTF-8 character operations ---
+@extern(library="aether_runtime", symbol="string_char_count")
+func string_char_count(s: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_grapheme_at")
+func string_grapheme_at(s: String, index: Int) -> String;
+
+// --- FFI: Map operations ---
+@extern(library="aether_runtime", symbol="string_int_map_new")
+func string_int_map_new() -> Int64;
+
+@extern(library="aether_runtime", symbol="string_int_map_insert")
+func string_int_map_insert(map: Int64, key: String, value: Int) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_int_map_get")
+func string_int_map_get(map: Int64, key: String) -> Int;
+
+@extern(library="aether_runtime", symbol="string_int_map_contains")
+func string_int_map_contains(map: Int64, key: String) -> Bool;
+
+@extern(library="aether_runtime", symbol="string_int_map_free")
+func string_int_map_free(map: Int64) -> Void;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+func println(s: String) -> Void {
+    aether_print(s);
+    aether_print("\n");
+}
+
+func print_int(label: String, val: Int) -> Void {
+    aether_print(label);
+    aether_print(": ");
+    println(int_to_string(val));
+}
+
+// Create a pair key for merge lookup: "left|||right"
+func make_pair_key(left: String, right: String) -> String {
+    let sep = "|||";
+    let tmp = string_concat(left, sep);
+    return string_concat(tmp, right);
+}
+
+// ============================================================================
+// Test: UTF-8 Character Operations
+// ============================================================================
+
+func test_char_operations() -> Bool {
+    println("=== Test: UTF-8 Character Operations ===");
+
+    // Test 1: ASCII string character count
+    let ascii = "hello";
+    let ascii_count = string_char_count(ascii);
+    print_int("ASCII char count for 'hello'", ascii_count);
+
+    if ({ascii_count != 5}) {
+        println("FAIL: Expected 5 chars for 'hello'");
+        return false;
+    }
+
+    // Test 2: Get individual characters
+    let c0 = string_grapheme_at("hello", 0);
+    let c1 = string_grapheme_at("hello", 1);
+    let c4 = string_grapheme_at("hello", 4);
+
+    if (!string_equals(c0, "h")) {
+        println("FAIL: char[0] should be 'h'");
+        return false;
+    }
+
+    if (!string_equals(c1, "e")) {
+        println("FAIL: char[1] should be 'e'");
+        return false;
+    }
+
+    if (!string_equals(c4, "o")) {
+        println("FAIL: char[4] should be 'o'");
+        return false;
+    }
+
+    // Test 3: Unicode string
+    let unicode = "héllo";
+    let unicode_count = string_char_count(unicode);
+    print_int("Unicode char count for 'héllo'", unicode_count);
+
+    if ({unicode_count != 5}) {
+        println("FAIL: Expected 5 chars for 'héllo'");
+        return false;
+    }
+
+    // Test 4: Get unicode character
+    let unicode_c1 = string_grapheme_at("héllo", 1);
+    if (!string_equals(unicode_c1, "é")) {
+        aether_print("FAIL: char[1] should be 'é', got '");
+        aether_print(unicode_c1);
+        println("'");
+        return false;
+    }
+
+    println("PASS: UTF-8 Character Operations");
+    return true;
+}
+
+// ============================================================================
+// Test: Merge Rule Lookup
+// ============================================================================
+
+func test_merge_lookup() -> Bool {
+    println("=== Test: Merge Rule Lookup ===");
+
+    let merge_map = string_int_map_new();
+
+    // Add some merge rules with priorities
+    let key1 = make_pair_key("h", "e");
+    let key2 = make_pair_key("l", "l");
+    let key3 = make_pair_key("he", "l");
+
+    string_int_map_insert(merge_map, key1, 0);
+    string_int_map_insert(merge_map, key2, 1);
+    string_int_map_insert(merge_map, key3, 2);
+
+    // Check lookups
+    let lookup_key1 = make_pair_key("h", "e");
+    let p1 = string_int_map_get(merge_map, lookup_key1);
+    if ({p1 != 0}) {
+        println("FAIL: Priority for 'h+e' should be 0");
+        string_int_map_free(merge_map);
+        return false;
+    }
+
+    let lookup_key2 = make_pair_key("l", "l");
+    let p2 = string_int_map_get(merge_map, lookup_key2);
+    if ({p2 != 1}) {
+        println("FAIL: Priority for 'l+l' should be 1");
+        string_int_map_free(merge_map);
+        return false;
+    }
+
+    // Check non-existent
+    let key_missing = make_pair_key("x", "y");
+    let p_missing = string_int_map_get(merge_map, key_missing);
+    if ({p_missing != -1}) {
+        println("FAIL: Missing merge should return -1");
+        string_int_map_free(merge_map);
+        return false;
+    }
+
+    string_int_map_free(merge_map);
+    println("PASS: Merge Rule Lookup");
+    return true;
+}
+
+// ============================================================================
+// Test: Simple String Concatenation (merge operation)
+// ============================================================================
+
+func test_string_merge() -> Bool {
+    println("=== Test: String Concatenation (merge) ===");
+
+    let left = "h";
+    let right = "e";
+    let merged = string_concat(left, right);
+
+    if (!string_equals(merged, "he")) {
+        aether_print("FAIL: 'h' + 'e' should be 'he', got '");
+        aether_print(merged);
+        println("'");
+        return false;
+    }
+
+    // Test multi-char merge
+    let left2 = "he";
+    let right2 = "llo";
+    let merged2 = string_concat(left2, right2);
+
+    if (!string_equals(merged2, "hello")) {
+        println("FAIL: 'he' + 'llo' should be 'hello'");
+        return false;
+    }
+
+    println("PASS: String Concatenation (merge)");
+    return true;
+}
+
+// ============================================================================
+// Test: BPE Merge Selection
+// ============================================================================
+
+func test_merge_selection() -> Bool {
+    println("=== Test: BPE Merge Selection ===");
+
+    // For the string "hello", simulating BPE:
+    // Initial: [h, e, l, l, o]
+    // With merge rules: h+e=0, l+l=1, he+l=2, ...
+    // Should select h+e first (lowest priority)
+
+    let merge_map = string_int_map_new();
+
+    // Add merge rules
+    string_int_map_insert(merge_map, make_pair_key("h", "e"), 0);
+    string_int_map_insert(merge_map, make_pair_key("l", "l"), 1);
+    string_int_map_insert(merge_map, make_pair_key("he", "l"), 2);
+
+    // Simulate checking pairs in "hello"
+    // Pairs: (h,e), (e,l), (l,l), (l,o)
+
+    let mut best_priority = 999999;
+    let mut best_pair = "";
+
+    // Check (h, e)
+    let key_he = make_pair_key("h", "e");
+    if (string_int_map_contains(merge_map, key_he)) {
+        let p = string_int_map_get(merge_map, key_he);
+        if ({p < best_priority}) {
+            best_priority = p;
+            best_pair = "h+e";
+        }
+    }
+
+    // Check (e, l)
+    let key_el = make_pair_key("e", "l");
+    if (string_int_map_contains(merge_map, key_el)) {
+        let p = string_int_map_get(merge_map, key_el);
+        if ({p < best_priority}) {
+            best_priority = p;
+            best_pair = "e+l";
+        }
+    }
+
+    // Check (l, l)
+    let key_ll = make_pair_key("l", "l");
+    if (string_int_map_contains(merge_map, key_ll)) {
+        let p = string_int_map_get(merge_map, key_ll);
+        if ({p < best_priority}) {
+            best_priority = p;
+            best_pair = "l+l";
+        }
+    }
+
+    // Check (l, o)
+    let key_lo = make_pair_key("l", "o");
+    if (string_int_map_contains(merge_map, key_lo)) {
+        let p = string_int_map_get(merge_map, key_lo);
+        if ({p < best_priority}) {
+            best_priority = p;
+            best_pair = "l+o";
+        }
+    }
+
+    aether_print("Best merge: ");
+    aether_print(best_pair);
+    aether_print(" with priority ");
+    println(int_to_string(best_priority));
+
+    if (!string_equals(best_pair, "h+e")) {
+        println("FAIL: Best merge should be 'h+e'");
+        string_int_map_free(merge_map);
+        return false;
+    }
+
+    if ({best_priority != 0}) {
+        println("FAIL: Best priority should be 0");
+        string_int_map_free(merge_map);
+        return false;
+    }
+
+    string_int_map_free(merge_map);
+    println("PASS: BPE Merge Selection");
+    return true;
+}
+
+// ============================================================================
+// Main Test Runner
+// ============================================================================
+
+func main() -> Int {
+    println("========================================");
+    println("BPE Encoder Tests");
+    println("========================================");
+    println("");
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    if (test_char_operations()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_merge_lookup()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_string_merge()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    if (test_merge_selection()) {
+        passed = {passed + 1};
+    } else {
+        failed = {failed + 1};
+    }
+    println("");
+
+    println("========================================");
+    aether_print("Results: ");
+    aether_print(int_to_string(passed));
+    aether_print(" passed, ");
+    aether_print(int_to_string(failed));
+    println(" failed");
+    println("========================================");
+
+    if ({failed > 0}) {
+        return 1;
+    }
+    return 0;
+}
