@@ -138,6 +138,7 @@ pub extern "C" fn aether_panic(message: *const c_char) {
 pub mod network;
 pub mod memory;
 pub mod memory_alloc;
+pub mod arrays;
 pub mod http;
 pub mod json;
 pub mod collections;
