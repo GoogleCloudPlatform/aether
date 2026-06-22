@@ -27,7 +27,7 @@ clap = { version = "4.4", features = ["derive"] }
 
 # Error handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Serialization (for AST, config files)
 serde = { version = "1.0", features = ["derive"] }
